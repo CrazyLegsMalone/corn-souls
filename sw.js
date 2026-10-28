@@ -1,4 +1,4 @@
-// Corn Souls 1.88: always fetch the newest game when online, fall back to the saved copy when offline
+// Corn Souls 1.89: always fetch the newest game when online, fall back to the saved copy when offline
 const C = 'corn-souls';
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']))); });
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
