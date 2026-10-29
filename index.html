@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.92</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls — Alpha v1.92…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -9,7 +9,7 @@
       for(const reg of regs) if(reg.scope.includes('/corn-souls/')) await reg.unregister();
     } catch(err) {}
   }
-  const response=await fetch('game.html?live_corn_v26='+Date.now(),{cache:'no-store'});
+  const response=await fetch('game.html?alpha_v1_92='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
