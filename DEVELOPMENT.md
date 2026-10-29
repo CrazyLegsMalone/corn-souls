@@ -1,3 +1,7 @@
+## TEST v1.96.12 — vertical pause menu (2026-10-29)
+- Pause/main menu now uses the existing vertical modal layout: one full-width action per row. Shared pause button, menu button and controller Start entry retain their existing actions. Inbox and weather layouts remain unchanged.
+- Complete loader/generated-script validation and existing client checks pass. Version 1.96.12 / cache shell-v20; refresh helper updated. LIVE unchanged.
+
 ## TEST v1.96.11 — compact Debug and message browsing (2026-10-29)
 - Built on current main `332fe8d` (TEST v1.96.10), preserving its inbox response checks and post-login error handling.
 - Renamed the Debug/pause entry and form title to Message Developer. Grouped live/sunny/cloudy/rain/snow under one Weather submenu with a Back to Debug action; existing weather behavior is retained.

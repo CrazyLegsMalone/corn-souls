@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.11';
+ const TEST_VERSION='1.96.12';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -165,6 +165,7 @@
   // Every TEST modal has a sticky escape button, even on short phone screens.
   // Keep it outside .row so existing action indexes/controller mappings stay intact.
   const modalExitPatches=[
+    ["modal('<h1>Corn Souls</h1>', b);", "modal('<h1>Corn Souls</h1>', b, true);"],
     ["$('card').classList.toggle('vert', !!vert);", "$('card').classList.remove('cs-inbox');$('card').classList.toggle('vert', !!vert);"],
     ["$('card').innerHTML = html +", "$('card').innerHTML = '<div class=\"cs-modal-exit\"><button id=\"csModalExit\" type=\"button\">Back to game ×</button></div>' + html +"],
     ["modalBtns.forEach((el, i) => el.onclick =", "$('csModalExit').onclick = () => inboxClose();\n  modalBtns.forEach((el, i) => el.onclick ="],

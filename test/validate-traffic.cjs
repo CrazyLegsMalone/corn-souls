@@ -12,7 +12,7 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  for(const s of scripts(rendered))new vm.Script(s);
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.11'));
+ assert.ok(rendered.includes('1.96.12'));
  assert.ok(rendered.includes('✉ Message Developer'));
  assert.ok(!rendered.includes('<h1>Leave a note</h1>'));
  assert.ok(rendered.includes("['Weather ▸',()=>debugWeather(code)]"));
