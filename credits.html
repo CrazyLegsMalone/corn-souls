@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Corn Souls — Asset Credits</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101820;color:#f2eee2;font:16px/1.5 system-ui,sans-serif}
+main{max-width:850px;margin:0 auto;padding:28px 20px 64px}a{color:#f5c76e}h1{font-size:clamp(1.7rem,5vw,2.4rem);margin-bottom:.3rem}
+.sub{color:#bbc5cc}article{background:#1a2730;border:1px solid #3e5058;border-radius:10px;padding:17px 20px;margin:16px 0}
+.meta{font-size:.94rem;color:#d0d6d8}a:hover{text-decoration:none}footer{border-top:1px solid #46525a;margin-top:30px;padding-top:12px;font-size:.9rem;color:#b7c3c9}
+</style>
+</head><body><main>
+<p><a href="./">← Return to Corn Souls</a></p>
+<h1>Third-party asset credits</h1>
+<p class="sub">Creators, licensing, and modifications for externally sourced assets used in Corn Souls.</p>
+<div id="entries" aria-live="polite"><p>Loading registered credits…</p></div>
+<footer>Asset provenance and licensing records: <a href="https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/registry.json">registry</a> · <a href="https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md">policy</a>. This list only includes assets marked as shipped; older embedded assets still require an inventory review.</footer>
+<script>
+'use strict';
+const entries=document.getElementById('entries');
+function label(parent,tag,value){const n=document.createElement(tag);n.textContent=String(value??'');parent.append(n);return n;}
+function link(parent,url,title){try{const u=new URL(url);if(u.protocol!=='https:')return label(parent,'span',title);const a=document.createElement('a');a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=title;parent.append(a);return a;}catch{return label(parent,'span',title);}}
+fetch('assets/registry.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json();}).then(data=>{
+  entries.replaceChildren();
+  const assets=Array.isArray(data.assets)?data.assets.filter(a=>a.status==='in-use'):[];
+  if(!assets.length){label(entries,'p','No imported third-party assets have been verified and registered as shipped yet. Existing embedded assets still require an audit.');return;}
+  for(const asset of assets){
+    const article=document.createElement('article');
+    label(article,'h2',asset.title||'Unnamed asset');
+    const by=document.createElement('p');by.className='meta';by.append('Created by ');label(by,'strong',asset.creator||'Unknown');by.append(' · ');link(by,asset.source_url||'',asset.source_platform||'Original source');article.append(by);
+    const lic=document.createElement('p');lic.append('License: ');link(lic,asset.license_url||'',asset.license_name||'Unspecified');article.append(lic);
+    const mods=document.createElement('p');label(mods,'strong','Modifications: ');label(mods,'span',asset.modifications||'None recorded');article.append(mods);
+    if(asset.copyright_notice)label(article,'p',asset.copyright_notice);
+    if(asset.required_notice)label(article,'p',asset.required_notice);
+    entries.append(article);
+  }
+}).catch(err=>{entries.replaceChildren();label(entries,'p','Credits could not be loaded. See CREDITS.md in the repository.');});
+</script></main></body></html>
