@@ -1,0 +1,23 @@
+name: Inspect grain receiving source
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/inspect_grain_receiving.py
+      - .github/workflows/inspect-grain-receiving.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect full game source
+        run: python3 scripts/inspect_grain_receiving.py
+      - name: Commit source inspection report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add grain-receiving-source-report.md
+          git diff --cached --quiet || (git commit -m "docs: inspect grain receiving coordinates" && git push)
