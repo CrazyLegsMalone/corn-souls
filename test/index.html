@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Test Build</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls test build…</p><script>
+(async()=>{
+ const status=document.getElementById('status');
+ try {
+  const response=await fetch('../index.html?test='+Date.now(),{cache:'no-store'});
+  if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
+  let html=await response.text();
+  const start=html.indexOf("  if (k === 'crowbar') {");
+  const end=html.indexOf("  } else if (k === 'shovel')",start);
+  if(start<0||end<0||end-start>8000)throw new Error('Crowbar source changed. Preview patch needs updating; live game was not modified.');
+  html=html.slice(0,start)+"  if (k === 'crowbar') { // classic Half-Life-inspired angular pry bar\n    const poly=(p,fill,outline='#211b1b',w=2)=>{c.beginPath();c.moveTo(p[0][0],p[0][1]);for(let i=1;i<p.length;i++)c.lineTo(p[i][0],p[i][1]);c.closePath();c.fillStyle=fill;c.fill();if(w){c.strokeStyle=outline;c.lineWidth=w;c.stroke();}};\n    poly([[42,75],[393,56],[399,76],[48,95]],'#891e18','#32100f',3);\n    poly([[51,77],[390,59],[391,64],[52,83]],'#c34b3a','#c34b3a',0);\n    poly([[53,89],[394,70],[395,75],[54,94]],'#541510','#541510',0);\n    poly([[389,56],[427,39],[447,20],[459,33],[439,56],[399,76]],'#92241c','#32100f',3);\n    poly([[398,57],[427,43],[445,25],[448,29],[430,49],[399,65]],'#d45b48','#d45b48',0);\n    poly([[444,20],[459,16],[483,20],[497,14],[488,29],[463,36],[453,37]],'#8a9298','#25292c',2.5);\n    poly([[452,21],[462,18],[474,19],[484,16],[476,25],[461,30],[455,29]],'#c3c9cc','#c3c9cc',0);\n    poly([[477,21],[496,14],[488,29],[467,38],[459,33]],'#596169','#25292c',2);\n    stroke(()=>{c.moveTo(473,25);c.lineTo(486,20);},3.2,'#25292c');\n    poly([[45,74],[17,82],[8,94],[48,96]],'#737b81','#25292c',2.5);\n    poly([[19,84],[42,78],[43,83],[14,92]],'#b4bdc2','#b4bdc2',0);\n    for(const [x,y,l] of [[96,80,13],[178,76,8],[252,69,15],[338,65,9]])stroke(()=>{c.moveTo(x,y);c.lineTo(x+l,y-0.6*l/13);},1.3,'#b68a78');\n"+html.slice(end);
+  html=html.replace(/<head>/i,'<head><base href="../">');
+  html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
+  document.open();document.write(html);document.close();
+ }catch(e){status.textContent='Test preview failed: '+e.message;}
+})();
+</script></body></html>
