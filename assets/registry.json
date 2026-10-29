@@ -8,5 +8,24 @@
     "in-use",
     "rejected"
   ],
-  "assets": []
+  "assets": [
+    {
+      "id": "sketchfab-hvarley-horror-game-crowbar",
+      "title": "Horror Game Crowbar",
+      "creator": "hvarley",
+      "source_platform": "Sketchfab",
+      "source_url": "https://sketchfab.com/3d-models/horror-game-crowbar-0fbdfdd2a53e40be9ca3ffde55d71689",
+      "license_name": "CC Attribution — exact version unverified",
+      "license_url": "",
+      "status": "candidate",
+      "modifications": "Not imported or modified",
+      "files": [],
+      "checked_on": "2026-10-29",
+      "reviewer": "ChatGPT (screenshot only)",
+      "evidence": "User screenshot shows creator, CC Attribution, 290 triangles and 173 vertices; exact license version, provenance and packaged license have not been verified",
+      "commercial_use_review": "pending",
+      "public_repository_redistribution_review": "pending",
+      "notes": "Do not ship or mark in-use until download/license review and creator attribution are completed."
+    }
+  ]
 }
