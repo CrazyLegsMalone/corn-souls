@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.16';
+ const TEST_VERSION='1.96.17';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -167,6 +167,9 @@
   // Every TEST modal has a sticky escape button, even on short phone screens.
   // Keep it outside .row so existing action indexes/controller mappings stay intact.
   const modalExitPatches=[
+    ["// NOS: hold the boost button for up to ~3 s of extra power and top speed; the tank refills in ~8 s when you let go", "// TEST: unlimited turbo while held; existing vehicle, brake and reverse restrictions still apply."],
+    ["!u.noNos && I.nos && u.nos > 0.02 && I.b < 0.05", "!u.noNos && I.nos && I.b < 0.05"],
+    ["u.nos = boosting ? Math.max(0, u.nos - dt / 3) : Math.min(1, u.nos + dt / 8);", "u.nos = u.noNos ? 0 : 1;"],
     ["heldG.ext = makeExtHud(); }", "heldG.ext = makeExtHud(); for(const item of Object.values(heldG))hudScene.add(item); }"],
     ["if ((!gun || !gun.visible) && SR.carry !== 'me') return;", "if ((!gun || !gun.visible) && !Object.values(heldG).some(item=>item.visible) && SR.carry !== 'me') return;"],
     [", ['Reset all setpoints', resetAll]", ""],

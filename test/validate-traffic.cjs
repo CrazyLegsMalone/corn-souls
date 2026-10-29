@@ -31,9 +31,18 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
   assert.equal(hudRender.renderer.autoClear,true,'renderer state restored');
  }
  Object.values(hudRender.heldG).forEach(item=>item.visible=false);calls.length=0;hudRender.draw();assert.equal(calls.length,0,'hidden first-person items do not draw');
+ const boostStart=rendered.indexOf('  const boosting = !!(!u.noNos'),boostEnd=rendered.indexOf('  const MAXF =',boostStart);
+ const boost={u:{noNos:false,nos:0,boosting:false},I:{nos:true,b:0},fs:10,dt:1/60,utvWhoosh(){}};
+ vm.createContext(boost);const tickBoost=new vm.Script('{'+rendered.slice(boostStart,boostEnd)+'}');
+ for(let frame=0;frame<10000;frame++)tickBoost.runInContext(boost);
+ assert.equal(boost.u.nos,1,'turbo never depletes');assert.equal(boost.u.boosting,true,'turbo works from empty reserve');
+ boost.I.nos=false;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false,'release stops boost');
+ boost.I.nos=true;boost.I.b=1;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false,'brake restriction retained');
+ boost.I.b=0;boost.fs=-1;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false,'reverse restriction retained');
+ boost.fs=10;boost.u.noNos=true;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false);assert.equal(boost.u.nos,0,'non-turbo vehicle stays ineligible');
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.16'));
+ assert.ok(rendered.includes('1.96.17'));
  assert.ok(rendered.includes("['Sound ▸',()=>soundSettings()]"));
  assert.ok(rendered.includes("const music = $('music'); music.volume=soundMusicVolume();"),'saved volume applied before first track');
  assert.ok(rendered.includes('✉ Message Developer'));
