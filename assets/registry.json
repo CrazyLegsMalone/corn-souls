@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "project": "Corn Souls",
+  "policy": "ASSET_POLICY.md",
+  "status_values": [
+    "candidate",
+    "approved",
+    "in-use",
+    "rejected"
+  ],
+  "assets": []
+}
