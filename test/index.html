@@ -28,18 +28,18 @@
   const hookA='  clock += dt;';
   const hookB='function fire() {\n  if (!walk.on || walk.dead) return false;';
   const hookC='const r = P3.kiaToggle() || P3.radioToggle()';
-  const hookD='try { P3.init(view); } catch (e)';
+  const hookD='try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); } catch (e)';
   const hookE='root.Plant3D = {';
-  if(!html.includes(hookA)||!html.includes(hookB)||!html.includes(hookC)||!html.includes(hookD)||!html.includes(hookE)){
-   throw Error('Corn source signatures changed; no patch applied');
-  }
-  html=html.replace(hookE,cornEngine+'\n'+hookE);
+  const checks={simUpdate:hookA,fire:hookB,interact:hookC,shopSpawn:hookD,plantExports:hookE};
+  const missing=Object.entries(checks).filter(([key,val])=>!html.includes(val)).map(([key])=>key);
+  if(missing.length)throw Error('Corn patch needs updating: '+missing.join(', '));
+  html=html.replace(hookE,cornEngine+'\nroot.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract,');
   html=html.replace(hookA,'  clock += dt; cornUpdate(dt);');
   html=html.replace(hookB,'function fire() {\n  if (!walk.on || walk.dead) return false;\n  if(cornThrow())return true;');
   html=html.replace(hookC,'const r = P3.cornInteract() || P3.kiaToggle() || P3.radioToggle()');
-  html=html.replace(hookE,'root.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract,');
-  html=html.replace(hookD,'try { P3.init(view); P3.cornBuild(); } catch (e)');
-  html=html.replace('</body>','<div style="position:fixed;bottom:9px;left:10px;z-index:2147483647;background:#154a2a;color:#fff;font:bold 12px monospace;padding:6px;pointer-events:none">CORN PROPS TEST v13</div></body>');
+  html=html.replace(hookD,'try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); P3.cornBuild(); } catch (e)');
+  if(!html.includes('cornBuild:cornBuild, cornInteract:cornInteract') || !html.includes('P3.cornBuild();'))throw Error('Corn setup verification failed');
+  html=html.replace('</body>','<div style="position:fixed;bottom:9px;left:10px;z-index:2147483647;background:#154a2a;color:#fff;font:bold 12px monospace;padding:6px;pointer-events:none">CORN PROPS TEST v14</div></body>');
   html=html.replace(/<head>/i,'<head><base href="../">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
