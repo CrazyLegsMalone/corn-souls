@@ -1,5 +1,5 @@
 // Corn Souls TEST is an independent install; NEVER control or clear the live app.
-const CACHE = 'corn-souls-test-shell-v8';
+const CACHE = 'corn-souls-test-shell-v9';
 const APP_PATH = '/corn-souls/test/';
 const PRECACHE = ['./index.html', './game.html', './manifest.webmanifest', './icon-192-blue-psx.png', './icon-512-blue-psx.png'];
 self.addEventListener('install', event => {
@@ -29,12 +29,14 @@ self.addEventListener('fetch', event => {
       }
       return response;
     } catch (err) {
+      // Never silently launch a cached older TEST build for a navigation.
+      // Keep assets available offline, but prompt users to reconnect to update the game.
+      if (req.mode === 'navigate') return new Response(
+        '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>TEST update needs internet</title><body style="font:18px system-ui;background:#06111f;color:white;padding:2rem"><h2>Corn Souls TEST needs a connection</h2><p>Reconnect to the internet and reopen TEST to get the latest build.</p><a style="color:#9cf" href="/corn-souls/test/refresh.html">Refresh TEST</a></body>',
+        {headers:{'Content-Type':'text/html;charset=utf-8'},status:503}
+      );
       const hit = await caches.match(req, {ignoreSearch:true});
       if (hit) return hit;
-      if (req.mode === 'navigate') {
-        const shell = await caches.match('./index.html');
-        if (shell) return shell;
-      }
       throw err;
     }
   })());
