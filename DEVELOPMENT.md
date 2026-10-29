@@ -20,8 +20,9 @@ This file is the shared development log for work done with Claude, ChatGPT, or a
 7. When switching assistants, ask the incoming assistant to read `DEVELOPMENT.md` and the latest commits first.
 
 ## Features verified
-- [ ] Full gameplay feature inventory pending source inspection.
-- [ ] Android packaging and deployment path pending verification.
+- [x] Static gameplay inventory documented below.
+- [ ] Android native wrapper and runtime testing pending.
+- [ ] Multiplayer and persistence behavior need live tests.
 
 ## Known issues
 - No specific gameplay defects confirmed yet. Add reproducible issues here; do not mistake unverified behavior for a bug.
@@ -30,6 +31,27 @@ This file is the shared development log for work done with Claude, ChatGPT, or a
 - [ ] Review project architecture and document confirmed game systems.
 - [ ] Record user-requested gameplay changes as they are decided.
 - [ ] Consider splitting the large `index.html` into smaller modules **only after** reviewing dependencies and deployment constraints.
+
+## Source audit — 2026-10-29 (ChatGPT, static inspection of uploaded repository ZIP)
+- Audited ZIP from commit `22d0304`, gameplay version `1.91`; 3,343,220-byte `index.html`, 11,524 lines, 10 inline JavaScript blocks.
+- All 10 inline scripts passed `node --check` syntax validation. **No runtime, device, or multiplayer testing performed.**
+- **Genre:** interactive 3D ethanol plant simulator/sandbox, not a zombie shooter.
+- **Core process:** grain receiving and silos, day bins and hammermills, slurry and strainers, hydroheater/cook tubes, liquefaction, 7 fermenters, beer well, distillation, ethanol storage and shipping. Plant time is adjustable; default is one simulated minute per real second.
+- **Player modes:** Squeeg first-person walking/interacting; Savior overhead plant-management view.
+- **Sandbox:** NPC dialogue, cars and UTV, zero-turn mower, keys, breakable windows, tools, vehicle damage/fires, extinguisher, paint/water shotgun, climbing/parachute, wildlife and ambient interactions.
+- **Controls:** desktop keyboard/mouse, controller, and mobile touch controls; 1-player and 2-player host/join menus.
+- **Networking:** PeerJS/WebRTC with a dynamically loaded library from unpkg.com; connectivity and Android compatibility are unverified.
+- **Deployment:** static GitHub Pages PWA; Android wrapper reportedly loads hosted URL per README, but Android native project is not included in this ZIP. Service worker is network-first with offline cache fallback.
+- **Persistence:** localStorage used for notes, preferences and update markers; no full plant/game save-load system verified.
+- **Simulation caveat:** `FAILURES = false` explicitly disables simulated breakdowns; do not claim strainer plugging or infections occur normally.
+- **Risks / priorities:**
+  1. Single-file size and inline bundled Three.js/audio assets complicate safe edits, code review and caching; separate source modules/build pipeline only with regression testing.
+  2. Need actual Android device/browser FPS, memory, touch and WebGL testing; source parsing is not a runtime test.
+  3. Need end-to-end multiplayer host/join/disconnect and offline behavior testing. PeerJS library is loaded over network.
+  4. Verify whether full game progress should persist; current verified localStorage use is limited to notes/preferences/version markers.
+  5. Review service-worker cache versioning/update transitions and the fallback response for non-navigation requests.
+  6. Review dynamic HTML sinks for escaping when incorporating user or remote content.
+- **Next step:** run smoke tests on desktop and Android, document exact failures, then prioritize focused fixes. No gameplay source modified by this audit.
 
 ## Change log
 ### 2026-10-29 — Shared handoff initialized (ChatGPT)
