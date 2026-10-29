@@ -43,7 +43,9 @@ function inboxLogin(message){
   '<input id="inboxEmail" type="email" autocomplete="username" placeholder="Developer email" style="width:100%;box-sizing:border-box;padding:9px">'+
   '<input id="inboxPassword" type="password" autocomplete="current-password" placeholder="Password" style="width:100%;box-sizing:border-box;padding:9px;margin-top:8px">',
   [['Sign in',()=>inboxSignIn()],['Cancel',()=>inboxClose()]],true);
- for(const id of ['inboxEmail','inboxPassword'])$(id).addEventListener('keydown',e=>e.stopPropagation());
+ for(const id of ['inboxEmail','inboxPassword'])$(id).addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();inboxClose();}e.stopPropagation();
+ });
 }
 async function inboxSignIn(){
  const view=++CS_INBOX_VIEW;
@@ -60,7 +62,12 @@ async function inboxSignIn(){
  }catch(e){if(view!==CS_INBOX_VIEW)return;CS_INBOX_SESSION=null;inboxLogin(e.message);}
 }
 function inboxOpen(){if(!CS_INBOX_SESSION||Date.now()>=CS_INBOX_SESSION.expires)inboxLogin();else inboxList();}
-function inboxClose(){CS_INBOX_VIEW++;$('card').textContent='';}
+function inboxClose(){
+ CS_INBOX_VIEW++;
+ $('modal').classList.remove('open');
+ $('card').textContent='';
+ modalBtns=[];modalFocus=0;
+}
 function inboxSignOut(){const old=CS_INBOX_SESSION;CS_INBOX_SESSION=null;inboxClose();if(old&&inboxReady())fetch(INBOX_CONFIG.url+'/auth/v1/logout',{method:'POST',headers:{apikey:INBOX_CONFIG.publicKey,Authorization:'Bearer '+old.token}}).catch(()=>{});toast('Developer signed out.');}
 async function inboxList(){
  if(!CS_INBOX_SESSION){inboxLogin();return;}

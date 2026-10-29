@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.8';
+ const TEST_VERSION='1.96.9';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -162,6 +162,21 @@
     }else if(!inboxConfig.publicKey.startsWith('sb_publishable_'))throw new Error('Unsupported inbox key');
   }
   const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  // Every TEST modal has a sticky escape button, even on short phone screens.
+  // Keep it outside .row so existing action indexes/controller mappings stay intact.
+  const modalExitPatches=[
+    ["$('card').innerHTML = html +", "$('card').innerHTML = '<div class=\"cs-modal-exit\"><button id=\"csModalExit\" type=\"button\">Back to game ×</button></div>' + html +"],
+    ["modalBtns.forEach((el, i) => el.onclick =", "$('csModalExit').onclick = () => inboxClose();\n  modalBtns.forEach((el, i) => el.onclick ="],
+    ["if (n === 'B' || n === 'START') $('modal').classList.remove('open');", "if (n === 'B' || n === 'START') { inboxClose();return; }"],
+    ["if (n === 'A') modalBtns[modalFocus].click();", "if (n === 'A' && modalBtns[modalFocus]) modalBtns[modalFocus].click();"],
+    ["const b = $('card').querySelectorAll('button')[1];", "const b = $('card').querySelectorAll('button:not(#csModalExit)')[1];"],
+    ["['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ", ""]
+  ];
+  for(const [from,to] of modalExitPatches){
+    if(!html.includes(from))throw new Error('Modal exit source changed; refusing partial patch.');
+    html=html.replace(from,()=>to);
+  }
+  html=html.replace('</head>','<style>.card{box-sizing:border-box;max-height:88vh;max-height:88dvh}.cs-modal-exit{position:sticky;top:0;z-index:3;display:flex;justify-content:flex-end;background:#fff;padding:6px 0;margin:-6px 0 8px}.cs-modal-exit button{background:#174e85;color:white;min-height:44px;touch-action:manipulation}</style></head>');
   const notePatches=[
     ['const notesLoad = () =>',noteEngine+'\nconst notesLoad = () =>'],
     ["It's saved on this device for the developer to read later.",inboxConfig.url&&inboxConfig.publicKey?'Saving sends your note, game details and checked screenshot to the private developer inbox. A copy stays on this device.':'Central inbox setup is pending. Notes are saved on this device; use Share note to send them.'],

@@ -1,8 +1,9 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 (async()=>{
  let saved=[],dialogs=[],notices=[],calls=[],handler=async()=>({ok:true,status:200,json:async()=>null});
- const elements={card:{textContent:'',querySelectorAll:()=>[]},inboxEmail:{value:'owner@example.test'},inboxPassword:{value:'password',addEventListener(){}}};
- const c={INBOX_CONFIG:{url:'',publicKey:''},crypto:require('node:crypto').webcrypto,AbortController,setTimeout,clearTimeout,Date,
+ const modalClasses=new Set(['open']);
+ const elements={modal:{classList:{remove:s=>modalClasses.delete(s)}},card:{textContent:'',querySelectorAll:()=>[]},inboxEmail:{value:'owner@example.test'},inboxPassword:{value:'password',addEventListener(){}}};
+ const c={modalBtns:[],modalFocus:0,INBOX_CONFIG:{url:'',publicKey:''},crypto:require('node:crypto').webcrypto,AbortController,setTimeout,clearTimeout,Date,
   notesLoad:()=>structuredClone(saved),notesSave:a=>{saved=structuredClone(a);return true;},
   toast:s=>notices.push(s),modal:(...a)=>dialogs.push(a),escH:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
   $:id=>elements[id]||(elements[id]={value:'',addEventListener(){}}),noteShare(){},
@@ -35,6 +36,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  let release;handler=()=>new Promise(r=>release=r);const before=dialogs.length,pending=c.inboxList();
  c.inboxSignOut();release({ok:true,status:200,json:async()=>[row]});await pending;
  assert.equal(dialogs.length,before,'late response cannot reopen inbox after signout');assert.equal(elements.card.textContent,'');
+ assert.equal(modalClasses.has('open'),false,'close removes the modal overlay');
+ assert.equal(c.modalBtns.length,0,'close clears stale controller targets');
  elements.inboxEmail.value='owner@example.test';elements.inboxPassword.value='password';
  handler=async url=>({ok:true,status:200,json:async()=>url.includes('/token?')?{access_token:'test',expires_in:3600}:false});
  await c.inboxSignIn();assert.ok(dialogs.at(-1)[0].includes('not approved'));assert.equal(state('CS_INBOX_SESSION'),null);

@@ -12,7 +12,11 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  for(const s of scripts(rendered))new vm.Script(s);
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.8'));
+ assert.ok(rendered.includes('1.96.9'));
+ assert.ok(rendered.includes('Back to game ×'),'all modals have visible escape action');
+ assert.ok(rendered.includes("$('csModalExit').onclick = () => inboxClose()"));
+ assert.ok(!rendered.includes("['📬 Read notes ("),'old local reader removed from Debug');
+ assert.ok(rendered.includes("if (n === 'B' || n === 'START') { inboxClose();return; }"),'controller exit invalidates pending requests');
  assert.ok(!rendered.includes("navigator.serviceWorker.register('sw.js')"));
  const m=loader.match(/const trafficPatches=(.*);\r?\n  for/),patches=JSON.parse(m[1]);
  let now=1000,removed=[];
