@@ -26,9 +26,9 @@ else:
  replace_once("  clock += dt;","  clock += dt; cornUpdate(dt);")
  replace_once("function fire() {\n  if (!walk.on || walk.dead) return false;","function fire() {\n  if (!walk.on || walk.dead) return false;\n  if(cornThrow())return true;")
  replace_once("const r = P3.kiaToggle() || P3.radioToggle()","const r = P3.cornInteract() || P3.kiaToggle() || P3.radioToggle()")
- replace_once("try { P3.init(view); } catch (e)","try { P3.init(view); P3.cornBuild(); } catch (e)")
+ replace_once("try { P3.init(view); } catch (e)","try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); P3.cornBuild(); } catch (e)")
  replace_once("const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third;","const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !CORN_PROPS_STATE.held;")
- # Do not apply preview-only player spawn or crowbar changes.
+ # Preserve the previously approved first-person maintenance-shop spawn; do not alter crowbar.
  assert "const rx=-172+GDX+5.5" in html
  assert "const x=56+SH_DX-2.9" in html
  assert "cornBuild:cornBuild, cornInteract:cornInteract" in html
