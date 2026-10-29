@@ -8,7 +8,7 @@
     navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('./game.html?corn_collision_test_v38='+Date.now(),{cache:'no-store'});
+  const response=await fetch('./game.html?corn_collision_test_v39='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -68,7 +68,7 @@
   html=html.replace(originalMusicPlay,soloTitleMusicPlay);
   // Distinguish the TEST version on both bottom-right HUD and splash screen.
   const originalVersionDisplay="document.getElementById('ver').textContent = 'Alpha v' + (window.APP_VERSION || ''); document.getElementById('spVer').textContent = 'ALPHA v' + (window.APP_VERSION || '');";
-  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v38'; document.getElementById('spVer').textContent = 'TEST v38';";
+  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v39'; document.getElementById('spVer').textContent = 'TEST v39';";
   if(!html.includes(originalVersionDisplay)) throw new Error('Game version display changed; TEST label not applied.');
   html=html.replace(originalVersionDisplay,testVersionDisplay);
   // TEST controller diagnosis: report each newly pressed gamepad button.
@@ -90,6 +90,20 @@
   const r3PressFix="function press(n) {\n  nav = 'pad';\n  if (n === 'R3' && P3.walking && !$('modal').classList.contains('open')) { if (P3.driving) { toast(P3.utvView()); return; } toggleView(); return; }";
   if(!html.includes(r3PressMarker))throw new Error('Controller press handler changed; R3 fix not applied.');
   html=html.replace(r3PressMarker,r3PressFix);
+  // Load the existing repository PSX model at both usable fire extinguisher posts.
+  // Keep pickup, spray, damage logic and the other decorative props unchanged.
+  const extModelAnchor="function extStation(x, y, z, ry) {";
+  const extModelInsert="// Authentic PSX fire-extinguisher GLB, shared between both usable stations and held HUD.\nconst EXT_GLB=crowbarReadGLB('assets/models/psx_fire_extinguisher.glb').catch(e=>{console.warn('Extinguisher model unavailable; keeping usable fallback:',e);return null;});\nfunction extModelInto(m,height,hud){\n EXT_GLB.then(proto=>{\n  if(!proto)return;\n  const obj=proto.clone(true);\n  // Shared GLB reader normalizes the object's longest axis to X and .94 units.\n  // Rotate upright to Y, then size the entire tank to a real extinguisher height.\n  obj.rotation.z=Math.PI/2;\n  obj.scale.multiplyScalar(height/.94);\n  obj.traverse(x=>{if(x.isMesh){x.userData.noHit=true;if(hud){x.material=x.material.clone();x.material.depthTest=false;x.renderOrder=35;}}});\n  const bb=new T.Box3().setFromObject(obj);\n  const center=bb.getCenter(new T.Vector3());\n  obj.position.sub(center);\n  m.clear();m.add(obj);\n });\n}\n";
+  const extStationOld="const m = new T.Mesh(new T.PlaneGeometry(0.3, 0.6), new T.MeshLambertMaterial({ map: extTex(), transparent: true, alphaTest: 0.4, side: T.DoubleSide }));";
+  const extStationNew="const m = new T.Group(); m.userData.noHit=true; const fallback=new T.Mesh(new T.PlaneGeometry(0.3,0.6),new T.MeshLambertMaterial({map:extTex(),transparent:true,alphaTest:0.4,side:T.DoubleSide})); m.add(fallback); extModelInto(m,0.62,false);";
+  const extHudOld="const q = hudPart(g, new T.PlaneGeometry(0.17, 0.34), new T.MeshBasicMaterial({ map: extTex(), color: 0xdadada, transparent: true, alphaTest: 0.35, depthTest: false, side: T.DoubleSide }), 0.22, -0.19, -0.55); q.rotation.set(-0.1, -0.3, 0.12);";
+  const extHudNew="const q = new T.Group(); q.position.set(0.22,-0.19,-0.55); q.rotation.set(-0.1,-0.3,0.12); g.add(q); const fallback=hudPart(q,new T.PlaneGeometry(0.17,0.34),new T.MeshBasicMaterial({map:extTex(),color:0xdadada,transparent:true,alphaTest:0.35,depthTest:false,side:T.DoubleSide}),0,0,0);extModelInto(q,0.38,true);";
+  for(const [label,oldText] of [['model insertion',extModelAnchor],['station visual',extStationOld],['held visual',extHudOld]]){
+    if(!html.includes(oldText))throw new Error('Extinguisher '+label+' source changed; model replacement not applied.');
+  }
+  html=html.replace(extModelAnchor,extModelInsert+extModelAnchor);
+  html=html.replace(extStationOld,extStationNew);
+  html=html.replace(extHudOld,extHudNew);
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
