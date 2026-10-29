@@ -10701,12 +10701,12 @@ function cornBuild(){
  // Receiving spans x=-202..-172 and z=-12..12 before GDX/GDZ.
  // Keep clear of rail pit 1 and truck pits 2/3, plus north/south truck doors.
  const rx=-172+GDX+5.5, rz=-12+GDZ+5.5;
- const recvCan=new T.Group();recvCan.position.set(rx,0,rz);scene.add(recvCan);
+ const bucketX=rx-0.6096; const recvCan=new T.Group();recvCan.position.set(bucketX,0,rz);scene.add(recvCan);
  const recvWall=new T.Mesh(new T.CylinderGeometry(.45,.38,.91,10,1,true),body);recvWall.position.y=.47;recvCan.add(recvWall);
  const recvBase=new T.Mesh(new T.CylinderGeometry(.38,.38,.07,10),body);recvBase.position.y=.06;recvCan.add(recvBase);
  const recvRim=new T.Mesh(new T.TorusGeometry(.45,.05,5,12),new T.MeshLambertMaterial({color:0x1e292a}));recvRim.rotation.x=Math.PI/2;recvRim.position.y=.92;recvCan.add(recvRim);
  for(const [dx,dz,dy] of [[-1.7,-2.1,.28],[-1.1,-2.1,.28],[-1.4,-1.9,.82],[-1.7,-1.5,.28]])make('cube',rx+dx,dy,rz+dz);
- for(let i=0;i<7;i++){const a=i*Math.PI*2/7;make('ear',rx+Math.cos(a)*.19,.99+(i%3)*.08,rz+Math.sin(a)*.18,true);}
+ for(let i=0;i<7;i++){const a=i*Math.PI*2/7;make('ear',bucketX+Math.cos(a)*.19,.99+(i%3)*.08,rz+Math.sin(a)*.18,true);}
 }
 function cornVisual(item){
  item.g.clear();const m=CORN_PROPS_STATE.loaded[item.type];
@@ -11623,7 +11623,7 @@ let toastT = 0;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); toastT = 5; }
 
 // ---------- loop ----------
-try { P3.init(view); P3.cornBuild(); } catch (e) { if (window.__showErr) __showErr((e && e.message) + '\n' + (e && e.stack || '')); }
+try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); P3.cornBuild(); } catch (e) { if (window.__showErr) __showErr((e && e.message) + '\n' + (e && e.stack || '')); }
 let last = performance.now(), uiT = 0, lastCorn = 0, frameErrs = 0, deathT = 0;
 function frameBody(now) {
   const paused = $('modal').classList.contains('open');
