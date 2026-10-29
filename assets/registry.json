@@ -62,6 +62,42 @@
       "commercial_use_review": "not cleared; franchise design rights need verification",
       "public_repository_redistribution_review": "not cleared; DO NOT publish or ship while provenance uncertain",
       "notes": "82 triangles; 38,504-byte converted GLB. Only private evaluation until rights are resolved. Removed from the Corn Souls test selector at owner's request on 2026-10-29; never shipped."
+    },
+    {
+      "id": "sketchfab-tg-corn-cube",
+      "title": "Corn Cube",
+      "creator": "tg",
+      "source_platform": "Sketchfab",
+      "source_url": "https://sketchfab.com/3d-models/corn-cube-a4210ecd049546b79cf68cfd796c5883",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "candidate",
+      "modifications": "Resized and instanced in local test build; original mesh/texture unchanged.",
+      "files": [],
+      "checked_on": "2026-10-29",
+      "reviewer": "ChatGPT — embedded GLB license metadata",
+      "evidence": "Embedded glTF asset extras declares tg, Sketchfab source link, CC-BY-4.0.",
+      "commercial_use_review": "CC BY permits commercial use with attribution; source rights not independently confirmed",
+      "public_repository_redistribution_review": "pending before online publication",
+      "notes": "12 triangles. Included in downloadable local test ZIP only, not deployed to live GitHub game."
+    },
+    {
+      "id": "sketchfab-low-poly-fox-corn",
+      "title": "Corn (Low Poly)",
+      "creator": "Low Poly Fox",
+      "source_platform": "Sketchfab",
+      "source_url": "https://sketchfab.com/3d-models/corn-low-poly-c640a2fbe4914b8092b2f3aff0dbf538",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "candidate",
+      "modifications": "Resized and rotated/instanced in local test build; original mesh/texture unchanged.",
+      "files": [],
+      "checked_on": "2026-10-29",
+      "reviewer": "ChatGPT — embedded GLB license metadata",
+      "evidence": "Embedded glTF asset extras declares Low Poly Fox, Sketchfab source link, CC-BY-4.0.",
+      "commercial_use_review": "CC BY permits commercial use with attribution; source rights not independently confirmed",
+      "public_repository_redistribution_review": "pending before online publication",
+      "notes": "94 triangles. Included in downloadable local test ZIP only, not deployed to live GitHub game."
     }
   ]
 }
