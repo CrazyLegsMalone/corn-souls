@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.6';
+ const TEST_VERSION='1.96.7';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -149,14 +149,28 @@
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   const noteResponse=await fetch('./note-sharing.js?build='+TEST_VERSION,{cache:'no-store'});
   if(!noteResponse.ok)throw new Error('Note sharing HTTP '+noteResponse.status);
-  const noteEngine=await noteResponse.text();
+  const inboxResponse=await fetch('./inbox.js?build='+TEST_VERSION,{cache:'no-store'});
+  const configResponse=await fetch('./inbox-config.json?build='+TEST_VERSION,{cache:'no-store'});
+  if(!inboxResponse.ok||!configResponse.ok)throw new Error('Inbox files could not load');
+  const inboxConfig=await configResponse.json();
+  // Only a publishable/anon key belongs in public source. Reject server credentials.
+  if(inboxConfig.publicKey){
+    if(inboxConfig.publicKey.startsWith('sb_secret_'))throw new Error('Private inbox key rejected');
+    if(inboxConfig.publicKey.startsWith('eyJ')){
+      const role=JSON.parse(atob(inboxConfig.publicKey.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role;
+      if(role!=='anon')throw new Error('Inbox requires a public anon key');
+    }else if(!inboxConfig.publicKey.startsWith('sb_publishable_'))throw new Error('Unsupported inbox key');
+  }
+  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
   const notePatches=[
     ['const notesLoad = () =>',noteEngine+'\nconst notesLoad = () =>'],
-    ["It's saved on this device for the developer to read later.","Saved on this device. After saving, tap Share note to send it to the developer."],
+    ["It's saved on this device for the developer to read later.",inboxConfig.url&&inboxConfig.publicKey?'Saving sends your note, game details and checked screenshot to the private developer inbox. A copy stays on this device.':'Central inbox setup is pending. Notes are saved on this device; use Share note to send them.'],
     ["  toast(notesSave(a) ? '📝 Thanks' + (name ? ', ' + name : '') + '! Note saved.' : '📝 Couldn\\'t save the note on this device.');",
      "  if(notesSave(a))noteSaved(a[a.length-1]);else { $('modal').classList.add('open');toast('📝 Could not save the note. Your text is still in the form.'); }"],
-    ['<button data-del="', '<button data-share="\' + (a.length - 1 - i) + \'" style="margin:6px 12px 0 0">Share note</button><button data-del="'],
-    ["  $('card').querySelectorAll('[data-del]')", "  $('card').querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>noteShare(a[+b.dataset.share]));\n  $('card').querySelectorAll('[data-del]')"]
+    ['<button data-del="', '<button data-send="\' + (a.length - 1 - i) + \'" style="margin:6px 12px 0 0">\' + (n.sentAt ? \'Received by inbox\' : \'Send to developer inbox\') + \'</button><button data-share="\' + (a.length - 1 - i) + \'" style="margin:6px 12px 0 0">Share note</button><button data-del="'],
+    ["  $('card').querySelectorAll('[data-del]')", "  $('card').querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>inboxSend(a[+b.dataset.send]));\n  $('card').querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>noteShare(a[+b.dataset.share]));\n  $('card').querySelectorAll('[data-del]')"],
+    ["['💾 Save note', () => noteSave(kind)]", "[inboxReady()?'Send report':'💾 Save note', () => noteSave(kind)]"],
+    ["['🎮 Controls', () => controlsMenu(code)]", "['📥 Developer Inbox',()=>inboxOpen()], ['🎮 Controls', () => controlsMenu(code)]"]
   ];
   // The source HTML escapes the apostrophe inside this JavaScript string.
   notePatches[1][0]="It\\'s saved on this device for the developer to read later.";

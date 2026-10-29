@@ -41,6 +41,7 @@ async function noteShare(n) {
   }
 }
 function noteSaved(n) {
-  modal('<h1>Note saved on this device</h1><p>The developer has not received it. Tap Share note, then choose Messages, Mail, or another app and send it to the developer.</p>',
+  if(inboxReady()){inboxSend(n);return;}
+  modal('<h1>Note saved on this device</h1><p>The central inbox is not connected yet. The developer has not received this note. You can share it through Messages or Mail.</p>',
     [['Share note', () => noteShare(n)], ['Keep on this device', null]], true);
 }

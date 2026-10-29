@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 (async()=>{
  const notices=[],dialogs=[];
- const ctx={NOTE_KIND:{bug:['','Bug'],msg:['','Message']},navigator:{},Date,Uint8Array,File,
+ const ctx={inboxReady:()=>false,NOTE_KIND:{bug:['','Bug'],msg:['','Message']},navigator:{},Date,Uint8Array,File,
   atob,escH:s=>String(s).replaceAll('<','&lt;'),toast:s=>notices.push(s),modal:(...a)=>dialogs.push(a)};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync('test/note-sharing.js','utf8'),ctx);
  const n={kind:'bug',name:'Tester',t:0,v:'1.96.6',dev:'iPhone/iPad',where:'walking at x 1, z 2',text:'Door stuck <test>',img:'data:image/jpeg;base64,/9j/2Q=='};

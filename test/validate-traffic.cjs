@@ -6,13 +6,13 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  let rendered='',failure='';
  const status={set textContent(v){failure=v;}};
  const ctx={console,URL,Date,encodeURIComponent,location:{protocol:'file:',hostname:''},navigator:{},
-  fetch:async url=>({ok:true,text:async()=>url.startsWith('./note-sharing.js')?fs.readFileSync('test/note-sharing.js','utf8'):base}),document:{getElementById:()=>status,open(){},write(s){rendered=s;},close(){}}};
+  fetch:async url=>({ok:true,text:async()=>url.startsWith('./game.html')?base:fs.readFileSync('test/'+url.slice(2).split('?')[0],'utf8'),json:async()=>JSON.parse(fs.readFileSync('test/'+url.slice(2).split('?')[0],'utf8'))}),document:{getElementById:()=>status,open(){},write(s){rendered=s;},close(){}}};
  for(const s of scripts(loader))await vm.runInNewContext(s,ctx);
  assert.ok(rendered,failure);
  for(const s of scripts(rendered))new vm.Script(s);
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.6'));
+ assert.ok(rendered.includes('1.96.7'));
  assert.ok(!rendered.includes("navigator.serviceWorker.register('sw.js')"));
  const m=loader.match(/const trafficPatches=(.*);\r?\n  for/),patches=JSON.parse(m[1]);
  let now=1000,removed=[];
