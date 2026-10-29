@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Crowbar Mount Polish v21</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls sandbox preview…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Vehicle Avatar Test v22</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls sandbox preview…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -9,7 +9,7 @@
       for(const reg of regs) if(reg.scope.includes('/corn-souls/')) await reg.unregister();
     } catch(err) {}
   }
-  const response=await fetch('../index.html?crowbar_mount_v21='+Date.now(),{cache:'no-store'});
+  const response=await fetch('../index.html?vehicle_avatar_v22='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -48,6 +48,13 @@
   html=html.replace(hookC,'const r = P3.cornInteract() || P3.kiaToggle() || P3.radioToggle()');
   html=html.replace(hookD,'try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); P3.cornBuild(); } catch (e)');
   if(!html.includes('cornBuild:cornBuild, cornInteract:cornInteract') || !html.includes('P3.cornBuild();'))throw Error('Corn setup verification failed');
+  // Hide the standalone third-person Squeeg avatar immediately on vehicle entry.
+  // Drive cameras do not run walkCam() / updateSelfAv(), so otherwise it freezes at
+  // the place the player entered the vehicle.
+  const vehicleEnter='function utvEnter() { utvIgnition(); walk.drive = true;';
+  if(!html.includes(vehicleEnter))throw Error('Vehicle-entry code changed; avatar fix not applied');
+  html=html.replace(vehicleEnter,
+    'function utvEnter() { utvIgnition(); walk.drive = true; if (VIEW.av) VIEW.av.visible = false;');
   // Test HUD removed; corn assets load without file selection.
   html=html.replace(/<head>/i,'<head><base href="../">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
