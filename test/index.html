@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.2';
+ const TEST_VERSION='1.96.3';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -120,6 +120,12 @@
 
   html=html.replace(extStationOld,extStationNew);
   html=html.replace(extHudOld,extHudNew);
+  // TEST traffic: host authority, increased corn deliveries, 5Hz vehicle snapshots.
+  const trafficPatches=[["function updateVehicles(dt) {\n  if (spawnQueue.length) { const q = spawnQueue.shift(); spawn(q[0], q[1]); }","let AMBIENT_TRAFFIC_T=0, AMBIENT_TRAFFIC_FIRST=true;\nfunction updateVehicles(dt) {\n  if(NET.conn && NET.conn.open && !NET.host){ semiSound(dt);return; }\n  // Maintain a small stream of grain deliveries without flooding the plant.\n  AMBIENT_TRAFFIC_T+=Math.min(dt,.25);\n  if(AMBIENT_TRAFFIC_T>(AMBIENT_TRAFFIC_FIRST?6:28)){\n    AMBIENT_TRAFFIC_T=0; AMBIENT_TRAFFIC_FIRST=false;\n    if(vehicles.length<5 && spawnQueue.length<3)spawn('corn',null);\n  }\n  if (spawnQueue.length) { const q = spawnQueue.shift(); spawn(q[0], q[1]); }"],["for (const e of events) spawn(e.kind, e.ship);","if (!NET.conn || !NET.conn.open || NET.host) for (const e of events) spawn(e.kind, e.ship);"],["} else if (m.t === 'w' && !NET.host) {   // host keeps the world in step","} else if(m.t==='vt' && !NET.host){\n    // Only the host creates and moves semis. Follow authoritative snapshots.\n    const ids=new Set(m.v.map(a=>a[0]));\n    for(const old of vehicles){if(!ids.has(old.netId))scene.remove(old.g);}\n    vehicles=vehicles.filter(v=>ids.has(v.netId));\n    for(const a of m.v){\n      let v=vehicles.find(v=>v.netId===a[0]);\n      if(!v){\n        const g=truck(a[1]); v={g,kind:a[1],lane:a[2],route:[],i:a[3],t:0,netId:a[0]}; vehicles.push(v);\n      }\n      v.g.position.set(a[4],0,a[5]);v.g.rotation.y=a[6];v.i=a[3];v.t=a[7];\n      v.dumping=!!a[8];v.weighing=!!a[9];v.loading=!!a[10];\n    }\n  } else if (m.t === 'w' && !NET.host) {   // host keeps the world in step"],["if (NET.host) { NET.worldT += rdt; if (NET.worldT > 0.2) { NET.worldT = 0; netSend({ t:'w', ts:train.s, st:train.stopT,","if (NET.host) { NET.worldT += rdt; if (NET.worldT > 0.2) { NET.worldT = 0; netSend({t:'vt',v:vehicles.map(v=>{if(v.netId==null)v.netId=++NET.trafficId;return [v.netId,v.kind,v.lane,v.i,+v.g.position.x.toFixed(2),+v.g.position.z.toFixed(2),+v.g.rotation.y.toFixed(3),+v.t.toFixed(2),+!!v.dumping,+!!v.weighing,+!!v.loading];})}); netSend({ t:'w', ts:train.s, st:train.stopT,"],["const NET = { peer: null, conn: null, host: false, code: '', status: '', rp: null, rr: null, sendT: 0, worldT: 0, tags: 0, notify: null };","const NET = { peer: null, conn: null, host: false, code: '', status: '', rp: null, rr: null, sendT: 0, worldT: 0, trafficId: 0, tags: 0, notify: null };"]];
+  for(const [from,to] of trafficPatches){
+    if(!html.includes(from))throw new Error('Traffic sync source changed; TEST patch not applied at: '+from.slice(0,48));
+    html=html.replace(from,to);
+  }
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
