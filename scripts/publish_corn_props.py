@@ -14,7 +14,21 @@ def replace_once(before,after):
  if n!=1:raise RuntimeError(f"Expected exactly one match, got {n}: {before[:100]!r}")
  html=html.replace(before,after,1)
 if "CORN_PROPS_STATE" in html:
- print("Corn props already installed; no duplicate change")
+ # Update an already-published game without reinjecting the corn engine.
+ original=html
+ old="const recvCan=new T.Group();recvCan.position.set(rx,0,rz);scene.add(recvCan);"
+ new="const bucketX=rx-0.6096; const recvCan=new T.Group();recvCan.position.set(bucketX,0,rz);scene.add(recvCan);"
+ if old in html:html=html.replace(old,new,1)
+ old="make('ear',rx+Math.cos(a)*.19,.99+(i%3)*.08,rz+Math.sin(a)*.18,true);"
+ new="make('ear',bucketX+Math.cos(a)*.19,.99+(i%3)*.08,rz+Math.sin(a)*.18,true);"
+ if old in html:html=html.replace(old,new,1)
+ old="try { P3.init(view); P3.cornBuild(); } catch (e)"
+ new="try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); P3.cornBuild(); } catch (e)"
+ if old in html:html=html.replace(old,new,1)
+ assert "bucketX=rx-0.6096" in html, "Bucket shift missing"
+ assert "P3.cam.tx = 28" in html, "First-person maintenance-shop spawn missing"
+ if html!=original:main.write_text(html)
+ print("Live corn props, bucket shift and first-person maintenance shop verified")
 else:
  corn=engine("cornEngine")
  crowbar=engine("crowbarEngine")
