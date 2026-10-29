@@ -30,6 +30,8 @@
   const thirdNeedle='m = new T.Mesh(new T.PlaneGeometry(L, L / 4), toolMat(k));';
   if(!html.includes(thirdNeedle))throw new Error('Third-person tool layout changed');
   html=html.replace(thirdNeedle, "m = k==='crowbar' ? makeCrowbar3D(false) : new T.Mesh(new T.PlaneGeometry(L, L / 4), toolMat(k));");
+  // Visual proof of which preview revision is actually running.
+  html=html.replace('</body>', '<div id="crowbar-preview-revision" style="position:fixed;top:54px;right:14px;z-index:2147483647;padding:8px 12px;background:#143b2c;color:#ffffff;border:2px solid #9bffbb;font:bold 13px monospace;pointer-events:none">3D CROWBAR TEST v8</div></body>');
   html=html.replace(/<head>/i,'<head><base href="../">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
