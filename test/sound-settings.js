@@ -17,11 +17,15 @@ function soundSetMusicVolume(value){
 function soundSettings(focus=0){
  const percent=Math.round(music.volume*100);
  modal('<h1>Sound</h1><label for="csMusicVolume" style="display:block;margin:16px 0 8px">Music volume <b id="csMusicVolumeLabel">'+percent+'%</b></label>'+
-  '<input id="csMusicVolume" type="range" min="0" max="100" step="1" value="'+percent+'" style="width:100%;min-height:44px;box-sizing:border-box">',
+  '<div style="display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px">'+
+  '<button id="csMusicMinus" type="button" aria-label="Decrease music volume" style="height:44px;padding:0;font-size:22px">−</button>'+
+  '<input id="csMusicVolume" type="range" min="0" max="100" step="1" value="'+percent+'" style="width:100%;min-width:0;min-height:44px;box-sizing:border-box;margin:0">'+
+  '<button id="csMusicPlus" type="button" aria-label="Increase music volume" style="height:44px;padding:0;font-size:22px">+</button></div>',
   [[musicOn?'Music: On':'Music: Off',()=>{toggleMusic();soundSettings();}],
-   ['Volume −',()=>{soundSetMusicVolume(music.volume-.1);soundSettings(1);}],
-   ['Volume +',()=>{soundSetMusicVolume(music.volume+.1);soundSettings(2);}],
    ['Back to pause menu',()=>menu()]],true);
+ $('csMusicMinus').onclick=()=>soundSetMusicVolume(music.volume-.1);
+ $('csMusicPlus').onclick=()=>soundSetMusicVolume(music.volume+.1);
+ modalBtns=Array.from($('card').querySelectorAll('button:not(#csModalExit)'));
  modalFocus=focus;markModal();
  const slider=$('csMusicVolume');
  slider.oninput=()=>soundSetMusicVolume(Number(slider.value)/100);
