@@ -1,6 +1,8 @@
 # Corn Souls TEST developer inbox
 
-Status: game implementation prepared; backend connection and deployment pending.
+Status: receiving project URL and publishable key configured. Owner reports setup
+SQL succeeded. Developer Auth user/allowlist and hosted access/delivery tests are
+still pending; local client tests pass.
 LIVE Alpha v1.96 is not changed by these files.
 
 ## Connect the receiving project
