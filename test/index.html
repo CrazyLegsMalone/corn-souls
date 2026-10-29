@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.19';
+ const TEST_VERSION='1.96.20';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -179,6 +179,9 @@
   ];
   for(const [from,to] of scopedEffects){if(!html.includes(from))throw new Error('Plant effect source changed; refusing partial patch.');html=html.replace(from,()=>to);}
   const acidVisualPatches=[
+   ["SA.poolM = new T.Mesh(new T.CircleGeometry(1, 28),", "SA.poolM = new T.Mesh(new T.PlaneGeometry(2,2),"],
+   ["const r = 0.3 + SA.pool * 3.4, c = SA.leaks[0] ? SA.leaks[0].land : SA.poolC || V3(SA.x, 0, SA.z); SA.poolC = c; SA.pr = r;\n    const hx = (SA.cx1 - SA.cx0) / 2, hz = (SA.cz1 - SA.cz0) / 2, rz = Math.min(r, hz), pz = Math.max(SA.cz0 + rz, Math.min(SA.cz1 - rz, c.z));   // stays inside the containment curb\n    SA.poolM.position.set((SA.cx0 + SA.cx1) / 2, 0.13, pz); SA.poolM.scale.set(Math.min(r, hx), rz, 1);", "saLiquidPool();"],
+   ["((walk.x - P.position.x) / P.scale.x) ** 2 + ((walk.z - P.position.z) / P.scale.y) ** 2 < 1", "Math.abs(walk.x-P.position.x)<P.scale.x && Math.abs(walk.z-P.position.z)<P.scale.y"],
    ["if (!B.remote) nh3Hit(h.point);", "if (!B.remote) { nh3Hit(h.point);saLiquidPaintHit(h.point); }"],
    ["const curve = new T.QuadraticBezierCurve3(hp, mid, land), m = new T.Mesh(new T.TubeGeometry(curve, 10, 0.035, 5, false), SA.streamM || (SA.streamM = new T.MeshBasicMaterial({ color: 0xe6dc8a, transparent: true, opacity: 0.8 })));", "const m=saLiquidMesh(hp,mid,land);"],
    ["L.m.scale.x = L.m.scale.z = 0.85 + 0.3 * Math.random();", "saLiquidAnimate(L);"],

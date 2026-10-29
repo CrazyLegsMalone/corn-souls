@@ -8,13 +8,13 @@ function coolerDoorSound(door,kind){
  output.gain.value=volume;output.connect(pan);
  const source=C.createBufferSource(),filter=C.createBiquadFilter(),gain=C.createGain();
  source.buffer=noiseBuf(C,1);filter.type=kind==='open'?'highpass':'lowpass';filter.frequency.value=kind==='open'?950:kind==='close'?650:450;
- gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(kind==='close'?.28:kind==='open'?.12:.045,time+.012);
+ gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(kind==='close'?.56:kind==='open'?.12:.045,time+.012);
  gain.gain.exponentialRampToValueAtTime(.0001,time+duration);
  source.connect(filter);filter.connect(gain);gain.connect(output);source.start(time);source.stop(time+duration+.02);
  // A short low body resonance makes the closing seal sound weighty.
  const tone=C.createOscillator(),body=C.createGain();tone.type='sine';tone.frequency.setValueAtTime(kind==='close'?110:190,time);
  tone.frequency.exponentialRampToValueAtTime(kind==='close'?48:85,time+.14);
- body.gain.setValueAtTime(.0001,time);body.gain.linearRampToValueAtTime(kind==='close'?.22:.055,time+.008);body.gain.exponentialRampToValueAtTime(.0001,time+.18);
+ body.gain.setValueAtTime(.0001,time);body.gain.linearRampToValueAtTime(kind==='close'?.44:.055,time+.008);body.gain.exponentialRampToValueAtTime(.0001,time+.18);
  tone.connect(body);body.connect(output);tone.start(time);tone.stop(time+.2);
  let ended=0;const cleanup=()=>{if(++ended<2)return;for(const node of [source,filter,gain,tone,body,output,pan])node.disconnect();};
  source.onended=cleanup;tone.onended=cleanup;

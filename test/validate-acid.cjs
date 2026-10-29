@@ -25,4 +25,16 @@ ctx.netSend=packet=>{assert.equal(packet.t,'sa');packets++;};
 ctx.saLiquidPaintHit(hole);assert.equal(packets,1,'originating paintball sends one existing leak packet');
 ctx.saHit=()=>false;ctx.saLiquidPaintHit(hole);assert.equal(packets,1,'other surfaces do not broadcast leaks');
 ctx.saHit=()=>true;ctx.saLiquidPaintHit(hole);assert.equal(packets,1,'empty tank does not broadcast an absent hole');
+Object.assign(ctx.SA,{x:36,z:100,cx0:33.85,cx1:38.15,cz0:95.55,cz1:104.45,pool:.02,poolC:null,poolM:new T.Mesh(),leaks:[{land}]});
+ctx.saLiquidPool();const pool=ctx.SA.poolM;
+assert.ok(Math.abs(pool.position.x-land.x)<1e-10,'small spill starts at stream');
+for(let amount=.02;amount<=1;amount+=.01){ctx.SA.pool=amount;ctx.saLiquidPool();
+ assert.ok(pool.position.x-pool.scale.x>=ctx.SA.cx0-1e-10&&pool.position.x+pool.scale.x<=ctx.SA.cx1+1e-10);
+ assert.ok(pool.position.z-pool.scale.y>=ctx.SA.cz0-1e-10&&pool.position.z+pool.scale.y<=ctx.SA.cz1+1e-10);
+ assert.ok(Math.abs(land.x-pool.position.x)<=pool.scale.x+1e-10&&Math.abs(land.z-pool.position.z)<=pool.scale.y+1e-10,'surface always covers stream impact');
+}
+ctx.SA.pool=1;ctx.saLiquidPool();assert.ok(Math.abs(pool.scale.x-(ctx.SA.cx1-ctx.SA.cx0)/2)<1e-10);assert.ok(Math.abs(pool.scale.y-(ctx.SA.cz1-ctx.SA.cz0)/2)<1e-10);
+assert.ok(pool.position.y<.9,'full surface stays below curb');
+ctx.SA.leaks=[];ctx.SA.pool=.5;ctx.saLiquidPool();assert.equal(ctx.SA.poolC,land,'drain retains original spill anchor');
+ctx.SA.pool=0;ctx.saLiquidPool();assert.equal(ctx.SA.poolC,null,'new spill can choose a new origin after drying');
 console.log('PASS: real Three.js liquid geometry anchors, landing point, 1,000-frame stable flow, animated highlights/ripples, shared resources and disposal.');

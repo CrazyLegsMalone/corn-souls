@@ -27,7 +27,21 @@ function saLiquidAnimate(leak){
  // Moving highlights suggest flow; the stream's position/scale never jitter.
  const phase=((40-leak.t)*1.8)%1,ripple=leak.m.userData.ripple;
  if(SA.streamM&&SA.streamM.map)SA.streamM.map.offset.x=-(clock*.8)%1;
- if(ripple){ripple.scale.setScalar(.07+phase*.32);ripple.material.opacity=.28*(1-phase);}
+ if(ripple){ripple.scale.setScalar(.07+phase*.32);ripple.material.opacity=.28*(1-phase);
+  ripple.position.y=(SA.poolM&&SA.poolM.visible?SA.poolM.position.y:.13)-leak.m.position.y+.015;
+ }
+}
+function saLiquidPool(){
+ // Keep the first impact as the origin until this spill has drained. Grow by
+ // clipping its expanding bounds, rather than moving the center off the stream.
+ const c=SA.poolC||(SA.leaks[0]?SA.leaks[0].land:V3(SA.x,0,SA.z));SA.poolC=c;
+ const cx=Math.max(SA.cx0,Math.min(SA.cx1,c.x)),cz=Math.max(SA.cz0,Math.min(SA.cz1,c.z));
+ const reach=Math.max(cx-SA.cx0,SA.cx1-cx,cz-SA.cz0,SA.cz1-cz);
+ const r=.15+SA.pool*reach;
+ const x0=Math.max(SA.cx0,cx-r),x1=Math.min(SA.cx1,cx+r),z0=Math.max(SA.cz0,cz-r),z1=Math.min(SA.cz1,cz+r);
+ SA.pr=r;SA.poolM.position.set((x0+x1)/2,.13+SA.pool*.55,(z0+z1)/2);
+ SA.poolM.scale.set((x1-x0)/2,(z1-z0)/2,1);
+ if(SA.pool<=.01&&!SA.leaks.length)SA.poolC=null;
 }
 function saLiquidRemove(leak){
  scene.remove(leak.m);leak.m.geometry.dispose();

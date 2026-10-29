@@ -42,7 +42,7 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  boost.fs=10;boost.u.noNos=true;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false);assert.equal(boost.u.nos,0,'non-turbo vehicle stays ineligible');
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.19'));
+ assert.ok(rendered.includes('1.96.20'));
  const plantExport=rendered.indexOf('root.Plant3D = {');
  assert.ok(rendered.indexOf('function saLiquidMesh(')<plantExport,'acid helper is inside plant scope');
  assert.ok(rendered.indexOf('function coolerDoorSound(')<plantExport,'door audio is inside plant scope');
