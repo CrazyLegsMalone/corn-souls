@@ -10,9 +10,30 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  for(const s of scripts(loader))await vm.runInNewContext(s,ctx);
  assert.ok(rendered,failure);
  for(const s of scripts(rendered))new vm.Script(s);
+ // First-person items must use the post-world pass even when the shotgun is hidden.
+ const initHeld=rendered.split('\n').find(line=>line.includes('if (!heldG.squeegee)'));
+ const makeHeld=()=>({visible:false,parent:'world-camera',position:{x:.1,y:-.2,z:-.6}});
+ const hudState={heldG:{},TOOLS:{crowbar:{}},hudScene:{add(item){item.parent=this;}},
+  makeSqueegee:makeHeld,makeHand:makeHeld,makeWasher:makeHeld,makeTool:makeHeld,makeExtHud:makeHeld};
+ vm.runInNewContext(initHeld,hudState);
+ assert.ok(Object.values(hudState.heldG).every(item=>item.parent===hudState.hudScene),'all held groups removed from world pass');
+ assert.equal(hudState.heldG.crowbar.position.z,-.6,'reparenting preserves local pose');
+ const calls=[],chain={copy(){return this;},sub(){return this;},normalize(){return this;},applyQuaternion(){return this;},invert(){return this;}};
+ const light=()=>({color:{copy(){}},intensity:1,position:{copy(){}},target:{position:{set(){}}}});
+ const hudRender={gun:{visible:false},heldG:hudState.heldG,SR:{carry:null},hudScene:hudState.hudScene,
+  hudCam:{updateProjectionMatrix(){}},camera:{aspect:1,view:null,quaternion:{}},hudHemi:light(),hudSun:light(),hemi:light(),sunL:light(),tv:chain,tq:chain,
+  renderer:{autoClear:true,clearDepth(){calls.push('clearDepth');},render(scene){calls.push(scene===hudState.hudScene?'hud':'world');}}};
+ const drawStart=rendered.indexOf('function drawHudGun() {'),drawEnd=rendered.indexOf('\nconst tq =',drawStart);
+ vm.runInNewContext(rendered.slice(drawStart,drawEnd)+'\nthis.draw=drawHudGun;',hudRender);
+ for(const name of ['crowbar','hand','squeegee','ext']){
+  calls.length=0;Object.values(hudRender.heldG).forEach(item=>item.visible=false);hudRender.heldG[name].visible=true;
+  hudRender.renderer.render('world');hudRender.draw();assert.equal(calls.join(','),'world,clearDepth,hud',name+' renders after complete world');
+  assert.equal(hudRender.renderer.autoClear,true,'renderer state restored');
+ }
+ Object.values(hudRender.heldG).forEach(item=>item.visible=false);calls.length=0;hudRender.draw();assert.equal(calls.length,0,'hidden first-person items do not draw');
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.15'));
+ assert.ok(rendered.includes('1.96.16'));
  assert.ok(rendered.includes("['Sound ▸',()=>soundSettings()]"));
  assert.ok(rendered.includes("const music = $('music'); music.volume=soundMusicVolume();"),'saved volume applied before first track');
  assert.ok(rendered.includes('✉ Message Developer'));
@@ -53,5 +74,5 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  const yaw=h.traffic[0].g.rotation.y;h.updateHighwayTraffic(.1);assert.equal(h.traffic[0].g.rotation.y,yaw);
  assert.ok(rendered.includes("ht:+HWY_TRAFFIC_TIME.toFixed(2)"),'host clock still sent');
  assert.ok(rendered.includes("HWY_TRAFFIC_TIME=m.ht"),'guest clock still received');
- console.log('PASS: loader patches, generated JS syntax, version, semi spawn/interpolation/turn/stall/despawn, fixed highway headings, shared geometry/materials, host traffic clock.');
+ console.log('PASS: first-person HUD pass/visibility/state, loader patches, generated JS syntax, version, semi spawn/interpolation/turn/stall/despawn, fixed highway headings, shared geometry/materials, host traffic clock.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

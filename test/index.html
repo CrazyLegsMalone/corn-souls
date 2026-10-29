@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.15';
+ const TEST_VERSION='1.96.16';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -167,6 +167,8 @@
   // Every TEST modal has a sticky escape button, even on short phone screens.
   // Keep it outside .row so existing action indexes/controller mappings stay intact.
   const modalExitPatches=[
+    ["heldG.ext = makeExtHud(); }", "heldG.ext = makeExtHud(); for(const item of Object.values(heldG))hudScene.add(item); }"],
+    ["if ((!gun || !gun.visible) && SR.carry !== 'me') return;", "if ((!gun || !gun.visible) && !Object.values(heldG).some(item=>item.visible) && SR.carry !== 'me') return;"],
     [", ['Reset all setpoints', resetAll]", ""],
     ["[musicOn ? 'Music: on' : 'Music: off', toggleMusic]", "['Sound ▸',()=>soundSettings()]"],
     ["music.volume = 0.6;", "music.volume = soundMusicVolume();"],
