@@ -1,9 +1,31 @@
-// Corn Souls 1.91: always fetch the newest game when online, fall back to the saved copy when offline
-const C = 'corn-souls';
-self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']))); });
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', e => {
-  const u = new URL(e.request.url); if (e.request.method !== 'GET' || u.origin !== location.origin) return;
-  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(r => { if (r.ok) { const k = r.clone(); caches.open(C).then(c => c.put(e.request, k)); } return r; })
-    .catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match('index.html'))));
+// Corn Souls LIVE — Alpha v1.93. Independently scoped from Corn Souls TEST.
+const CACHE='corn-souls-live-shell-v1';
+const ROOT='/corn-souls/';
+const PRELOAD=['./index.html','./game.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+self.addEventListener('install', e=>{
+ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRELOAD)).then(()=>self.skipWaiting()));
+});
+self.addEventListener('activate', e=>{
+ e.waitUntil((async()=>{
+  const names=await caches.keys();
+  await Promise.all(names.filter(n=>n.startsWith('corn-souls-live-shell-')&&n!==CACHE).map(n=>caches.delete(n)));
+  await self.clients.claim();
+ })());
+});
+self.addEventListener('fetch', e=>{
+ const req=e.request,url=new URL(req.url);
+ if(req.method!=='GET'||url.origin!==self.location.origin)return;
+ if(!url.pathname.startsWith(ROOT)||url.pathname.startsWith(ROOT+'test/'))return;
+ e.respondWith((async()=>{
+  try{
+   const response=await fetch(req,{cache:'no-store'});
+   if(response.ok){const cache=await caches.open(CACHE);await cache.put(req,response.clone());}
+   return response;
+  }catch(err){
+   const hit=await caches.match(req,{ignoreSearch:true});
+   if(hit)return hit;
+   if(req.mode==='navigate'){const shell=await caches.match('./index.html');if(shell)return shell;}
+   throw err;
+  }
+ })());
 });
