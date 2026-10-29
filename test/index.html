@@ -1,9 +1,15 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Test Build</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls test build…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Test v15</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST v15 — verifying game source…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
-  const response=await fetch('../index.html?test='+Date.now(),{cache:'no-store'});
+  // Defeat old preview caching. Keep current page available even if worker cleanup fails.
+  if('serviceWorker' in navigator) {
+    try {const regs=await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs) if(reg.scope.includes('/corn-souls/')) await reg.unregister();
+    } catch(err) {}
+  }
+  const response=await fetch('../index.html?corn_test_v15='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -32,14 +38,14 @@
   const hookE='root.Plant3D = {';
   const checks={simUpdate:hookA,fire:hookB,interact:hookC,shopSpawn:hookD,plantExports:hookE};
   const missing=Object.entries(checks).filter(([key,val])=>!html.includes(val)).map(([key])=>key);
-  if(missing.length)throw Error('Corn patch needs updating: '+missing.join(', '));
+  if(missing.length)throw Error('Corn v15 patch mismatch: '+missing.join(', ')+'; source fetch status='+response.status);
   html=html.replace(hookE,cornEngine+'\nroot.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract,');
   html=html.replace(hookA,'  clock += dt; cornUpdate(dt);');
   html=html.replace(hookB,'function fire() {\n  if (!walk.on || walk.dead) return false;\n  if(cornThrow())return true;');
   html=html.replace(hookC,'const r = P3.cornInteract() || P3.kiaToggle() || P3.radioToggle()');
   html=html.replace(hookD,'try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); P3.cornBuild(); } catch (e)');
   if(!html.includes('cornBuild:cornBuild, cornInteract:cornInteract') || !html.includes('P3.cornBuild();'))throw Error('Corn setup verification failed');
-  html=html.replace('</body>','<div style="position:fixed;bottom:9px;left:10px;z-index:2147483647;background:#154a2a;color:#fff;font:bold 12px monospace;padding:6px;pointer-events:none">CORN PROPS TEST v14</div></body>');
+  html=html.replace('</body>','<div style="position:fixed;bottom:9px;left:10px;z-index:2147483647;background:#154a2a;color:#fff;font:bold 12px monospace;padding:6px;pointer-events:none">CORN PROPS TEST v15</div></body>');
   html=html.replace(/<head>/i,'<head><base href="../">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
