@@ -1,7 +1,7 @@
 // Corn Souls TEST is an independent install; NEVER control or clear the live app.
-const CACHE = 'corn-souls-test-shell-v2';
+const CACHE = 'corn-souls-test-shell-v3';
 const APP_PATH = '/corn-souls/test/';
-const PRECACHE = ['./index.html', './game.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const PRECACHE = ['./index.html', './game.html', './manifest.webmanifest', './icon-192-blue-psx.png', './icon-512-blue-psx.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
 });

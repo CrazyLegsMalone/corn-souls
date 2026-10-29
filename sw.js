@@ -1,7 +1,7 @@
-// Corn Souls LIVE — Alpha v1.93. Independently scoped from Corn Souls TEST.
-const CACHE='corn-souls-live-shell-v1';
+// Corn Souls LIVE — Alpha v1.94. Independently scoped from Corn Souls TEST.
+const CACHE='corn-souls-live-shell-v2';
 const ROOT='/corn-souls/';
-const PRELOAD=['./index.html','./game.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const PRELOAD=['./index.html','./game.html','./manifest.webmanifest','./icon-192-blue-psx.png','./icon-512-blue-psx.png'];
 self.addEventListener('install', e=>{
  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRELOAD)).then(()=>self.skipWaiting()));
 });

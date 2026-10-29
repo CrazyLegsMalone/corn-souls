@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls TEST — Collision Build</title><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls TEST — Collision Build</title><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -60,7 +60,7 @@
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
   html=html.replace(/<link\\b(?=[^>]*\\brel=["']manifest["'])[^>]*>/gi,'');
-  html=html.replace(/<head>/i,'<head><base href="../"><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192.png">');
+  html=html.replace(/<head>/i,'<head><base href="../"><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
  }catch(e){status.textContent='Corn Souls TEST could not load ('+e.message+'). Check internet, then reopen the TEST icon. If offline, connect once to download the new build.';}

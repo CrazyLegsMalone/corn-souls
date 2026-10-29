@@ -15,16 +15,16 @@
   "theme_color": "#06111f",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "icon-192-blue-psx.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "icon-512-blue-psx.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

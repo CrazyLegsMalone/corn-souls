@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.93</title><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls — Alpha v1.93…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.94</title><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls — Alpha v1.94…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -8,18 +8,18 @@
     navigator.serviceWorker.register('/corn-souls/sw.js', {scope:'/corn-souls/'})
       .catch(err => console.warn('Live app cache registration unavailable:', err));
   }
-  const response=await fetch('game.html?alpha_v1_93='+Date.now(),{cache:'no-store'});
+  const response=await fetch('game.html?alpha_v1_94='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
   let html=await response.text();
   // Match the real in-game title, splash screen and HUD to this approved Alpha release.
   const alphaVersionMarker="window.APP_VERSION = '1.91';";
   if(!html.includes(alphaVersionMarker))throw Error('The base game version marker changed');
-  html=html.replace(alphaVersionMarker,"window.APP_VERSION = '1.93';");
+  html=html.replace(alphaVersionMarker,"window.APP_VERSION = '1.94';");
   const patchNoteMarker='const PATCH_NOTES = [';
   if(html.includes(patchNoteMarker)){
-   html=html.replace(patchNoteMarker,patchNoteMarker+"\n  { v: '1.93', title: 'Corn Props & Collision', notes: ['🌽 Corn cubes, low-poly corn ears and metal bins at the scale house and grain receiving.', '🪣 Corn and bins now have solid collision while walking and when throwing corn.', '🛠️ First-person maintenance shop startup and game loading improvements.'] },");
+   html=html.replace(patchNoteMarker,patchNoteMarker+"\n  { v: '1.94', title: 'New PSX App Icons', notes: ['🌙 Updated moonlit plant icon, with the matching crash-test hard hat on TEST.'] },\n  { v: '1.93', title: 'Corn Props & Collision', notes: ['🌽 Corn cubes, low-poly corn ears and metal bins at the scale house and grain receiving.', '🪣 Corn and bins now have solid collision while walking and when throwing corn.', '🛠️ First-person maintenance shop startup and game loading improvements.'] },");
   }
-  html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.93</title>');
+  html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.94</title>');
   // Keep the approved first-person maintenance-shop startup.
   // Position is on the open shop floor, away from the two forklifts at z=37.
   const initMarker='try { P3.init(view); } catch (e)';
@@ -69,6 +69,6 @@
   html=html.replace(/<head>/i,'<head><base href="./">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
- }catch(e){status.textContent='Corn Souls Alpha v1.93 could not load: '+e.message;}
+ }catch(e){status.textContent='Corn Souls Alpha v1.94 could not load: '+e.message;}
 })();
 </script></body></html>
