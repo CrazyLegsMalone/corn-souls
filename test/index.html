@@ -8,8 +8,8 @@
     navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('../game.html?corn_collision_test_v31='+Date.now(),{cache:'no-store'});
-  if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
+  const response=await fetch('./game.html?corn_collision_test_v32='+Date.now(),{cache:'no-store'});
+  if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
   // Position is on the open shop floor, away from the two forklifts at z=37.
@@ -63,6 +63,6 @@
   html=html.replace(/<head>/i,'<head><base href="../"><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192.png">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
- }catch(e){status.textContent='Test preview failed: '+e.message;}
+ }catch(e){status.textContent='Corn Souls TEST could not load ('+e.message+'). Check internet, then reopen the TEST icon. If offline, connect once to download the new build.';}
 })();
 </script></body></html>
