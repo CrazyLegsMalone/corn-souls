@@ -8187,7 +8187,7 @@ function updateWeather(dt) {
 function update(sim, dt, events) {
   dayT += dt;
   if (dayT > 20) { dayT = 0; const d = new Date(); daylight(d.getHours() + d.getMinutes() / 60); }
-  clock += dt;
+  clock += dt; cornUpdate(dt);
   const Sim = root.Sim, p = sim.sp, o = sim.out, N = 1800;
   const lv = id => Sim.level(sim, id) / 100;
   const feed = sim.beer.feed;
@@ -10487,6 +10487,7 @@ function setItem(name) { if (name === 'washer') { held = 'gun'; ammo = 'water'; 
 function cycleItem(d) { return setItem(ITEMS[(ITEMS.indexOf(held) + d + ITEMS.length) % ITEMS.length]); }
 function fire() {
   if (!walk.on || walk.dead) return false;
+  if(cornThrow())return true;
   if (walk.mow) { const t = performance.now(); if (t - MOW.fireT > 300) mowBlade(); MOW.fireT = t; return true; }   // on the mower: fire toggles the blades
   if (held === 'squeegee') { if (swipe <= 0) swipe = 1; return true; }
   if (TOOLS[held]) { if (swipe <= 0) { swipe = 1; toolHit(); } return true; }
@@ -10559,7 +10560,7 @@ function updateBalls(dt) {
 function updateGun(dt) {
   if (!gun) gun = makeGun();
   if (!heldG.squeegee) { heldG.squeegee = makeSqueegee(); heldG.hand = makeHand(); heldG.washer = makeWasher(); for (const k in TOOLS) heldG[k] = makeTool(k); heldG.ext = makeExtHud(); }
-  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third;
+  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !CORN_PROPS_STATE.held;
   gun.visible = fp && held === 'gun'; heldG.squeegee.visible = fp && held === 'squeegee'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
   wash.t = Math.max(0, wash.t - dt); updateWasher(dt, show && held === 'gun' && wash.t > 0);
   if (!show) { aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
@@ -10598,7 +10599,190 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { get scene() { return scene; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
+function crowbarAccessor(doc,bin,index){
+ const a=doc.accessors[index],v=doc.bufferViews[a.bufferView],types={5120:[Int8Array,1],5121:[Uint8Array,1],5122:[Int16Array,2],5123:[Uint16Array,2],5125:[Uint32Array,4],5126:[Float32Array,4]},
+ pair=types[a.componentType],size={SCALAR:1,VEC2:2,VEC3:3,VEC4:4}[a.type],n=a.count*size,
+ byte=v.byteOffset||0,off=byte+(a.byteOffset||0),stride=v.byteStride||size*pair[1],out=new pair[0](n),view=new DataView(bin);
+ for(let i=0;i<a.count;i++)for(let j=0;j<size;j++){
+  const at=off+i*stride+j*pair[1];
+  out[i*size+j]=a.componentType===5126?view.getFloat32(at,true):a.componentType===5125?view.getUint32(at,true):a.componentType===5123?view.getUint16(at,true):a.componentType===5121?view.getUint8(at):a.componentType===5122?view.getInt16(at,true):view.getInt8(at);
+ }
+ return {array:out,itemSize:size,normalized:!!a.normalized};
+}
+async function crowbarReadGLB(url){
+ const response=await fetch(url,{cache:'no-store'});
+ if(!response.ok)throw Error('Model download HTTP '+response.status+' — '+url);
+ const bytes=await response.arrayBuffer(),header=new DataView(bytes);
+ if(header.getUint32(0,true)!==0x46546c67||header.getUint32(4,true)!==2)throw Error('Not a GLB 2.0 file');
+ let json=null,bin=null,offset=12;
+ while(offset<bytes.byteLength){
+  const n=header.getUint32(offset,true),kind=header.getUint32(offset+4,true);offset+=8;
+  if(kind===0x4e4f534a)json=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,offset,n)));
+  if(kind===0x004e4942)bin=bytes.slice(offset,offset+n);
+  offset+=n;
+ }
+ if(!json||!bin)throw Error('Incomplete GLB');
+ const textures=(json.textures||[]).map(t=>{
+  const image=json.images[t.source],view=json.bufferViews[image.bufferView];
+  const data=bin.slice(view.byteOffset||0,(view.byteOffset||0)+view.byteLength);
+  const img=new Image(),objectUrl=URL.createObjectURL(new Blob([data],{type:image.mimeType||'image/png'}));
+  const tex=new T.Texture();tex.flipY=false;
+  if('colorSpace' in tex&&T.SRGBColorSpace)tex.colorSpace=T.SRGBColorSpace;
+  img.onload=()=>{tex.image=img;tex.needsUpdate=true;URL.revokeObjectURL(objectUrl);};
+  img.onerror=()=>URL.revokeObjectURL(objectUrl);
+  img.src=objectUrl;return tex;
+ });
+ const materials=(json.materials||[]).map(m=>{
+  const p=m.pbrMetallicRoughness||{},factor=p.baseColorFactor||[1,1,1,1];
+  return new T.MeshStandardMaterial({
+   color:new T.Color().setRGB(factor[0],factor[1],factor[2]),
+   map:p.baseColorTexture?textures[p.baseColorTexture.index]:null,
+   metalness:p.metallicFactor||0,roughness:p.roughnessFactor??.9,
+   side:m.doubleSided?T.DoubleSide:T.FrontSide,transparent:factor[3]<1,opacity:factor[3]
+  });
+ });
+ const meshObjs=(json.meshes||[]).map(m=>(m.primitives||[]).map(p=>{
+  if(p.mode!==undefined&&p.mode!==4)throw Error('Unsupported non-triangle primitive');
+  const geo=new T.BufferGeometry();
+  for(const [attribute,name] of [['POSITION','position'],['NORMAL','normal'],['TEXCOORD_0','uv'],['COLOR_0','color']]){
+   if(p.attributes[attribute]===undefined)continue;
+   const a=crowbarAccessor(json,bin,p.attributes[attribute]);
+   geo.setAttribute(name,new T.BufferAttribute(a.array,a.itemSize,a.normalized));
+  }
+  if(p.indices!==undefined){const a=crowbarAccessor(json,bin,p.indices);geo.setIndex(new T.BufferAttribute(a.array,1));}
+  if(!geo.attributes.normal)geo.computeVertexNormals();
+  return new T.Mesh(geo,materials[p.material]||new T.MeshStandardMaterial({color:'#888888'}));
+ }));
+ const objects=(json.nodes||[]).map(n=>{
+  const g=new T.Group();g.name=n.name||'';
+  if(n.matrix){const mat=new T.Matrix4().fromArray(n.matrix);g.matrix.copy(mat);g.matrix.decompose(g.position,g.quaternion,g.scale);}
+  else{if(n.translation)g.position.fromArray(n.translation);if(n.rotation)g.quaternion.fromArray(n.rotation);if(n.scale)g.scale.fromArray(n.scale);}
+  if(n.mesh!==undefined)meshObjs[n.mesh].forEach(m=>g.add(m.clone()));
+  return g;
+ });
+ (json.nodes||[]).forEach((n,i)=>(n.children||[]).forEach(id=>objects[i].add(objects[id])));
+ const root=new T.Group(),scene=json.scenes?.[json.scene||0]||json.scenes?.[0];
+ (scene?.nodes||[0]).forEach(i=>root.add(objects[i]));
+ // Normalize the authentic model geometry, irrespective of Sketchfab export units.
+ root.updateMatrixWorld(true);
+ const b=new T.Box3().setFromObject(root),extent=b.getSize(new T.Vector3());
+ const axis=extent.x>=extent.y&&extent.x>=extent.z?new T.Vector3(1,0,0):extent.y>=extent.z?new T.Vector3(0,1,0):new T.Vector3(0,0,1);
+ const group=new T.Group();group.add(root);group.quaternion.setFromUnitVectors(axis,new T.Vector3(1,0,0));
+ group.updateMatrixWorld(true);
+ const bb=new T.Box3().setFromObject(group),center=bb.getCenter(new T.Vector3()),length=bb.getSize(new T.Vector3()).x;
+ root.position.sub(center); // translation is inside rotated parent, so correct with group-local center below instead
+ root.position.add(center);
+ const normalized=new T.Group();normalized.add(group);
+ normalized.scale.setScalar(.94/Math.max(.001,length));
+ normalized.updateMatrixWorld(true);
+ const cb=new T.Box3().setFromObject(normalized),c=cb.getCenter(new T.Vector3());
+ normalized.position.sub(c);
+ normalized.userData.noHit=true;
+ return normalized;
+}
+
+
+const CORN_PROPS_STATE={items:[],held:null,can:null,loaded:{},ready:false};
+function cornBuild(){
+ if(CORN_PROPS_STATE.ready)return;CORN_PROPS_STATE.ready=true;
+ const x=56+SH_DX-2.9,z=((NROAD+4.5)+(SCZ_OUT-4.5))/2;
+ const body=new T.MeshLambertMaterial({color:0x3b494b,side:T.DoubleSide});
+ const can=new T.Group();can.position.set(x,0,z+3.3);scene.add(can);
+ const wall=new T.Mesh(new T.CylinderGeometry(.45,.38,.91,10,1,true),body);wall.position.y=.47;can.add(wall);
+ const base=new T.Mesh(new T.CylinderGeometry(.38,.38,.07,10),body);base.position.y=.06;can.add(base);
+ const rim=new T.Mesh(new T.TorusGeometry(.45,.05,5,12),new T.MeshLambertMaterial({color:0x1e292a}));rim.rotation.x=Math.PI/2;rim.position.y=.92;can.add(rim);CORN_PROPS_STATE.can=can;
+ function make(type,a,b,c,inCan=false){
+  const g=new T.Group();g.position.set(a,b,c);scene.add(g);
+  const item={type,g,inCan,held:false,sleep:true,v:new T.Vector3(),spin:new T.Vector3(2,1.5,2.4)};CORN_PROPS_STATE.items.push(item);cornVisual(item);
+ }
+ for(const [dx,dz,dy] of [[-2,-2.1,.28],[-1.42,-2.1,.28],[-1.72,-2,.82],[-2,-1.53,.28]])make('cube',x+dx,dy,z+dz);
+ for(let i=0;i<7;i++){const a=i*Math.PI*2/7;make('ear',x+Math.cos(a)*.19,.99+(i%3)*.08,z+3.3+Math.sin(a)*.18,true);}
+ // Second prop station: outside the east wall of the three-pit grain receiving building.
+ // Receiving spans x=-202..-172 and z=-12..12 before GDX/GDZ.
+ // Keep clear of rail pit 1 and truck pits 2/3, plus north/south truck doors.
+ const rx=-172+GDX+5.5, rz=-12+GDZ+5.5;
+ const recvCan=new T.Group();recvCan.position.set(rx,0,rz);scene.add(recvCan);
+ const recvWall=new T.Mesh(new T.CylinderGeometry(.45,.38,.91,10,1,true),body);recvWall.position.y=.47;recvCan.add(recvWall);
+ const recvBase=new T.Mesh(new T.CylinderGeometry(.38,.38,.07,10),body);recvBase.position.y=.06;recvCan.add(recvBase);
+ const recvRim=new T.Mesh(new T.TorusGeometry(.45,.05,5,12),new T.MeshLambertMaterial({color:0x1e292a}));recvRim.rotation.x=Math.PI/2;recvRim.position.y=.92;recvCan.add(recvRim);
+ for(const [dx,dz,dy] of [[-1.7,-2.1,.28],[-1.1,-2.1,.28],[-1.4,-1.9,.82],[-1.7,-1.5,.28]])make('cube',rx+dx,dy,rz+dz);
+ for(let i=0;i<7;i++){const a=i*Math.PI*2/7;make('ear',rx+Math.cos(a)*.19,.99+(i%3)*.08,rz+Math.sin(a)*.18,true);}
+}
+function cornVisual(item){
+ item.g.clear();const m=CORN_PROPS_STATE.loaded[item.type];
+ if(m){
+   item.g.add(m.clone(true));
+   // Reinforced dark-green cube edges make this a playful CORN BLOCK, not a raw kernel.
+   if(item.type==='cube'){
+     const outline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(.57,.57,.57)),
+       new T.LineBasicMaterial({color:0x254b3d,depthTest:true}));
+     outline.userData.noHit=true;item.g.add(outline);
+   }
+   return;
+ }
+ const geo=item.type==='cube'?new T.BoxGeometry(.52,.52,.52):new T.CylinderGeometry(.10,.12,.55,6);
+ const mesh=new T.Mesh(geo,new T.MeshLambertMaterial({color:item.type==='cube'?0xcba33b:0xe1bf47}));
+ item.g.add(mesh);
+}
+function cornModel(type,source){
+ // Reuse test-build GLB loader; normalize to a useful physical scale.
+ return crowbarReadGLB(source).then(raw=>{
+  const box=new T.Box3().setFromObject(raw),sz=box.getSize(new T.Vector3());
+  const max=Math.max(sz.x,sz.y,sz.z);
+  if(!Number.isFinite(max)||max<=0)throw Error('Invalid corn model geometry');
+  const g=new T.Group();g.add(raw);raw.scale.multiplyScalar((type==='cube'?.55:.62)/max);
+  g.updateMatrixWorld(true);const b=new T.Box3().setFromObject(g),center=b.getCenter(new T.Vector3());g.position.sub(center);
+  CORN_PROPS_STATE.loaded[type]=g;
+  for(const item of CORN_PROPS_STATE.items)if(item.type===type)cornVisual(item);
+ });
+}
+function cornInteract(){
+ if(!walk.on||walk.drive||walk.mow||walk.dead)return false;
+ if(CORN_PROPS_STATE.held){const t=CORN_PROPS_STATE.held;t.held=false;t.sleep=false;t.v.set(0,.3,0);CORN_PROPS_STATE.held=null;return 'Set down corn';}
+ camera.updateMatrixWorld();const dir=new T.Vector3();camera.getWorldDirection(dir);
+ let best=null,min=9999;
+ for(const t of CORN_PROPS_STATE.items){
+  if(t.held)continue;
+  const delta=t.g.position.clone().sub(camera.position),dist=delta.length(),forward=delta.dot(dir);
+  if(dist>3.3||forward<.15)continue;
+  const side=Math.sqrt(Math.max(0,dist*dist-forward*forward));
+  if(side>.85)continue;
+  const score=side+dist*.04;
+  if(score<min){min=score;best=t;}
+ }
+ if(!best&&CORN_PROPS_STATE.can){
+  const delta=CORN_PROPS_STATE.can.position.clone().add(new T.Vector3(0,.7,0)).sub(camera.position);
+  if(delta.length()<3.3&&delta.normalize().dot(dir)>.87)best=CORN_PROPS_STATE.items.find(i=>i.inCan&&!i.held&&i.sleep);
+ }
+ if(!best)return false;best.held=true;best.inCan=false;best.sleep=false;best.v.set(0,0,0);CORN_PROPS_STATE.held=best;
+ return best.type==='cube'?'Picked up corn cube — fire to throw':'Picked up corn ear — fire to throw';
+}
+function cornThrow(){
+ if(!CORN_PROPS_STATE.held||!walk.on)return false;
+ const item=CORN_PROPS_STATE.held,dir=new T.Vector3();camera.getWorldDirection(dir);
+ item.held=false;item.inCan=false;item.sleep=false;
+ item.v.copy(dir).multiplyScalar(item.type==='cube'?7.5:9).add(new T.Vector3(0,2,0));CORN_PROPS_STATE.held=null;return true;
+}
+function cornUpdate(dt){
+ if(!CORN_PROPS_STATE.ready||!walk.on)return;
+ dt=Math.max(0,Math.min(.05,dt));
+ const dir=new T.Vector3();camera.getWorldDirection(dir);
+ for(const t of CORN_PROPS_STATE.items){
+  if(t.held){t.g.position.copy(camera.position).addScaledVector(dir,1.45).add(new T.Vector3(0,-.2,0));continue;}
+  if(t.sleep)continue;
+  t.v.y-=9.8*dt;t.g.position.addScaledVector(t.v,dt);
+  t.g.rotation.x+=t.spin.x*dt;t.g.rotation.y+=t.spin.y*dt;
+  const floor=t.type==='cube'?.27:.23;
+  if(t.g.position.y<=floor){t.g.position.y=floor;if(Math.abs(t.v.y)>.35){t.v.y*=-.23;t.v.x*=.75;t.v.z*=.75;}else{t.v.set(0,0,0);t.sleep=true;}}
+ }
+}
+
+setTimeout(()=>{
+ cornModel('cube','assets/models/corn_cube.glb').catch(err=>console.error('Corn cube GLB unavailable:',err));
+ cornModel('ear','assets/models/corn_low_poly.glb').catch(err=>console.error('Corn ear GLB unavailable:',err));
+},0);
+
+root.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract, get scene() { return scene; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
 })(this);
 </script>
 <script>// =====================================================================
@@ -11305,7 +11489,7 @@ function press(n) {
     if (n === 'L3') { pad.sprint = !pad.sprint; return; }
     if (n === 'R3') { toggleView(); return; }   // click the right stick: 1st / 3rd person
     if (n === 'X') { { const who = P3.npcAt(); if (who && NPC_DEF[who]) { talk(who); return; } }   // talk to whoever you're looking at
-    const r = P3.kiaToggle() || P3.radioToggle() || P3.takeTool() || P3.takeExtinguisher() || P3.pickChute() || P3.takeKey() || P3.carToggle() || P3.mowerToggle() || P3.coolerHandle() || P3.nh3Valve() || P3.throwSwitch() || P3.rideToggle(); if (r) { toast(r); return; } const id = P3.interactTarget(); if (id === 'BOARD') openBoard(); else if (id === 'BOARD_BUSY') toast('The Board Op is using this board — use the other one'); else if (id) selectUnit(id); else toast('Nothing to interact with here'); return; }
+    const r = P3.cornInteract() || P3.kiaToggle() || P3.radioToggle() || P3.takeTool() || P3.takeExtinguisher() || P3.pickChute() || P3.takeKey() || P3.carToggle() || P3.mowerToggle() || P3.coolerHandle() || P3.nh3Valve() || P3.throwSwitch() || P3.rideToggle(); if (r) { toast(r); return; } const id = P3.interactTarget(); if (id === 'BOARD') openBoard(); else if (id === 'BOARD_BUSY') toast('The Board Op is using this board — use the other one'); else if (id) selectUnit(id); else toast('Nothing to interact with here'); return; }
     if (n === 'B') { if (cur) closePanel(); return; }   // B only backs out of panels/menus; it doesn't leave Squeeg mode
     if (n === 'A' && !cur) { P3.walkJump(); return; }
     if (n === 'Y') { if (P3.driving) { toast(P3.utvView()); return; } toggleLamp(); return; }   // headlamp (in the UTV: chase / driver's-seat view)
@@ -11439,7 +11623,7 @@ let toastT = 0;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); toastT = 5; }
 
 // ---------- loop ----------
-try { P3.init(view); } catch (e) { if (window.__showErr) __showErr((e && e.message) + '\n' + (e && e.stack || '')); }
+try { P3.init(view); P3.cornBuild(); } catch (e) { if (window.__showErr) __showErr((e && e.message) + '\n' + (e && e.stack || '')); }
 let last = performance.now(), uiT = 0, lastCorn = 0, frameErrs = 0, deathT = 0;
 function frameBody(now) {
   const paused = $('modal').classList.contains('open');
