@@ -61,7 +61,10 @@ function inboxLogin(message){
   if(e.key==='Escape'){e.preventDefault();inboxClose();}e.stopPropagation();
  });
 }
+let CS_INBOX_LOGIN_BUSY=false;
 async function inboxSignIn(){
+ if(CS_INBOX_LOGIN_BUSY)return;
+ CS_INBOX_LOGIN_BUSY=true;
  const view=++CS_INBOX_VIEW;
  const email=$('inboxEmail').value.trim(),password=$('inboxPassword').value;
  $('inboxPassword').value='';if(!email||!password){inboxLogin('Enter your email and password.');return;}
@@ -75,7 +78,8 @@ async function inboxSignIn(){
   CS_INBOX_PAGE=0;
   try{await inboxList();}
   catch(e){console.error('Developer inbox list after login failed:',e);modal('<h1>Inbox unavailable</h1><p>'+escH(e.message||'Unable to load inbox.')+'</p>',[['Retry',()=>inboxList()],['Close',()=>inboxClose()]],true);}
- }catch(e){if(view!==CS_INBOX_VIEW)return;CS_INBOX_SESSION=null;inboxLogin(e.message);}
+ }catch(e){console.error('Developer Inbox login:',e);if(view!==CS_INBOX_VIEW)return;CS_INBOX_SESSION=null;inboxLogin(e.message||'Sign-in failed.');}
+ finally{CS_INBOX_LOGIN_BUSY=false;}
 }
 function inboxOpen(){if(!CS_INBOX_SESSION||Date.now()>=CS_INBOX_SESSION.expires)inboxLogin();else inboxList();}
 function inboxClose(){
