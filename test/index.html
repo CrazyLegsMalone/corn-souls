@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.5';
+ const TEST_VERSION='1.96.6';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -147,6 +147,23 @@
   html=html.replace(/<head>/i,'<head><base href="../"><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png">');
   html=html.replace(/<head>/i,'<head><script>'+audioBackgroundGuard+'</scr'+'ipt>');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
+  const noteResponse=await fetch('./note-sharing.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!noteResponse.ok)throw new Error('Note sharing HTTP '+noteResponse.status);
+  const noteEngine=await noteResponse.text();
+  const notePatches=[
+    ['const notesLoad = () =>',noteEngine+'\nconst notesLoad = () =>'],
+    ["It's saved on this device for the developer to read later.","Saved on this device. After saving, tap Share note to send it to the developer."],
+    ["  toast(notesSave(a) ? '📝 Thanks' + (name ? ', ' + name : '') + '! Note saved.' : '📝 Couldn\\'t save the note on this device.');",
+     "  if(notesSave(a))noteSaved(a[a.length-1]);else { $('modal').classList.add('open');toast('📝 Could not save the note. Your text is still in the form.'); }"],
+    ['<button data-del="', '<button data-share="\' + (a.length - 1 - i) + \'" style="margin:6px 12px 0 0">Share note</button><button data-del="'],
+    ["  $('card').querySelectorAll('[data-del]')", "  $('card').querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>noteShare(a[+b.dataset.share]));\n  $('card').querySelectorAll('[data-del]')"]
+  ];
+  // The source HTML escapes the apostrophe inside this JavaScript string.
+  notePatches[1][0]="It\\'s saved on this device for the developer to read later.";
+  for(const [from,to] of notePatches){
+    if(!html.includes(from))throw new Error('Note sharing source changed; refusing partial patch: '+from.slice(0,40));
+    html=html.replace(from,()=>to);
+  }
   document.open();document.write(html);document.close();
  }catch(e){status.textContent='Corn Souls TEST could not load ('+e.message+'). Check internet, then reopen the TEST icon. If offline, connect once to download the new build.';}
 })();
