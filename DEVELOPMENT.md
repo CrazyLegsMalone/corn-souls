@@ -29,6 +29,16 @@ This file is the shared development log for work done with Claude, ChatGPT, or a
 - **Status:** Preview file committed; GitHub Pages publication and runtime behavior have not yet been verified. Do not call it tested until opened on a real browser/device.
 - **Approval rule:** Ask the owner before merging a preview change into live `index.html`.
 
+## MANDATORY — third-party asset licensing and credits (2026-10-29)
+**Claude and ChatGPT: before downloading/importing ANY external model, texture, audio, font, icon, or animation, read [ASSET_POLICY.md](ASSET_POLICY.md).**
+- **Single source of truth:** `assets/registry.json` (candidate → approved → in-use / rejected).
+- **Shipped public credits:** `credits.html` (auto-reads in-use entries), with `CREDITS.md` as a human-readable credits record.
+- Record creator, exact source link, license/version/link, evidence, modifications, permission for commercial use and public GitHub hosting; preserve license notices and mark in-use only when shipped.
+- Do not silently substitute models, assume downloading conveys rights, or claim CC0/CC BY provenance is certain without verifying.
+- **Horror Game Crowbar by hvarley is currently candidate only**, not installed or licensed as approved based on the screenshot.
+- Before every release, reconcile registry, in-game/public credits, source files and license requirements. Existing assets need retrospective review.
+- Player credits URL: https://crazylegsmalone.github.io/corn-souls/credits.html
+
 ## Current baseline
 - Repository: https://github.com/CrazyLegsMalone/corn-souls
 - Last verified version at creation: **1.91**
