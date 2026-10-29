@@ -8,7 +8,7 @@
     navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('../game.html?corn_collision_test_v28='+Date.now(),{cache:'no-store'});
+  const response=await fetch('../game.html?corn_collision_test_v29='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -35,10 +35,12 @@
   const hookC='const r = P3.kiaToggle() || P3.radioToggle()';
   const hookD='try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); } catch (e)';
   const hookE='root.Plant3D = {';
-  const checks={simUpdate:hookA,fire:hookB,interact:hookC,shopSpawn:hookD,plantExports:hookE};
+  const hookF='  vehPush();\\n  walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));';
+  const checks={simUpdate:hookA,fire:hookB,interact:hookC,shopSpawn:hookD,plantExports:hookE,playerCollision:hookF};
   const missing=Object.entries(checks).filter(([key,val])=>!html.includes(val)).map(([key])=>key);
   if(missing.length)throw Error('Corn collision test patch mismatch: '+missing.join(', ')+'; source fetch status='+response.status);
   html=html.replace(hookE,cornEngine+'\nroot.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract,');
+  html=html.replace(hookF,'  vehPush();\\n  if (typeof cornPlayerPushOut === "function") cornPlayerPushOut();\\n  walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));');
   const hudVis='  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third;';
   if(!html.includes(hudVis))throw Error('Weapon visibility signature changed');
   html=html.replace(hudVis,'  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !CORN_PROPS_STATE.held;');
