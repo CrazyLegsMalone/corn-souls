@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.3';
+ const TEST_VERSION='1.96.4';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -126,6 +126,17 @@
     if(!html.includes(from))throw new Error('Traffic sync source changed; TEST patch not applied at: '+from.slice(0,48));
     html=html.replace(from,to);
   }
+  // Highway-only low-cost sprite traffic; RP6 host clock drives both clients.
+  const highwayTrafficEngine="\n// Corn Souls TEST: inexpensive non-interactive highway-only traffic.\n// 20 camera-facing canvas sprites, 4 shared textures; no 3D models, colliders or shadows.\n// Every player derives positions from a host-authoritative elapsed-time clock.\nlet HWY_TRAFFIC_TIME=0, HWY_TRAFFIC_READY=false;\nconst HWY_TRAFFIC=[];\nfunction highwayTrafficTexture(type,col){\n const cv=document.createElement('canvas');cv.width=128;cv.height=64;\n const c=cv.getContext('2d');\n c.clearRect(0,0,128,64);\n c.fillStyle='#11171f';\n // silhouette and wheels are baked into one picture; one sprite draw per vehicle.\n if(type===2){\n  c.fillStyle=col;c.fillRect(12,20,99,25);c.fillRect(61,9,37,13);\n  c.fillStyle='#c8dcef';c.fillRect(67,12,24,10);\n }else if(type===1){\n  c.fillStyle=col;c.fillRect(14,27,98,18);c.fillRect(57,14,45,16);\n  c.fillStyle='#a4c8df';c.fillRect(64,17,31,11);\n }else{\n  c.fillStyle=col;c.fillRect(13,30,101,15);\n  c.beginPath();c.moveTo(35,30);c.lineTo(48,17);c.lineTo(87,17);c.lineTo(104,30);c.closePath();c.fill();\n  c.fillStyle='#8ab5d0';c.fillRect(50,20,18,10);c.fillRect(71,20,14,10);\n }\n for(const x of [36,94]){c.fillStyle='#0b1017';c.beginPath();c.arc(x,46,9,0,7);c.fill();c.fillStyle='#78838b';c.beginPath();c.arc(x,46,3.4,0,7);c.fill();}\n c.fillStyle='#f6e7b0';c.fillRect(111,32,4,5);c.fillStyle='#ce4545';c.fillRect(11,32,4,5);\n const tx=new T.CanvasTexture(cv);tx.colorSpace=T.SRGBColorSpace;\n return new T.SpriteMaterial({map:tx,transparent:true,depthWrite:false,fog:true});\n}\nfunction highwayTrafficInit(){\n if(HWY_TRAFFIC_READY)return;\n HWY_TRAFFIC_READY=true;\n const colors=['#3f78a8','#b53e34','#ece3cc','#65676c'];\n const mats=colors.map((color,i)=>highwayTrafficTexture(i%3,color));\n for(let i=0;i<20;i++){\n  const dir=i%2?1:-1;\n  const lane=Math.floor(i/2)%2, color=(i*7+Math.floor(i/4))%4;\n  const g=new T.Sprite(mats[color]);\n  g.scale.set(i%5===0?7.0:5.2,i%5===0?3.2:2.5,1);\n  g.userData.noHit=true;\n  g.frustumCulled=true;\n  scene.add(g);\n  HWY_TRAFFIC.push({g,dir,lane,phase:((i*571+Math.floor(i/2)*167)%3200),speed:19+(i%6)*2.3});\n }\n}\nfunction updateHighwayTraffic(dt){\n highwayTrafficInit();\n HWY_TRAFFIC_TIME+=Math.max(0,Math.min(dt,.25));\n const c=HWY.c, sn=HWY.s;\n for(const v of HWY_TRAFFIC){\n  const dist=(v.phase+HWY_TRAFFIC_TIME*v.speed)%3200;\n  const x=v.dir>0?-1500+dist:1700-dist;\n  const side=v.dir>0?1:-1;\n  const n=side*(7.5+1.2+1.83+v.lane*3.66);\n  v.g.position.set(x+n*sn,1.6,HWY.z(x)+n*c);\n }\n}\n";
+  const highwayUpdateAnchor="function updateVehicles(dt) {";
+  const highwayRecvAnchor="} else if(m.t==='vt' && !NET.host){";
+  const highwaySendAnchor="netSend({t:'vt',v:vehicles.map";
+  for(const [tag,marker] of [['tick',highwayUpdateAnchor],['receive',highwayRecvAnchor],['send',highwaySendAnchor]]){
+   if(!html.includes(marker))throw new Error('Highway traffic '+tag+' source changed; refusing partial patch.');
+  }
+  html=html.replace(highwayUpdateAnchor,highwayTrafficEngine+"\\nfunction updateVehicles(dt) { updateHighwayTraffic(dt);");
+  html=html.replace(highwayRecvAnchor,"} else if(m.t==='vt' && !NET.host){ if(typeof m.ht==='number') HWY_TRAFFIC_TIME=m.ht;");
+  html=html.replace(highwaySendAnchor,"netSend({t:'vt',ht:+HWY_TRAFFIC_TIME.toFixed(2),v:vehicles.map");
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
