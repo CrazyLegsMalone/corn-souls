@@ -2,13 +2,15 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls TEST</title><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST…</p><script>
 (async()=>{
  const status=document.getElementById('status');
+ // One version constant drives TEST HUD, title screen and asset request.
+ const TEST_VERSION='1.96.1';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('./game.html?corn_collision_test_v40='+Date.now(),{cache:'no-store'});
+  const response=await fetch('./game.html?test_version='+encodeURIComponent(TEST_VERSION)+'&t='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -68,7 +70,7 @@
   html=html.replace(originalMusicPlay,soloTitleMusicPlay);
   // Distinguish the TEST version on both bottom-right HUD and splash screen.
   const originalVersionDisplay="document.getElementById('ver').textContent = 'Alpha v' + (window.APP_VERSION || ''); document.getElementById('spVer').textContent = 'ALPHA v' + (window.APP_VERSION || '');";
-  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v40'; document.getElementById('spVer').textContent = 'TEST v40';";
+  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v"+TEST_VERSION+"'; document.getElementById('spVer').textContent = 'TEST v"+TEST_VERSION+"';";
   if(!html.includes(originalVersionDisplay)) throw new Error('Game version display changed; TEST label not applied.');
   html=html.replace(originalVersionDisplay,testVersionDisplay);
   // TEST controller diagnosis: report each newly pressed gamepad button.
