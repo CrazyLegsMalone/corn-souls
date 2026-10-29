@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls TEST — Collision Build</title><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls TEST</title><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -62,7 +62,10 @@
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
-  html=html.replace(/<link\\b(?=[^>]*\\brel=["']manifest["'])[^>]*>/gi,'');
+  // Remove ALL game-source manifest tags before adding the TEST-only one.
+  // Previously this regex matched a literal backslash instead of a word boundary.
+  html=html.replace(/<link\b[^>]*\brel\s*=\s*["']manifest["'][^>]*>/gi,'');
+  html=html.replace(/<link\b[^>]*\brel\s*=\s*manifest(?=[\s>])[^>]*>/gi,'');
   html=html.replace(/<head>/i,'<head><base href="../"><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192-blue-psx.png">');
   html=html.replace(/<head>/i,'<head><script>'+audioBackgroundGuard+'</scr'+'ipt>');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');

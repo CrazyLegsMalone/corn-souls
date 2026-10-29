@@ -1,7 +1,7 @@
 {
   "name": "Corn Souls",
   "short_name": "Corn Souls",
-  "start_url": "./",
+  "start_url": "/corn-souls/index.html",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#06111f",
@@ -17,5 +17,7 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "id": "/corn-souls/",
+  "scope": "/corn-souls/"
 }

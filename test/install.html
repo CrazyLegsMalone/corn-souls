@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install Corn Souls TEST</title>
+<link rel="manifest" href="/corn-souls/test/manifest.webmanifest">
+<link rel="icon" href="/corn-souls/test/icon-192-blue-psx.png" type="image/png">
+<meta name="theme-color" content="#06111f">
+<style>
+:root{color-scheme:dark}
+body{font:17px system-ui, sans-serif;color:#e7f3ff;background:#06111f;margin:0;min-height:100dvh;display:grid;place-items:center}
+main{width:min(90%,460px);text-align:center}
+img{width:132px;height:132px;object-fit:contain;border-radius:22px}
+h1{font-size:1.7rem;color:#92c7ff}
+p{line-height:1.5}
+a{color:#9ad3ff}
+small{color:#aab9cd}
+</style>
+</head>
+<body>
+<main>
+<img src="/corn-souls/test/icon-192-blue-psx.png" alt="Corn Souls TEST crash-dummy hardhat icon">
+<h1>Corn Souls TEST</h1>
+<p>This is the independent TEST app, not the stable Alpha release.</p>
+<p>In Chrome, open the <b>⋮</b> menu and select <b>Install app</b> or <b>Add to Home screen</b>.</p>
+<p><a href="/corn-souls/test/index.html">Open the TEST game</a></p>
+<small>Installing this app opens the latest test build, with its own icon and app identity.</small>
+</main>
+<script>
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/corn-souls/test/sw.js',{scope:'/corn-souls/test/'}).catch(console.warn);
+</script>
+</body>
+</html>
