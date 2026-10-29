@@ -1,3 +1,11 @@
+## Crowbar hand mount correction (2026-10-29 — Test v23)
+- User confirmed the **pegboard mounting is correct** and MUST NOT be changed in this fix.
+- User supplied screenshots showing first-person hook placement still awkward and third-person crowbar sideways across the avatar's head.
+- Root cause confirmed from live main source: `toolItem()` already sets `m.rotation.y = Math.PI / 2` and `m.position.z = -L * 0.35`; test injection had applied an additional `visual.rotation.y=Math.PI/2`, doubling the yaw.
+- In `test/index.html` commit `667e2cf`: removed the redundant local yaw in third-person, kept `visual.rotation=(0,0,0)` and scale 0.74; matched first-person grip at `q.position=(0.14,-0.13,-0.67)`, scale 0.88, rolled the claw 180° about the local shaft so the tip should point away from the player. **Pegboard's transform was verified unchanged.**
+- Test URL: https://crazylegsmalone.github.io/corn-souls/test/index.html?v=23
+- JavaScript syntax checked; browser-visible position STILL needs screenshot validation. Do not publish to live until user approves both handheld views.
+
 # Corn Souls — Development Handoff
 
 This file is the shared development log for work done with Claude, ChatGPT, or a human developer.
