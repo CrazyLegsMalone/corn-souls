@@ -39,6 +39,14 @@ This file is the shared development log for work done with Claude, ChatGPT, or a
 - Before every release, reconcile registry, in-game/public credits, source files and license requirements. Existing assets need retrospective review.
 - Player credits URL: https://crazylegsmalone.github.io/corn-souls/credits.html
 
+## Crowbar three-model A/B/C test (2026-10-29)
+- **Test preview:** https://crazylegsmalone.github.io/corn-souls/test/index.html?v=10
+- `test/index.html` includes a lightweight GLB 2.0 parser using the game's bundled Three.js and a selector for three real creator-made models: **clean** (mahdylg, 104 triangles), **horror** (hvarley, 290 triangles) and **Bendy-named** (FurLad, 82 triangles).
+- The user uploaded all three GLBs to ChatGPT. They are **not in GitHub**, because the current GitHub write connector cannot import mounted binary files. The test page lets the player choose all three GLB files directly from their computer with a local file picker, then switch between models; it also supports optional hosting at `test/models/<filename>` if independently cleared for public redistribution.
+- Keep the live crowbar and gameplay unchanged until testing and user approval.
+- Licensing: embedded model metadata declares CC BY 4.0, and the three models are registered as **candidates** in `assets/registry.json`. The **Bendy and the indigo ink** model explicitly references another franchise, so do not publicly host or ship it until rights to the underlying design are verified. Private comparison only for now. In-game/public credits must be added before shipping other models.
+- Runtime rendering and orientation not verified on a real browser yet. Treat any visual differences or loader errors as issues to test, not established successes.
+
 ## Current baseline
 - Repository: https://github.com/CrazyLegsMalone/corn-souls
 - Last verified version at creation: **1.91**
