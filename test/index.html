@@ -8,7 +8,7 @@
     navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('./game.html?corn_collision_test_v36='+Date.now(),{cache:'no-store'});
+  const response=await fetch('./game.html?corn_collision_test_v37='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -84,6 +84,12 @@
   html=html.replace(gpExtraMarker,gpExtraDiagnostic);
   // A low-profile TEST-only overlay, never part of the stable game.
   html=html.replace(/<\/body>/i,"<div id='corn-pad-diagnostic' style='position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);display:none;padding:8px 12px;border-radius:8px;background:rgba(7,17,31,.92);color:#ffe68b;font:14px monospace;pointer-events:none'>Press R3 to identify button</div></body>");
+  // R3 is detected correctly, but the generic controller menu route can swallow it.
+  // Route stick-click directly to the same button handler as the working touch toggle.
+  const r3PressMarker="function press(n) {\n  nav = 'pad';";
+  const r3PressFix="function press(n) {\n  nav = 'pad';\n  if (n === 'R3' && P3.walking && !$('modal').classList.contains('open')) { $('walkBtn').click(); return; }";
+  if(!html.includes(r3PressMarker))throw new Error('Controller press handler changed; R3 fix not applied.');
+  html=html.replace(r3PressMarker,r3PressFix);
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
