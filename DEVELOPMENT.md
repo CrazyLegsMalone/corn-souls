@@ -76,6 +76,13 @@ This file is the shared development log for work done with Claude, ChatGPT, or a
 - URL: https://crazylegsmalone.github.io/corn-souls/test/index.html?v=14
 - Actual browser gameplay still awaits confirmation. If loading succeeds, validate placement at scale-house west entrance, pickup/carry/throw, and optional GLB file selection. The live game remains unchanged.
 
+## Corn props Test v16 startup crash fix (2026-10-29)
+- User tested v15 and reported `Uncaught SyntaxError: Identifier 'CORN' has already been declared` on Squeeg startup, followed by missing `STATIONS`.
+- Root cause: original game defines `const CORN = {}` for cornfield graphics; injected props had also defined `const CORN` in the same script scope.
+- Updated only `test/index.html`: renamed all 22 occurrences in corn prop injection to `CORN_PROPS_STATE`, preserving existing main game's `CORN`. Commit `ebd2bb3`.
+- Preview: https://crazylegsmalone.github.io/corn-souls/test/index.html?v=16
+- **Not yet runtime-verified**. If any further error appears, diagnose actual message before claiming success. Do not promote to live before confirming Squeeg startup and pickup/throw in browser.
+
 ## Current baseline
 - Repository: https://github.com/CrazyLegsMalone/corn-souls
 - Last verified version at creation: **1.91**
