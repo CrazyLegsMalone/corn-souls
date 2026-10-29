@@ -12,7 +12,11 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  for(const s of scripts(rendered))new vm.Script(s);
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.9'));
+ assert.ok(rendered.includes('1.96.11'));
+ assert.ok(rendered.includes('✉ Message Developer'));
+ assert.ok(!rendered.includes('<h1>Leave a note</h1>'));
+ assert.ok(rendered.includes("['Weather ▸',()=>debugWeather(code)]"));
+ assert.ok(!rendered.includes("['Weather: sunny', () => set('sunny')]"),'weather options moved out of Debug');
  assert.ok(rendered.includes('Back to game ×'),'all modals have visible escape action');
  assert.ok(rendered.includes("$('csModalExit').onclick = () => inboxClose()"));
  assert.ok(!rendered.includes("['📬 Read notes ("),'old local reader removed from Debug');

@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.10';
+ const TEST_VERSION='1.96.11';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -165,6 +165,7 @@
   // Every TEST modal has a sticky escape button, even on short phone screens.
   // Keep it outside .row so existing action indexes/controller mappings stay intact.
   const modalExitPatches=[
+    ["$('card').classList.toggle('vert', !!vert);", "$('card').classList.remove('cs-inbox');$('card').classList.toggle('vert', !!vert);"],
     ["$('card').innerHTML = html +", "$('card').innerHTML = '<div class=\"cs-modal-exit\"><button id=\"csModalExit\" type=\"button\">Back to game ×</button></div>' + html +"],
     ["modalBtns.forEach((el, i) => el.onclick =", "$('csModalExit').onclick = () => inboxClose();\n  modalBtns.forEach((el, i) => el.onclick ="],
     ["if (n === 'B' || n === 'START') $('modal').classList.remove('open');", "if (n === 'B' || n === 'START') { inboxClose();return; }"],
@@ -193,6 +194,32 @@
     if(!html.includes(from))throw new Error('Note sharing source changed; refusing partial patch: '+from.slice(0,40));
     html=html.replace(from,()=>to);
   }
+  const weatherChoices="['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')]";
+  if(!html.includes(weatherChoices))throw new Error('Weather menu source changed; refusing partial patch.');
+  html=html.replace(weatherChoices,"['Weather ▸',()=>debugWeather(code)]");
+  html=html.replaceAll('📝 Leave a note (bug / idea / message)','✉ Message Developer').replaceAll('📝 Leave a note','✉ Message Developer').replaceAll('<h1>Leave a note</h1>','<h1>Message Developer</h1>');
+  const modalFocusSource="function markModal() { modalBtns.forEach((b, i) => b.classList.toggle('focus', nav === 'pad' && i === modalFocus)); }";
+  if(!html.includes(modalFocusSource))throw new Error('Modal focus source changed; refusing partial patch.');
+  html=html.replace(modalFocusSource,"function markModal() { modalBtns.forEach((b,i)=>b.classList.toggle('focus',nav==='pad'&&i===modalFocus));if(nav==='pad'&&modalBtns[modalFocus])modalBtns[modalFocus].scrollIntoView({block:'nearest'}); }");
+  html=html.replace('</head>',`<style>
+   .card.cs-inbox{width:min(720px,94vw)}
+   .cs-inbox-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}
+   .cs-inbox-tabs button{padding:0 5px;min-height:44px}
+   .cs-inbox-tabs button[aria-pressed="true"]{background:#174e85;color:#fff}
+   .cs-inbox-meta{font-size:12px;color:#5d6b7c;margin:8px 0}
+   .cs-inbox-list,.cs-inbox-detail{max-height:45vh;max-height:45dvh;overflow:auto;overscroll-behavior:contain}
+   .card button.cs-inbox-message{display:block;width:100%;height:auto;min-height:90px;text-align:left;padding:12px;margin:0 0 8px;border:1px solid #dce3eb;border-radius:9px}
+   .cs-inbox-message-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+   .cs-inbox-preview{display:block;font-weight:400;margin:6px 0;overflow-wrap:anywhere}
+   .cs-inbox-message small{font-weight:400;color:#5d6b7c}
+   .cs-inbox-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px;line-height:1.6}
+   .cs-inbox-empty{padding:16px 4px;line-height:1.6;color:#5d6b7c}
+   .cs-inbox-detail summary{cursor:pointer;padding:12px 0;color:#174e85;font-weight:700}
+   .cs-inbox-detail summary.focus{outline:3px solid #ffc531}
+   .cs-inbox .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+   .cs-inbox .row button{height:auto;min-height:44px;padding:8px}
+   @media(max-height:500px){.cs-inbox-list,.cs-inbox-detail{max-height:30dvh}}
+  </style></head>`);
   document.open();document.write(html);document.close();
  }catch(e){status.textContent='Corn Souls TEST could not load ('+e.message+'). Check internet, then reopen the TEST icon. If offline, connect once to download the new build.';}
 })();

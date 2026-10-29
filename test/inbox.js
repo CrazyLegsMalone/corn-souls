@@ -1,6 +1,20 @@
 // Public config only. Never place a service-role key or administrator password here.
-let CS_INBOX_SESSION=null, CS_INBOX_PAGE=0, CS_INBOX_FILTER='unread', CS_INBOX_VIEW=0;
+let CS_INBOX_SESSION=null, CS_INBOX_PAGE=0, CS_INBOX_FILTER='all', CS_INBOX_VIEW=0;
+let CS_INBOX_ITEMS=[];
 const CS_INBOX_SENDING=new Set();
+function inboxControls(){
+ // Include filters and messages, not just the footer, in controller navigation.
+ modalBtns=Array.from($('card').querySelectorAll('button:not(#csModalExit),summary'));
+ modalFocus=0;markModal();
+ modalBtns.forEach(b=>b.addEventListener('focus',()=>b.scrollIntoView({block:'nearest'})));
+}
+function inboxPanel(html,buttons){modal(html,buttons,false);$('card').classList.add('cs-inbox');}
+function inboxFilter(filter){CS_INBOX_FILTER=filter;CS_INBOX_PAGE=0;return inboxList();}
+function debugWeather(code){
+ const choose=k=>{wxForced=k;P3.setWeather(k||wxLive);if(!k)fetchWeather();toast('Weather: '+(k||'live'));debugWeather(code);};
+ modal('<h1>Weather</h1><p>Current: <b>'+escH(P3.weather)+'</b> · '+(wxForced?'Manual':'Live weather')+'</p>',
+  [['Back to Debug',()=>debugMenu(code)],['Live / automatic',()=>choose(null)],['Sunny',()=>choose('sunny')],['Cloudy',()=>choose('cloudy')],['Rain',()=>choose('rain')],['Snow',()=>choose('snow')]],false);
+}
 function inboxReady(){return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(INBOX_CONFIG.url||'')&&!!INBOX_CONFIG.publicKey;}
 function inboxUnavailable(){modal('<h1>Developer Inbox</h1><p>The central inbox is not connected yet. Notes remain saved on this device. You can still use Share note.</p>',[['Close',null]],true);}
 async function inboxRequest(path,options={},privateRequest=false){
@@ -69,6 +83,7 @@ function inboxClose(){
  $('modal').classList.remove('open');
  $('card').textContent='';
  modalBtns=[];modalFocus=0;
+ $('card').classList.remove('cs-inbox');CS_INBOX_ITEMS=[];
 }
 function inboxSignOut(){const old=CS_INBOX_SESSION;CS_INBOX_SESSION=null;inboxClose();if(old&&inboxReady())fetch(INBOX_CONFIG.url+'/auth/v1/logout',{method:'POST',headers:{apikey:INBOX_CONFIG.publicKey,Authorization:'Bearer '+old.token}}).catch(()=>{});toast('Developer signed out.');}
 async function inboxList(){
@@ -82,13 +97,17 @@ async function inboxList(){
   // an unexpected response crash the live 3D game or its controller UI.
   if(!Array.isArray(rows))throw Error('Developer Inbox returned an unexpected report-list response; please retry.');
   const visible=rows.slice(0,20);
-  const content=visible.map((r,i)=>'<button data-report="'+i+'" style="display:block;width:100%;text-align:left;margin:6px 0;padding:10px">'+
-   (r.read_at?'':'● ')+escH(r.name||'anonymous')+' · '+escH(r.kind)+' · '+escH(new Date(r.created_at).toLocaleString())+
-   '<br>'+escH(r.body.slice(0,100))+'<br><small>'+escH(r.build)+' · '+escH(r.device)+(r.resolved?' · Resolved':'')+'</small></button>').join('');
-  modal('<h1>Developer Inbox</h1><p>'+escH(filter)+' · Page '+(page+1)+'</p><div style="max-height:52vh;overflow:auto">'+(content||'<p>No reports here.</p>')+'</div>',
-   [['Close',()=>inboxClose()],['Unread',()=>{CS_INBOX_FILTER='unread';CS_INBOX_PAGE=0;inboxList();}],['All',()=>{CS_INBOX_FILTER='all';CS_INBOX_PAGE=0;inboxList();}],['Resolved',()=>{CS_INBOX_FILTER='resolved';CS_INBOX_PAGE=0;inboxList();}],
-    ...(page?[['Previous',()=>{CS_INBOX_PAGE--;inboxList();}]]:[]),...(rows.length>20?[['Next',()=>{CS_INBOX_PAGE++;inboxList();}]]:[]),['Refresh',()=>inboxList()],['Sign out',()=>inboxSignOut()]],true);
+  CS_INBOX_ITEMS=visible;
+  const tabs=[['all','All messages'],['unread','Unread'],['resolved','Resolved']].map(([key,label])=>'<button data-inbox-filter="'+key+'" aria-pressed="'+(key===filter)+'">'+label+'</button>').join('');
+  const content=visible.map((r,i)=>'<button class="cs-inbox-message" data-report="'+i+'">'+
+   '<span class="cs-inbox-message-head"><b>'+(r.read_at?'':'● ')+escH(r.name||'anonymous')+'</b><small>'+escH(new Date(r.created_at).toLocaleString())+'</small></span>'+
+   '<span class="cs-inbox-preview">'+escH(r.body.slice(0,140))+'</span><small>'+escH(r.kind)+' · '+escH(r.build)+' · '+escH(r.device)+(r.resolved?' · Resolved':'')+'</small></button>').join('');
+  const empty=filter==='unread'?'You’re caught up. Choose All messages to see messages you’ve read.':filter==='resolved'?'No resolved messages.':'No messages yet. Players can use Message Developer in the game menu.';
+  inboxPanel('<h1>Developer Inbox</h1><div class="cs-inbox-tabs">'+tabs+'</div><p class="cs-inbox-meta">Page '+(page+1)+' · '+visible.length+' messages</p><div class="cs-inbox-list">'+(content||'<p class="cs-inbox-empty">'+empty+'</p>')+'</div>',
+   [...(page?[['Previous page',()=>{CS_INBOX_PAGE--;inboxList();}]]:[]),...(rows.length>20?[['Next page',()=>{CS_INBOX_PAGE++;inboxList();}]]:[]),['Refresh',()=>inboxList()],['Debug menu',()=>debugMenu()],['Sign out',()=>inboxSignOut()]]);
+  $('card').querySelectorAll('[data-inbox-filter]').forEach(b=>b.onclick=()=>inboxFilter(b.dataset.inboxFilter));
   $('card').querySelectorAll('[data-report]').forEach(b=>b.onclick=()=>inboxDetail(visible[+b.dataset.report].id));
+  inboxControls();
  }catch(e){if(view!==CS_INBOX_VIEW)return;if(!CS_INBOX_SESSION)inboxLogin(e.message);else modal('<h1>Inbox unavailable</h1><p>'+escH(e.message)+'</p>',[['Retry',()=>inboxList()],['Close',()=>inboxClose()]],true);}
 }
 async function inboxDetail(id){
@@ -100,11 +119,22 @@ async function inboxDetail(id){
   await inboxRequest('/rest/v1/cs_reports?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({read_at:new Date().toISOString()})},true);
   if(view!==CS_INBOX_VIEW||!CS_INBOX_SESSION)return;
   const image=/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.screenshot||'')?'<img src="'+r.screenshot+'" alt="Report screenshot" style="width:100%;max-width:640px">':'';
-  modal('<h1>'+escH(r.kind)+' — '+escH(r.name||'anonymous')+'</h1><div style="max-height:60vh;overflow:auto"><p style="white-space:pre-wrap">'+escH(r.body)+'</p>'+image+
-   '<p>'+escH(r.build)+' · '+escH(r.device)+' · '+escH(r.location)+'<br>'+escH(new Date(r.created_at).toLocaleString())+'</p></div>',
-   [['Back',()=>inboxList()],[r.resolved?'Reopen report':'Mark resolved',async()=>{
-    try{await inboxRequest('/rest/v1/cs_reports?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({resolved:!r.resolved})},true);inboxDetail(id);}
-    catch(e){toast(e.message);inboxList();}
-   }],['Close',()=>inboxClose()]],true);
+  const index=CS_INBOX_ITEMS.findIndex(item=>item.id===id);
+  if(index>=0)CS_INBOX_ITEMS[index].read_at=new Date().toISOString();
+  inboxPanel('<h1>'+escH(r.name||'anonymous')+'</h1><p class="cs-inbox-meta">'+escH(r.kind)+' · '+escH(new Date(r.created_at).toLocaleString())+(index>=0?' · Message '+(index+1)+' of '+CS_INBOX_ITEMS.length:'')+'</p><div class="cs-inbox-detail"><p class="cs-inbox-body">'+escH(r.body)+'</p>'+
+   (image?'<details><summary>View screenshot</summary>'+image+'</details>':'')+'<p class="cs-inbox-meta">'+escH(r.build)+' · '+escH(r.device)+' · '+escH(r.location)+'</p></div>',
+   [['Back to messages',()=>inboxList()],...(index>0?[['Previous message',()=>inboxDetail(CS_INBOX_ITEMS[index-1].id)]]:[]),...(index>=0&&index<CS_INBOX_ITEMS.length-1?[['Next message',()=>inboxDetail(CS_INBOX_ITEMS[index+1].id)]]:[]),
+   [r.resolved?'Reopen message':'Mark resolved',()=>inboxResolve(r,index)]]);
+  inboxControls();
  }catch(e){if(view!==CS_INBOX_VIEW)return;if(!CS_INBOX_SESSION)inboxLogin(e.message);else {toast(e.message);inboxList();}}
+}
+async function inboxResolve(report,index){
+ const view=CS_INBOX_VIEW;
+ try{
+  await inboxRequest('/rest/v1/cs_reports?id=eq.'+encodeURIComponent(report.id),{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({resolved:!report.resolved})},true);
+  if(view!==CS_INBOX_VIEW||!CS_INBOX_SESSION)return;
+  // Continue through the current set instead of reloading the same message.
+  if(!report.resolved&&index>=0&&index+1<CS_INBOX_ITEMS.length)await inboxDetail(CS_INBOX_ITEMS[index+1].id);
+  else await inboxList();
+ }catch(e){if(view===CS_INBOX_VIEW){toast(e.message);inboxList();}}
 }
