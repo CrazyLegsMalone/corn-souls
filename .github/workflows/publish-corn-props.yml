@@ -1,0 +1,36 @@
+name: Publish corn props to live game
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/publish_corn_props.py
+      - .github/workflows/publish-corn-props.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply corn props to live game
+        run: python3 scripts/publish_corn_props.py
+      - name: Validate embedded JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          import re,pathlib,subprocess
+          s=pathlib.Path('index.html').read_text()
+          scripts=re.findall(r'<script(?:\\s[^>]*)?>([\\s\\S]*?)</script>',s,re.I)
+          for i,script in enumerate(scripts):
+              if script.strip():
+                  pathlib.Path('/tmp/corn-check.js').write_text(script)
+                  p=subprocess.run(['node','--check','/tmp/corn-check.js'],capture_output=True,text=True)
+                  if p.returncode:raise SystemExit(f'Script {i} invalid: {p.stderr}')
+          print('Validated',len(scripts),'script blocks')
+          PY
+      - name: Commit live game
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || (git commit -m "feat: publish corn cubes and low-poly corn at scale house and grain receiving" && git push)
