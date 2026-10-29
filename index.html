@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.94</title><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls — Alpha v1.94…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.95</title><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls — Alpha v1.95…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -8,18 +8,19 @@
     navigator.serviceWorker.register('/corn-souls/sw.js', {scope:'/corn-souls/'})
       .catch(err => console.warn('Live app cache registration unavailable:', err));
   }
-  const response=await fetch('game.html?alpha_v1_94='+Date.now(),{cache:'no-store'});
+  const response=await fetch('game.html?alpha_v1_95='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
   let html=await response.text();
+  html=html.replace("window.APP_VERSION = '1.94';","window.APP_VERSION = '1.95';");
   // Match the real in-game title, splash screen and HUD to this approved Alpha release.
   const alphaVersionMarker="window.APP_VERSION = '1.91';";
   if(!html.includes(alphaVersionMarker))throw Error('The base game version marker changed');
-  html=html.replace(alphaVersionMarker,"window.APP_VERSION = '1.94';");
+  html=html.replace(alphaVersionMarker,"window.APP_VERSION = '1.95';");
   const patchNoteMarker='const PATCH_NOTES = [';
   if(html.includes(patchNoteMarker)){
    html=html.replace(patchNoteMarker,patchNoteMarker+"\n  { v: '1.94', title: 'New PSX App Icons', notes: ['🌙 Updated moonlit plant icon, with the matching crash-test hard hat on TEST.'] },\n  { v: '1.93', title: 'Corn Props & Collision', notes: ['🌽 Corn cubes, low-poly corn ears and metal bins at the scale house and grain receiving.', '🪣 Corn and bins now have solid collision while walking and when throwing corn.', '🛠️ First-person maintenance shop startup and game loading improvements.'] },");
   }
-  html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.94</title>');
+  html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.95</title>');
   // Keep the approved first-person maintenance-shop startup.
   // Position is on the open shop floor, away from the two forklifts at z=37.
   const initMarker='try { P3.init(view); } catch (e)';
@@ -65,10 +66,13 @@
   if(!html.includes(vehicleEnter))throw Error('Vehicle-entry code changed; avatar fix not applied');
   html=html.replace(vehicleEnter,
     'function utvEnter() { utvIgnition(); walk.drive = true; if (VIEW.av) VIEW.av.visible = false;');
+  // Approved Razr background-audio guard; preserves music while visible.
+  const audioBackgroundGuard="(function(){\n if(window.__cornVisibilityAudioFix)return;\n window.__cornVisibilityAudioFix=true;\n const contexts=new Set();\n const resumeContexts=new Set();\n const resumeMedia=new Set();\n let wasHidden=false;\n const AudioBase=window.AudioContext, WebkitBase=window.webkitAudioContext;\n function wrap(Base){\n  return class extends Base{\n   constructor(...args){super(...args);contexts.add(this);}\n  };\n }\n if(typeof AudioBase==='function')window.AudioContext=wrap(AudioBase);\n if(typeof WebkitBase==='function'&&WebkitBase!==AudioBase)window.webkitAudioContext=wrap(WebkitBase);\n else if(WebkitBase===AudioBase && typeof AudioBase==='function')window.webkitAudioContext=window.AudioContext;\n function background(){\n  if(!document.hidden||wasHidden)return;\n  wasHidden=true;\n  for(const c of contexts)if(c.state==='running'){\n   resumeContexts.add(c);\n   c.suspend().catch(()=>{});\n  }\n  for(const el of document.querySelectorAll('audio,video')){\n   if(!el.paused){resumeMedia.add(el);el.pause();}\n  }\n }\n function foreground(){\n  if(document.hidden||!wasHidden)return;\n  wasHidden=false;\n  for(const c of resumeContexts)if(c.state==='suspended')c.resume().catch(()=>{});\n  resumeContexts.clear();\n  for(const el of resumeMedia)if(el.isConnected&&el.paused){\n   const p=el.play();if(p&&p.catch)p.catch(()=>{});\n  }\n  resumeMedia.clear();\n }\n document.addEventListener('visibilitychange',()=>document.hidden?background():foreground());\n window.addEventListener('pagehide',()=>{if(document.hidden)background();});\n window.addEventListener('pageshow',()=>{if(!document.hidden)foreground();});\n // Allow the title music's normal musicPlay() to retry after a real user gesture.\n // Browsers often reject autoplay on first launch; never force music when user switched it off.\n document.addEventListener('pointerdown',()=>{\n  if(!document.hidden&&typeof window.musicPlay==='function')window.musicPlay();\n },{capture:true});\n})();";
   // Test HUD removed; corn assets load without file selection.
   html=html.replace(/<head>/i,'<head><base href="./">');
+  html=html.replace(/<head>/i,'<head><script>'+audioBackgroundGuard+'</scr'+'ipt>');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
- }catch(e){status.textContent='Corn Souls Alpha v1.94 could not load: '+e.message;}
+ }catch(e){status.textContent='Corn Souls Alpha v1.95 could not load: '+e.message;}
 })();
 </script></body></html>
