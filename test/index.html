@@ -66,6 +66,11 @@
   const soloTitleMusicPlay='function musicPlay() { if (musicOn && !document.hidden && !(window.__splashOn && window.__splashOn())) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } }';
   if(!html.includes(originalMusicPlay)) throw new Error('Music initialization changed; TEST title audio isolation not applied.');
   html=html.replace(originalMusicPlay,soloTitleMusicPlay);
+  // Distinguish the TEST version on both bottom-right HUD and splash screen.
+  const originalVersionDisplay="document.getElementById('ver').textContent = 'Alpha v' + (window.APP_VERSION || ''); document.getElementById('spVer').textContent = 'ALPHA v' + (window.APP_VERSION || '');";
+  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v35'; document.getElementById('spVer').textContent = 'TEST v35';";
+  if(!html.includes(originalVersionDisplay)) throw new Error('Game version display changed; TEST label not applied.');
+  html=html.replace(originalVersionDisplay,testVersionDisplay);
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
