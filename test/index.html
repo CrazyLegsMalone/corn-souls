@@ -8,7 +8,7 @@
     navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('./game.html?corn_collision_test_v34='+Date.now(),{cache:'no-store'});
+  const response=await fetch('./game.html?corn_collision_test_v35='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
@@ -59,6 +59,13 @@
   // TEST-only: hard-stop all HTML audio and synthesized WebAudio when Android backgrounds the app.
   // Install before the original game's scripts execute, then restore on return.
   const audioBackgroundGuard="(function(){\n if(window.__cornVisibilityAudioFix)return;\n window.__cornVisibilityAudioFix=true;\n const contexts=new Set();\n const resumeContexts=new Set();\n const resumeMedia=new Set();\n let wasHidden=false;\n const AudioBase=window.AudioContext, WebkitBase=window.webkitAudioContext;\n function wrap(Base){\n  return class extends Base{\n   constructor(...args){super(...args);contexts.add(this);}\n  };\n }\n if(typeof AudioBase==='function')window.AudioContext=wrap(AudioBase);\n if(typeof WebkitBase==='function'&&WebkitBase!==AudioBase)window.webkitAudioContext=wrap(WebkitBase);\n else if(WebkitBase===AudioBase && typeof AudioBase==='function')window.webkitAudioContext=window.AudioContext;\n function background(){\n  if(!document.hidden||wasHidden)return;\n  wasHidden=true;\n  for(const c of contexts)if(c.state==='running'){\n   resumeContexts.add(c);\n   c.suspend().catch(()=>{});\n  }\n  for(const el of document.querySelectorAll('audio,video')){\n   if(!el.paused){resumeMedia.add(el);el.pause();}\n  }\n }\n function foreground(){\n  if(document.hidden||!wasHidden)return;\n  wasHidden=false;\n  for(const c of resumeContexts)if(c.state==='suspended')c.resume().catch(()=>{});\n  resumeContexts.clear();\n  for(const el of resumeMedia)if(el.isConnected&&el.paused){\n   const p=el.play();if(p&&p.catch)p.catch(()=>{});\n  }\n  resumeMedia.clear();\n }\n document.addEventListener('visibilitychange',()=>document.hidden?background():foreground());\n window.addEventListener('pagehide',()=>{if(document.hidden)background();});\n window.addEventListener('pageshow',()=>{if(!document.hidden)foreground();});\n // Allow the title music's normal musicPlay() to retry after a real user gesture.\n // Browsers often reject autoplay on first launch; never force music when user switched it off.\n document.addEventListener('pointerdown',()=>{\n  if(!document.hidden&&typeof window.musicPlay==='function')window.musicPlay();\n },{capture:true});\n})();";
+  // TEST audio isolation: keep the splash's synthesized soundtrack solo.
+  // The ordinary AM/PM in-game <audio> track must not start until the user
+  // actually selects a mode and leaves the title screen.
+  const originalMusicPlay='function musicPlay() { if (musicOn && !document.hidden) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } }';
+  const soloTitleMusicPlay='function musicPlay() { if (musicOn && !document.hidden && !(window.__splashOn && window.__splashOn())) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } }';
+  if(!html.includes(originalMusicPlay)) throw new Error('Music initialization changed; TEST title audio isolation not applied.');
+  html=html.replace(originalMusicPlay,soloTitleMusicPlay);
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
