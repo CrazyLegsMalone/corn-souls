@@ -1,0 +1,28 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync('test/game.html','utf8');
+const three=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).find(s=>s.includes('window.THREE=eu'));
+const lib={window:{},console};vm.runInNewContext(three,lib);const T=lib.window.THREE;
+const ctx={T,V3:(x,y,z)=>new T.Vector3(x,y,z),SA:{},clock:0,scene:new T.Scene(),document:{createElement:()=>({getContext:()=>({fillRect(){}})})}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('test/acid-liquid.js','utf8'),ctx);
+const hole=new T.Vector3(37.25,2.25,100),mid=new T.Vector3(37.7,1.435,100),land=new T.Vector3(37.85,.12,100);
+const mesh=ctx.saLiquidMesh(hole,mid,land);ctx.scene.add(mesh);
+assert.ok(mesh.position.distanceTo(hole)<1e-10,'source anchored at impact');
+const end=mesh.geometry.parameters.path.getPoint(1);mesh.localToWorld(end);assert.ok(end.distanceTo(land)<1e-10,'stream reaches original gameplay landing point');
+const leak={m:mesh,t:40};
+for(let i=0;i<1000;i++){ctx.clock=i/60;leak.t=40-i/60;ctx.saLiquidAnimate(leak);}
+assert.ok(mesh.position.distanceTo(hole)<1e-10,'flow does not shift stream around world origin');
+assert.equal(mesh.scale.x,1);assert.equal(mesh.scale.z,1);
+assert.ok(ctx.SA.streamM.map.offset.x!==0,'texture flows');
+assert.ok(mesh.userData.ripple.material.opacity>=0&&mesh.userData.ripple.material.opacity<=.28);
+let tubeDisposed=false,rippleDisposed=false,sharedDisposed=false;
+mesh.geometry.addEventListener('dispose',()=>tubeDisposed=true);mesh.userData.ripple.material.addEventListener('dispose',()=>rippleDisposed=true);
+ctx.SA.rippleGeo.addEventListener('dispose',()=>sharedDisposed=true);
+ctx.saLiquidRemove(leak);assert.equal(mesh.parent,null);assert.ok(tubeDisposed&&rippleDisposed);assert.equal(sharedDisposed,false);
+const second=ctx.saLiquidMesh(hole,mid,land);assert.equal(second.material,mesh.material);assert.equal(second.userData.ripple.geometry,ctx.SA.rippleGeo);
+ctx.SA.leaks=[];let packets=0;
+ctx.saHit=(p,remote)=>{assert.equal(remote,true,'paintball cannot accidentally use wrench patch branch');ctx.SA.leaks.push({});return true;};
+ctx.netSend=packet=>{assert.equal(packet.t,'sa');packets++;};
+ctx.saLiquidPaintHit(hole);assert.equal(packets,1,'originating paintball sends one existing leak packet');
+ctx.saHit=()=>false;ctx.saLiquidPaintHit(hole);assert.equal(packets,1,'other surfaces do not broadcast leaks');
+ctx.saHit=()=>true;ctx.saLiquidPaintHit(hole);assert.equal(packets,1,'empty tank does not broadcast an absent hole');
+console.log('PASS: real Three.js liquid geometry anchors, landing point, 1,000-frame stable flow, animated highlights/ripples, shared resources and disposal.');

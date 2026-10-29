@@ -42,7 +42,8 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  boost.fs=10;boost.u.noNos=true;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false);assert.equal(boost.u.nos,0,'non-turbo vehicle stays ineligible');
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.17'));
+ assert.ok(rendered.includes('1.96.18'));
+ assert.ok(rendered.includes('if (!B.remote) { nh3Hit(h.point);saLiquidPaintHit(h.point); }'),'only originating paintballs create/broadcast acid leaks');
  assert.ok(rendered.includes("['Sound ▸',()=>soundSettings()]"));
  assert.ok(rendered.includes("const music = $('music'); music.volume=soundMusicVolume();"),'saved volume applied before first track');
  assert.ok(rendered.includes('✉ Message Developer'));

@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.17';
+ const TEST_VERSION='1.96.18';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -163,7 +163,20 @@
   }
   const soundResponse=await fetch('./sound-settings.js?build='+TEST_VERSION,{cache:'no-store'});
   if(!soundResponse.ok)throw new Error('Sound settings could not load');
-  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await soundResponse.text()+'\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  const acidResponse=await fetch('./acid-liquid.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!acidResponse.ok)throw new Error('Acid liquid visuals could not load');
+  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await acidResponse.text()+'\n'+await soundResponse.text()+'\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  const acidVisualPatches=[
+   ["if (!B.remote) nh3Hit(h.point);", "if (!B.remote) { nh3Hit(h.point);saLiquidPaintHit(h.point); }"],
+   ["const curve = new T.QuadraticBezierCurve3(hp, mid, land), m = new T.Mesh(new T.TubeGeometry(curve, 10, 0.035, 5, false), SA.streamM || (SA.streamM = new T.MeshBasicMaterial({ color: 0xe6dc8a, transparent: true, opacity: 0.8 })));", "const m=saLiquidMesh(hp,mid,land);"],
+   ["L.m.scale.x = L.m.scale.z = 0.85 + 0.3 * Math.random();", "saLiquidAnimate(L);"],
+   ["if (Math.random() < dt * 4) puff(L.land, 0.12, 0xe6dc8a);", "/* Liquid impact ripples replace the rising bubble puffs. */"],
+   ["SA.poolM.material.opacity = 0.55 + 0.1 * Math.sin(clock * 3);", "SA.poolM.material.opacity = 0.65 + 0.025 * Math.sin(clock * 3);"]
+  ];
+  for(const [from,to] of acidVisualPatches){if(!html.includes(from))throw new Error('Acid leak visual source changed; refusing partial patch.');html=html.replace(from,()=>to);}
+  const acidCleanup='scene.remove(L.m); L.m.geometry.dispose();';
+  if(html.split(acidCleanup).length!==3)throw new Error('Acid cleanup source changed; refusing partial patch.');
+  html=html.replaceAll(acidCleanup,'saLiquidRemove(L);');
   // Every TEST modal has a sticky escape button, even on short phone screens.
   // Keep it outside .row so existing action indexes/controller mappings stay intact.
   const modalExitPatches=[
