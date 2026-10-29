@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.18';
+ const TEST_VERSION='1.96.19';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -165,7 +165,19 @@
   if(!soundResponse.ok)throw new Error('Sound settings could not load');
   const acidResponse=await fetch('./acid-liquid.js?build='+TEST_VERSION,{cache:'no-store'});
   if(!acidResponse.ok)throw new Error('Acid liquid visuals could not load');
-  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await acidResponse.text()+'\n'+await soundResponse.text()+'\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  const acidEngine=await acidResponse.text();
+  const doorResponse=await fetch('./cooler-door-audio.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!doorResponse.ok)throw new Error('Cooler door audio could not load');
+  const doorEngine=await doorResponse.text();
+  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await soundResponse.text()+'\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  // These helpers need the private plant state, so inject inside Plant3D's scope.
+  const scopedEffects=[
+   ['function saHit(p, remote) {',acidEngine+'\nfunction saHit(p, remote) {'],
+   ['function coolerHandle(remote) {',doorEngine+'\nfunction coolerHandle(remote) {'],
+   ["d.want = remote ? remote.o : d.want ? 0 : 1; if (!remote) netSend({ t: 'cd', i: d.i, o: d.want });", "const previousWant=d.want; d.want = remote ? remote.o : d.want ? 0 : 1; if(d.want!==previousWant)coolerDoorSound(d,d.want?'open':'swing'); if (!remote) netSend({ t: 'cd', i: d.i, o: d.want });"],
+   ["d.open += Math.max(-dt * 1.6, Math.min(dt * 1.6, d.want - d.open)); openSum += d.open;", "const previousOpen=d.open; d.open += Math.max(-dt * 1.6, Math.min(dt * 1.6, d.want - d.open)); if(previousOpen>0&&d.open===0)coolerDoorSound(d,'close'); openSum += d.open;"]
+  ];
+  for(const [from,to] of scopedEffects){if(!html.includes(from))throw new Error('Plant effect source changed; refusing partial patch.');html=html.replace(from,()=>to);}
   const acidVisualPatches=[
    ["if (!B.remote) nh3Hit(h.point);", "if (!B.remote) { nh3Hit(h.point);saLiquidPaintHit(h.point); }"],
    ["const curve = new T.QuadraticBezierCurve3(hp, mid, land), m = new T.Mesh(new T.TubeGeometry(curve, 10, 0.035, 5, false), SA.streamM || (SA.streamM = new T.MeshBasicMaterial({ color: 0xe6dc8a, transparent: true, opacity: 0.8 })));", "const m=saLiquidMesh(hp,mid,land);"],

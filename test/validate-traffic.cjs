@@ -42,7 +42,32 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  boost.fs=10;boost.u.noNos=true;tickBoost.runInContext(boost);assert.equal(boost.u.boosting,false);assert.equal(boost.u.nos,0,'non-turbo vehicle stays ineligible');
  new vm.Script(fs.readFileSync('test/sw.js','utf8'));
  for(const s of scripts(fs.readFileSync('test/refresh.html','utf8')))new vm.Script(s);
- assert.ok(rendered.includes('1.96.18'));
+ assert.ok(rendered.includes('1.96.19'));
+ const plantExport=rendered.indexOf('root.Plant3D = {');
+ assert.ok(rendered.indexOf('function saLiquidMesh(')<plantExport,'acid helper is inside plant scope');
+ assert.ok(rendered.indexOf('function coolerDoorSound(')<plantExport,'door audio is inside plant scope');
+ // Execute the actual generated acid helper + caller together in an isolated
+ // plant closure; parsing helpers separately failed to catch the v1.96.18 bug.
+ const acidStart=rendered.indexOf('function saLiquidPaintHit('),acidEnd=rendered.indexOf('// ---------- ANHYDROUS AMMONIA TANK',acidStart);
+ const acidCode=rendered.slice(acidStart,acidEnd);
+ const world={window:{},console};vm.runInNewContext(scripts(base).find(s=>s.includes('window.THREE=eu')),world);
+ const AT=world.window.THREE,acidState={T:AT,V3:(x,y,z)=>new AT.Vector3(x,y,z),SA:{R:1.25,L:6.6,x:36,z:100,cy:2.25,level:1,leaks:[],alarm:false},
+  held:'crowbar',COOL_NOTIFY:null,scene:new AT.Scene(),netSend(){},document:{createElement:()=>({getContext:()=>({fillRect(){}})})}};
+ // SA is normally declared outside this extracted block, inside Plant3D.
+ const callerStart=acidCode.indexOf('function saHit('),callerEnd=acidCode.indexOf('function saPatch()');
+ vm.runInNewContext('(function(){'+acidCode.slice(0,callerStart)+acidCode.slice(callerStart,callerEnd)+'this.hit=saHit;}).call(this);',acidState);
+ assert.equal(acidState.hit(new AT.Vector3(37.25,2.25,100)),true);
+ assert.equal(acidState.SA.leaks.length,1,'real caller resolves helper and creates liquid mesh');
+ const doorStart=rendered.indexOf('function coolerHandle(remote) {'),doorEnd=rendered.indexOf('function coolerBeep(',doorStart);
+ const sounds=[],door={i:0,want:0,open:0};
+ const doorState={O:{coolerDoors:[door]},coolerDoorSound:(d,kind)=>sounds.push(kind),netSend(){}};
+ vm.runInNewContext(rendered.slice(doorStart,doorEnd)+'this.handle=coolerHandle;',doorState);
+ doorState.handle({i:0,o:1});doorState.handle({i:0,o:1});doorState.handle({i:0,o:0});
+ assert.equal(sounds.join(','),'open,swing','one sound per target transition, including remote action');
+ const doorMotion=rendered.split('\n').find(line=>line.includes('const previousOpen=d.open;'));
+ const motion={d:door,dt:1/60,openSum:0,coolerDoorSound:doorState.coolerDoorSound};door.open=1;
+ vm.createContext(motion);const doorTick=new vm.Script('{'+doorMotion+'}');for(let i=0;i<120;i++)doorTick.runInContext(motion);
+ assert.equal(sounds.join(','),'open,swing,close','closing seal plays once at full closure');
  assert.ok(rendered.includes('if (!B.remote) { nh3Hit(h.point);saLiquidPaintHit(h.point); }'),'only originating paintballs create/broadcast acid leaks');
  assert.ok(rendered.includes("['Sound ▸',()=>soundSettings()]"));
  assert.ok(rendered.includes("const music = $('music'); music.volume=soundMusicVolume();"),'saved volume applied before first track');
