@@ -68,7 +68,7 @@
   html=html.replace(originalMusicPlay,soloTitleMusicPlay);
   // Distinguish the TEST version on both bottom-right HUD and splash screen.
   const originalVersionDisplay="document.getElementById('ver').textContent = 'Alpha v' + (window.APP_VERSION || ''); document.getElementById('spVer').textContent = 'ALPHA v' + (window.APP_VERSION || '');";
-  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v35'; document.getElementById('spVer').textContent = 'TEST v35';";
+  const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v37'; document.getElementById('spVer').textContent = 'TEST v37';";
   if(!html.includes(originalVersionDisplay)) throw new Error('Game version display changed; TEST label not applied.');
   html=html.replace(originalVersionDisplay,testVersionDisplay);
   // TEST controller diagnosis: report each newly pressed gamepad button.
