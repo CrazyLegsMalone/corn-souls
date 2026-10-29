@@ -134,7 +134,7 @@
   for(const [tag,marker] of [['tick',highwayUpdateAnchor],['receive',highwayRecvAnchor],['send',highwaySendAnchor]]){
    if(!html.includes(marker))throw new Error('Highway traffic '+tag+' source changed; refusing partial patch.');
   }
-  html=html.replace(highwayUpdateAnchor,highwayTrafficEngine+"\\nfunction updateVehicles(dt) { updateHighwayTraffic(dt);");
+  html=html.replace(highwayUpdateAnchor,highwayTrafficEngine+"function updateVehicles(dt) { updateHighwayTraffic(dt);");
   html=html.replace(highwayRecvAnchor,"} else if(m.t==='vt' && !NET.host){ if(typeof m.ht==='number') HWY_TRAFFIC_TIME=m.ht;");
   html=html.replace(highwaySendAnchor,"netSend({t:'vt',ht:+HWY_TRAFFIC_TIME.toFixed(2),v:vehicles.map");
   // Test HUD removed; corn assets load without file selection.
