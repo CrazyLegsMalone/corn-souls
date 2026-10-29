@@ -1,13 +1,12 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Collision Test</title><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls sandbox preview…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls TEST — Collision Build</title><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls TEST…</p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
-  // Defeat old preview caching. Keep current page available even if worker cleanup fails.
-  if('serviceWorker' in navigator) {
-    try {const regs=await navigator.serviceWorker.getRegistrations();
-      for(const reg of regs) if(reg.scope.includes('/corn-souls/')) await reg.unregister();
-    } catch(err) {}
+  // This test build has its own service worker and never unregisters the live game's worker.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
+      .catch(err => console.warn('Test app update registration unavailable:', err));
   }
   const response=await fetch('../game.html?corn_collision_test_v28='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
@@ -56,7 +55,10 @@
   html=html.replace(vehicleEnter,
     'function utvEnter() { utvIgnition(); walk.drive = true; if (VIEW.av) VIEW.av.visible = false;');
   // Test HUD removed; corn assets load without file selection.
-  html=html.replace(/<head>/i,'<head><base href="../">');
+  // Give the dynamically loaded game the same independent TEST install identity.
+  // Remove the live build's manifest so Android installs this as a separate app.
+  html=html.replace(/<link\\b(?=[^>]*\\brel=["']manifest["'])[^>]*>/gi,'');
+  html=html.replace(/<head>/i,'<head><base href="../"><link rel="manifest" href="/corn-souls/test/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/test/icon-192.png">');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
   document.open();document.write(html);document.close();
  }catch(e){status.textContent='Test preview failed: '+e.message;}

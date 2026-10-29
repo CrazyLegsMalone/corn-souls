@@ -1,0 +1,30 @@
+{
+  "name": "Corn Souls TEST",
+  "short_name": "Corn Souls TEST",
+  "description": "Corn Souls development test build — separate from the live game.",
+  "id": "/corn-souls/test/",
+  "start_url": "/corn-souls/test/index.html",
+  "scope": "/corn-souls/test/",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "landscape",
+  "background_color": "#06111f",
+  "theme_color": "#06111f",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
