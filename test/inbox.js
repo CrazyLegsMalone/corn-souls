@@ -58,7 +58,9 @@ async function inboxSignIn(){
   const allowed=await inboxRequest('/rest/v1/rpc/cs_is_report_admin',{method:'POST',body:'{}'},true);
   if(view!==CS_INBOX_VIEW)return;
   if(!allowed){CS_INBOX_SESSION=null;inboxLogin('This account is not approved for the developer inbox.');return;}
-  CS_INBOX_PAGE=0;await inboxList();
+  CS_INBOX_PAGE=0;
+  try{await inboxList();}
+  catch(e){console.error('Developer inbox list after login failed:',e);modal('<h1>Inbox unavailable</h1><p>'+escH(e.message||'Unable to load inbox.')+'</p>',[['Retry',()=>inboxList()],['Close',()=>inboxClose()]],true);}
  }catch(e){if(view!==CS_INBOX_VIEW)return;CS_INBOX_SESSION=null;inboxLogin(e.message);}
 }
 function inboxOpen(){if(!CS_INBOX_SESSION||Date.now()>=CS_INBOX_SESSION.expires)inboxLogin();else inboxList();}
@@ -76,6 +78,9 @@ async function inboxList(){
   const query=filter==='unread'?'&read_at=is.null&resolved=eq.false':filter==='resolved'?'&resolved=eq.true':'';
   const rows=await inboxRequest('/rest/v1/cs_reports?select=id,created_at,kind,name,body,build,device,read_at,resolved&order=created_at.desc,id.desc&limit=21&offset='+page*20+query,{},true);
   if(view!==CS_INBOX_VIEW||!CS_INBOX_SESSION)return;
+  // After sign-in Supabase can return an error/object or no rows. Never let
+  // an unexpected response crash the live 3D game or its controller UI.
+  if(!Array.isArray(rows))throw Error('Developer Inbox returned an unexpected report-list response; please retry.');
   const visible=rows.slice(0,20);
   const content=visible.map((r,i)=>'<button data-report="'+i+'" style="display:block;width:100%;text-align:left;margin:6px 0;padding:10px">'+
    (r.read_at?'':'● ')+escH(r.name||'anonymous')+' · '+escH(r.kind)+' · '+escH(new Date(r.created_at).toLocaleString())+
