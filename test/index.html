@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.12';
+ const TEST_VERSION='1.96.13';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -161,10 +161,15 @@
       if(role!=='anon')throw new Error('Inbox requires a public anon key');
     }else if(!inboxConfig.publicKey.startsWith('sb_publishable_'))throw new Error('Unsupported inbox key');
   }
-  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  const soundResponse=await fetch('./sound-settings.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!soundResponse.ok)throw new Error('Sound settings could not load');
+  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await soundResponse.text()+'\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
   // Every TEST modal has a sticky escape button, even on short phone screens.
   // Keep it outside .row so existing action indexes/controller mappings stay intact.
   const modalExitPatches=[
+    ["[musicOn ? 'Music: on' : 'Music: off', toggleMusic]", "['Sound ▸',()=>soundSettings()]"],
+    ["music.volume = 0.6;", "music.volume = soundMusicVolume();"],
+    ["const music = $('music'); let musicOn", "const music = $('music'); music.volume=soundMusicVolume(); let musicOn"],
     ["modal('<h1>Corn Souls</h1>', b);", "modal('<h1>Corn Souls</h1>', b, true);"],
     ["$('card').classList.toggle('vert', !!vert);", "$('card').classList.remove('cs-inbox');$('card').classList.toggle('vert', !!vert);"],
     ["$('card').innerHTML = html +", "$('card').innerHTML = '<div class=\"cs-modal-exit\"><button id=\"csModalExit\" type=\"button\">Back to game ×</button></div>' + html +"],
