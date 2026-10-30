@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.3';
+ const TEST_VERSION='1.97.4';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -161,6 +161,12 @@
   // south wind cannot be mistaken for a broken rotation.
   const windDebug="<div id='wind-readout' style='position:fixed;left:8px;bottom:8px;z-index:2147483600;background:rgba(0,26,47,.88);color:#ffe7a6;padding:5px 8px;font:12px monospace;pointer-events:none'>Wind: waiting for live weather...</div><script>setInterval(()=>{const w=window.__cornWindSockState,d=document.getElementById('wind-readout');if(!d||!w)return;d.textContent='WIND '+(window.__cornWindWeatherAt?'LIVE':'FALLBACK')+' '+w.mph+' mph FROM '+w.from+'° · sock TO '+w.towards+'°';},900);</scr"+"ipt>";
   html=html.replace(/<\/body>/i,windDebug+'</body>');
+  // Crossing bell is local: full volume inside ~20 world units, a smooth
+  // quadratic fade, and completely silent beyond 85 world units.
+  // The original inverse-distance calculation was audible across the map.
+  const crossingBellOld="crossingBell(Math.min(1, 30 / (camera.position.distanceTo(pos) + 5)), panOf(pos));";
+  if(!html.includes(crossingBellOld))throw Error('Rail crossing bell code changed; safe range patch not applied.');
+  html=html.replace(crossingBellOld,"crossingBell(Math.pow(Math.max(0, Math.min(1, (85 - camera.position.distanceTo(pos)) / 65)), 2), panOf(pos));");
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
