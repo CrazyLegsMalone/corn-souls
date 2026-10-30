@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.6';
+ const TEST_VERSION='1.97.7';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -179,6 +179,14 @@
   const fermRailOld="const a0 = i / N * Math.PI * 2, a1 = (i + 1) / N * Math.PI * 2, mid = (a0 + a1) / 2;";
   if(!html.includes(fermRailOld))throw Error('Fermenter railing geometry changed; gap fix not applied.');
   html=html.replace(fermRailOld,"const a0 = (i - 0.5) / N * Math.PI * 2, a1 = (i + 0.5) / N * Math.PI * 2, mid = (a0 + a1) / 2;");
+  // Move Controls out of Debug and into Pause, replacing the old Help entry.
+  // Keep the original controlsMenu renderer and its complete controller/phone/keyboard instructions.
+  const debugControlsEntry="['📥 Developer Inbox',()=>inboxOpen()], ['🎮 Controls', () => controlsMenu(code)]";
+  if(!html.includes(debugControlsEntry))throw Error('Debug Controls entry changed; cannot safely move it');
+  html=html.replace(debugControlsEntry,"['📥 Developer Inbox',()=>inboxOpen()]");
+  const pauseHelpEntry="['Help', help]";
+  if(!html.includes(pauseHelpEntry))throw Error('Pause Help entry changed; cannot safely replace it');
+  html=html.replace(pauseHelpEntry,"['🎮 Controls', () => controlsMenu('', false)]");
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
