@@ -6799,7 +6799,7 @@ function init(container) {
       const kn = new T.Mesh(new T.SphereGeometry(0.04, 6, 4), mat(0xc0c6cc)); kn.position.set(lw - 0.1, 1.0, -0.06); g.add(kn);
       (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x: MDX, z, open: 0 });
       box(1.05, 0.1, 0.4, mat(0x56606b), MDX, 2.16, z);
-      cyl(0.09, 0.5, mat(0xc8211c), MDX - 0.85, 0.5, z - 0.22, null, 8);                                              // extinguisher
+      extWall(MDX - 0.85, 0.75, z - 0.3, Math.PI);                                              // extinguisher
       box(0.35, 0.2, 0.15, new T.MeshBasicMaterial({ color: 0xffffff }), MDX - 0.3, 5.2, z - 0.2);                    // wall pack light
       box(0.28, 0.2, 0.02, mat(0xf4f4f0), RUX - RW / 2 - 0.35, 1.75, z - 0.16); box(0.24, 0.05, 0.025, mat(0xc8211c), RUX - RW / 2 - 0.35, 1.81, z - 0.16);   // DANGER sign
       for (const [w, h, d, c, y] of [[0.2, 0.15, 0.02, 0xf4f4f0, 1.4], [0.18, 0.04, 0.025, 0x1f56a8, 1.45], [0.18, 0.2, 0.02, 0xb9c6d2, 1.7]]) { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(0.45, y, -0.04); g.add(m); }   // NOTICE + posted sheet on the door
@@ -6982,7 +6982,7 @@ function init(container) {
       building(TX0, TX1, TZM, TZ1, 4.0, null, [[EZ1, 0.95, 2.13]], [[WDD, 1.75, 2.13]]);                   // MCC room (south)
       building(TX0, TX1, TZ0, TZM, 7.0, [2.6, 4.9, 7.7, 10.2].map(dx => [TX1 - dx, 0.95, 0.95, 0.92]), [[EZ2, 0.95, 2.13]], [[WZ1, 0.95, 2.13], [WRU, RUW, RUH]]);   // turbine room (north)
       box(TX1 - TX0 - 0.3, 0.1, TZ1 - TZ0 - 0.3, mat(0x8d9196), (TX0 + TX1) / 2, 0.16, (TZ0 + TZ1) / 2);
-      const grn = mat(0x3a4a48), red = mat(0xd23a2a), ext = (x, z) => cyl(0.09, 0.5, mat(0xc8211c), x, 0.6, z, null, 8);
+      const grn = mat(0x3a4a48), red = mat(0xd23a2a), ext = (x, z) => extWall(x, 0.85, z, x > TX1 ? Math.PI / 2 : -Math.PI / 2);
       // man doors (vanish as Squeeg walks up): [wall x, center z, outward sign (+1 east / -1 west), hinge at the -z end?, leaves]
       const mdoor = (wx, zc, out, hingeN, pair) => { const W = pair ? 1.75 : 0.95, lw = (pair ? W / 2 : W) - 0.06;
         for (const k of pair ? [-1, 1] : [hingeN ? -1 : 1]) { const g = new T.Group(); g.position.set(wx, 0, zc + k * W / 2); g.rotation.y = Math.PI / 2; scene.add(g);
