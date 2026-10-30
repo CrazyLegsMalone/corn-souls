@@ -5649,8 +5649,8 @@ function init(container) {
       box(FXE - FXW, 0.15, 1.6, mat(0x8a9097), AC, top, ZN);   // crossover walkway between the two tank tops
     }
     wall(FXW, BWZ + BWR, FXW, NZ, PH, wm, [[2.3, DOOR]], { trim: true });                      // west side, beer well down to the cook alley corner; man door just south of the beer well (photo)
-    wall(FXE, Z1 + FR, FXE, -10, PH, wm, [], { trim: true });                                  // east side, F1 down to where the shop wing joins
-    wall(FXE, -10, FXE, SZ, PH, wm, [[OZN - 2.6 - -10, 4.5, 4.6], [27 - -10, DOOR], [SZ - 1.7 - -10, DOOR]], { trim: true });   // inside now: ferm alley ↔ shop side, wide opening + doors
+    wall(FXE, Z1 + FR, FXE, -23.7, PH, wm, [], { trim: true });                                  // east side, F1 down to the south edge of Ferm MCC; retain its enclosure
+    // Open ferm aisle to the shop side from z=-23.7 to SZ: no divider meshes, trim, door leaves or collision.
     // roofs: west block and ferm alley (tanks and evaporators poke up through)
     add(new T.BoxGeometry(EW - WW + 0.6, 0.3, SZ - NZ + 0.6), roofM, (WW + EW) / 2, PH + 0.15, (NZ + SZ) / 2, null, true);
     add(new T.BoxGeometry(FXE - FXW + 0.6, 0.3, SZ - ZN + 0.6), roofM, AC, PH + 0.15, (SZ + ZN) / 2, null, true);
