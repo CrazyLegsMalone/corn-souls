@@ -12,7 +12,7 @@ vm.runInContext(build,ctx);
 assert.equal(ctx.O.windsocks.length,2);assert.equal(ctx.O.windsock,ctx.O.windsocks[0]);
 const [cake,ammonia]=ctx.O.windsocks;
 assert.deepEqual(Array.from(cake.piv.position.toArray()),[-71,6,103]);
-assert.deepEqual(Array.from(ammonia.piv.position.toArray()),[31.299999999999997,6,-56.5]);
+assert.deepEqual(Array.from(ammonia.piv.position.toArray()),[39.3,6,-56.5]);
 assert.equal(ctx.extraCols.length,2,'both poles have collision');
 assert.notEqual(cake.piv,ammonia.piv);assert.notEqual(cake.segs[0],ammonia.segs[0]);
 assert.equal(ammonia.segs.length,5);

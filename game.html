@@ -7037,9 +7037,9 @@ function init(container) {
       cyl(0.9, 16, mat(0x8a9097), rx - 6.5, 0, rz, null, 12); extraCols.push([rx - 6.5, rz, 1.0]); STACKS.push({ x: rx - 6.5, y: 16.1, z: rz, r: 0.9, rate: 7 });   /* stack on the west side (plume) */ }
     // WIND SOCK by the wet cake pad (west end): orange/white striped sock on a 20 ft pole. It swings to point downwind with the live
     // weather and fills out with the wind speed (limp and hanging when it's calm), fluttering a little.
-    // Keep the wet cake windsock; add an identical one northwest of ammonia, clear of the tank, valves and south pump rack.
+    // Keep the wet cake windsock; add an identical one northeast of ammonia, clear of the tank, valves and south pump rack.
     O.windsocks = [];
-    for (const [WX, WZ] of [[E1 - 67 - 4, EZ1 + 3], [NH3.x - 4, NH3.z - 8]]) {
+    for (const [WX, WZ] of [[E1 - 67 - 4, EZ1 + 3], [NH3.x + 4, NH3.z - 8]]) {
       cyl(0.07, 6.0, mat(0xd8dcdf), WX, 0, WZ, null, 10); box(0.5, 0.2, 0.5, mat(0x9a9fa4), WX, 0.1, WZ); extraCols.push([WX, WZ, 0.3]);
       const piv = new T.Group(); piv.position.set(WX, 6.0, WZ); scene.add(piv);
       const ring = new T.Mesh(new T.TorusGeometry(0.28, 0.025, 6, 16), mat(0x9aa0a6)); ring.position.set(0, 0, 0.12); piv.add(ring);
