@@ -265,3 +265,9 @@ Copy/update this section at the end of each work session:
 
 ## Important
 GitHub synchronizes committed files, **not** assistant conversations or uncommitted edits. Always fetch the latest state before continuing. If a user has uncommitted local work, request it before editing overlapping files.
+## TEST v1.97.12 — satellite west-wing proportions (2026-10-30)
+- West arm stays anchored to its existing north/east joins, at full equipment scale: 43 m wide, depth shortened from 56.5 m to 32.5 m. This matches the satellite roof arm's approximate width/depth ratio, not a survey of absolute dimensions. Main ferm/shop south wall, tanks and east road remain fixed.
+- Translate the entire office block 6 m north without scaling rooms or furnishings; move Rick with his chair. Relocate strainers and cook tube 2, including pipe paths and selection targets, to retain the cook aisle. Move all eight full-size evaporators and their tower 24 m north; retain over 2 m clear aisle south of the offices. Move the outside distillation pad/beer-feed endpoint into the exposed recess. Add recessed south/return walls, working exits and matching collision; update floors, roof, paths and critter bounds.
+- Refresh TEST game source from the current LIVE source before the focused geometry edits, retaining current NPC dialogue and recent plant fixes. TEST launcher retains its own installation identity and patches; version 1.97.12 / shell-v39. LIVE source and launcher are unchanged.
+- Validation: real Three.js scene construction; original office meshes and positions compared after rigid translation; eight evaporators and aisle clearances; wall collision and door positions; NPC routing and generated LIVE launcher; windsocks, extinguisher, acid and cooler audio suites pass. TEST launcher loads and starts locally. Full visual overhead comparison and walkthrough remain pending owner review. Publish only TEST pending approval for LIVE.
+
