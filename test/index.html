@@ -113,10 +113,8 @@
   for(const [label,oldText] of [['model insertion',extModelAnchor],['station visual',extStationOld],['held visual',extHudOld]]){
     if(!html.includes(oldText))throw new Error('Extinguisher '+label+' source changed; model replacement not applied.');
   }
-  // Diagnostic only during v40 testing: explicitly show model loading status
-  // rather than silently displaying the old placeholder when GLB decoding fails.
-  const statusPatch="setTimeout(()=>{ EXT_GLB.then(proto=>{const d=document.createElement('div');d.id='ext-model-status';d.style.cssText='position:fixed;top:44px;right:8px;padding:6px 9px;background:#122b29;color:#fff;font:12px monospace;z-index:2147483647;pointer-events:none';d.textContent=proto?'🧯 GLB 3D model READY':'🧯 GLB ERROR: '+(window.__extGlbFailure||'unknown');document.body.append(d);});},600);";
-  html=html.replace(extModelAnchor,extModelInsert+statusPatch+"\n"+extModelAnchor);
+  // The 3D model is approved; no on-screen GLB loading diagnostic.
+  html=html.replace(extModelAnchor,extModelInsert+extModelAnchor);
 
   html=html.replace(extStationOld,extStationNew);
   html=html.replace(extHudOld,extHudNew);
