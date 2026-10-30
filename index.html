@@ -1,27 +1,21 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.96</title><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls — Alpha v1.96…</p><script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Corn Souls — Alpha v1.97</title><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192-blue-psx.png"><style>body{background:#06111f;color:#e5e8ed;font:16px system-ui;margin:3rem}pre{white-space:pre-wrap}</style></head><body><p id="status">Loading Corn Souls…</p><script>
 (async()=>{
  const status=document.getElementById('status');
+ // One version constant drives TEST HUD, title screen and asset request.
+ const TEST_VERSION='1.97';
  try {
-  // Independent LIVE app service worker; never unregister the TEST app's worker.
+  // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('/corn-souls/sw.js', {scope:'/corn-souls/'})
-      .catch(err => console.warn('Live app cache registration unavailable:', err));
+      .catch(err => console.warn('Test app update registration unavailable:', err));
   }
-  const response=await fetch('game.html?alpha_v1_96='+Date.now(),{cache:'no-store'});
-  if(!response.ok)throw new Error('Could not load live game: HTTP '+response.status);
+  const response=await fetch('./game.html?test_version='+encodeURIComponent(TEST_VERSION)+'&t='+Date.now(),{cache:'no-store'});
+  if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
-  html=html.replace("window.APP_VERSION = '1.94';","window.APP_VERSION = '1.96';");
-  // Match the real in-game title, splash screen and HUD to this approved Alpha release.
-  const alphaVersionMarker="window.APP_VERSION = '1.91';";
-  if(!html.includes(alphaVersionMarker))throw Error('The base game version marker changed');
-  html=html.replace(alphaVersionMarker,"window.APP_VERSION = '1.96';");
-  const patchNoteMarker='const PATCH_NOTES = [';
-  if(html.includes(patchNoteMarker)){
-   html=html.replace(patchNoteMarker,patchNoteMarker+"\n  { v: '1.94', title: 'New PSX App Icons', notes: ['🌙 Updated moonlit plant icon, with the matching crash-test hard hat on TEST.'] },\n  { v: '1.93', title: 'Corn Props & Collision', notes: ['🌽 Corn cubes, low-poly corn ears and metal bins at the scale house and grain receiving.', '🪣 Corn and bins now have solid collision while walking and when throwing corn.', '🛠️ First-person maintenance shop startup and game loading improvements.'] },");
-  }
-  html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.96</title>');
-  // Keep the approved first-person maintenance-shop startup.
+  html=html.replace("window.APP_VERSION = '1.91';","window.APP_VERSION = '1.97';");
+  html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.97</title>');
+  // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
   // Position is on the open shop floor, away from the two forklifts at z=37.
   const initMarker='try { P3.init(view); } catch (e)';
   if(!html.includes(initMarker)) throw new Error('Game initialization changed; cannot apply shop spawn safely.');
@@ -37,6 +31,16 @@
   html=html.replace(fp, "const q = k==='crowbar' ? crowbarSlot('hud',L) : hudPart(g, new T.PlaneGeometry(L,L/4),toolMat(k,true),0.12,-0.12,-0.6); if(k==='crowbar'){q.position.set(0.14,-0.13,-0.67);g.add(q);} q.rotation.set(0,0.35,2.25);");
   html=html.replace(t3, "const L=TOOLS[k].L,g=new T.Group(),m=k==='crowbar'?crowbarSlot('third',L):new T.Mesh(new T.PlaneGeometry(L,L/4),toolMat(k));");
   html=html.replace(wall, "const L=TOOLS[k].L,m=k==='crowbar'?crowbarSlot('wall',L):new T.Mesh(new T.PlaneGeometry(L,L/4),toolMat(k));");
+  // Keep the main-line highway trains and loop train host-authoritative in 2P.
+  // The original net packets carried only the loop distance, leaving the two
+  // through trains on independent local random spawn/return timers.
+  const railRecvOld="const d = m.ts - train.s; if (Math.abs(d) > 30) train.s = m.ts; else train.s += d * 0.3;";
+  const railRecvNew="// Multiplayer authority: the host owns all rail traffic, not just the loop locomotive.\n    const d=m.ts-train.s; if(Math.abs(d)>15)train.s=m.ts;else train.s+=d*0.65;\n    if(m.st!==undefined)train.stopT=m.st;\n    if(m.tc&&m.tc.length===train.cars.length)for(let i=0;i<m.tc.length;i++){\n      if(train.cars[i].load){train.cars[i].loaded=!!m.tc[i];train.cars[i].load.visible=!!m.tc[i];}\n    }\n    if(m.th)for(let i=0;i<THRUS.length&&i<m.th.length;i++){\n      const R=THRUS[i],h=m.th[i];\n      if(!h)continue;\n      R.u=h[0];R.wait=h[1];R.horn=!!h[2];\n      R.cars.forEach(c=>{c.g.visible=R.u>=0;});\n    }";
+  const railSendOld="if (NET.host) { NET.worldT += rdt; if (NET.worldT > 1) { NET.worldT = 0; netSend({ t: 'w', ts: train.s, wx: weather.kind }); } }";
+  const railSendNew="if (NET.host) { NET.worldT += rdt; if (NET.worldT > 0.2) { NET.worldT = 0; netSend({ t:'w', ts:train.s, st:train.stopT,\n    tc:train.cars.map(c=>c.load?+!!c.loaded:null),\n    th:THRUS.map(R=>[R.u,R.wait,+!!R.horn]),\n    wx:weather.kind }); } }";
+  if(!html.includes(railRecvOld)||!html.includes(railSendOld))
+    throw new Error('Rail multiplayer sync source changed; safe TEST patch not applied.');
+  html=html.replace(railRecvOld,railRecvNew).replace(railSendOld,railSendNew);
   // Test HUD removed; automatic asset loading is silent.
 
   const cornEngine="\nconst CORN_PROPS_STATE={items:[],held:null,can:null,cans:[],loaded:{},ready:false};\n// The plant's existing circular colliders are shared by walking and vehicles.\n// Register each corn prop with that same collision system, with live positions.\nfunction cornSolid(x,z,r){\n const c=[x,z,r];extraCols.push(c);\n if(colliders)colliders.push(c);\n return c;\n}\nfunction cornSyncCollider(t){\n if(!t.col)return;\n const active=!t.held&&t.g.position.y<1.45;\n t.col[0]=active?t.g.position.x:1e5;\n t.col[1]=active?t.g.position.z:1e5;\n}\nfunction cornPlayerPushOut(){\n // Resolve the player's body against the corn props after the game's standard collision pass.\n if(!walk.on||walk.drive||walk.mow||walk.ride||walk.dead)return;\n if(walk.y>15||(walk.floor||0)>=2)return;\n const br=BODY_R||.28;\n for(let pass=0;pass<2;pass++){\n  for(const can of CORN_PROPS_STATE.cans){\n   const dx=walk.x-can.position.x,dz=walk.z-can.position.z,d=Math.hypot(dx,dz),min=.49+br;\n   if(d<min){\n    const nx=d>.001?dx/d:1,nz=d>.001?dz/d:0;\n    walk.x=can.position.x+nx*min;walk.z=can.position.z+nz*min;\n   }\n  }\n  for(const item of CORN_PROPS_STATE.items){\n   if(item.held)continue;\n   const p=item.g.position,h=item.type==='cube'?.52:.55;\n   if(p.y+h*.5<walk.y||p.y-h*.5>walk.y+1.7)continue;\n   const dx=walk.x-p.x,dz=walk.z-p.z,d=Math.hypot(dx,dz),min=br+item.radius;\n   if(d<min){\n    const nx=d>.001?dx/d:1,nz=d>.001?dz/d:0;\n    walk.x=p.x+nx*min;walk.z=p.z+nz*min;\n   }\n  }\n }\n}\nfunction cornBounce(t,nx,nz,restitution=.25){\n const d=t.v.x*nx+t.v.z*nz;\n if(d<0){t.v.x-=(1+restitution)*d*nx;t.v.z-=(1+restitution)*d*nz;}\n t.v.x*=.78;t.v.z*=.78;\n}\nfunction cornResolve(t){\n const p=t.g.position,r=t.radius;\n // Solid bucket sides and rim. Dropped or thrown corn cannot pass through them.\n for(const can of CORN_PROPS_STATE.cans){\n  const dx=p.x-can.position.x,dz=p.z-can.position.z;\n  const d=Math.hypot(dx,dz),limit=.49+r;\n  if(d>=limit||p.y-r>.99||p.y+r<.03)continue;\n  if(p.y>.83&&p.y-r>.68&&t.v.y<=0){\n   p.y=.97+r;t.v.y=Math.max(0,-t.v.y*.18);\n   t.v.x*=.6;t.v.z*=.6;continue;\n  }\n  const nx=d>.0001?dx/d:1,nz=d>.0001?dz/d:0;\n  p.x=can.position.x+nx*limit;p.z=can.position.z+nz*limit;\n  cornBounce(t,nx,nz);\n }\n // World walls: use their real line segments, including height-limited obstacles.\n for(const [ax,az,bx,bz,ylo,yhi] of wallSegs){\n  if(ylo!==undefined&&(p.y+r<ylo||p.y-r>yhi))continue;\n  const vx=bx-ax,vz=bz-az,len=vx*vx+vz*vz||1;\n  const f=Math.max(0,Math.min(1,((p.x-ax)*vx+(p.z-az)*vz)/len));\n  const hx=ax+f*vx,hz=az+f*vz,dx=p.x-hx,dz=p.z-hz,d=Math.hypot(dx,dz);\n  if(d>=r)continue;\n  const nx=d>.0001?dx/d:-vz/Math.sqrt(len);\n  const nz=d>.0001?dz/d:vx/Math.sqrt(len);\n  p.x=hx+nx*r;p.z=hz+nz*r;cornBounce(t,nx,nz);\n }\n // Corn-on-corn: resting and moving cubes/ears have their own small hit volumes.\n for(const other of CORN_PROPS_STATE.items){\n  if(other===t||other.held)continue;\n  const o=other.g.position,dx=p.x-o.x,dz=p.z-o.z,dy=p.y-o.y;\n  const rr=r+other.radius,d2=dx*dx+dz*dz+dy*dy;\n  if(d2>=rr*rr)continue;\n  const horizontal=Math.hypot(dx,dz);\n  if(horizontal<.0001&&Math.abs(dy)>rr*.5){\n   const sign=dy>=0?1:-1;p.y=o.y+sign*rr;\n   t.v.y=sign*Math.abs(t.v.y)*.2;\n  }else{\n   const nx=horizontal>.0001?dx/horizontal:1;\n   const nz=horizontal>.0001?dz/horizontal:0;\n   const need=Math.sqrt(Math.max(0,rr*rr-dy*dy));\n   p.x=o.x+nx*need;p.z=o.z+nz*need;\n   cornBounce(t,nx,nz);\n  }\n }\n}\nfunction cornBuild(){\n if(CORN_PROPS_STATE.ready)return;CORN_PROPS_STATE.ready=true;\n const x=56+SH_DX-2.9,z=((NROAD+4.5)+(SCZ_OUT-4.5))/2;\n const body=new T.MeshLambertMaterial({color:0x3b494b,side:T.DoubleSide});\n const can=new T.Group();can.position.set(x,0,z+3.3);scene.add(can);CORN_PROPS_STATE.cans.push(can);cornSolid(x,z+3.3,.49);\n const wall=new T.Mesh(new T.CylinderGeometry(.45,.38,.91,10,1,true),body);wall.position.y=.47;can.add(wall);\n const base=new T.Mesh(new T.CylinderGeometry(.38,.38,.07,10),body);base.position.y=.06;can.add(base);\n const rim=new T.Mesh(new T.TorusGeometry(.45,.05,5,12),new T.MeshLambertMaterial({color:0x1e292a}));rim.rotation.x=Math.PI/2;rim.position.y=.92;can.add(rim);CORN_PROPS_STATE.can=can;\n function make(type,a,b,c,inCan=false){\n  const g=new T.Group();g.position.set(a,b,c);scene.add(g);\n  const item={type,g,inCan,held:false,sleep:true,radius:type==='cube'?.32:.18,v:new T.Vector3(),spin:new T.Vector3(2,1.5,2.4),col:cornSolid(a,c,type==='cube'?.32:.18)};CORN_PROPS_STATE.items.push(item);cornVisual(item);\n }\n for(const [dx,dz,dy] of [[-2,-2.1,.28],[-1.42,-2.1,.28],[-1.72,-2,.82],[-2,-1.53,.28]])make('cube',x+dx,dy,z+dz);\n for(let i=0;i<7;i++){const a=i*Math.PI*2/7;make('ear',x+Math.cos(a)*.19,.99+(i%3)*.08,z+3.3+Math.sin(a)*.18,true);}\n // Second prop station: outside the east wall of the three-pit grain receiving building.\n // Receiving spans x=-202..-172 and z=-12..12 before GDX/GDZ.\n // Keep clear of rail pit 1 and truck pits 2/3, plus north/south truck doors.\n const rx=-172+GDX+5.5, rz=-12+GDZ+5.5;\n // Move the grain receiving bucket and its low-poly ears 2 ft west (0.6096 m).\n const bucketX=rx-0.6096;\n const recvCan=new T.Group();recvCan.position.set(bucketX,0,rz);scene.add(recvCan);CORN_PROPS_STATE.cans.push(recvCan);cornSolid(bucketX,rz,.49);\n const recvWall=new T.Mesh(new T.CylinderGeometry(.45,.38,.91,10,1,true),body);recvWall.position.y=.47;recvCan.add(recvWall);\n const recvBase=new T.Mesh(new T.CylinderGeometry(.38,.38,.07,10),body);recvBase.position.y=.06;recvCan.add(recvBase);\n const recvRim=new T.Mesh(new T.TorusGeometry(.45,.05,5,12),new T.MeshLambertMaterial({color:0x1e292a}));recvRim.rotation.x=Math.PI/2;recvRim.position.y=.92;recvCan.add(recvRim);\n for(const [dx,dz,dy] of [[-1.7,-2.1,.28],[-1.1,-2.1,.28],[-1.4,-1.9,.82],[-1.7,-1.5,.28]])make('cube',rx+dx,dy,rz+dz);\n for(let i=0;i<7;i++){const a=i*Math.PI*2/7;make('ear',bucketX+Math.cos(a)*.19,.99+(i%3)*.08,rz+Math.sin(a)*.18,true);}\n}\nfunction cornVisual(item){\n item.g.clear();const m=CORN_PROPS_STATE.loaded[item.type];\n if(m){\n   item.g.add(m.clone(true));\n   // Reinforced dark-green cube edges make this a playful CORN BLOCK, not a raw kernel.\n   if(item.type==='cube'){\n     const outline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(.57,.57,.57)),\n       new T.LineBasicMaterial({color:0x254b3d,depthTest:true}));\n     outline.userData.noHit=true;item.g.add(outline);\n   }\n   return;\n }\n const geo=item.type==='cube'?new T.BoxGeometry(.52,.52,.52):new T.CylinderGeometry(.10,.12,.55,6);\n const mesh=new T.Mesh(geo,new T.MeshLambertMaterial({color:item.type==='cube'?0xcba33b:0xe1bf47}));\n item.g.add(mesh);\n}\nfunction cornModel(type,source){\n // Reuse test-build GLB loader; normalize to a useful physical scale.\n return crowbarReadGLB(source).then(raw=>{\n  const box=new T.Box3().setFromObject(raw),sz=box.getSize(new T.Vector3());\n  const max=Math.max(sz.x,sz.y,sz.z);\n  if(!Number.isFinite(max)||max<=0)throw Error('Invalid corn model geometry');\n  const g=new T.Group();g.add(raw);raw.scale.multiplyScalar((type==='cube'?.55:.62)/max);\n  g.updateMatrixWorld(true);const b=new T.Box3().setFromObject(g),center=b.getCenter(new T.Vector3());g.position.sub(center);\n  CORN_PROPS_STATE.loaded[type]=g;\n  for(const item of CORN_PROPS_STATE.items)if(item.type===type)cornVisual(item);\n });\n}\nfunction cornInteract(){\n if(!walk.on||walk.drive||walk.mow||walk.dead)return false;\n if(CORN_PROPS_STATE.held){const t=CORN_PROPS_STATE.held;t.held=false;t.sleep=false;t.v.set(0,.3,0);CORN_PROPS_STATE.held=null;return 'Set down corn';}\n camera.updateMatrixWorld();const dir=new T.Vector3();camera.getWorldDirection(dir);\n let best=null,min=9999;\n for(const t of CORN_PROPS_STATE.items){\n  if(t.held)continue;\n  const delta=t.g.position.clone().sub(camera.position),dist=delta.length(),forward=delta.dot(dir);\n  if(dist>3.3||forward<.15)continue;\n  const side=Math.sqrt(Math.max(0,dist*dist-forward*forward));\n  if(side>.85)continue;\n  const score=side+dist*.04;\n  if(score<min){min=score;best=t;}\n }\n if(!best){\n  for(const can of CORN_PROPS_STATE.cans){\n   const delta=can.position.clone().add(new T.Vector3(0,.7,0)).sub(camera.position);\n   if(delta.length()<3.3&&delta.normalize().dot(dir)>.87){\n    best=CORN_PROPS_STATE.items.find(i=>i.inCan&&!i.held&&i.sleep&&\n      Math.hypot(i.g.position.x-can.position.x,i.g.position.z-can.position.z)<.5);\n    if(best)break;\n   }\n  }\n }\n if(!best)return false;best.held=true;best.inCan=false;best.sleep=false;best.v.set(0,0,0);CORN_PROPS_STATE.held=best;\n return best.type==='cube'?'Picked up corn cube — fire to throw':'Picked up corn ear — fire to throw';\n}\nfunction cornThrow(){\n if(!CORN_PROPS_STATE.held||!walk.on)return false;\n const item=CORN_PROPS_STATE.held,dir=new T.Vector3();camera.getWorldDirection(dir);\n item.held=false;item.inCan=false;item.sleep=false;\n item.v.copy(dir).multiplyScalar(item.type==='cube'?7.5:9).add(new T.Vector3(0,2,0));CORN_PROPS_STATE.held=null;return true;\n}\nfunction cornUpdate(dt){\n if(!CORN_PROPS_STATE.ready||!walk.on)return;\n dt=Math.max(0,Math.min(.05,dt));\n const dir=new T.Vector3();camera.getWorldDirection(dir);\n for(const t of CORN_PROPS_STATE.items){\n  if(t.held){\n   t.g.position.copy(camera.position).addScaledVector(dir,1.45).add(new T.Vector3(0,-.2,0));\n   cornSyncCollider(t);continue;\n  }\n  if(t.sleep){cornSyncCollider(t);continue;}\n  // Small substeps prevent a fast-thrown ear from tunneling through thin walls/bins.\n  const steps=Math.min(12,Math.max(1,Math.ceil(t.v.length()*dt/(t.radius*.6))));\n  const h=dt/steps;\n  for(let i=0;i<steps;i++){\n   t.v.y-=9.8*h;t.g.position.addScaledVector(t.v,h);\n   cornResolve(t);\n   const floor=t.type==='cube'?.27:.23;\n   if(t.g.position.y<=floor){\n    t.g.position.y=floor;\n    if(Math.abs(t.v.y)>.35){t.v.y*=-.23;t.v.x*=.75;t.v.z*=.75;}\n    else{t.v.set(0,0,0);t.sleep=true;break;}\n   }\n  }\n  t.g.rotation.x+=t.spin.x*dt;t.g.rotation.y+=t.spin.y*dt;\n  cornSyncCollider(t);\n }\n}\n\nsetTimeout(()=>{\n cornModel('cube','assets/models/corn_cube.glb').catch(err=>console.error('Corn cube GLB unavailable:',err));\n cornModel('ear','assets/models/corn_low_poly.glb').catch(err=>console.error('Corn ear GLB unavailable:',err));\n},0);\n";
@@ -45,12 +49,12 @@
   const hookC='const r = P3.kiaToggle() || P3.radioToggle()';
   const hookD='try { P3.init(view); P3.cam.tx = 28; P3.cam.tz = 27; P3.cam.yaw = 0.35; P3.walkStart(); setWalkUI(); } catch (e)';
   const hookE='root.Plant3D = {';
-  const hookF="  vehPush();\n  walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));";
+  const hookF='  vehPush();\n  walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));';
   const checks={simUpdate:hookA,fire:hookB,interact:hookC,shopSpawn:hookD,plantExports:hookE,playerCollision:hookF};
   const missing=Object.entries(checks).filter(([key,val])=>!html.includes(val)).map(([key])=>key);
-  if(missing.length)throw Error('Corn v16 patch mismatch: '+missing.join(', ')+'; source fetch status='+response.status);
+  if(missing.length)throw Error('Corn collision test patch mismatch: '+missing.join(', ')+'; source fetch status='+response.status);
   html=html.replace(hookE,cornEngine+'\nroot.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract,');
-  html=html.replace(hookF,"  vehPush();\n  if (typeof cornPlayerPushOut === \"function\") cornPlayerPushOut();\n  walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));");
+  html=html.replace(hookF,'  vehPush();\n  if (typeof cornPlayerPushOut === "function") cornPlayerPushOut();\n  walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));');
   const hudVis='  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third;';
   if(!html.includes(hudVis))throw Error('Weapon visibility signature changed');
   html=html.replace(hudVis,'  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !CORN_PROPS_STATE.held;');
@@ -66,20 +70,199 @@
   if(!html.includes(vehicleEnter))throw Error('Vehicle-entry code changed; avatar fix not applied');
   html=html.replace(vehicleEnter,
     'function utvEnter() { utvIgnition(); walk.drive = true; if (VIEW.av) VIEW.av.visible = false;');
-  // Approved Razr background-audio guard; preserves music while visible.
+  // TEST-only: hard-stop all HTML audio and synthesized WebAudio when Android backgrounds the app.
+  // Install before the original game's scripts execute, then restore on return.
   const audioBackgroundGuard="(function(){\n if(window.__cornVisibilityAudioFix)return;\n window.__cornVisibilityAudioFix=true;\n const contexts=new Set();\n const resumeContexts=new Set();\n const resumeMedia=new Set();\n let wasHidden=false;\n const AudioBase=window.AudioContext, WebkitBase=window.webkitAudioContext;\n function wrap(Base){\n  return class extends Base{\n   constructor(...args){super(...args);contexts.add(this);}\n  };\n }\n if(typeof AudioBase==='function')window.AudioContext=wrap(AudioBase);\n if(typeof WebkitBase==='function'&&WebkitBase!==AudioBase)window.webkitAudioContext=wrap(WebkitBase);\n else if(WebkitBase===AudioBase && typeof AudioBase==='function')window.webkitAudioContext=window.AudioContext;\n function background(){\n  if(!document.hidden||wasHidden)return;\n  wasHidden=true;\n  for(const c of contexts)if(c.state==='running'){\n   resumeContexts.add(c);\n   c.suspend().catch(()=>{});\n  }\n  for(const el of document.querySelectorAll('audio,video')){\n   if(!el.paused){resumeMedia.add(el);el.pause();}\n  }\n }\n function foreground(){\n  if(document.hidden||!wasHidden)return;\n  wasHidden=false;\n  for(const c of resumeContexts)if(c.state==='suspended')c.resume().catch(()=>{});\n  resumeContexts.clear();\n  for(const el of resumeMedia)if(el.isConnected&&el.paused){\n   const p=el.play();if(p&&p.catch)p.catch(()=>{});\n  }\n  resumeMedia.clear();\n }\n document.addEventListener('visibilitychange',()=>document.hidden?background():foreground());\n window.addEventListener('pagehide',()=>{if(document.hidden)background();});\n window.addEventListener('pageshow',()=>{if(!document.hidden)foreground();});\n // Allow the title music's normal musicPlay() to retry after a real user gesture.\n // Browsers often reject autoplay on first launch; never force music when user switched it off.\n document.addEventListener('pointerdown',()=>{\n  if(!document.hidden&&typeof window.musicPlay==='function')window.musicPlay();\n },{capture:true});\n})();";
-  // Approved title-screen audio isolation: keep the splash's synthesized soundtrack solo.
+  // TEST audio isolation: keep the splash's synthesized soundtrack solo.
   // The ordinary AM/PM in-game <audio> track must not start until the user
   // actually selects a mode and leaves the title screen.
   const originalMusicPlay='function musicPlay() { if (musicOn && !document.hidden) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } }';
   const soloTitleMusicPlay='function musicPlay() { if (musicOn && !document.hidden && !(window.__splashOn && window.__splashOn())) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } }';
-  if(!html.includes(originalMusicPlay)) throw new Error('Music initialization changed; LIVE title audio isolation not applied.');
+  if(!html.includes(originalMusicPlay)) throw new Error('Music initialization changed; TEST title audio isolation not applied.');
   html=html.replace(originalMusicPlay,soloTitleMusicPlay);
+  // Distinguish the TEST version on both bottom-right HUD and splash screen.
+  const originalVersionDisplay="document.getElementById('ver').textContent = 'Alpha v' + (window.APP_VERSION || ''); document.getElementById('spVer').textContent = 'ALPHA v' + (window.APP_VERSION || '');";
+  const testVersionDisplay="document.getElementById('ver').textContent = 'Alpha v"+TEST_VERSION+"'; document.getElementById('spVer').textContent = 'Alpha v"+TEST_VERSION+"';";
+  if(!html.includes(originalVersionDisplay)) throw new Error('Game version display changed; TEST label not applied.');
+  html=html.replace(originalVersionDisplay,testVersionDisplay);
+  // TEST controller diagnosis: report each newly pressed gamepad button.
+  // Helps identify non-standard Retroid stick-click mappings without remapping others.
+  const gpMappingMarker="if (down !== !!gpPrev[key]) { gpPrev[key] = down;";
+  const gpMappingDiagnostic="if (down !== !!gpPrev[key]) { if(down){ const diag=document.getElementById('corn-pad-diagnostic'); if(diag){ diag.textContent='Controller '+gp.index+' · Button '+i+' · '+n+' · '+gp.mapping; diag.style.display='block'; diag.dataset.lastButton=String(i); } } gpPrev[key] = down;";
+  if(!html.includes(gpMappingMarker))throw new Error('Gamepad event loop changed; controller diagnostic not applied.');
+  html=html.replace(gpMappingMarker,gpMappingDiagnostic);
+  // Poll even controllers reporting additional buttons beyond the standard 16.
+  const gpExtraMarker="  const ax = i => gp.axes[i] || 0, bv = i => gp.buttons[i] ? gp.buttons[i].value : 0;";
+  const gpExtraDiagnostic="  for(let i=16;i<gp.buttons.length;i++){ const b=gp.buttons[i]; if(!b)continue; const down=b.pressed||b.value>0.5,key=gp.index+'BTN'+i; if(down!==!!gpPrev[key]){gpPrev[key]=down;if(down){const d=document.getElementById('corn-pad-diagnostic');if(d){d.textContent='Controller '+gp.index+' · Extra button '+i+' · '+gp.mapping;d.style.display='block';d.dataset.lastButton=String(i);}}}}\n"+gpExtraMarker;
+  if(!html.includes(gpExtraMarker))throw new Error('Controller axis loop changed; extra button probe not applied.');
+  html=html.replace(gpExtraMarker,gpExtraDiagnostic);
+  // A low-profile TEST-only overlay, never part of the stable game.
+  html=html.replace(/<\/body>/i,"<div id='corn-pad-diagnostic' style='position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);display:none;padding:8px 12px;border-radius:8px;background:rgba(7,17,31,.92);color:#ffe68b;font:14px monospace;pointer-events:none'>Press R3 to identify button</div></body>");
+  // R3 is detected correctly, but the generic controller menu route can swallow it.
+  // Route stick-click directly to the same button handler as the working touch toggle.
+  const r3PressMarker="function press(n) {\n  nav = 'pad';";
+  const r3PressFix="function press(n) {\n  nav = 'pad';\n  if (n === 'R3' && P3.walking && !$('modal').classList.contains('open')) { if (P3.driving) { toast(P3.utvView()); return; } toggleView(); return; }";
+  if(!html.includes(r3PressMarker))throw new Error('Controller press handler changed; R3 fix not applied.');
+  html=html.replace(r3PressMarker,r3PressFix);
+  // Load the existing repository PSX model at both usable fire extinguisher posts.
+  // Keep pickup, spray, damage logic and the other decorative props unchanged.
+  const extModelAnchor="function extStation(x, y, z, ry) {";
+  const extModelInsert="// Authentic PSX fire-extinguisher GLB, shared between both usable stations and held HUD.\nconst EXT_GLB=crowbarReadGLB('/corn-souls/assets/models/psx_fire_extinguisher.glb').then(proto=>{console.info('PSX extinguisher GLB loaded');return proto;}).catch(e=>{console.error('PSX extinguisher GLB load FAILED:',e);window.__extGlbFailure=String(e&&e.message||e);return null;});\nfunction extModelInto(m,height,hud){\n EXT_GLB.then(proto=>{\n  if(!proto)return;\n  const obj=proto.clone(true);\n  // Shared GLB reader normalizes the object's longest axis to X and .94 units.\n  // Rotate upright to Y, then size the entire tank to a real extinguisher height.\n  obj.rotation.z=Math.PI/2;\n  obj.scale.multiplyScalar(height/.94);\n  obj.traverse(x=>{if(x.isMesh){x.userData.noHit=true;if(hud){x.material=x.material.clone();x.material.depthTest=false;x.renderOrder=35;}}});\n  const bb=new T.Box3().setFromObject(obj);\n  const center=bb.getCenter(new T.Vector3());\n  obj.position.sub(center);\n  m.clear();m.add(obj);\n });\n}\n";
+  const extStationOld="const m = new T.Mesh(new T.PlaneGeometry(0.3, 0.6), new T.MeshLambertMaterial({ map: extTex(), transparent: true, alphaTest: 0.4, side: T.DoubleSide }));";
+  const extStationNew="const m = new T.Group(); m.userData.noHit=true; const fallback=new T.Mesh(new T.PlaneGeometry(0.3,0.6),new T.MeshLambertMaterial({map:extTex(),transparent:true,alphaTest:0.4,side:T.DoubleSide})); m.add(fallback); extModelInto(m,0.62,false);";
+  const extHudOld="const q = hudPart(g, new T.PlaneGeometry(0.17, 0.34), new T.MeshBasicMaterial({ map: extTex(), color: 0xdadada, transparent: true, alphaTest: 0.35, depthTest: false, side: T.DoubleSide }), 0.22, -0.19, -0.55); q.rotation.set(-0.1, -0.3, 0.12);";
+  const extHudNew="const q = new T.Group(); q.position.set(0.22,-0.19,-0.55); q.rotation.set(-0.1,-0.3,0.12); g.add(q); const fallback=hudPart(q,new T.PlaneGeometry(0.17,0.34),new T.MeshBasicMaterial({map:extTex(),color:0xdadada,transparent:true,alphaTest:0.35,depthTest:false,side:T.DoubleSide}),0,0,0);extModelInto(q,0.38,true);";
+  for(const [label,oldText] of [['model insertion',extModelAnchor],['station visual',extStationOld],['held visual',extHudOld]]){
+    if(!html.includes(oldText))throw new Error('Extinguisher '+label+' source changed; model replacement not applied.');
+  }
+  // Diagnostic only during v40 testing: explicitly show model loading status
+  // rather than silently displaying the old placeholder when GLB decoding fails.
+  const statusPatch="setTimeout(()=>{ EXT_GLB.then(proto=>{const d=document.createElement('div');d.id='ext-model-status';d.style.cssText='position:fixed;top:44px;right:8px;padding:6px 9px;background:#122b29;color:#fff;font:12px monospace;z-index:2147483647;pointer-events:none';d.textContent=proto?'🧯 GLB 3D model READY':'🧯 GLB ERROR: '+(window.__extGlbFailure||'unknown');document.body.append(d);});},600);";
+  html=html.replace(extModelAnchor,extModelInsert+statusPatch+"\n"+extModelAnchor);
+
+  html=html.replace(extStationOld,extStationNew);
+  html=html.replace(extHudOld,extHudNew);
+  // TEST traffic: host authority, increased corn deliveries, 5Hz vehicle snapshots.
+  const trafficPatches=[["function updateVehicles(dt) {\n  if (spawnQueue.length) { const q = spawnQueue.shift(); spawn(q[0], q[1]); }","// Render 250ms behind receipt time to bracket the host's 5Hz snapshots.\n// Hold the last pose during packet loss; never extrapolate through a scale or pit.\nfunction updateGuestSemis(){\n const at=performance.now()-250;\n for(const v of vehicles){\n  const q=v.netSnapshots;if(!q||!q.length)continue;\n  while(q.length>2&&q[1].at<=at)q.shift();\n  const a=q[0],b=q[1]||a;\n  const f=b.at>a.at?Math.max(0,Math.min(1,(at-a.at)/(b.at-a.at))):1;\n  v.g.position.set(a.x+(b.x-a.x)*f,0,a.z+(b.z-a.z)*f);\n  const angle=Math.atan2(Math.sin(b.yaw-a.yaw),Math.cos(b.yaw-a.yaw));\n  v.g.rotation.y=a.yaw+angle*f;\n }\n}\nlet AMBIENT_TRAFFIC_T=0, AMBIENT_TRAFFIC_FIRST=true;\nfunction updateVehicles(dt) {\n  if(NET.conn && NET.conn.open && !NET.host){ updateGuestSemis();semiSound(dt);return; }\n  // Maintain a small stream of grain deliveries without flooding the plant.\n  AMBIENT_TRAFFIC_T+=Math.min(dt,.25);\n  if(AMBIENT_TRAFFIC_T>(AMBIENT_TRAFFIC_FIRST?6:28)){\n    AMBIENT_TRAFFIC_T=0; AMBIENT_TRAFFIC_FIRST=false;\n    if(vehicles.length<5 && spawnQueue.length<3)spawn('corn',null);\n  }\n  if (spawnQueue.length) { const q = spawnQueue.shift(); spawn(q[0], q[1]); }"],["for (const e of events) spawn(e.kind, e.ship);","if (!NET.conn || !NET.conn.open || NET.host) for (const e of events) spawn(e.kind, e.ship);"],["} else if (m.t === 'w' && !NET.host) {   // host keeps the world in step","} else if(m.t==='vt' && !NET.host){\n    // Only the host creates and moves semis. Follow authoritative snapshots.\n    const now=performance.now();\n    const ids=new Set(m.v.map(a=>a[0]));\n    for(const old of vehicles){if(!ids.has(old.netId))scene.remove(old.g);}\n    vehicles=vehicles.filter(v=>ids.has(v.netId));\n    for(const a of m.v){\n      let v=vehicles.find(v=>v.netId===a[0]);\n      if(!v){\n        const g=truck(a[1]); v={g,kind:a[1],lane:a[2],route:[],i:a[3],t:0,netId:a[0]}; vehicles.push(v);\n      }\n      const pose={at:now,x:a[4],z:a[5],yaw:a[6]};\n      if(!v.netSnapshots){\n        // New IDs (including a first join) appear at their actual host position.\n        v.netSnapshots=[];v.g.position.set(pose.x,0,pose.z);v.g.rotation.y=pose.yaw;\n      }\n      v.netSnapshots.push(pose);\n      if(v.netSnapshots.length>8)v.netSnapshots.shift();\n      v.i=a[3];v.t=a[7];\n      v.dumping=!!a[8];v.weighing=!!a[9];v.loading=!!a[10];\n    }\n  } else if (m.t === 'w' && !NET.host) {   // host keeps the world in step"],["if (NET.host) { NET.worldT += rdt; if (NET.worldT > 0.2) { NET.worldT = 0; netSend({ t:'w', ts:train.s, st:train.stopT,","if (NET.host) { NET.worldT += rdt; if (NET.worldT > 0.2) { NET.worldT = 0; netSend({t:'vt',v:vehicles.map(v=>{if(v.netId==null)v.netId=++NET.trafficId;return [v.netId,v.kind,v.lane,v.i,+v.g.position.x.toFixed(2),+v.g.position.z.toFixed(2),+v.g.rotation.y.toFixed(3),+v.t.toFixed(2),+!!v.dumping,+!!v.weighing,+!!v.loading];})}); netSend({ t:'w', ts:train.s, st:train.stopT,"],["const NET = { peer: null, conn: null, host: false, code: '', status: '', rp: null, rr: null, sendT: 0, worldT: 0, tags: 0, notify: null };","const NET = { peer: null, conn: null, host: false, code: '', status: '', rp: null, rr: null, sendT: 0, worldT: 0, trafficId: 0, tags: 0, notify: null };"]];
+  for(const [from,to] of trafficPatches){
+    if(!html.includes(from))throw new Error('Traffic sync source changed; TEST patch not applied at: '+from.slice(0,48));
+    html=html.replace(from,to);
+  }
+  // Highway-only low-cost sprite traffic; RP6 host clock drives both clients.
+  const highwayTrafficEngine="\n// Corn Souls: inexpensive non-interactive highway-only traffic.\n// 20 fixed side quads, one shared geometry and 4 textures; no colliders or shadows.\n// Every player derives positions from a host-authoritative elapsed-time clock.\nlet HWY_TRAFFIC_TIME=0, HWY_TRAFFIC_READY=false;\nconst HWY_TRAFFIC=[];\nfunction highwayTrafficTexture(type,col){\n const cv=document.createElement('canvas');cv.width=128;cv.height=64;\n const c=cv.getContext('2d');\n c.clearRect(0,0,128,64);\n c.fillStyle='#11171f';\n // silhouette and wheels are baked into one picture; one quad draw per vehicle.\n if(type===2){\n  c.fillStyle=col;c.fillRect(12,20,99,25);c.fillRect(61,9,37,13);\n  c.fillStyle='#c8dcef';c.fillRect(67,12,24,10);\n }else if(type===1){\n  c.fillStyle=col;c.fillRect(14,27,98,18);c.fillRect(57,14,45,16);\n  c.fillStyle='#a4c8df';c.fillRect(64,17,31,11);\n }else{\n  c.fillStyle=col;c.fillRect(13,30,101,15);\n  c.beginPath();c.moveTo(35,30);c.lineTo(48,17);c.lineTo(87,17);c.lineTo(104,30);c.closePath();c.fill();\n  c.fillStyle='#8ab5d0';c.fillRect(50,20,18,10);c.fillRect(71,20,14,10);\n }\n for(const x of [36,94]){c.fillStyle='#0b1017';c.beginPath();c.arc(x,46,9,0,7);c.fill();c.fillStyle='#78838b';c.beginPath();c.arc(x,46,3.4,0,7);c.fill();}\n c.fillStyle='#f6e7b0';c.fillRect(111,32,4,5);c.fillStyle='#ce4545';c.fillRect(11,32,4,5);\n const tx=new T.CanvasTexture(cv);tx.colorSpace=T.SRGBColorSpace;\n return new T.MeshBasicMaterial({map:tx,transparent:true,alphaTest:.1,depthWrite:false,fog:true,side:T.DoubleSide});\n}\nfunction highwayTrafficInit(){\n if(HWY_TRAFFIC_READY)return;\n HWY_TRAFFIC_READY=true;\n const colors=['#3f78a8','#b53e34','#ece3cc','#65676c'];\n const mats=colors.map((color,i)=>highwayTrafficTexture(i%3,color));\n const geo=new T.PlaneGeometry(1,1);\n for(let i=0;i<20;i++){\n  const dir=i%2?1:-1;\n  const lane=Math.floor(i/2)%2, color=(i*7+Math.floor(i/4))%4;\n  const g=new T.Mesh(geo,mats[color]);\n  // Texture headlights point along local +X; highway tangent is (1,0,-k).\n  g.rotation.y=Math.atan2(HWY.k,1)+(dir<0?Math.PI:0);\n  g.scale.set(i%5===0?7.0:5.2,i%5===0?3.2:2.5,1);\n  g.userData.noHit=true;\n  g.frustumCulled=true;\n  scene.add(g);\n  HWY_TRAFFIC.push({g,dir,lane,phase:((i*571+Math.floor(i/2)*167)%3200),speed:19+(i%6)*2.3});\n }\n}\nfunction updateHighwayTraffic(dt){\n highwayTrafficInit();\n HWY_TRAFFIC_TIME+=Math.max(0,Math.min(dt,.25));\n const c=HWY.c, sn=HWY.s;\n for(const v of HWY_TRAFFIC){\n  const dist=(v.phase+HWY_TRAFFIC_TIME*v.speed)%3200;\n  const x=v.dir>0?-1500+dist:1700-dist;\n  const side=v.dir>0?1:-1;\n  const n=side*(7.5+1.2+1.83+v.lane*3.66);\n  v.g.position.set(x+n*sn,1.6,HWY.z(x)+n*c);\n }\n}\n";
+  const highwayUpdateAnchor="function updateVehicles(dt) {";
+  const highwayRecvAnchor="} else if(m.t==='vt' && !NET.host){";
+  const highwaySendAnchor="netSend({t:'vt',v:vehicles.map";
+  for(const [tag,marker] of [['tick',highwayUpdateAnchor],['receive',highwayRecvAnchor],['send',highwaySendAnchor]]){
+   if(!html.includes(marker))throw new Error('Highway traffic '+tag+' source changed; refusing partial patch.');
+  }
+  html=html.replace(highwayUpdateAnchor,highwayTrafficEngine+"function updateVehicles(dt) { updateHighwayTraffic(dt);");
+  html=html.replace(highwayRecvAnchor,"} else if(m.t==='vt' && !NET.host){ if(typeof m.ht==='number') HWY_TRAFFIC_TIME=m.ht;");
+  html=html.replace(highwaySendAnchor,"netSend({t:'vt',ht:+HWY_TRAFFIC_TIME.toFixed(2),v:vehicles.map");
   // Test HUD removed; corn assets load without file selection.
-  html=html.replace(/<head>/i,'<head><base href="./">');
+  // Give the dynamically loaded game the same independent TEST install identity.
+  // Remove the live build's manifest so Android installs this as a separate app.
+  // Remove ALL game-source manifest tags before adding the TEST-only one.
+  // Previously this regex matched a literal backslash instead of a word boundary.
+  html=html.replace(/<link\b[^>]*\brel\s*=\s*["']manifest["'][^>]*>/gi,'');
+  html=html.replace(/<link\b[^>]*\brel\s*=\s*manifest(?=[\s>])[^>]*>/gi,'');
+  html=html.replace(/<head>/i,'<head><base href="./"><link rel="manifest" href="/corn-souls/manifest.webmanifest"><meta name="theme-color" content="#06111f"><link rel="icon" type="image/png" href="/corn-souls/icon-192-blue-psx.png">');
   html=html.replace(/<head>/i,'<head><script>'+audioBackgroundGuard+'</scr'+'ipt>');
   html=html.replace(/<script>if \(\(location\.protocol === 'https:'[\s\S]*?navigator\.serviceWorker\.register\('sw\.js'\)\.catch\(function \(\) \{\}\);<\/script>/,'');
+  const noteResponse=await fetch('./note-sharing.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!noteResponse.ok)throw new Error('Note sharing HTTP '+noteResponse.status);
+  const inboxResponse=await fetch('./inbox.js?build='+TEST_VERSION,{cache:'no-store'});
+  const configResponse=await fetch('./inbox-config.json?build='+TEST_VERSION,{cache:'no-store'});
+  if(!inboxResponse.ok||!configResponse.ok)throw new Error('Inbox files could not load');
+  const inboxConfig=await configResponse.json();
+  // Only a publishable/anon key belongs in public source. Reject server credentials.
+  if(inboxConfig.publicKey){
+    if(inboxConfig.publicKey.startsWith('sb_secret_'))throw new Error('Private inbox key rejected');
+    if(inboxConfig.publicKey.startsWith('eyJ')){
+      const role=JSON.parse(atob(inboxConfig.publicKey.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role;
+      if(role!=='anon')throw new Error('Inbox requires a public anon key');
+    }else if(!inboxConfig.publicKey.startsWith('sb_publishable_'))throw new Error('Unsupported inbox key');
+  }
+  const soundResponse=await fetch('./sound-settings.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!soundResponse.ok)throw new Error('Sound settings could not load');
+  const acidResponse=await fetch('./acid-liquid.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!acidResponse.ok)throw new Error('Acid liquid visuals could not load');
+  const acidEngine=await acidResponse.text();
+  const doorResponse=await fetch('./cooler-door-audio.js?build='+TEST_VERSION,{cache:'no-store'});
+  if(!doorResponse.ok)throw new Error('Cooler door audio could not load');
+  const doorEngine=await doorResponse.text();
+  const noteEngine='const INBOX_CONFIG='+JSON.stringify(inboxConfig)+';\n'+await soundResponse.text()+'\n'+await inboxResponse.text()+'\n'+await noteResponse.text();
+  // These helpers need the private plant state, so inject inside Plant3D's scope.
+  const scopedEffects=[
+   ['function saHit(p, remote) {',acidEngine+'\nfunction saHit(p, remote) {'],
+   ['function coolerHandle(remote) {',doorEngine+'\nfunction coolerHandle(remote) {'],
+   ["d.want = remote ? remote.o : d.want ? 0 : 1; if (!remote) netSend({ t: 'cd', i: d.i, o: d.want });", "const previousWant=d.want; d.want = remote ? remote.o : d.want ? 0 : 1; if(d.want!==previousWant)coolerDoorSound(d,d.want?'open':'swing'); if (!remote) netSend({ t: 'cd', i: d.i, o: d.want });"],
+   ["d.open += Math.max(-dt * 1.6, Math.min(dt * 1.6, d.want - d.open)); openSum += d.open;", "const previousOpen=d.open; d.open += Math.max(-dt * 1.6, Math.min(dt * 1.6, d.want - d.open)); if(previousOpen>0&&d.open===0)coolerDoorSound(d,'close'); openSum += d.open;"]
+  ];
+  for(const [from,to] of scopedEffects){if(!html.includes(from))throw new Error('Plant effect source changed; refusing partial patch.');html=html.replace(from,()=>to);}
+  const acidVisualPatches=[
+   ["SA.poolM = new T.Mesh(new T.CircleGeometry(1, 28),", "SA.poolM = new T.Mesh(new T.PlaneGeometry(2,2),"],
+   ["const r = 0.3 + SA.pool * 3.4, c = SA.leaks[0] ? SA.leaks[0].land : SA.poolC || V3(SA.x, 0, SA.z); SA.poolC = c; SA.pr = r;\n    const hx = (SA.cx1 - SA.cx0) / 2, hz = (SA.cz1 - SA.cz0) / 2, rz = Math.min(r, hz), pz = Math.max(SA.cz0 + rz, Math.min(SA.cz1 - rz, c.z));   // stays inside the containment curb\n    SA.poolM.position.set((SA.cx0 + SA.cx1) / 2, 0.13, pz); SA.poolM.scale.set(Math.min(r, hx), rz, 1);", "saLiquidPool();"],
+   ["((walk.x - P.position.x) / P.scale.x) ** 2 + ((walk.z - P.position.z) / P.scale.y) ** 2 < 1", "Math.abs(walk.x-P.position.x)<P.scale.x && Math.abs(walk.z-P.position.z)<P.scale.y"],
+   ["if (!B.remote) nh3Hit(h.point);", "if (!B.remote) { nh3Hit(h.point);saLiquidPaintHit(h.point); }"],
+   ["const curve = new T.QuadraticBezierCurve3(hp, mid, land), m = new T.Mesh(new T.TubeGeometry(curve, 10, 0.035, 5, false), SA.streamM || (SA.streamM = new T.MeshBasicMaterial({ color: 0xe6dc8a, transparent: true, opacity: 0.8 })));", "const m=saLiquidMesh(hp,mid,land);"],
+   ["L.m.scale.x = L.m.scale.z = 0.85 + 0.3 * Math.random();", "saLiquidAnimate(L);"],
+   ["if (Math.random() < dt * 4) puff(L.land, 0.12, 0xe6dc8a);", "/* Liquid impact ripples replace the rising bubble puffs. */"],
+   ["SA.poolM.material.opacity = 0.55 + 0.1 * Math.sin(clock * 3);", "SA.poolM.material.opacity = 0.65 + 0.025 * Math.sin(clock * 3);"]
+  ];
+  for(const [from,to] of acidVisualPatches){if(!html.includes(from))throw new Error('Acid leak visual source changed; refusing partial patch.');html=html.replace(from,()=>to);}
+  const acidCleanup='scene.remove(L.m); L.m.geometry.dispose();';
+  if(html.split(acidCleanup).length!==3)throw new Error('Acid cleanup source changed; refusing partial patch.');
+  html=html.replaceAll(acidCleanup,'saLiquidRemove(L);');
+  // Every TEST modal has a sticky escape button, even on short phone screens.
+  // Keep it outside .row so existing action indexes/controller mappings stay intact.
+  const modalExitPatches=[
+    ["// NOS: hold the boost button for up to ~3 s of extra power and top speed; the tank refills in ~8 s when you let go", "// TEST: unlimited turbo while held; existing vehicle, brake and reverse restrictions still apply."],
+    ["!u.noNos && I.nos && u.nos > 0.02 && I.b < 0.05", "!u.noNos && I.nos && I.b < 0.05"],
+    ["u.nos = boosting ? Math.max(0, u.nos - dt / 3) : Math.min(1, u.nos + dt / 8);", "u.nos = u.noNos ? 0 : 1;"],
+    ["heldG.ext = makeExtHud(); }", "heldG.ext = makeExtHud(); for(const item of Object.values(heldG))hudScene.add(item); }"],
+    ["if ((!gun || !gun.visible) && SR.carry !== 'me') return;", "if ((!gun || !gun.visible) && !Object.values(heldG).some(item=>item.visible) && SR.carry !== 'me') return;"],
+    [", ['Reset all setpoints', resetAll]", ""],
+    ["[musicOn ? 'Music: on' : 'Music: off', toggleMusic]", "['Sound ▸',()=>soundSettings()]"],
+    ["music.volume = 0.6;", "music.volume = soundMusicVolume();"],
+    ["const music = $('music'); let musicOn", "const music = $('music'); music.volume=soundMusicVolume(); let musicOn"],
+    ["modal('<h1>Corn Souls</h1>', b);", "modal('<h1>Corn Souls</h1>', b, true);"],
+    ["$('card').classList.toggle('vert', !!vert);", "$('card').classList.remove('cs-inbox');$('card').classList.toggle('vert', !!vert);"],
+    ["$('card').innerHTML = html +", "$('card').innerHTML = '<div class=\"cs-modal-exit\"><button id=\"csModalExit\" type=\"button\">Back to game ×</button></div>' + html +"],
+    ["modalBtns.forEach((el, i) => el.onclick =", "$('csModalExit').onclick = () => inboxClose();\n  modalBtns.forEach((el, i) => el.onclick ="],
+    ["if (n === 'B' || n === 'START') $('modal').classList.remove('open');", "if (n === 'B' || n === 'START') { inboxClose();return; }"],
+    ["if (n === 'A') modalBtns[modalFocus].click();", "if (n === 'A' && modalBtns[modalFocus]) modalBtns[modalFocus].click();"],
+    ["const b = $('card').querySelectorAll('button')[1];", "const b = $('card').querySelectorAll('button:not(#csModalExit)')[1];"],
+    ["['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ", ""]
+  ];
+  for(const [from,to] of modalExitPatches){
+    if(!html.includes(from))throw new Error('Modal exit source changed; refusing partial patch.');
+    html=html.replace(from,()=>to);
+  }
+  html=html.replace('</head>','<style>.card{box-sizing:border-box;max-height:88vh;max-height:88dvh}.cs-modal-exit{position:sticky;top:0;z-index:3;display:flex;justify-content:flex-end;background:#fff;padding:6px 0;margin:-6px 0 8px}.cs-modal-exit button{background:#174e85;color:white;min-height:44px;touch-action:manipulation}</style></head>');
+  const notePatches=[
+    ['const notesLoad = () =>',noteEngine+'\nconst notesLoad = () =>'],
+    ["It's saved on this device for the developer to read later.",inboxConfig.url&&inboxConfig.publicKey?'Saving sends your note, game details and checked screenshot to the private developer inbox. A copy stays on this device.':'Central inbox setup is pending. Notes are saved on this device; use Share note to send them.'],
+    ["  toast(notesSave(a) ? '📝 Thanks' + (name ? ', ' + name : '') + '! Note saved.' : '📝 Couldn\\'t save the note on this device.');",
+     "  if(notesSave(a))noteSaved(a[a.length-1]);else { $('modal').classList.add('open');toast('📝 Could not save the note. Your text is still in the form.'); }"],
+    ['<button data-del="', '<button data-send="\' + (a.length - 1 - i) + \'" style="margin:6px 12px 0 0">\' + (n.sentAt ? \'Received by inbox\' : \'Send to developer inbox\') + \'</button><button data-share="\' + (a.length - 1 - i) + \'" style="margin:6px 12px 0 0">Share note</button><button data-del="'],
+    ["  $('card').querySelectorAll('[data-del]')", "  $('card').querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>inboxSend(a[+b.dataset.send]));\n  $('card').querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>noteShare(a[+b.dataset.share]));\n  $('card').querySelectorAll('[data-del]')"],
+    ["['💾 Save note', () => noteSave(kind)]", "[inboxReady()?'Send report':'💾 Save note', () => noteSave(kind)]"],
+    ["['🎮 Controls', () => controlsMenu(code)]", "['📥 Developer Inbox',()=>inboxOpen()], ['🎮 Controls', () => controlsMenu(code)]"]
+  ];
+  // The source HTML escapes the apostrophe inside this JavaScript string.
+  notePatches[1][0]="It\\'s saved on this device for the developer to read later.";
+  for(const [from,to] of notePatches){
+    if(!html.includes(from))throw new Error('Note sharing source changed; refusing partial patch: '+from.slice(0,40));
+    html=html.replace(from,()=>to);
+  }
+  const weatherChoices="['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')]";
+  if(!html.includes(weatherChoices))throw new Error('Weather menu source changed; refusing partial patch.');
+  html=html.replace(weatherChoices,"['Weather ▸',()=>debugWeather(code)]");
+  html=html.replaceAll('📝 Leave a note (bug / idea / message)','✉ Message Developer').replaceAll('📝 Leave a note','✉ Message Developer').replaceAll('<h1>Leave a note</h1>','<h1>Message Developer</h1>');
+  const modalFocusSource="function markModal() { modalBtns.forEach((b, i) => b.classList.toggle('focus', nav === 'pad' && i === modalFocus)); }";
+  if(!html.includes(modalFocusSource))throw new Error('Modal focus source changed; refusing partial patch.');
+  html=html.replace(modalFocusSource,"function markModal() { modalBtns.forEach((b,i)=>b.classList.toggle('focus',nav==='pad'&&i===modalFocus));if(nav==='pad'&&modalBtns[modalFocus])modalBtns[modalFocus].scrollIntoView({block:'nearest'}); }");
+  html=html.replace('</head>',`<style>
+   .card.cs-inbox{width:min(720px,94vw)}
+   .cs-inbox-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}
+   .cs-inbox-tabs button{padding:0 5px;min-height:44px}
+   .cs-inbox-tabs button[aria-pressed="true"]{background:#174e85;color:#fff}
+   .cs-inbox-meta{font-size:12px;color:#5d6b7c;margin:8px 0}
+   .cs-inbox-list,.cs-inbox-detail{max-height:45vh;max-height:45dvh;overflow:auto;overscroll-behavior:contain}
+   .card button.cs-inbox-message{display:block;width:100%;height:auto;min-height:90px;text-align:left;padding:12px;margin:0 0 8px;border:1px solid #dce3eb;border-radius:9px}
+   .cs-inbox-message-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+   .cs-inbox-preview{display:block;font-weight:400;margin:6px 0;overflow-wrap:anywhere}
+   .cs-inbox-message small{font-weight:400;color:#5d6b7c}
+   .cs-inbox-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px;line-height:1.6}
+   .cs-inbox-empty{padding:16px 4px;line-height:1.6;color:#5d6b7c}
+   .cs-inbox-detail summary{cursor:pointer;padding:12px 0;color:#174e85;font-weight:700}
+   .cs-inbox-detail summary.focus{outline:3px solid #ffc531}
+   .cs-inbox .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+   .cs-inbox .row button{height:auto;min-height:44px;padding:8px}
+   @media(max-height:500px){.cs-inbox-list,.cs-inbox-detail{max-height:30dvh}}
+  </style></head>`);
   document.open();document.write(html);document.close();
- }catch(e){status.textContent='Corn Souls Alpha v1.96 could not load: '+e.message;}
+ }catch(e){status.textContent='Corn Souls could not load ('+e.message+'). Check internet, then reopen the TEST icon. If offline, connect once to download the new build.';}
 })();
 </script></body></html>
