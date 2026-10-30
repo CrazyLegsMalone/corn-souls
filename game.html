@@ -11061,7 +11061,7 @@ function npcMatch(D, said) {   // best topic for what was typed / said: whole ph
     for (const T of Object.values(D.topics)) for (const k of T.k) {
       const phrase = k.toLowerCase();
       if (s.includes(' ' + phrase + ' ')) {
-        const score = phrase.includes(' ') ? 100 + phrase.length : phrase.length;
+        const score = phrase.includes(' ') ? 100 + phrase.length : ['temperature', 'temp', 'hot', 'cold', 'work', 'help', 'problem', 'status'].includes(phrase) ? 1 : phrase.length;
         if (score > rank) { rank = score; specific = T; }
       }
     }

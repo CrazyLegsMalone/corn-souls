@@ -15,7 +15,7 @@ const cases={
  'Got anything else?':'job','Got anything for me to do?':'job',"How's the cooler?":'cooler',
  'Any alarms?':'alarms','How does the plant work?':'plant','distillation temperature':'distillation',
  'do you know about cameras':'cameras','your Jeep Gladiator truck':'jeep','coffee at work':'coffee',
- 'DCS control systems':'dcs','cigaretes':'cigarettes','army veteran':'army'
+ 'cook temperature':'cook','DCS control systems':'dcs','cigaretes':'cigarettes','army veteran':'army'
 };
 for(const [q,topic] of Object.entries(cases)){
  assert.equal(context.match(context.def.op,q)?.id,topic,q);context.reply('op',q);assert.ok(shown.includes('Rick'),q);
@@ -47,4 +47,3 @@ for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(sc
  assert.ok(rendered.includes('Army veteran'));assert.ok(rendered.includes("id: 'vern'"));
  console.log('PASS: Rick routing, menu clicks, contextual state, response variation, NPC/gameplay preservation, source and live launcher script syntax');
 })().catch(e=>{console.error(e);process.exitCode=1;});
-
