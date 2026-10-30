@@ -9082,6 +9082,18 @@ function toolHit() {   // a swing: whatever is right in front of you (about arm 
       const r = dmgHit(tk, -15, true); wrenchSound(); if (DMG_NOTIFY) DMG_NOTIFY(r || ('🔧 Repairing… ' + Math.round(dmgOf(tk).h) + '%' + (dmgOf(tk).h >= 100 ? ' · good as new' : ''))); return; } }   // no vehicle: the swing goes on (the wrench can patch the acid tank)
   if (tk) dmgHit(tk, 6, true);   // tools dent cars a bit too
   const o = V3(walk.x, walk.y + EYE, walk.z), dir = V3(); camera.getWorldDirection(dir);
+  if (birds) for (const b of birds) if (b.state === 'perch' || b.state === 'fly') {
+    const bc = b.g.position.clone(); bc.y += 0.25; const t = Math.max(0, Math.min(2.3, bc.clone().sub(o).dot(dir)));
+    if (bc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.65) { hitBird(b, null); splatSnd(bc); return; }
+  }
+  if (critters) for (const c of critters) if (c.state === 'idle' || c.state === 'run') {
+    const cc = c.g.position.clone(); cc.y += 0.06; const t = Math.max(0, Math.min(2.3, cc.clone().sub(o).dot(dir)));
+    if (cc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.45) { hitCritter(c, null); splatSnd(cc); return; }
+  }
+  if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const f of pondFrogs) if (f.state === 'live' && f.group.visible) {
+    const fc = f.group.position.clone(); fc.y += 0.2; const t = Math.max(0, Math.min(2.3, fc.clone().sub(o).dot(dir)));
+    if (fc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.5) { hitPondFrog(f, null); splatSnd(fc); return; }
+  }
   ray.set(o, dir); ray.far = 2.3; ray.camera = camera; let hit = null;
   for (const h of ray.intersectObjects(scene.children, true)) { let q = h.object, skip = !q.isMesh || q.userData.noHit || q.isSprite || q.isInstancedMesh; while (q && !skip) { skip = q === camera || q === VIEW.av || q === SR.g; q = q.parent; } if (!skip) { hit = h; break; } }
   ray.far = Infinity; TOOL_LAST = hit ? { p: hit.point.toArray().map(v => +v.toFixed(2)), c: hit.object.material && hit.object.material.color && hit.object.material.color.getHexString(), d: +hit.distance.toFixed(2) } : null;
@@ -10127,7 +10139,7 @@ function farPerch(b, minFromPlayer) {
   return perches[Math.random() * perches.length | 0];
 }
 function perchAt(b, p) {
-  b.state = 'perch'; b.g.visible = true; b.g.position.copy(p); b.g.rotation.set(0, Math.random() * 6.28, 0);
+  b.state = 'perch'; b.held = false; b.thrown = false; b.g.visible = true; b.g.position.copy(p); b.g.rotation.set(0, Math.random() * 6.28, 0);
   b.wl.rotation.set(0, 1.45, 0); b.wr.rotation.set(0, -1.45, 0); b.idle = 15 + Math.random() * 30;   // wings folded back
 }
 function flyTo(b, p) {
@@ -10172,7 +10184,7 @@ function crSpawn(c) {
     const a = CR_AREA[Math.random() * CR_AREA.length | 0], x = a[0] + Math.random() * (a[2] - a[0]), z = a[1] + Math.random() * (a[3] - a[1]);
     if (walk.on && Math.hypot(x - walk.x, z - walk.z) < 6) continue;   // not right under Squeeg's nose
     const y = crFloor(x, z); if (y == null) continue;
-    c.g.position.set(x, y, z); c.g.rotation.set(0, Math.random() * 6.3, 0); c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i])); if (c.g.userData.sprite) c.g.userData.sprite.material.rotation = 0;
+    c.g.position.set(x, y, z); c.g.rotation.set(0, Math.random() * 6.3, 0); c.held = false; c.thrown = false; c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i])); if (c.g.userData.sprite) c.g.userData.sprite.material.rotation = 0;
     c.g.visible = true; c.state = 'idle'; c.t = 0.5 + Math.random() * 2; c.life = 60 + Math.random() * 90; return;
   }
   c.t = 2;   // try again shortly
@@ -10195,7 +10207,7 @@ function updateCritters(dt) {
   for (const c of critters) {
     const p = c.g.position;
     if (c.state === 'gone') { if ((c.t -= dt) <= 0) crSpawn(c); continue; }
-    if (c.state === 'hit') { if ((c.t -= dt) <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 10 + Math.random() * 30; } continue; }
+    if (c.state === 'hit') { if (!c.held && !c.thrown && (c.t -= dt) <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 10 + Math.random() * 30; } continue; }
     c.life -= dt;
     const near = walk.on && !walk.dead && Math.hypot(p.x - walk.x, p.z - walk.z) < 4;
     if (c.state === 'idle') {
@@ -10209,12 +10221,12 @@ function updateCritters(dt) {
   }
 }
 function hitCritter(c, col) {
-  critterHits++; c.state = 'hit'; c.t = 5; c.mats.forEach(m => m.color.setHex(col));
+  critterHits++; c.state = 'hit'; c.t = 45; c.held = false; c.thrown = false; if (col != null) c.mats.forEach(m => m.color.setHex(col));
   const sp = c.g.userData.sprite; if (sp) sp.material.rotation = Math.PI; else { c.g.rotation.z = Math.PI; c.g.position.y += 0.13; }   // knocked belly-up
   for (let i = 0; i < 3; i++) puff(c.g.position.clone().add(V3((Math.random() - 0.5) * 0.3, 0.1, (Math.random() - 0.5) * 0.3)), 0.08, 0xf2f2f2);
 }
 function hitBird(b, c) {
-  pigeonHits++; b.state = 'fall'; b.mats.forEach(m => m.color.setHex(c));
+  pigeonHits++; b.state = 'fall'; b.held = false; b.thrown = false; if (c != null) b.mats.forEach(m => m.color.setHex(c));
   b.vel = V3((Math.random() - 0.5) * 3, 2.5, (Math.random() - 0.5) * 3); b.spin = V3(Math.random() * 8, Math.random() * 4, Math.random() * 8);
   const at = b.g.position.clone(); at.y += 0.3;
   for (let i = 0; i < 4; i++) puff(at.clone().add(V3((Math.random() - 0.5) * 0.4, Math.random() * 0.3, (Math.random() - 0.5) * 0.4)), 0.1, 0xf2f2f2);
@@ -10277,10 +10289,13 @@ function updateBirds(dt) {
       const f = Math.sin(clock * 32) * 0.9 * (b.t > 0.85 ? 0.5 : 1); b.wl.rotation.z = f; b.wr.rotation.z = -f;
       if (b.t >= 1) perchAt(b, b.to);
     } else if (b.state === 'fall') {
+      if (b.held || b.thrown) continue;
       b.vel.y -= 9.8 * dt; g.position.addScaledVector(b.vel, dt);
       g.rotation.x += b.spin.x * dt; g.rotation.y += b.spin.y * dt; g.rotation.z += b.spin.z * dt;
-      if (g.position.y <= 0.05) { g.position.y = 0.05; g.rotation.set(0, g.rotation.y, Math.PI / 2); b.state = 'down'; b.t = 8; }
+      const fy = Math.max(0.05, floorAt(g.position.x, g.position.z, g.position.y + 0.2) + 0.05);
+      if (g.position.y <= fy) { g.position.y = fy; g.rotation.set(0, g.rotation.y, Math.PI / 2); b.state = 'down'; b.t = 45; }
     } else if (b.state === 'down') {
+      if (b.held || b.thrown) continue;
       b.t -= dt; if (b.t <= 0) { g.visible = false; b.state = 'gone'; b.t = 6 + Math.random() * 8; }
     } else if (b.state === 'gone') {
       b.t -= dt; if (b.t <= 0) { b.mats[0].color.setHex(0x8a8f99); b.mats[1].color.setHex(0x4b5260); perchAt(b, farPerch(null, 25)); }

@@ -109,5 +109,45 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  const yaw=h.traffic[0].g.rotation.y;h.updateHighwayTraffic(.1);assert.equal(h.traffic[0].g.rotation.y,yaw);
  assert.ok(rendered.includes("ht:+HWY_TRAFFIC_TIME.toFixed(2)"),'host clock still sent');
  assert.ok(rendered.includes("HWY_TRAFFIC_TIME=m.ht"),'guest clock still received');
- console.log('PASS: first-person HUD pass/visibility/state, loader patches, generated JS syntax, version, semi spawn/interpolation/turn/stall/despawn, fixed highway headings, shared geometry/materials, host traffic clock.');
+ const cornSrc=JSON.parse(loader.match(/const cornEngine=("(?:[^"\\]|\\.)*");/)[1]);
+ const frogSrc=JSON.parse(loader.match(/const frogEngine=("(?:[^"\\]|\\.)*");/)[1]);
+ const critterCtx={
+  T:AT,V3:(x=0,y=0,z=0)=>new AT.Vector3(x,y,z),console,setTimeout(){},
+  scene:new AT.Scene(),extraCols:[],colliders:[],wallSegs:[],
+  PONDS:Object.assign([[-260,-300]],{half:35,phi:0}),
+  floorAt:()=>0,puff(){},splatSnd(){},gunClick(){},
+  walk:{on:true,drive:false,mow:false,ride:false,dead:false,x:0,y:0,z:0,yaw:0},
+  camera:{position:new AT.Vector3(0,1.6,0),updateMatrixWorld(){},getWorldDirection(v){return v.set(0,0,-1);}},
+  birds:[{g:Object.assign(new AT.Group(),{userData:{}}),state:'down',t:45,vy:0}],
+  critters:[
+   {g:Object.assign(new AT.Group(),{userData:{sprite:{material:{rotation:0}}}}),kind:'rat',state:'hit',t:45},
+   {g:Object.assign(new AT.Group(),{userData:{sprite:{material:{rotation:0}}}}),kind:'lizard',state:'hit',t:45}
+  ]
+ };
+ vm.createContext(critterCtx);
+ vm.runInContext(frogSrc+'\n'+cornSrc+'\nthis.CORN_PROPS_STATE=CORN_PROPS_STATE;this.pondFrogs=pondFrogs;',critterCtx);
+ critterCtx.CORN_PROPS_STATE.ready=true;
+ critterCtx.makePondFrogs();
+ critterCtx.hitPondFrog(critterCtx.pondFrogs[0],0xff3366);
+ assert.equal(critterCtx.pondFrogs[0].state,'hit','pond frog enters hit state when shot');
+ const targets=[
+  ['dead bird',critterCtx.birds[0].g,critterCtx.birds[0]],
+  ['dead rat',critterCtx.critters[0].g,critterCtx.critters[0]],
+  ['dead lizard',critterCtx.critters[1].g,critterCtx.critters[1]],
+  ['dead frog',critterCtx.pondFrogs[0].group,critterCtx.pondFrogs[0]]
+ ];
+ for(const [label,grp,ref] of targets){
+  grp.position.set(0,0.2,-1.8);
+  const pickMsg=critterCtx.cornInteract();
+  assert.equal(pickMsg,'Picked up '+label+' — fire to throw');
+  assert.equal(ref.held,true,label+' marked held');
+  critterCtx.cornUpdate(0.016);
+  assert.equal(critterCtx.cornThrow(),true,label+' thrown on fire');
+  assert.equal(ref.held,false,label+' released on throw');
+  assert.equal(ref.thrown,true,label+' marked thrown');
+  critterCtx.cornUpdate(0.05);
+  assert.ok(grp.position.z<-1.9,label+' moves forward when thrown');
+  grp.position.set(100,0.2,100);
+ }
+ console.log('PASS: first-person HUD pass/visibility/state, loader patches, generated JS syntax, version, semi spawn/interpolation/turn/stall/despawn, fixed highway headings, shared geometry/materials, host traffic clock, dead bird/frog/rat/lizard grab & throw.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

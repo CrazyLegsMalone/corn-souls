@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refresh Corn Souls TEST</title><style>body{background:#06111f;color:#e8f3ff;font:17px system-ui;text-align:center;padding:15vh 1rem}a{color:#9edaff}</style></head><body><h2>Refreshing Corn Souls TEST</h2><p id="status">Removing old TEST cache…</p><p><a href="/corn-souls/test/index.html?refresh=1.97.14">Open TEST v1.97.14</a></p><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refresh Corn Souls TEST</title><style>body{background:#06111f;color:#e8f3ff;font:17px system-ui;text-align:center;padding:15vh 1rem}a{color:#9edaff}</style></head><body><h2>Refreshing Corn Souls TEST</h2><p id="status">Removing old TEST cache…</p><p><a href="/corn-souls/test/index.html?refresh=1.97.15">Open TEST v1.97.15</a></p><script>
 (async()=>{
  const status=document.getElementById('status');
  try {
@@ -9,7 +9,7 @@
    await Promise.all(regs.filter(r=>new URL(r.scope).pathname==='/corn-souls/test/').map(r=>r.unregister()));
   }
   status.textContent='TEST cache cleared. Opening latest TEST…';
-  location.replace('/corn-souls/test/index.html?refresh=1.97.14&fresh='+Date.now());
- }catch(e){status.textContent='Could not automatically clear TEST cache: '+e.message+' — use Open TEST v1.97.14 above.';}
+  location.replace('/corn-souls/test/index.html?refresh=1.97.15&fresh='+Date.now());
+ }catch(e){status.textContent='Could not automatically clear TEST cache: '+e.message+' — use Open TEST v1.97.15 above.';}
 })();
 </script></body></html>
