@@ -5614,12 +5614,10 @@ function init(container) {
       c.fillStyle = '#d0201a'; c.font = 'bold 8px Arial'; c.textAlign = 'center'; c.fillText('FIRE', 115, 92);
       c.font = 'bold 6px Arial'; 'EXTINGUISHER'.split('').forEach((ch, i) => c.fillText(ch, 115, 101 + i * 5.5));
       c.beginPath(); c.moveTo(108, 165); c.lineTo(122, 165); c.lineTo(115, 172); c.fill();               // arrow down
-      c.fillStyle = '#e04848'; c.beginPath(); c.moveTo(96, 186); c.lineTo(134, 186); c.lineTo(128, 262); c.quadraticCurveTo(115, 268, 102, 262); c.closePath(); c.fill();   // red extinguisher cover
-      c.fillStyle = '#2a2a2a'; c.fillRect(110, 182, 10, 6);                                             // hanger
-      c.fillStyle = '#7a1414'; c.font = 'bold 8px Arial'; c.fillText('FIRE', 115, 218); c.fillText('KEEP', 115, 238); c.fillText('CLEAR', 115, 247);
       const tex = new T.CanvasTexture(cv); tex.anisotropy = 4;
       const m = new T.Mesh(new T.PlaneGeometry(W, H), new T.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.05 }));
-      m.position.set(AC - 2.35 - 0.48 - 0.2 - W / 2, H / 2, SZ + 0.17); m.userData.noHit = true; scene.add(m); }
+      m.position.set(AC - 2.35 - 0.48 - 0.2 - W / 2, H / 2, SZ + 0.17); m.userData.noHit = true; scene.add(m);
+      extWall(AC - 3.58, 0.76, SZ + 0.3, 0); }
     // two more signs from the photo: DANGER overhead door (between the man door and the roll-up door) and NOTICE hard hats (on the man door)
     { const signTex = (draw, w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.textAlign = 'center'; draw(c); const t = new T.CanvasTexture(cv); t.anisotropy = 4; return t; };
       const danger = signTex(c => { c.fillStyle = '#111'; c.fillRect(4, 4, 152, 34); c.fillStyle = '#d0201a'; c.beginPath(); c.ellipse(80, 21, 58, 13, 0, 0, Math.PI * 2); c.fill();
@@ -5628,7 +5626,9 @@ function init(container) {
       const notice = signTex(c => { c.fillStyle = '#1f4fa8'; c.fillRect(6, 6, 148, 30); c.fillStyle = '#fff'; c.font = 'bold 22px Arial'; c.fillText('NOTICE', 80, 29);
         c.fillStyle = '#111'; c.font = 'bold 11px Arial'; c.fillText('HARD HATS AND', 80, 54); c.fillText('EYE PROTECTION', 80, 68); c.font = 'bold 13px Arial'; c.fillText('REQUIRED', 80, 84); c.font = 'bold 11px Arial'; c.fillText('IN THIS AREA', 80, 99);
         c.strokeStyle = '#111'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, 157, 109); }, 160, 112);
-      const dm = new T.Mesh(new T.PlaneGeometry(0.4, 0.28), new T.MeshLambertMaterial({ map: danger })); dm.position.set(AC - 2.35 + 0.48 + 0.22, 1.85, SZ + 0.17); dm.userData.noHit = true; scene.add(dm);
+      const dm = new T.Mesh(new T.PlaneGeometry(0.4, 0.28), new T.MeshLambertMaterial({ map: danger })); dm.position.set(AC, 1.85, SZ + 0.17); dm.userData.noHit = true; scene.add(dm);
+      const rollD = (O.rollDoors || []).find(d => Math.abs(d.x - AC) < 0.01 && Math.abs(d.z - (SZ - 0.05)) < 0.01);
+      if (rollD) rollD.panel.attach(dm);   // preserve world placement and move with the rolling door
       // NOTICE rides on the door leaf so it disappears with the door when Squeeg walks through
       const nm = new T.Mesh(new T.PlaneGeometry(0.36, 0.25), new T.MeshLambertMaterial({ map: notice })); nm.userData.noHit = true;
       const leafD = (O.swingDoors || []).filter(d => Math.abs(d.z - SZ) < 0.6 && Math.abs(d.x - (AC - 2.35)) < 0.8).pop();
