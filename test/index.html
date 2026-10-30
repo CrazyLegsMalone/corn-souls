@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.10';
+ const TEST_VERSION='1.97.11';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -214,6 +214,20 @@
     "if(q)return;}\n"+routeCheck);
   // Rail cars cannot leave their tracks: displace parked vehicles when hit.
   html=html.replace(vehicleLoopAnchor,vehicleLoopAnchor+'\n  csRailPushParked();');
+  // Mower blades kill only another walking player when the mower is moving.
+  // The victim validates the host/peer's mower snapshots and broadcasts its
+  // own normal death, avoiding duplicate or spoofable "kill" commands.
+  const mowerStrikeEngine="\n// Blade collision is checked on the potential victim's machine against\n// the mower driver's authoritative 15 Hz multiplayer snapshots.\n// The victim uses the existing die/ragdoll broadcast, so both peers agree.\nlet CS_MOWER_LAST=null;\nfunction csRemoteMowerStrike(mw){\n if(!Array.isArray(mw)||mw.length<5)return;\n const x=Number(mw[0]),y=Number(mw[1]),z=Number(mw[2]);\n if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return;\n const now=performance.now();\n const prev=CS_MOWER_LAST;\n CS_MOWER_LAST={x,y,z,at:now};\n if(!mw[4]||!walk.on||walk.dead||walk.drive||walk.mow||walk.ride)return;\n if(!prev||now-prev.at>600||now-prev.at<8)return;\n const dx=x-prev.x,dz=z-prev.z,move=Math.hypot(dx,dz),elapsed=(now-prev.at)/1000;\n if(move<0.075||move/elapsed<0.45)return;\n if(Math.abs(walk.y-y)>2.0)return;\n // Swept collision checks the entire path between network snapshots,\n // preventing a fast mower from skipping a nearby walking player.\n const vx=walk.x-prev.x,vz=walk.z-prev.z;\n const t=Math.max(0,Math.min(1,(vx*dx+vz*dz)/(move*move)));\n const cx=prev.x+t*dx,cz=prev.z+t*dz;\n if(Math.hypot(walk.x-cx,walk.z-cz)>1.3)return;\n walk.dead='mower';\n walk.diedAt={x:walk.x,z:walk.z};\n const k=Math.min(4,Math.max(1.3,move/elapsed*.7));\n layBody(walk.x,walk.z,walk.yaw,dx/move*k,1.3,dz/move*k,2.2,true);\n}\n";
+  const netReceiveAnchor='function netRecv(m) {';
+  const mowerReceiveAnchor='if (m.mw) { R.mow = m.mw;';
+  if(!html.includes(netReceiveAnchor)||!html.includes(mowerReceiveAnchor))
+    throw Error('Multiplayer mower receive code changed; strike patch refused');
+  html=html.replace(netReceiveAnchor,mowerStrikeEngine+'\n'+netReceiveAnchor);
+  html=html.replace(mowerReceiveAnchor,'if (m.mw) { csRemoteMowerStrike(m.mw); R.mow = m.mw;');
+  // A fresh mower session should not collide with an old disconnected pose.
+  const clearRemoteAnchor='function netDrop() {';
+  if(!html.includes(clearRemoteAnchor))throw Error('Network reset source changed');
+  html=html.replace(clearRemoteAnchor,'function netDrop() { CS_MOWER_LAST=null;');
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
