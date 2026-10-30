@@ -33,7 +33,7 @@ for(const o of office(old).filter(o=>!(o.geometry?.parameters.depth>7))) {
 }
 assert.deepEqual(next.NPCS.map(n=>n.id),old.NPCS.map(n=>n.id));
 assert.equal(next.NPCS.find(n=>n.id==='op').g.position.z,6.75);
-assert.ok(next.O.swingDoors.some(d=>near(d.x,-33)&&near(d.z,20)),'west south exit');
+assert.ok(next.O.swingDoors.some(d=>near(d.x,-67.7)&&near(d.z,20)),'west south exit');
 assert.ok(next.O.swingDoors.some(d=>near(d.x,-31)&&near(d.z,23)),'return exit');
 assert.equal(next.O.rollDoors.length,old.O.rollDoors.length);
 for(const d of next.O.rollDoors.filter(d=>d.x> -31)){

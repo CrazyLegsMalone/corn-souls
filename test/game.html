@@ -4614,7 +4614,7 @@ const STATIONS = {
   slurry:    { name: 'Slurry',          color: '#e3b04b', pos: [-66, 0, 2],  h: 14, dist: 55 },
   cook:      { name: 'Cook',            color: '#ff5a5f', pos: [-46, 0, 0],  h: 19, dist: 50 },
   ferm:      { name: 'Fermentation',    color: '#3ddc84', pos: [-18.6, 0, -74], h: 22, dist: 120 },
-  dist:      { name: 'Distillation',    color: '#4aa3ff', pos: [-52.5, 0, 51.5], h: 6, dist: 65 },
+  dist:      { name: 'Distillation',    color: '#4aa3ff', pos: [-52.5, 0, 27.5], h: 6, dist: 65 },
   storage:   { name: 'Tank Farm',       color: '#7fd3ff', pos: [-151.4, 0, 244], h: 17, dist: 110 }
 };
 
@@ -4829,9 +4829,9 @@ function pipe(points, st, r) {
   const pts = points.map(p => V3(...p));
   const path = new T.CurvePath();
   for (let i = 0; i < pts.length - 1; i++) path.add(new T.LineCurve3(pts[i], pts[i + 1]));
-  const tube = new T.Mesh(new T.TubeGeometry(path, pts.length * 10, r || 0.75, 10, false), glass(0xe8f6ff, 0.48));
+  const tube = new T.Mesh(new T.TubeGeometry(path, pts.length * 10, r, 10, false), glass(0xe8f6ff, 0.48));
   tube.userData.station = st; pickables.push(tube); scene.add(tube);
-  for (let i = 1; i < pts.length - 1; i++) add(new T.SphereGeometry((r || 0.75) * 1.15, 10, 8), mat(0xb8c4d0), pts[i].x, pts[i].y, pts[i].z, null);
+  for (let i = 1; i < pts.length - 1; i++) add(new T.SphereGeometry(r * 1.15, 10, 8), mat(0xb8c4d0), pts[i].x, pts[i].y, pts[i].z, null);
   return path;
 }
 
@@ -5233,10 +5233,10 @@ function init(container) {
     const ringMat = new T.MeshBasicMaterial({ color: 0x3ddc84 });
     const ring = add(new T.TorusGeometry(0.78, 0.12, 6, 20), ringMat, x, 2.6, SZ, null, true); ring.rotation.x = Math.PI / 2;
     // feed runs overhead (walkway clearance), then drops beside each strainer into its bottom
-    const OH = 7.5, FZ = 3.2;
+    const OH = 7.5, FZ = 1.85;
     const feed = [[-69.0, 0.95, -3.2], [-69.0, 0.95, SP1Z], [SP1X, 0.95, SP1Z], [SP1X, OH, SP1Z], [SP1X, OH, FZ], [x, OH, FZ]];
     const branch = [[x, OH, FZ], [x, 0.9, FZ], [x, 0.9, SZ + 0.6]];
-    const head = [[x, 2.6, SZ], [x, 6.4, SZ], [SMX, 6.4, SZ], [SMX, 6.4, 2.4], [-59.1, 6.4, 2.4], [-59.1, 6.4, -3.6]];
+    const head = [[x, 2.6, SZ], [x, 6.4, SZ], [SMX, 6.4, SZ], [SMX, 6.4, -1.2], [-59.1, 6.4, -1.2], [-59.1, 6.4, -3.6]];
     if (i === 0) {                                                                 // shared overhead feed line from Slurry Pump 1, on a pipe rack
       pipe([[SP1X, 1.4, SP1Z], [SP1X, OH, SP1Z], [SP1X, OH, FZ], [-49.5, OH, FZ]], null, 0.45);
     }
@@ -5247,7 +5247,7 @@ function init(container) {
   });
   // forklift-style self-dumping trash hopper for strainer rejects, between Strainer 2 and the cook tubes
   {
-    const WX = -45.8, WZ = 1.6, hop = new T.Group();   // straight out from the lab's north door; cook tube 2 to its right, strainer B to its left
+    const WX = -45.8, WZ = 0.5, hop = new T.Group();   // straight out from the lab's north door; cook tube 2 to its right, strainer B to its left
     hop.position.set(WX, 0, WZ);
     const g = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; hop.add(o); return o; };
     const body = mat(0xd9772e), dark = mat(0x3b3f45);   // orange, like the real one
@@ -5585,7 +5585,7 @@ function init(container) {
 
     // south end of the ferm alley (photo looking north up the alley): ~9.5 ft x 10 ft roll-up centered on the trench drain, green man door just west of it
     // Recessed west south face and return; retain the ferm/shop south face and doors.
-    wall(WW, WZS, EW, WZS, PH, wm, [[EW - WW - 2, DOOR]], { trim: true, leaf: -1 });
+    wall(WW, WZS, EW, WZS, PH, wm, [[6.3, DOOR]], { trim: true, leaf: -1 });
     wall(EW, WZS, EW, SZ, PH, wm, [[3, DOOR]], { trim: true, leaf: -1 });
     wall(EW, SZ, 37.4, SZ, PH, wm, [[AC - EW, 2.95, 3.05], [AC - 2.35 - EW, 0.95]], { trim: true, leaf: -1 });
     rollDoor(AC, SZ - 0.05, true, 2.9, 3.0, 1, 'slat', -1);
@@ -5671,9 +5671,9 @@ function init(container) {
     slab(EW - WW, WZS - NZ, (WW + EW) / 2, (NZ + WZS) / 2);
     slab(FXE - FXW, SZ - ZN, AC, (SZ + ZN) / 2);
     box(0.45, 0.06, SZ - ZN - 1, grate, AC, 0.23, (SZ + ZN) / 2);
-    box(EW - WW - 2, 0.06, 0.45, grate, (WW + EW) / 2, 0.23, OZS + 3);
-    box(EW - (WW + 1), 0.06, 0.45, grate, (WW + 1 + EW) / 2, 0.23, OZN - 2.6);
-    box(36.4 - EW, 0.06, 0.45, grate, (EW + 36.4) / 2, 0.23, 8.4);   // trench drain down the aisle, cook alley to the east wall
+    box(EW - WW - 2, 0.06, 0.45, grate, (WW + EW) / 2, 0.23, OZS + 1.1);
+    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, 0.23, OZN - 2.6);
+    box(36.4 - AC, 0.06, 0.45, grate, (AC + 36.4) / 2, 0.23, 8.4);   // trench drain down the aisle, cook alley to the east wall
     // office block floor: tan/brown ceramic tile with darker grout
     {
       const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d');
@@ -10306,7 +10306,7 @@ function updateBirds(dt) {
 const MAG = 6;                                  // shots per magazine (paint or water)
 const mags = { paint: MAG, water: MAG };        // each ammo type has its own magazine
 let pumpT = 0, idleT = 0, reloadT = 0, reloadTo = null, reloadFill = true, aimK = 0, aimWant = false, sgBob = 0, sgLast = null, sgTilt = 0;
-const shellsLeft = () => mags[ammo];
+
 function gunClick(f, d, v) { const C = tsnd.ctx; if (!C) return; const t = C.currentTime, o = C.createOscillator(), g = C.createGain(); o.type = 'square'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v || 0.05, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0005, t + d); o.connect(g); g.connect(C.destination); o.start(t); o.stop(t + d + 0.01); }
 let SG_MATS = null;
 function sgMats() {
@@ -10471,10 +10471,10 @@ function makeHand() {
 // power washer: hold fire to spray a stream of water; it washes paint splats off whatever it hits and scatters pigeons and critters
 function makeWasher() {
   const g = new T.Group(); g.userData.noHit = true;
-  hudPart(g, new T.BoxGeometry(0.05, 0.12, 0.05), hudMat(0x2b2f36), 0.2, -0.24, -0.38).rotation.x = 0.3;          // grip
-  hudPart(g, new T.BoxGeometry(0.07, 0.06, 0.16), hudMat(0xffc531), 0.2, -0.18, -0.44);                            // yellow trigger gun body
-  const lance = hudPart(g, new T.CylinderGeometry(0.008, 0.008, 0.62, 8), hudMat(0xc0c8d0), 0.2, -0.165, -0.82); lance.rotation.x = Math.PI / 2;   // steel lance
-  hudPart(g, new T.CylinderGeometry(0.016, 0.012, 0.05, 10), hudMat(0x1d2a3a), 0.2, -0.165, -1.14).rotation.x = Math.PI / 2;                      // nozzle
+
+
+
+
   g.visible = false; camera.add(g); return g;
 }
 const wash = { t: 0, rayT: 0, drops: null, d: [], snd: null };
@@ -10939,7 +10939,7 @@ function controlsMenu(code, fromTitle) {
     ['Walking (Squeeg mode)', [
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
-      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
+      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
       ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
@@ -10958,13 +10958,13 @@ function controlsMenu(code, fromTitle) {
       ['Pan', 'W A S D / drag', 'Left stick', 'One finger drag'], ['Turn', 'Q / E / right-drag', 'Right stick', 'Two-finger twist'], ['Tilt', 'R / F', 'Right stick', 'Two fingers up / down'],
       ['Zoom', 'Wheel or - / =', 'L2 / R2', 'Pinch or + / −'], ['Open equipment', 'Click it', 'L1 / R1 cycle, A open', 'Tap it'], ['Close a panel', 'Esc', 'B', '✕']]],
     ['Menus', [
-      ['Squeeg / Savior mode', 'button', 'Y (whole plant)', 'Squeeg / Whole plant buttons'], ['Main menu (incl. 2 Player)', 'M', 'Start', '☰'], ['Debug menu (this)', 'H', 'Select', 'small square button'], ['Pause', 'button', '—', '❚❚']]],
+      ['Squeeg / Savior mode', 'button', 'Y (whole plant)', 'Squeeg / Whole plant buttons'], ['Main menu (incl. 2 Player)', 'M', 'Start', '☰'], ['Debug menu', 'H', 'Select', 'small square button'], ['Pause', 'button', '—', '❚❚']]],
   ];
   const td = 'padding:3px 6px;border-bottom:1px solid #e3e7ec;vertical-align:top';
   const html = '<h1>Controls</h1><div style="max-height:60vh;overflow:auto;font-size:12.5px;text-align:left">' + S.map(([title, rows]) =>
     '<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">' + title + '</div><table style="width:100%;border-collapse:collapse"><tr style="color:#5d6b7c"><th style="' + td + ';text-align:left">Action</th><th style="' + td + ';text-align:left">Keyboard / mouse</th><th style="' + td + ';text-align:left">Controller</th><th style="' + td + ';text-align:left">Phone</th></tr>' +
     rows.map(r => '<tr>' + r.map((c, i) => '<td style="' + td + (i ? '' : ';font-weight:bold') + '">' + c + '</td>').join('') + '</tr>').join('') + '</table>').join('') + '</div>';
-  modal(html, fromTitle ? [['Back', null]] : [['Back', () => debugMenu(code)], ['Close', null]], true);
+  modal(html, fromTitle ? [['Back', null]] : [['Back', () => code === 'pause' ? menu() : debugMenu(code)], ['Close', null]], true);
 }
 // ---------- TALKING TO PEOPLE: walk up to someone, look at them, ✋ / E / X. They answer with a line (spoken by the device voice) and you
 // reply by picking a preset phrase, typing anything, or 🎤 saying it out loud (speech recognition: Android's own in the app, the browser's on PC).
@@ -10973,7 +10973,7 @@ const pick = a => a[Math.random() * a.length | 0];
 const coolerSay = () => { const c = P3.cooler; if (!c) return 'Cooler? Ask maintenance.'; const t = Math.round(c.T);
   return c.alarm ? 'Yeast cooler is at ' + t + ' degrees and alarming. ' + (c.open ? 'Somebody left ' + (c.open > 1 ? c.open + ' doors' : 'a door') + ' open. Go shut it.' : 'Doors are shut, it should come back.') : 'Yeast cooler is reading ' + t + ' degrees. That\'s fine. Leave the doors shut.'; };
 const alarmSay = () => { const a = P3.alarms; return a.length ? 'Right now I\'ve got ' + a.length + ' alarm' + (a.length > 1 ? 's' : '') + ': ' + a.map(x => x.desc.replace(/\s+/g, ' ').toLowerCase()).join(', ') + '. Fun day.' : 'Board\'s quiet. No alarms. Don\'t jinx it.'; };
-const wxSay = () => { const el = $('wx'); return 'Out there it\'s ' + (P3.weather || 'sunny') + (el && el.style.display !== 'none' ? ', ' + el.textContent.replace('·', 'with wind') : '') + '. Check the wind sock by the cake house before you mess with ammonia.'; };
+const wxSay = () => { const el = $('wx'); return 'Out there it\'s ' + (P3.weather || 'sunny') + (el && el.style.display !== 'none' ? ', ' + el.textContent.replace('·', 'with wind') : '') + '. Check the wind socks by the cake house and ammonia tank before you mess with ammonia.'; };
 const NPC_DEF = {
   op: { name: 'Rick · Board Op', pitch: 0.8, rate: 1.0,
     hi: ['Army taught me to watch my sector. Now my sector is this board and a cold cup of coffee.', 'If you brought coffee, speak. If you brought an alarm, take a number.', 'Yeah? Make it useful. The plant does not run on conversation.', 'I can watch the DCS and complain at the same time. What do you need?'],
@@ -11020,7 +11020,7 @@ const NPC_DEF = {
       testing: { k: ['test','testing','mycotoxin','mycotoxins','aflatoxin','fumonisin','humidity','moisture','probe','sample','quality'], say: ['Moisture and quality. Mycotoxins when required.', 'We sample the grain and check it against receiving limits.', 'There is a procedure. Go read it.', 'Ask Vern if you want the long version.'], opts: ['Where is Vern?', 'How are the loads looking?'] },
       weight: { k: ['scale','weight','weigh','ticket','paperwork'], say: ['Loaded weight minus empty weight. That is the net.', 'I handle the inbound weights and tickets.'], opts: ['What do you test for?', 'Bye.'] },
       vern: { k: ['vern','grain guys','grain receiving','sent me','who should i ask'], say: ['Vern is over at grain receiving. Go ask him.', 'He has been here forever. He knows.', 'Ask Vern. If he talks, listen.'], opts: ['Bye.'] },
-      late: { k: ['late','ride','boyfriend','car','pink car','drive','driving'], say: ['My boyfriend gives me a ride. Why?', 'I got here, did\'t I?', 'That pink car is not mine.'], opts: ['Bye.'] },
+      late: { k: ['late','ride','boyfriend','car','pink car','drive','driving'], say: ['My boyfriend gives me a ride. Why?', 'I got here, didn\'t I?', 'That pink car is not mine.'], opts: ['Bye.'] },
       rick: { k: ['rick','board operator','control room'], say: ['Rick is in the control room. Ask him about process.', 'He can answer that. I have trucks.'], opts: ['Bye.'] },
       tammy: { k: ['tammy','outbound'], say: ['Tammy handles outbound. I handle inbound.', 'Go see Tammy if it is leaving the plant.'], opts: ['Bye.'] },
       thanks: { k: ['thanks','thank you','thx'], say: ['Yep.', 'Sure.', 'Mm-hm.'], opts: ['Bye.'] },
@@ -11553,7 +11553,7 @@ function frameBody(now) {
     deathT = 4.2; document.body.classList.add('dead');
     try { if (window.Android && Android.vibrate) Android.vibrate(300); else if (navigator.vibrate) navigator.vibrate(300); } catch (e) {}
     if (P3.walking) toggleWalk();
-    const msg = hit === 'pond' ? 'Squeeg waded into the retention pond. Toxic water!' : hit === 'train' ? 'Squeeg got run over by the train.' : hit === 'fall' ? 'Fell too far.' : hit === 'paint' ? 'Squeeg got tagged by the other player!' : hit === 'ammonia' ? 'Squeeg breathed in anhydrous ammonia. Stay upwind of a leak and shut that valve!' : hit === 'acid' ? 'Squeeg walked through sulfuric acid. Stay out of the containment when it leaks!' : 'Squeeg got run over by a semi.';
+    const msg = hit === 'pond' ? 'Squeeg waded into the retention pond. Toxic water!' : hit === 'train' ? 'Squeeg got run over by the train.' : hit === 'fall' ? 'Fell too far.' : hit === 'paint' ? 'Squeeg got tagged by the other player!' : hit === 'mower' ? 'Squeeg got mowed down by the other player!' : hit === 'ammonia' ? 'Squeeg breathed in anhydrous ammonia. Stay upwind of a leak and shut that valve!' : hit === 'acid' ? 'Squeeg walked through sulfuric acid. Stay out of the containment when it leaks!' : 'Squeeg got run over by a semi.';
     { const f = $('fired'); const caps = hit === 'pond' ? ['POISONED', 'SLIMED OUT', 'MELTED', 'DISSOLVED', 'MUTATED'] : hit === 'acid' ? ['ACID BATH', 'BOOTS DISSOLVED', 'CHEMICAL BURN', 'READ THE SDS', 'SHOULD HAVE WORN RUBBER BOOTS'] : hit === 'ammonia' ? ['GASSED', 'LUNGS SEARED', 'NH3 EXPOSURE', 'SHOULD HAVE WORN A RESPIRATOR', 'EVACUATE UPWIND', 'IDLH EXCEEDED'] : ['FIRED', 'YOU HAVE BEEN LET GO', 'LAME!', 'INCIDENT REPORT FILED', 'OSHA HAS BEEN NOTIFIED', 'RECORDABLE INJURY'];
       f.textContent = caps[Math.random() * caps.length | 0]; f.classList.toggle('slime', hit === 'pond'); f.classList.toggle('gas', hit === 'ammonia'); setTimeout(() => f.classList.add('on'), 1300); setTimeout(() => f.classList.remove('on'), 4300); }   // GTA-style "WASTED"
     setTimeout(() => { $('squish').classList.add('on'); }, 4200);
@@ -11563,7 +11563,7 @@ function frameBody(now) {
   if (deathT > 0) deathT -= dt;
   try { P3.update(sim, sdt, evs); } catch (e) { if (!window.__sceneErr) { window.__sceneErr = 1; if (window.__showErr) __showErr('3D: ' + (e && e.message)); } }
   const panelW = $('panel').classList.contains('open') ? $('panel').offsetWidth : 0;
-  for (const id in labels) {
+  if ($('labels').offsetParent) for (const id in labels) {
     const p = P3.project(id), el = labels[id];
     const hide = !p.vis || p.x < 20 || p.y < 56 || p.x > window.innerWidth - panelW - 20 || p.y > window.innerHeight - 10;
     el.style.display = hide ? 'none' : '';
@@ -11572,7 +11572,7 @@ function frameBody(now) {
   uiT += dt;
   if (uiT > 0.2) {
     uiT = 0; updateOuts(); refreshPanel(); setTxt($('birdCount'), '🐦 ' + P3.pigeonHits + (P3.critterHits ? ' · 🐀 ' + P3.critterHits : ''));
-    for (const id in labels) { const s = Sim.stationStatus(sim, id); setCls(labels[id].querySelector('.dot'), 'dot ' + (s === 'good' ? '' : s)); }
+    if ($('labels').offsetParent) for (const id in labels) { const s = Sim.stationStatus(sim, id); setCls(labels[id].querySelector('.dot'), 'dot ' + (s === 'good' ? '' : s)); }
   }
   { const a = P3.nh3 || 0, el = $('nh3'); if (el.dataset.a !== a.toFixed(2)) { el.dataset.a = a.toFixed(2); el.style.opacity = Math.min(0.92, a * 1.1); view.style.filter = a > 0.15 ? 'blur(' + ((a - 0.15) * 4).toFixed(1) + 'px)' : ''; } }   // ammonia: eyes burn and water
   { const t = P3.toxic || 0, el = $('toxic'); if (el.dataset.t !== t.toFixed(2)) { el.dataset.t = t.toFixed(2); el.style.opacity = Math.min(0.75, t * t * 0.75 + t * 0.1); } }   // pond poison: screen goes green
