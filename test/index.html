@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.5';
+ const TEST_VERSION='1.97.6';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -173,6 +173,12 @@
   if(!html.includes(mowerAvatarHook))throw Error('Self avatar hook missing');
   const mowerAvatarCode="function updateLocalMowerOperator(){\n const M=O.shedMower;if(!M)return;\n const show=walk.on&&walk.mow&&!walk.dead&&VIEW.third;\n if(show&&!M.localRider){\n  const me=NET.conn&&!NET.host?1:0;\n  const d=makeCharacter(VEST_COL[me],true);\n  d.scale.setScalar(SQ_K);d.rotation.y=Math.PI/2;d.position.set(.22,.05,0);\n  d.traverse(o=>{o.userData.noHit=true;if(o.isMesh)o.castShadow=true;});\n  M.g.add(d);M.localRider=d;\n }\n if(M.localRider)M.localRider.visible=show;\n}\n";
   html=html.replace(mowerAvatarHook,mowerAvatarCode+mowerAvatarHook+"\n  updateLocalMowerOperator();");
+  // Align each radial rail section's midpoint with the stair direction.
+  // Previously a stair gap fell between two rail sections and no section
+  // was omitted, leaving a yellow rail across some fermenter stair landings.
+  const fermRailOld="const a0 = i / N * Math.PI * 2, a1 = (i + 1) / N * Math.PI * 2, mid = (a0 + a1) / 2;";
+  if(!html.includes(fermRailOld))throw Error('Fermenter railing geometry changed; gap fix not applied.');
+  html=html.replace(fermRailOld,"const a0 = (i - 0.5) / N * Math.PI * 2, a1 = (i + 0.5) / N * Math.PI * 2, mid = (a0 + a1) / 2;");
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
