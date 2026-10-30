@@ -11,14 +11,28 @@ label{display:block}section{border:1px solid #294057;padding:18px;border-radius:
 .msg{display:block;text-align:left;width:100%;padding:13px;margin:8px 0;background:#10283c;border:1px solid #3c5a73;overflow-wrap:anywhere}
 .muted{color:#b5c6d5;font-size:14px}.body{white-space:pre-wrap;overflow-wrap:anywhere}.row{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 #status{min-height:24px;color:#ffe3a3;white-space:pre-wrap}#login,#reports,#detail{display:none}
+
+main{max-width:940px;padding:12px 16px 28px}
+section{background:#10263b;border:1px solid #46647b;border-radius:12px;margin-top:10px;padding:13px}
+h1{font-size:clamp(20px,3vw,27px);margin:8px 0}h2{margin:4px 0 8px}
+button{background:#214a70!important;color:#fff!important;border:1px solid #6d96b8!important;font-weight:650}
+button:disabled{opacity:.4}
+#reports>.row:nth-of-type(2){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#reports>.row:nth-of-type(2) button{width:100%;margin:0;min-height:48px}
+#reports button[aria-pressed="true"]{background:#d4eafa!important;color:#08233b!important}
+#messages{max-height:40dvh;overflow-y:auto;overscroll-behavior:contain}
+#messages .msg{background:#183750!important;color:white!important;border:1px solid #7296af!important;min-height:64px;white-space:pre-wrap;font-weight:500;border-radius:10px}
+#reports>.row:last-child{justify-content:space-between}
+#status{font-size:13px;min-height:22px;margin:5px 0}
+@media(max-height:500px){section{padding:9px}#messages{max-height:34dvh}}
 </style></head><body><main>
 <a href="/corn-souls/test/index.html">← Back to TEST game</a>
-<h1>Corn Souls TEST · Developer Inbox</h1>
-<p class="muted">The inbox runs separately from the 3D game, preventing controller and renderer errors during sign-in. Only approved developer accounts can read reports.</p>
+<h1>Developer Messages</h1>
+<p class="muted">Select a category, then choose a message to read.</p>
 <p id="status" role="status" aria-live="polite">Loading inbox…</p>
 <section id="login"><h2>Developer sign in</h2><form id="authForm"><label>Email<input id="email" type="email" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button id="signIn" class="primary" type="submit">Sign in</button></form></section>
 <section id="reports"><div class="row"><h2>Messages</h2><button id="refresh">Refresh</button><button id="logout">Sign out</button></div>
-<div class="row"><button data-filter="unread">Unread</button><button data-filter="all">All messages</button><button data-filter="resolved">Resolved</button></div><div id="messages"></div><div class="row"><button id="prev">Previous</button><button id="next">Next</button></div></section>
+<div class="row"><button data-filter="unread">● Unread</button><button data-filter="all">All messages</button><button data-filter="resolved">✓ Resolved</button></div><div id="messages"></div><div class="row"><button id="prev">← Previous</button><button id="next">Next →</button></div></section>
 <section id="detail"><button id="back">← Messages</button><h2 id="detailTitle"></h2><p id="detailMeta" class="muted"></p><div id="detailBody" class="body"></div><div id="detailImage"></div><button id="resolve">Mark resolved</button></section>
 </main><script>
 'use strict';
@@ -61,6 +75,7 @@ async function loadReports(){
   const query=filter==='unread'?'&read_at=is.null&resolved=eq.false':filter==='resolved'?'&resolved=eq.true':'';
   const rows=await request('/rest/v1/cs_reports?select=id,created_at,kind,name,body,build,device,read_at,resolved&order=created_at.desc,id.desc&limit=21&offset='+(page*20)+query,{},true);
   if(!Array.isArray(rows))throw Error('Inbox returned an invalid report list.');
+  document.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===filter)));
   lastCount=rows.length;
   const el=$('messages');el.replaceChildren();
   for(const r of rows.slice(0,20)){
