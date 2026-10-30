@@ -7629,7 +7629,7 @@ function buildNH3Line() {   // tank bottom -> 2 small pumps on a pad (one online
   const lamp = new T.Mesh(new T.SphereGeometry(0.04, 6, 4), new T.MeshBasicMaterial({ color: 0x3ddc84 })); lamp.position.set(x - 0.7, 0.7, PZ + 0.18); scene.add(lamp);   // green light: this pump is the one online
   run([[x, cy - R + 0.05, S - 0.6], [x, 0.48, S - 0.6], [x, 0.48, PZ - 0.55]]);                       // tank bottom down to the pump suction header
   run([[x, 1.0, PZ - 0.16], [x - 1.2, 1.0, PZ - 0.16], [x - 1.2, RACK, PZ - 0.16], [x - 1.2, RACK, RZ], [BX, RACK, RZ], [BX, RACK, BNZ - 0.2]]);   // riser off to the west side so the gauge stays readable   // riser, rack west, into the building from the north
-  for (let xx = x - 2; xx > BX + 1; xx -= 6.5) tpost(xx, RZ, RACK, false);
+  for (let xx = x - 2; xx > BX + 1; xx -= 6.5) { if (Math.abs(xx - 13.8) < 0.01) continue; tpost(xx, RZ, RACK, false); }   // omit the T support directly in front of the methanator pump house
   tpost(BX, (RZ + BNZ) / 2, RACK, true);
 }
 function drawNH3Gauge() {
