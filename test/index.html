@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.9';
+ const TEST_VERSION='1.97.10';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -187,6 +187,33 @@
   const frogTick='  clock += dt; cornUpdate(dt);';
   if(!html.includes(frogTick))throw Error('Game update hook changed; frog animation not applied');
   html=html.replace(frogTick,'  clock += dt; cornUpdate(dt); updatePondFrogs(dt);');
+  // Unified car/Ranger/mower/truck/train solid-body contacts in TEST.
+  const vehicleContactEngine="\n/* Physical vehicle contacts. Train cars are kinematic (rail locked);\n   player cars, Rangers, mowers and deliveries are blocked by them. */\nfunction csVehicleBodies(ignore){\n const out=[],put=(g,x,z,r,kind)=>{if(g&&g!==ignore&&g.visible!==false&&Number.isFinite(x)&&Number.isFinite(z))out.push({g,x,z,r,kind});};\n const seg=(g,offsets,rad,alongX,kind)=>{\n  if(!g||g===ignore||g.visible===false)return;\n  const a=g.rotation.y,ca=Math.cos(a),sa=Math.sin(a);\n  for(const o of offsets){\n   const x=g.position.x+(alongX?ca:-sa)*o,z=g.position.z+(alongX?-sa:-ca)*o;\n   put(g,x,z,rad,kind);\n  }\n };\n for(const v of vehicles)if(!v.done)seg(v.g,[-7,-3,1,5,7],1.5,true,'corn-truck');\n for(const c of train.cars)seg(c.g,c.loco?[-4,0,4]:[-3.3,0,3.3],1.8,true,'train');\n for(const R of THRUS)if(R.u>=0)for(const c of R.cars)seg(c.g,c.loco?[-4,0,4]:[-3.3,0,3.3],1.8,true,'train');\n if(O.cars)for(const car of O.cars)if(!CAR_ON||car!==CAR_ON)seg(car.g,[-1.15,1.15],1.08,false,'car');\n if(RANGER_SAVE)seg(RANGER_SAVE.g,[-1,1],1.05,false,'ranger');\n else if(!walk.drive)seg(utv.g,[-1,1],1.05,false,'ranger');\n if(O.shedMower&&(!walk.mow||O.shedMower.g!==ignore)&&O.shedMower.out)seg(O.shedMower.g,[-.32,.32],.83,false,'mower');\n return out;\n}\nfunction csVehiclePenetration(x,z,r,ignore){\n let px=0,pz=0,touched=false,strongest=0,kind='';\n for(const o of csVehicleBodies(ignore)){\n  const dx=x-o.x,dz=z-o.z,d2=dx*dx+dz*dz,reach=r+o.r;\n  if(d2>=reach*reach)continue;\n  const d=Math.sqrt(d2),depth=Math.min(3.0,reach-d);\n  const nx=d>.0001?dx/d:1,nz=d>.0001?dz/d:0;\n  // Largest contact, not all overlapping samples summed together.\n  if(depth>strongest){strongest=depth;px=nx*depth;pz=nz*depth;kind=o.kind;touched=true;}\n }\n return touched?{x:px,z:pz,kind}:null;\n}\nfunction csRailPushParked(){\n // Host owns deliveries. Local movement controllers handle occupied vehicles.\n const trains=csVehicleBodies(null).filter(b=>b.kind==='train');\n if(!trains.length)return;\n const contact=(x,z,r)=>{\n  let best=null,dmax=0;\n  for(const t of trains){const dx=x-t.x,dz=z-t.z,d=Math.hypot(dx,dz),penetration=r+t.r-d;\n   if(penetration>0&&penetration>dmax){dmax=penetration;best={x:(d>.01?dx/d:1)*(penetration+.08),z:(d>.01?dz/d:0)*(penetration+.08)};}\n  }\n  return best;\n };\n const shove=(g,x,z,r,fn)=>{\n  if(!g||g.visible===false)return;\n  const p=contact(x,z,r);if(p)fn(p);\n };\n if(O.cars)for(const car of O.cars){\n  if(CAR_ON===car||NET.rp&&NET.rp.car&&NET.rp.car[0]===car.i)continue;\n  shove(car.g,car.x,car.z,1.85,p=>{\n   car.x+=p.x;car.z+=p.z;car.g.position.x=car.x;car.g.position.z=car.z;\n   if(car.cols)for(let i=0;i<car.cols.length;i++){\n    const off=i?1.2:-1.2;\n    car.cols[i][0]=car.x-Math.sin(car.a)*off;\n    car.cols[i][1]=car.z-Math.cos(car.a)*off;\n   }\n  });\n }\n if(O.shedMower&&!walk.mow&&!(NET.rp&&NET.rp.mow)){\n  const m=O.shedMower;shove(m.g,m.g.position.x,m.g.position.z,1.0,p=>{\n    m.g.position.x+=p.x;m.g.position.z+=p.z;\n  });\n }\n if(!walk.drive&&utv.g&&!CAR_ON){\n  shove(utv.g,utv.x,utv.z,1.45,p=>{\n   utv.x+=p.x;utv.z+=p.z;utv.g.position.x=utv.x;utv.g.position.z=utv.z;\n  });\n }\n if(!NET.conn||NET.host)for(const v of vehicles){\n  shove(v.g,v.g.position.x,v.g.position.z,2.2,p=>{\n   v.g.position.x+=p.x;v.g.position.z+=p.z;\n   v.collisionHold=0.45;\n  });\n }\n}\n";
+  const playerBlockAnchor='function utvBlocked(x, z, a) {';
+  const mowBlockAnchor='function mowBlocked(x, z) {';
+  const truckRouteAnchor='function driveRoute(v, dt) {';
+  const vehicleLoopAnchor='  updateVehicles(dt);';
+  for(const needle of [playerBlockAnchor,mowBlockAnchor,truckRouteAnchor,vehicleLoopAnchor])
+    if(!html.includes(needle))throw Error('Vehicle collision engine anchor missing: '+needle);
+  html=html.replace(playerBlockAnchor,vehicleContactEngine+'\n'+playerBlockAnchor);
+  // Both the driven cars/Ranger and mower sample world-space dynamic contacts.
+  const utvCollideAnchor='    if (NET.rr) for (const off2 of [-0.9, 0.9])';
+  if(!html.includes(utvCollideAnchor))throw Error('Ranger blocker changed');
+  html=html.replace(utvCollideAnchor,
+    "    const cs=csVehiclePenetration(cx,cz,r,utv.g);if(cs){hit=true;px+=cs.x;pz+=cs.z;}\n"+utvCollideAnchor);
+  const mowerBlockEnd='  return hit ? [px, pz] : null;\n}\nfunction mowUpdate(dt) {';
+  if(!html.includes(mowerBlockEnd))throw Error('Mower blocker changed');
+  html=html.replace(mowerBlockEnd,
+    "  const cs=csVehiclePenetration(x,z,r,O.shedMower.g);if(cs){hit=true;px+=cs.x;pz+=cs.z;}\n"+mowerBlockEnd);
+  const routeCheck='  const prev = v.route[v.i - 1] || [], st =';
+  if(!html.includes(routeCheck))throw Error('Corn truck routing changed');
+  html=html.replace(routeCheck,
+    "  // Corn deliveries wait for occupied road space, other vehicles and trains.\n"+
+    "  if(v.collisionHold>0){v.collisionHold-=dt;return;}\n"+
+    "  if(d>0.01){const lead=Math.min(d,7),q=csVehiclePenetration(v.g.position.x+dx/d*lead,v.g.position.z+dz/d*lead,2.0,v.g);"+
+    "if(q)return;}\n"+routeCheck);
+  // Rail cars cannot leave their tracks: displace parked vehicles when hit.
+  html=html.replace(vehicleLoopAnchor,vehicleLoopAnchor+'\n  csRailPushParked();');
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
