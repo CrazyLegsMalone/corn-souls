@@ -7037,7 +7037,9 @@ function init(container) {
       cyl(0.9, 16, mat(0x8a9097), rx - 6.5, 0, rz, null, 12); extraCols.push([rx - 6.5, rz, 1.0]); STACKS.push({ x: rx - 6.5, y: 16.1, z: rz, r: 0.9, rate: 7 });   /* stack on the west side (plume) */ }
     // WIND SOCK by the wet cake pad (west end): orange/white striped sock on a 20 ft pole. It swings to point downwind with the live
     // weather and fills out with the wind speed (limp and hanging when it's calm), fluttering a little.
-    { const WX = E1 - 67 - 4, WZ = EZ1 + 3;
+    // Keep the wet cake windsock; add an identical one northwest of ammonia, clear of the tank, valves and south pump rack.
+    O.windsocks = [];
+    for (const [WX, WZ] of [[E1 - 67 - 4, EZ1 + 3], [NH3.x - 4, NH3.z - 8]]) {
       cyl(0.07, 6.0, mat(0xd8dcdf), WX, 0, WZ, null, 10); box(0.5, 0.2, 0.5, mat(0x9a9fa4), WX, 0.1, WZ); extraCols.push([WX, WZ, 0.3]);
       const piv = new T.Group(); piv.position.set(WX, 6.0, WZ); scene.add(piv);
       const ring = new T.Mesh(new T.TorusGeometry(0.28, 0.025, 6, 16), mat(0x9aa0a6)); ring.position.set(0, 0, 0.12); piv.add(ring);
@@ -7045,7 +7047,8 @@ function init(container) {
       for (let i = 0; i < 5; i++) { const r0 = 0.28 - i * 0.034, r1 = r0 - 0.034, L = 0.46, sg = new T.Group(); sg.position.set(0, 0, z0); parent.add(sg);
         const m = new T.Mesh(new T.CylinderGeometry(r0, r1, L, 14, 1, true), new T.MeshLambertMaterial({ color: i % 2 ? 0xf4f4f2 : 0xf06a1a, side: T.DoubleSide }));
         m.rotation.x = Math.PI / 2; m.position.z = L / 2; sg.add(m); segs.push(sg); parent = sg; z0 = L - 0.03; }
-      O.windsock = { piv, segs, yaw: 0 }; }
+      O.windsocks.push({ piv, segs, yaw: 0 }); }
+    O.windsock = O.windsocks[0];
     // wet cake pad (blue): concrete slab under an open-sided roof on steel posts, 67 x 24 m, right south of the energy center
     { const P0 = E1 - 67, PZ0 = EZ1 + 2, PZ1 = PZ0 + 24, steel = mat(0x6f7378);
       box(67, 0.3, 24, mat(0x8a8f94), (P0 + E1) / 2, 0.15, (PZ0 + PZ1) / 2);
@@ -7377,13 +7380,14 @@ function updateDucks(dt) {
 }
 let WIND = { mph: 8, from: 180 };   // live wind from the weather fetch (speed, direction it blows FROM, degrees from north)
 function updateWindsock(dt) {
-  const W = O.windsock; if (!W) return;
+  for (const W of O.windsocks || []) {
   const to = (WIND.from + 180) * Math.PI / 180, k = Math.max(0.08, Math.min(1, WIND.mph / 15));   // north is -z, east is +x
   const want = Math.atan2(Math.sin(to), -Math.cos(to));                 // yaw that turns the sock's +z toward the downwind direction
   W.yaw += Math.atan2(Math.sin(want - W.yaw), Math.cos(want - W.yaw)) * Math.min(1, dt * 1.5);
   W.piv.rotation.y = W.yaw + Math.sin(clock * 2.3) * 0.08 * (0.3 + k);
   const droop = (1 - k) * 1.35 / 5;                                    // each stripe bends down a bit more when it's calm
   W.segs.forEach((sg, i) => { sg.rotation.x = droop + Math.sin(clock * (5 + i) + i) * 0.035 * k; sg.rotation.y = Math.sin(clock * 3.1 + i * 0.9) * 0.05 * k; });
+  }
 }
 function inPond(x, z, half) { half = half || PONDS.half; const c = Math.cos(PONDS.phi), s = Math.sin(PONDS.phi); return PONDS.some(([px, pz]) => { const dx = x - px, dz = z - pz; return Math.abs(dx * c - dz * s) < half && Math.abs(dx * s + dz * c) < half; }); }   // Road P x (also RDPX)
 const SATPX = (px, py) => [-240 + (px - 1062) * 1.6, (py - 507) * 1.6];

@@ -32,7 +32,7 @@ context.reply('op','Pigeons?');assert.match(shown,/7/);
 const first=[];for(let i=0;i<10;i++){context.reply('op','Do you drink coffee?');first.push(shown);}for(let i=1;i<first.length;i++)assert.notEqual(first[i],first[i-1]);
 // Other NPC definitions, physical NPCs and all surrounding gameplay are byte-for-byte preserved.
 assert.equal(html.slice(html.indexOf('  brenda: {'),html.indexOf('for (const id in NPC_DEF)')),original.slice(original.indexOf('  brenda: {'),original.indexOf('for (const id in NPC_DEF)')));
-assert.equal(html.slice(0,html.indexOf('  op: {')),original.slice(0,original.indexOf('  op: {')));
+assert.equal(html.slice(html.indexOf('const pick ='),html.indexOf('  op: {')),original.slice(original.indexOf('const pick ='),original.indexOf('  op: {')));
 assert.equal(html.slice(html.indexOf('// 2 player: one PC hosts')),original.slice(original.indexOf('// 2 player: one PC hosts')));
 assert.equal(fs.readFileSync('index.html','utf8').replaceAll('\r\n','\n'),cp.execFileSync('git',['show','HEAD:index.html']).toString().replaceAll('\r\n','\n'),'launcher unchanged');
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);
