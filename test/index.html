@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.2';
+ const TEST_VERSION='1.97.3';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -142,11 +142,25 @@
   html=html.replace(thirdCameraOriginal,"let tx = px + rx * 0.12 - fx * 3.9, ty = py + 0.45 - fy * 3.9, tz = pz + rz * 0.12 - fz * 3.9, k = 1;");
   // Wind comes from the game's existing live Open-Meteo speed/direction.
   // Replace only the presentation math; leave fetch location/cadence intact.
+  // TEST: explicit compass/vector mapping for the real weather windsock.
+  // The model's local +Z tail is rotated to the downwind vector.
   const windsockStart='function updateWindsock(dt) {';
   const windsockEnd='function inPond(';
   const wsA=html.indexOf(windsockStart),wsB=html.indexOf(windsockEnd,wsA);
   if(wsA<0||wsB<0||wsB-wsA>2500)throw Error('Windsock code changed; safe patch not applied');
-  html=html.slice(0,wsA)+"function updateWindsock(dt) {\n const W=O.windsock;if(!W)return;\n // Open-Meteo uses meteorological wind FROM degrees clockwise from north.\n // The sock's opening remains at the pole and the free end points downwind.\n const mph=Math.max(0,Number.isFinite(WIND.mph)?WIND.mph:0);\n const k=Math.min(1,mph/18);\n if(mph>0.8){\n  const to=((WIND.from+180)%360)*Math.PI/180;\n  const want=Math.atan2(Math.sin(to),-Math.cos(to));\n  W.yaw+=Math.atan2(Math.sin(want-W.yaw),Math.cos(want-W.yaw))*Math.min(1,Math.max(0,dt)*1.8);\n }\n const flutter=k*(0.015+0.038*Math.min(1,mph/25));\n W.piv.rotation.y=W.yaw+Math.sin(clock*(1.5+mph*.12))*flutter;\n W.segs.forEach((sg,i)=>{\n  // Low wind hangs down, stronger wind inflates and raises the sock.\n  const droop=(1-k)*0.36;\n  const f=clock*(2+mph*.3)+i*.85;\n  sg.rotation.x=droop+Math.sin(f)*flutter*(0.6+i*.13);\n  sg.rotation.y=Math.cos(f*.87)*flutter;\n });\n}"+'\n'+html.slice(wsB);
+  html=html.slice(0,wsA)+"function updateWindsock(dt) {\n const W=O.windsock;if(!W)return;\n // Mesh extends along its parent's local +Z axis. Positive wind FROM degrees\n // are clockwise from north (-Z). The tail points exactly downwind.\n const from=((Number(WIND.from)||0)%360+360)%360;\n const windRad=from*Math.PI/180;\n const downwindX=-Math.sin(windRad), downwindZ=Math.cos(windRad);\n const targetYaw=Math.atan2(downwindX,downwindZ);\n const mph=Math.max(0,Number(WIND.mph)||0);\n const strength=Math.min(1,mph/18);\n // React within about one second when real weather changes; no permanent bias.\n const delta=Math.atan2(Math.sin(targetYaw-W.yaw),Math.cos(targetYaw-W.yaw));\n W.yaw+=delta*(1-Math.exp(-Math.max(0,dt)*3));\n W.piv.rotation.y=W.yaw;\n const flutter=strength*(.012+.035*Math.min(1,mph/25));\n W.segs.forEach((seg,i)=>{\n  // At calm speeds the flexible tail hangs down rather than aiming at a\n  // fake fixed wind direction. At speed it rises and ripples in the wind.\n  const wave=clock*(1.9+mph*.24)+i*.75;\n  seg.rotation.x=(1-strength)*.34+Math.sin(wave)*flutter*(.6+i*.13);\n  seg.rotation.y=Math.cos(wave*.9)*flutter;\n });\n window.__cornWindSockState={from:Math.round(from),towards:Math.round((from+180)%360),mph:+mph.toFixed(1),yaw:+(W.yaw*180/Math.PI).toFixed(1)};\n}"+'\n'+html.slice(wsB);
+  // Instrument actual Open-Meteo data to distinguish live wind from the built-in
+  // offline placeholder, which otherwise makes the sock appear stuck.
+  const weatherApply='P3.setWind(c.wind_speed_10m, c.wind_direction_10m);';
+  if(!html.includes(weatherApply))throw Error('Open-Meteo wind binding changed');
+  html=html.replace(weatherApply,weatherApply+" window.__cornWindWeatherAt=Date.now();");
+  // Refresh from the API more frequently; Open-Meteo readings still determine
+  // direction and speed, not the player's own clock or a random animation.
+  html=html.replace('setInterval(fetchWeather, 20 * 60 * 1000);','setInterval(fetchWeather, 5 * 60 * 1000);');
+  // TEST-only status indicates whether weather really loaded, so a fallback
+  // south wind cannot be mistaken for a broken rotation.
+  const windDebug="<div id='wind-readout' style='position:fixed;left:8px;bottom:8px;z-index:2147483600;background:rgba(0,26,47,.88);color:#ffe7a6;padding:5px 8px;font:12px monospace;pointer-events:none'>Wind: waiting for live weather...</div><script>setInterval(()=>{const w=window.__cornWindSockState,d=document.getElementById('wind-readout');if(!d||!w)return;d.textContent='WIND '+(window.__cornWindWeatherAt?'LIVE':'FALLBACK')+' '+w.mph+' mph FROM '+w.from+'° · sock TO '+w.towards+'°';},900);</scr"+"ipt>";
+  html=html.replace(/<\/body>/i,windDebug+'</body>');
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
