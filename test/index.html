@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.1';
+ const TEST_VERSION='1.97.2';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -140,6 +140,13 @@
   const thirdCameraOriginal="let tx = px + rx * 0.7 - fx * 3.9, ty = py + 0.45 - fy * 3.9, tz = pz + rz * 0.7 - fz * 3.9, k = 1;";
   if(!html.includes(thirdCameraOriginal))throw new Error('Third-person camera source changed; centering fix not applied.');
   html=html.replace(thirdCameraOriginal,"let tx = px + rx * 0.12 - fx * 3.9, ty = py + 0.45 - fy * 3.9, tz = pz + rz * 0.12 - fz * 3.9, k = 1;");
+  // Wind comes from the game's existing live Open-Meteo speed/direction.
+  // Replace only the presentation math; leave fetch location/cadence intact.
+  const windsockStart='function updateWindsock(dt) {';
+  const windsockEnd='function inPond(';
+  const wsA=html.indexOf(windsockStart),wsB=html.indexOf(windsockEnd,wsA);
+  if(wsA<0||wsB<0||wsB-wsA>2500)throw Error('Windsock code changed; safe patch not applied');
+  html=html.slice(0,wsA)+"function updateWindsock(dt) {\n const W=O.windsock;if(!W)return;\n // Open-Meteo uses meteorological wind FROM degrees clockwise from north.\n // The sock's opening remains at the pole and the free end points downwind.\n const mph=Math.max(0,Number.isFinite(WIND.mph)?WIND.mph:0);\n const k=Math.min(1,mph/18);\n if(mph>0.8){\n  const to=((WIND.from+180)%360)*Math.PI/180;\n  const want=Math.atan2(Math.sin(to),-Math.cos(to));\n  W.yaw+=Math.atan2(Math.sin(want-W.yaw),Math.cos(want-W.yaw))*Math.min(1,Math.max(0,dt)*1.8);\n }\n const flutter=k*(0.015+0.038*Math.min(1,mph/25));\n W.piv.rotation.y=W.yaw+Math.sin(clock*(1.5+mph*.12))*flutter;\n W.segs.forEach((sg,i)=>{\n  // Low wind hangs down, stronger wind inflates and raises the sock.\n  const droop=(1-k)*0.36;\n  const f=clock*(2+mph*.3)+i*.85;\n  sg.rotation.x=droop+Math.sin(f)*flutter*(0.6+i*.13);\n  sg.rotation.y=Math.cos(f*.87)*flutter;\n });\n}"+'\n'+html.slice(wsB);
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
