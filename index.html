@@ -13,7 +13,7 @@
   const response=await fetch('./game.html?test_version='+encodeURIComponent(TEST_VERSION)+'&t='+Date.now(),{cache:'no-store'});
   if(!response.ok)throw new Error('Test game data HTTP '+response.status);
   let html=await response.text();
-  html=html.replace("window.APP_VERSION = '1.91';","window.APP_VERSION = '1.97';");
+  html=html.replace("window.APP_VERSION = '1.92';","window.APP_VERSION = '1.97';");
   html=html.replace('<title>Corn Souls</title>','<title>Corn Souls — Alpha v1.97</title>');
   // Preview-only: start in first-person Squeeg mode, inside the maintenance shop.
   // Position is on the open shop floor, away from the two forklifts at z=37.
