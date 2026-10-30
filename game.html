@@ -6195,7 +6195,7 @@ function init(container) {
   { // ethanol LOADOUT shack (4 photos): 10 x 10 ft white panel shed with a gray barn-style (gambrel) metal roof, ~6 ft walls, 9 ft peak,
     // on gravel just north of Final Product Tank 1. Ridge east-west: door in the east gable (spill-kit + fire-extinguisher signs either side),
     // double-hung window on the south wall, 6-pane window + vent in the west gable (hydrant + bollard out front), NO SMOKING on the north wall.
-    const S = 3.05, H = 1.8, PK = 2.74, x = FPX + 1.5, z = FP1Z - 28.7, h = S / 2;   // satellite: under the pipe rack, between the south road and the tank farm fence
+    const S = 3.05, H = 1.8, PK = 2.74, x = FPX + 1.5 - 8 * 0.3048, z = FP1Z - 28.7, h = S / 2;   // satellite: under the pipe rack, between the south road and the tank farm fence
     const tex = (w, hh, draw) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = hh; const c = cv.getContext('2d'); draw(c, w, hh); return new T.CanvasTexture(cv); };
     const panels = tex(128, 64, (c, W, Hh) => { c.fillStyle = '#e9ebec'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#b9bec2'; for (let k = 0; k < 8; k++) c.fillRect(k * 16, 0, 2, Hh); });
     const wc = new T.MeshLambertMaterial({ map: panels }), rc = mat(0x8d9399), gl = new T.MeshBasicMaterial({ color: 0xf2d27a }), trim = mat(0x8a7a66);
