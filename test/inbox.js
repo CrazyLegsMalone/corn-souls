@@ -81,7 +81,7 @@ async function inboxSignIn(){
  }catch(e){console.error('Developer Inbox login:',e);if(view!==CS_INBOX_VIEW)return;CS_INBOX_SESSION=null;inboxLogin(e.message||'Sign-in failed.');}
  finally{CS_INBOX_LOGIN_BUSY=false;}
 }
-function inboxOpen(){if(!CS_INBOX_SESSION||Date.now()>=CS_INBOX_SESSION.expires)inboxLogin();else inboxList();}
+function inboxOpen(){ window.location.assign('/corn-souls/test/developer-inbox.html'); }
 function inboxClose(){
  CS_INBOX_VIEW++;
  $('modal').classList.remove('open');
