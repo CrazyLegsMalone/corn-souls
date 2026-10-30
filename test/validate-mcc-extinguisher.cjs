@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const html=fs.readFileSync('game.html','utf8');
+const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]);
+const lib={window:{},console};vm.runInNewContext(scripts.find(s=>s.includes('window.THREE=eu')),lib);const T=lib.window.THREE;
+let calls=[];const ctx={T,scene:new T.Scene(),extTex:()=>new T.Texture(),extModelInto:(m,h,hud)=>calls.push({m,h,hud})};
+vm.createContext(ctx);vm.runInContext(html.slice(html.indexOf('function extWall('),html.indexOf('function extStation(')),ctx);
+const m=ctx.extWall(10.3,1,20,Math.PI/2);
+assert.equal(calls.length,1);assert.equal(calls[0].m,m);assert.equal(calls[0].h,.62);assert.equal(calls[0].hud,false);
+assert.equal(m.parent,ctx.scene);assert.equal(m.position.x,10.3);assert.equal(m.position.y,1);assert.equal(m.rotation.y,Math.PI/2);
+assert.ok(m.userData.noHit&&m.children[0].userData.noHit);assert.equal(m.children[0].geometry.type,'PlaneGeometry');
+delete ctx.extModelInto;assert.doesNotThrow(()=>ctx.extWall(0,1,0,0),'base game works without launcher GLB patch');
+assert.ok(html.includes('extWall(E1 + 0.3, 1.0, dz - 1.45, Math.PI / 2);'));
+assert.ok(!html.includes('cyl(0.09, 0.5, mat(0xc8211c), E1 + 0.25, 0.75, dz - 1.45, null, 8);'));
+assert.ok(fs.readFileSync('index.html','utf8').includes("extModelInto(m,0.62,false)"),'same model sizing as existing stations');
+console.log('PASS: MCC placeholder replaced, existing GLB helper and sizing reused, east-facing wall mount, fallback, decorative collision behavior');
