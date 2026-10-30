@@ -10953,26 +10953,36 @@ const alarmSay = () => { const a = P3.alarms; return a.length ? 'Right now I\'ve
 const wxSay = () => { const el = $('wx'); return 'Out there it\'s ' + (P3.weather || 'sunny') + (el && el.style.display !== 'none' ? ', ' + el.textContent.replace('·', 'with wind') : '') + '. Check the wind sock by the cake house before you mess with ammonia.'; };
 const NPC_DEF = {
   op: { name: 'Rick · Board Op', pitch: 0.8, rate: 1.0,
-    hi: ['What do you need? I\'m watching the board.', 'Yeah?', 'Make it quick, the evap is acting up.', 'Oh good, a visitor. What.'],
-    fallback: ['Huh? I don\'t know what that means. Ask the production manager.', 'Say that again in plant words.', 'No idea. I just push buttons and drink coffee.'],
-    start: ['How\'s the cooler?', 'Any alarms?', 'Got anything for me to do?'],
+    hi: ['Army taught me to watch my sector. Now my sector is this board and a cold cup of coffee.', 'If you brought coffee, speak. If you brought an alarm, take a number.', 'Yeah? Make it useful. The plant does not run on conversation.', 'I can watch the DCS and complain at the same time. What do you need?'],
+    fallback: ['Give me a little context. Cook, distillation, the board, or my Jeep?', 'Try that again. I speak Army, ethanol, and sarcasm. Mind reading costs extra.', 'You lost me. Ask me something specific before my coffee gets any worse.'],
+    start: ['Any alarms?', 'How does cook work?', 'How does distillation work?', 'Tell me about yourself.'],
     topics: {
+      army: {"k":["army","veteran","military","service","served","soldier"],"say":["Army veteran. You learn to pay attention, look after your people, and complain efficiently. Useful skills on shift.","I was Army. No, that does not make this a boot camp. Check your equipment and do not leave the next shift a mess."],"opts":["Tell me about yourself.","How is your shift?"]},
+      cook: {"k":["cook","cooking","mash","slurry","liquefaction","starch","enzyme","enzymes"],"say":["Cook turns ground corn and water into mash. Heat opens up the starch; enzymes break it down so it can become fermentable sugar. It is a process, not a corn soup competition.","Watch slurry flow, temperature, and enzyme addition in cook. Get that part wrong and fermentation inherits your bad decisions. Believe me, it will complain."],"opts":["How does fermentation work?","How does distillation work?"]},
+      fermentation: {"k":["fermentation","ferment","fermenter","sugar"],"say":["Yeast converts fermentable sugars into ethanol and carbon dioxide. Watch temperature and keep contamination out. Yeast has a job; cooking it alive is poor supervision.","Cook prepares the mash, yeast ferments the sugars, then the beer goes to distillation. No, that is not permission to drink the beer well."],"opts":["How does cook work?","How's the cooler?","How does distillation work?"]},
+      distillation: {"k":["distillation","distill","column","columns","proof","rectifier","molecular sieve","dehydration"],"say":["Distillation separates ethanol from fermented beer using differences in volatility. The columns concentrate it; molecular sieves remove the remaining water for fuel ethanol. No magic. Just heat, separation, and a board full of things to watch.","On distillation I watch pressures, temperatures, levels, and flows together. One temperature does not tell the whole story. Neither does the loudest guy in the control room."],"opts":["What is the DCS?","Any alarms?"]},
+      dcs: {"k":["dcs","control system","control systems","controls","screens","setpoint","setpoints","trend","trends"],"say":["DCS means distributed control system. I watch the trends, alarms, levels, flows, and temperatures here. Clicking a button is easy. Knowing what it will upset is the job.","The DCS gives me process readings and controls. I compare trends before changing a setpoint. Random clicking is how you become the subject of shift handover."],"opts":["What about the cameras?","Any alarms?"]},
+      cameras: {"k":["camera","cameras","cctv","surveillance","watching me"],"say":["Cameras help me see what is happening around the plant. The DCS tells me what the process is doing. Neither one gives you permission to do something stupid.","Yes, I watch the cameras. If a Ranger heads toward the pond, I would rather notice before the splash."],"opts":["What is the DCS?","Tell me about your Jeep."]},
+      jeep: {"k":["jeep","gladiator","your truck","your vehicle"],"say":["Jeep Gladiator. Mine. Keep your hands off it and we will get along almost adequately.","I drive a Gladiator. Truck bed, Jeep attitude. No, you cannot borrow it. I have seen how you people park a Ranger."],"opts":["Do you drink coffee?","Were you in the Army?"]},
+      coffee: {"k":["coffee","caffeine","cup"],"say":["Coffee keeps me civil. This is the civil version. Imagine the alternative.","Been reheated enough times to qualify as a process stream. Still drinking it."],"opts":["Do you smoke?","How is your shift?"]},
+      cigarettes: {"k":["cigarette","cigarettes","smoke","smoking","nicotine"],"say":["Coffee and cigarettes. Two bad habits and a long shift. Smoking stays in the designated area, away from process equipment.","I could use a cigarette break. No smoking around ethanol or process areas. I am grumpy, not interested in becoming an incident report."],"opts":["Do you drink coffee?","Any alarms?"]},
+      shift: {"k":["how are you","how is your shift","how is your day","tired","grumpy","sarcastic"],"say":["Still here. Coffee is cold, board is busy, and somebody wants a personality update. How do you think I am?","Ask me after shift. Right now I am keeping an eye on the process and rationing my patience."],"opts":["Any alarms?","Tell me about yourself."]},
       cooler: { k: ['cooler', 'yeast', 'tote', 'temperature', 'temp', 'hot', 'cold'], say: coolerSay, opts: ['Any alarms?', 'What do the totes do?'] },
       totes: { k: ['what do the totes', 'totes do'], say: 'The totes are the yeast. Yeast eats the sugar in the mash and makes the ethanol. Warm yeast is sad yeast.', opts: ['How\'s the cooler?', 'How does the plant work?'] },
       alarms: { k: ['alarm', 'alarms', 'board', 'problem', 'wrong', 'status'], say: alarmSay, opts: ['How\'s the cooler?', 'Got anything for me to do?'] },
-      job: { k: ['do', 'job', 'task', 'work', 'help', 'bored'], say: () => pick(['Go check the yeast cooler doors. Somebody always leaves them open.', 'Mow something. The mower\'s in the shed.', 'Go squeegee the floor in the process building. It\'s gross.', 'Pigeons are everywhere. Do something about that.']), opts: ['Where\'s the mower?', 'Pigeons?', 'Never mind.'] },
+      job: { k: ['got anything for me to do', 'got anything else', 'give me a job', 'job', 'task', 'help', 'bored'], say: () => pick(['Go check the yeast cooler doors. Somebody always leaves them open.', 'Mow something. The mower\'s in the shed.', 'Go squeegee the floor in the process building. It\'s gross.', 'Pigeons are everywhere. Do something about that.']), opts: ['Where\'s the mower?', 'Pigeons?', 'Never mind.'] },
       mower: { k: ['mower', 'mow', 'grass', 'shed'], say: 'Zero-turn is in the shed. Hop on, push both sticks. Try not to mow the scarecrows. Or do, I don\'t care.', opts: ['Scarecrows?', 'Got anything else?'] },
       pigeons: { k: ['pigeon', 'pigeons', 'bird', 'birds'], say: () => 'They roost all over the plant. You\'ve gotten ' + P3.pigeonHits + ' of them so far. Paintballs are cheaper than spikes.', opts: ['Got anything else?', 'Bye.'] },
       scarecrows: { k: ['scarecrow', 'scarecrows', 'creepy', 'evil'], say: 'Don\'t look at the scarecrows too long. I\'m serious. The night guy quit over them.', opts: ['What about the buzzard?', 'Okay...'] },
       buzzard: { k: ['vulture', 'buzzard', 'bird on the stack', 'chalk', 'body', 'dead'], say: 'That buzzard on the RTO stack? He cleans up. You die out there, give it two minutes, he takes you to the far pond. Saves us paperwork.', opts: ['That\'s messed up.', 'Got anything else?'] },
       ammonia: { k: ['ammonia', 'nh3', 'leak', 'gas'], say: 'Ammonia tank is north of the sulfuric acid tank. If it leaks, get upwind and close the drain valve. Don\'t shoot it. Again.', opts: ['What\'s the weather?', 'Any alarms?'] },
       weather: { k: ['weather', 'wind', 'rain', 'snow', 'outside', 'sunny'], say: wxSay, opts: ['Any alarms?', 'Bye.'] },
-      plant: { k: ['how does', 'ethanol', 'plant work', 'process', 'make'], say: 'Corn comes in on trucks, gets ground and cooked into mash, yeast ferments it in the big tanks, the beer goes to distillation, and out comes ethanol. The leftovers get dried into cake. Simple. Ha.', opts: ['What do the totes do?', 'Thanks.'] },
+      plant: { k: ['how does the plant work', 'how is ethanol made', 'ethanol', 'plant work', 'process'], say: 'Corn comes in on trucks, gets ground and cooked into mash, yeast ferments it in the big tanks, the beer goes to distillation, and out comes ethanol. The leftovers get dried into cake. Simple. Ha.', opts: ['What do the totes do?', 'Thanks.'] },
       radio: { k: ['radio', 'music', 'song', 'boombox'], say: 'There\'s a beat-up radio on the bench in the maintenance shop. Bring it here and I\'ll take it away from you.', opts: ['Got anything else?', 'Bye.'] },
       keys: { k: ['key', 'keys', 'car', 'truck', 'drive', 'kia'], say: 'Cars need keys. Production manager keeps a set in his office. The lab has some. The Pink Sedan keys are in the RTO shack. Don\'t tell Tammy I told you.', opts: ['Who\'s Tammy?', 'Thanks.'] },
       tammy: { k: ['tammy', 'brenda', 'scale', 'scale house'], say: 'Brenda and Tammy run the scale house by the entrance. Brenda takes the corn in, Tammy sends the cake and ethanol out. Don\'t mess with Tammy\'s Pink Sedan.', opts: ['Got anything for me to do?', 'Bye.'] },
       parachute: { k: ['parachute', 'chute', 'jump', 'beer well'], say: 'Somebody leaves a parachute on top of the beer well. I don\'t want to know why. Don\'t make me fill out an injury report.', opts: ['Any alarms?', 'Bye.'] },
-      who: { k: ['who are you', 'your name', 'name', 'rick'], say: 'Rick. Board operator. Nineteen years. I\'ve seen things.', opts: ['Like what?', 'Got anything for me to do?'] },
+      who: { k: ['tell me about yourself', 'who are you', 'your name', 'name', 'rick'], say: ['Rick. Army veteran, board operator, nineteen years here. Still waiting on a coffee allowance.', 'Rick. I run the board. Army before this. Different uniform, same talent for finding something to complain about.'], opts: ['Like what?', 'Got anything for me to do?'] },
       seen: { k: ['like what', 'seen things'], say: 'A guy drove the Ranger into the retention pond. Twice. Same guy. It was you, wasn\'t it.', opts: ['Bye.'] },
       joke: { k: ['joke', 'funny', 'laugh'], say: () => pick(['Why did the corn go to the plant? To get a-maize-ing. Get out.', 'I\'m not paid enough for jokes.', 'The cake house. That\'s the joke. It\'s not cake.']), opts: ['Bye.'] },
       thanks: { k: ['thanks', 'thank you', 'thx', 'appreciate'], say: ['Yeah yeah.', 'Mm-hm.', 'Don\'t mention it. Really, don\'t.'], opts: ['Bye.'] },
@@ -11024,6 +11034,15 @@ const NPC_DEF = {
     } },
 };
 for (const id in NPC_DEF) { const D = NPC_DEF[id]; D.byLabel = {}; for (const t in D.topics) { const T = D.topics[t]; T.id = t; } }
+Object.assign(NPC_DEF.op.byLabel, {
+  'how does cook work': 'cook', 'how does fermentation work': 'fermentation',
+  'how does distillation work': 'distillation', 'what is the dcs': 'dcs',
+  'what about the cameras': 'cameras', 'tell me about your jeep': 'jeep',
+  'do you drink coffee': 'coffee', 'do you smoke': 'cigarettes',
+  'were you in the army': 'army', 'tell me about yourself': 'who',
+  'how is your shift': 'shift', 'what do the totes do': 'totes',
+  'got anything else': 'job'
+});
 function npcSay(D, text) {   // the device voice: lower and slower for Rick, higher for Brenda and Tammy
   try { if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.pitch = D.pitch; u.rate = D.rate; u.volume = 0.95;
     const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); const fem = D.pitch > 1; const v = vs.find(v => (fem ? /female|woman|zira|samantha|victoria|karen|aria|jenny/i : /male|man|david|daniel|alex|guy|fred/i).test(v.name) && !(fem ? /\bmale/i : /female/i).test(v.name)); if (v) u.voice = v;
@@ -11031,6 +11050,23 @@ function npcSay(D, text) {   // the device voice: lower and slower for Rick, hig
 }
 function npcMatch(D, said) {   // best topic for what was typed / said: whole phrases count most, then words (plurals and typos forgiven a little)
   const s = ' ' + said.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ') + ' ', words = s.trim().split(' ');
+  if (D === NPC_DEF.op) {
+    const normalize = text => text.toLowerCase().replace(/[^a-z0-9 ]+/g, '').replace(/\s+/g, ' ').trim();
+    const label = normalize(said);
+    if (D.byLabel[label]) return D.topics[D.byLabel[label]];
+    for (const T of Object.values(D.topics)) {
+      if (T.k.some(k => normalize(k) === label)) return T;
+    }
+    let specific = null, rank = 0;
+    for (const T of Object.values(D.topics)) for (const k of T.k) {
+      const phrase = k.toLowerCase();
+      if (s.includes(' ' + phrase + ' ')) {
+        const score = phrase.includes(' ') ? 100 + phrase.length : phrase.length;
+        if (score > rank) { rank = score; specific = T; }
+      }
+    }
+    if (specific) return specific;
+  }
   let best = null, bs = 0;
   for (const t in D.topics) { const T = D.topics[t]; let sc = 0;
     for (const k of T.k) { if (k.includes(' ')) { if (s.includes(' ' + k + ' ') || s.includes(k)) sc += 3; continue; }
