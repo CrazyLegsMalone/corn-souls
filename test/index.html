@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.96.23';
+ const TEST_VERSION='1.97.1';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -135,6 +135,11 @@
   html=html.replace(highwayUpdateAnchor,highwayTrafficEngine+"function updateVehicles(dt) { updateHighwayTraffic(dt);");
   html=html.replace(highwayRecvAnchor,"} else if(m.t==='vt' && !NET.host){ if(typeof m.ht==='number') HWY_TRAFFIC_TIME=m.ht;");
   html=html.replace(highwaySendAnchor,"netSend({t:'vt',ht:+HWY_TRAFFIC_TIME.toFixed(2),v:vehicles.map");
+  // Center the walking third-person view; retain camera distance,
+  // wall occlusion, first-person mode and vehicle camera unchanged.
+  const thirdCameraOriginal="let tx = px + rx * 0.7 - fx * 3.9, ty = py + 0.45 - fy * 3.9, tz = pz + rz * 0.7 - fz * 3.9, k = 1;";
+  if(!html.includes(thirdCameraOriginal))throw new Error('Third-person camera source changed; centering fix not applied.');
+  html=html.replace(thirdCameraOriginal,"let tx = px + rx * 0.12 - fx * 3.9, ty = py + 0.45 - fy * 3.9, tz = pz + rz * 0.12 - fz * 3.9, k = 1;");
   // Test HUD removed; corn assets load without file selection.
   // Give the dynamically loaded game the same independent TEST install identity.
   // Remove the live build's manifest so Android installs this as a separate app.
