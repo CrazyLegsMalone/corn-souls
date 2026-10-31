@@ -3,11 +3,35 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.15';
+ const TEST_VERSION='1.97.16';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/'})
+    const checkLatestVersion = async () => {
+      try {
+        const chk = await fetch('./index.html?check=' + Date.now(), {cache: 'no-store'});
+        if (!chk.ok) return false;
+        const txt = await chk.text();
+        const m = txt.match(/const TEST_VERSION='([^']+)'/);
+        if (m && m[1] && m[1] !== TEST_VERSION) {
+          if ('caches' in window) {
+            const names = await caches.keys();
+            await Promise.all(names.filter(n => n.startsWith('corn-souls-test-shell-')).map(n => caches.delete(n)));
+          }
+          location.replace('/corn-souls/test/index.html?v=' + encodeURIComponent(m[1]) + '&t=' + Date.now());
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    };
+    if (await checkLatestVersion()) return;
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkLatestVersion(); });
+    window.addEventListener('focus', () => { checkLatestVersion(); });
+    navigator.serviceWorker.register('/corn-souls/test/sw.js', {scope:'/corn-souls/test/', updateViaCache:'none'})
+      .then(reg => {
+        reg.update().catch(() => {});
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      })
       .catch(err => console.warn('Test app update registration unavailable:', err));
   }
   const response=await fetch('./game.html?test_version='+encodeURIComponent(TEST_VERSION)+'&t='+Date.now(),{cache:'no-store'});
