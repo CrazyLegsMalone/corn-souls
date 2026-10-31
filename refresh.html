@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refresh Corn Souls</title><style>body{background:#06111f;color:#e8f3ff;font:17px system-ui;text-align:center;padding:15vh 1rem}a{color:#9edaff}</style></head><body><h2>Refreshing Corn Souls</h2><p id="status">Removing old LIVE cache…</p><p><a href="/corn-souls/index.html?refresh=1.98">Open LIVE v1.98</a></p><script>
+(async()=>{
+ const status=document.getElementById('status');
+ try {
+  const names=await caches.keys();
+  await Promise.all(names.filter(n=>n.startsWith('corn-souls-live-shell-')).map(n=>caches.delete(n)));
+  if('serviceWorker' in navigator){
+   const regs=await navigator.serviceWorker.getRegistrations();
+   await Promise.all(regs.filter(r=>new URL(r.scope).pathname==='/corn-souls/').map(r=>r.unregister()));
+  }
+  status.textContent='LIVE cache cleared. Opening latest LIVE…';
+  location.replace('/corn-souls/index.html?refresh=1.98&fresh='+Date.now());
+ }catch(e){status.textContent='Could not automatically clear LIVE cache: '+e.message+' — use Open LIVE v1.98 above.';}
+})();
+</script></body></html>

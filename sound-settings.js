@@ -21,7 +21,7 @@ function soundSettings(focus=0){
   '<button id="csMusicMinus" type="button" aria-label="Decrease music volume" style="height:44px;padding:0;font-size:22px">−</button>'+
   '<input id="csMusicVolume" type="range" min="0" max="100" step="1" value="'+percent+'" style="width:100%;min-width:0;min-height:44px;box-sizing:border-box;margin:0">'+
   '<button id="csMusicPlus" type="button" aria-label="Increase music volume" style="height:44px;padding:0;font-size:22px">+</button></div>',
-  [[musicOn?'Music: On':'Music: Off',()=>{toggleMusic();soundSettings();}],
+  [[musicOn?'Music: On':'Music: Off',()=>{toggleMusic();soundSettings(2);}],
    ['Back to pause menu',()=>menu()]],true);
  $('csMusicMinus').onclick=()=>soundSetMusicVolume(music.volume-.1);
  $('csMusicPlus').onclick=()=>soundSetMusicVolume(music.volume+.1);

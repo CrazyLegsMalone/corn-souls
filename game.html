@@ -4611,8 +4611,8 @@ const V3 = (x, y, z) => new T.Vector3(x, y, z);
 const STATIONS = {
   receiving: { name: 'Grain Bins',     color: '#f4c430', pos: [-168, 0, 0], h: 40, dist: 120 },
   milling:   { name: 'Day Bins & Mills', color: '#ff8c42', pos: [-136, 0, -2], h: 26, dist: 70 },
-  slurry:    { name: 'Slurry',          color: '#e3b04b', pos: [-66, 0, 2],  h: 14, dist: 55 },
-  cook:      { name: 'Cook',            color: '#ff5a5f', pos: [-46, 0, 0],  h: 19, dist: 50 },
+  slurry:    { name: 'Slurry',          color: '#e3b04b', pos: [-66, 0, -2],  h: 14, dist: 55 },
+  cook:      { name: 'Cook',            color: '#ff5a5f', pos: [-46, 0, -4],  h: 19, dist: 50 },
   ferm:      { name: 'Fermentation',    color: '#3ddc84', pos: [-18.6, 0, -74], h: 22, dist: 120 },
   dist:      { name: 'Distillation',    color: '#4aa3ff', pos: [-52.5, 0, 51.5], h: 6, dist: 65 },
   storage:   { name: 'Tank Farm',       color: '#7fd3ff', pos: [-151.4, 0, 244], h: 17, dist: 110 }
@@ -4669,7 +4669,7 @@ function groundTex(kind) {
     blot(['#8a6a47', '#7d5f3f'], 260, 1.5, 4, 0.55);                     // clods
     blot(['#c9b393', '#bfa784', '#d6c5a8'], 320, 0.8, 2.2, 0.75);       // pebbles
     blot(['#6f5538'], 120, 0.6, 1.4, 0.6);                               // dark grit
-    c.strokeStyle = 'rgba(120,92,62,.18)'; c.lineWidth = 7; for (const y of [70, 170]) { c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(90, y + 12, 170, y - 10, N, y); c.stroke(); }   // faint ruts
+    c.strokeStyle = 'rgba(120,92,62,.18)'; c.lineWidth = 7; for (const y of [70, 170]) { c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(90, y + 12, 170, y - 10, N, y); c.stroke(); } } else if (kind === 'asphalt') { c.fillStyle = '#474c53'; c.fillRect(0, 0, N, N); blot(['#3e434a', '#50565e', '#42474e'], 48, 16, 42, 0.4); blot(['#646b74', '#727982', '#353940'], 520, 0.7, 1.9, 0.65); blot(['#2c3036'], 180, 0.6, 1.5, 0.5); } else if (kind === 'dirtroad') { c.fillStyle = '#9b7f5d'; c.fillRect(0, 0, N, N); blot(['#8f7250', '#ab8f6c', '#846847'], 45, 16, 42, 0.42); blot(['#c7b293', '#d4c3a8', '#785d3f'], 460, 0.8, 2.3, 0.75); c.strokeStyle = 'rgba(95,72,46,.26)'; c.lineWidth = 10; for (const y of [68, 188]) { c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(85, y + 8, 175, y - 8, N, y); c.stroke(); }   // faint ruts
   } else {
     c.fillStyle = '#76bd62'; c.fillRect(0, 0, N, N);
     blot(['#6cb259', '#82c76d', '#70b85c'], 50, 16, 44, 0.4);           // mottling
@@ -4682,7 +4682,7 @@ function groundTex(kind) {
 }
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
   const t = groundTex(kind).clone(); t.needsUpdate = true; if (worldUV) t.repeat.set(1 / 8, 1 / 8); else t.repeat.set(w / 8, d / 8);
-  return new T.MeshLambertMaterial({ map: t });
+  return new T.MeshLambertMaterial({ map: t, polygonOffset: kind !== 'grass', polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -4829,9 +4829,9 @@ function pipe(points, st, r) {
   const pts = points.map(p => V3(...p));
   const path = new T.CurvePath();
   for (let i = 0; i < pts.length - 1; i++) path.add(new T.LineCurve3(pts[i], pts[i + 1]));
-  const tube = new T.Mesh(new T.TubeGeometry(path, pts.length * 10, r || 0.75, 10, false), glass(0xe8f6ff, 0.48));
+  const tube = new T.Mesh(new T.TubeGeometry(path, pts.length * 10, r, 10, false), glass(0xe8f6ff, 0.48));
   tube.userData.station = st; pickables.push(tube); scene.add(tube);
-  for (let i = 1; i < pts.length - 1; i++) add(new T.SphereGeometry((r || 0.75) * 1.15, 10, 8), mat(0xb8c4d0), pts[i].x, pts[i].y, pts[i].z, null);
+  for (let i = 1; i < pts.length - 1; i++) add(new T.SphereGeometry(r * 1.15, 10, 8), mat(0xb8c4d0), pts[i].x, pts[i].y, pts[i].z, null);
   return path;
 }
 
@@ -4901,18 +4901,21 @@ function updateFlows(dt) {
 // mills sit on a second-floor deck (MY); day bins rise with them; silos keep the same 2-unit rise over the bins
 const NROAD = -134;   // north access road, north of the fermenters
 // slurry tank 1 (25,000 gal) and the blender above it set the mill deck height: the flour conveyor runs level/down into the blender
-const ST1R = 2.5, ST1H = 4.8, SP1X = -70.4, SP1Z = -0.5, BLX = -72.99, BLY = ST1H + 1.1 + 1.4;
+// Satellite reference: western roof arm is about 1.32 times as wide as deep.
+// Keep equipment/room scale and the north/east joins; remove unused aisle depth.
+const WEST_WING = Object.freeze({ west: -74, east: -31, north: -12.5, south: 44, officeNorth: 14 });
+const ST1R = 2.5, ST1H = 4.8, SP1X = -70.4, SP1Z = -4.0, BLX = -72.99, BLY = ST1H + 1.1 + 1.4;
 const MY = BLY + 0.4, COLX = -150, MILLX = -144, FLOURX = -138.8, DAYY = 9 + MY, DZ = [9.9, 3.3, -3.3, -9.9];   // day bins: 9,000 bu each (~6 m x 10.5 m)
 // Tin Bins 1 & 2 feed the day bins (estimated ~175,000 bu: 19 m x 22 m); Tin Bins 3 & 4 to the north hold 550,000 bu each (32 m x 22 m)
 const SILOX = -148.5, SILOR = 9.5, SILOH = 22, SILOZ = 24.5, TB34X = -142, TB34R = 16, TB34Z = [-52, -86];   // bins/mills run south (road side) to north
 const UPOS = { rail: [-196, 0, 5.5, 6], recv: [-182, 0, 10.5, 10], silo0: [SILOX, SILOZ, 10.2, 27], silo1: [SILOX, -SILOZ, 10.2, 27], tb3: [TB34X, TB34Z[0], 16.8, 30], tb4: [TB34X, TB34Z[1], 16.8, 30],
   day0: [COLX, DZ[0], 3.5, 11, DAYY], day1: [COLX, DZ[1], 3.5, 11, DAYY], day2: [COLX, DZ[2], 3.5, 11, DAYY], day3: [COLX, DZ[3], 3.5, 11, DAYY],
   mill0: [MILLX, DZ[0], 2.4, 4.5, MY], mill1: [MILLX, DZ[1], 2.4, 4.5, MY], mill2: [MILLX, DZ[2], 2.4, 4.5, MY], mill3: [MILLX, DZ[3], 2.4, 4.5, MY],
-  blend: [-72.99, -3.8, 2.4, 1.6, 6.2], st1: [-70.88, -5, 3.1, 6], cip: [-65.3, -5, 3.1, 6], strA: [-54, 5, 1.1, 3], strB: [-49.5, 5, 1.1, 3], st2: [-59.1, -5, 3.2, 6.5],
-  hydro: [-52, -4, 3.6, 6], ct1: [-42, -4, 1.3, 7.6], ct2: [-42, 4, 1.3, 7.6], liq: [-36.5, -18, 4.2, 13], liq1: [-46.5, -18, 4.2, 13], lp1: [-28.2, -21, 1.6, 2], lp2: [-28.2, -16, 1.6, 2], hxA1: [-27, -24, 1.6, 3.8], hxA2: [-27, -26.4, 1.6, 3.8], hxB1: [-27, -30, 1.6, 3.8], hxB2: [-27, -32.4, 1.6, 3.8], flash: [-34, -4, 1.8, 5, 3],
+  blend: [-72.99, -7.3, 2.4, 1.6, 6.2], st1: [-70.88, -8.5, 3.1, 6], cip: [-65.3, -8.5, 3.1, 6], strA: [-54, -3, 1.1, 3], strB: [-49.5, -3, 1.1, 3], st2: [-59.1, -8.5, 3.2, 6.5],
+  hydro: [-52, -8.5, 3.6, 6], ct1: [-42, -8.5, 1.3, 7.6], ct2: [-42, -4.0, 1.3, 7.6], liq: [-36.5, -18, 4.2, 13], liq1: [-46.5, -18, 4.2, 13], lp1: [-28.2, -21, 1.6, 2], lp2: [-28.2, -16, 1.6, 2], hxA1: [-27, -24, 1.6, 3.8], hxA2: [-27, -26.4, 1.6, 3.8], hxB1: [-27, -30, 1.6, 3.8], hxB2: [-27, -32.4, 1.6, 3.8], flash: [-34, -8.5, 1.8, 5, 3],
   f0: [-7.6, -47.1, 8.1, 18], f1: [-7.6, -63.5, 8.1, 18], f2: [-7.6, -79.9, 8.1, 18], f3: [-7.6, -96.3, 8.1, 18],
   f4: [-31, -96.3, 8.1, 18], f5: [-31, -79.9, 8.1, 18], f6: [-31, -63.5, 8.1, 18], beer: [-31, -45, 10.2, 15],
-  col: [-52.5, 51.5, 12, 2], etoh: [-158, 236, 28, 13] };
+  col: [-52.5, WEST_WING.south + 7.5, 12, 2], etoh: [-158, 236, 28, 13] };
 for (const id of ['rail', 'recv', 'silo0', 'silo1', 'tb3', 'tb4', 'day0', 'day1', 'day2', 'day3', 'mill0', 'mill1', 'mill2', 'mill3']) { UPOS[id][0] += GDX; UPOS[id][1] += GDZ; }
 for (const st of ['receiving', 'milling']) { STATIONS[st].pos[0] += GDX; STATIONS[st].pos[2] += GDZ; }
 let selected = null, selRing = null, selRing2 = null;
@@ -4955,10 +4958,10 @@ function init(container) {
     add(new T.ShapeGeometry(g), groundMat('grass', true), 0, 0, 0, null, true).rotation.x = -Math.PI / 2;
   }
   scene.children[scene.children.length - 1].receiveShadow = true;
-  const pad = (x, z, w, d, c) => { const p = add(new T.BoxGeometry(w, 0.16, d), mat(c), x, 0.12, z, null); p.castShadow = false; };
+  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat(c), x, 0.015, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
-  { const p = add(new T.BoxGeometry(EXR - WXR, 0.1, SZR - NROAD), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.05, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
-  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.1, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
+  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.01, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
+  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.01, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
     // the pit itself: four sloped sides and a flat bottom, one mesh; walkable (ramps), and the ground over it is cut away
     const r = P.run, D = -P.d, O = [[P.x0, P.z0], [P.x1, P.z0], [P.x1, P.z1], [P.x0, P.z1]], I = [[P.x0 + r, P.z0 + r], [P.x1 - r, P.z0 + r], [P.x1 - r, P.z1 - r], [P.x0 + r, P.z1 - r]];
     const v = [], quad = (a, b, c, d) => v.push(...a, ...b, ...c, ...a, ...c, ...d);
@@ -4977,30 +4980,30 @@ function init(container) {
     const s = STATIONS[st], c = new T.Color(s.color).lerp(new T.Color(0xffffff), 0.55);
     const size = { receiving: [64, 58], milling: [22, 28], slurry: [35, 30], cook: [30, 24], ferm: [48, 78], dist: [26, 22], storage: [58, 72] }[st];
     const at = { receiving: [-175 + GDX, GDZ], milling: [-131 + GDX, -2 + GDZ], slurry: [-76.5, -0.5], cook: [-44, 2] }[st] || [s.pos[0], s.pos[2]];
-    if (st === 'receiving') { const p = add(holeySlab(at[0] - size[0] / 2, at[1] - size[1] / 2, at[0] + size[0] / 2, at[1] + size[1] / 2, 0.16, [...RPITS, RSTAIR].map(([x, z, w, d]) => [x + GDX, z + GDZ, w, d])), mat(c.getHex()), 0, 0.04, 0, null); p.castShadow = false; continue; }
+    if (st === 'receiving') { const p = add(holeySlab(at[0] - size[0] / 2, at[1] - size[1] / 2, at[0] + size[0] / 2, at[1] + size[1] / 2, 0.012, [...RPITS, RSTAIR].map(([x, z, w, d]) => [x + GDX, z + GDZ, w, d])), mat(c.getHex()), 0, 0.005, 0, null); p.castShadow = false; continue; }
     pad(at[0], at[1], size[0], size[1], c.getHex());
   }
   // ---------- ROADS: a loop around the plant (north, south, east, west), a middle north-south road, and a cross road
   // south of the cook building. All trucks enter and leave at the northeast corner. A short road runs south past the tank farm.
   {
     const asphalt = mat(0x50555c), dash = mat(0xffffff), RW = 8, RC = 12, SRW = 10.7;
-    const rd = (x0, z0, x1, z1, W = RW) => {
+    const rd = (x0, z0, x1, z1, W = RW, kind = 'asphalt') => {
       const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-      const r = add(new T.BoxGeometry(alongX ? len : W, 0.2, alongX ? W : len), asphalt, (x0 + x1) / 2, 0.11, (z0 + z1) / 2, null); r.castShadow = false;
-      for (let t = 6; t < len - 6; t += 8) box(alongX ? 4 : 0.4, 0.22, alongX ? 0.4 : 4, dash, alongX ? Math.min(x0, x1) + t : x0, 0.12, alongX ? z0 : Math.min(z0, z1) + t);
+      const rw = alongX ? len : W, rd2 = alongX ? W : len, r = add(new T.PlaneGeometry(rw, rd2).rotateX(-Math.PI / 2), groundMat(kind, false, rw, rd2), (x0 + x1) / 2, 0.024, (z0 + z1) / 2, null); r.castShadow = false;
+      if (kind === 'asphalt') for (let t = 6; t < len - 6; t += 8) add(new T.PlaneGeometry(alongX ? 4 : 0.25, alongX ? 0.25 : 4).rotateX(-Math.PI / 2), dash, alongX ? Math.min(x0, x1) + t : x0, 0.03, alongX ? z0 : Math.min(z0, z1) + t, null, true);
     };
     rd(-235, NROAD, 245, NROAD);                              // north road, continuing east out the NE entrance (west end meets the grain yard roads)
     rd(-235, SZR, EXR - RC, SZR, SRW);                        // south road, 35 paces (~10.7 m) wide (paced) (west end meets the grain yard roads)
     rd(EXR, NROAD, EXR, SZR - RC);                            // east road
     rd(MXR, NROAD, MXR, SZR);                                 // middle road
-    { const r = add(new T.BoxGeometry(EXR - MXR, 0.2, 7.6), mat(0xa3a39c), (MXR + EXR) / 2, 0.11, CZR, null); r.castShadow = false; }   // cross road: plain concrete, 25 paces wide, no lines, just south of the CMT berm
-    const corner = (cx, cz, start, W = RW) => { const r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), asphalt, cx, 0.21, cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
+    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('dirtroad', false, EXR - MXR, 7.6), (MXR + EXR) / 2, 0.024, CZR, null); r.castShadow = false; }   // cross road: flat dirt/gravel road, 25 paces wide, just south of the CMT berm
+    const corner = (cx, cz, start, W = RW, kind = 'asphalt') => { const d = (RC + W / 2) * 2, r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), groundMat(kind, false, d, d), cx, 0.024, cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
     corner(EXR - RC, SZR - RC, -Math.PI / 2, SRW);                 // rounded SE corner of the plant loop
     // road around the tank farm: south on the east side, west along the south side, north on the west side back to the south road
     const tfE = TFX + TFW / 2 + 6, tfW = TFX - TFW / 2 - 6, tfS = TFZ + TFD / 2 + 6;
-    rd(tfE, SZR, tfE, tfS - RC); rd(tfE - RC, tfS, tfW + RC, tfS); rd(tfW, tfS - RC, tfW, SZR);
+    rd(tfE, SZR, tfE, tfS - RC, RW, 'dirtroad'); rd(tfE - RC, tfS, tfW + RC, tfS, RW, 'dirtroad'); rd(tfW, tfS - RC, tfW, SZR, RW, 'dirtroad');
     if (tfW < WXR) rd(tfW, SZR, WXR, SZR, SRW);                     // south road runs on west to meet the tank farm's west road
-    corner(tfE - RC, tfS - RC, -Math.PI / 2); corner(tfW + RC, tfS - RC, Math.PI);
+    corner(tfE - RC, tfS - RC, -Math.PI / 2, RW, 'dirtroad'); corner(tfW + RC, tfS - RC, Math.PI, RW, 'dirtroad');
   }
 
 
@@ -5062,13 +5065,13 @@ function init(container) {
       G(SX0, SZ0, SX1, SZ0, -20, -0.6);                                                                       // stairwell north end, below the floor
     }
     // lane markings through the building
-    for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) box(0.3, 0.05, 2.4, mat(0xffffff), x, 0.27, z);
+    for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) add(new T.PlaneGeometry(0.3, 2.4).rotateX(-Math.PI / 2), mat(0xffffff), x, 0.03, z, null, true);
   }
   // access roads: full trucks arrive from the east on the north road, empties leave south onto the main road
-  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.BoxGeometry(18, 0.21, z1 - z0), mat(0x50555c), -182, 0.1, (z0 + z1) / 2, null); r.castShadow = false; }
+  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.PlaneGeometry(18, z1 - z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 18, z1 - z0), -182, 0.024, (z0 + z1) / 2, null); r.castShadow = false; }
   // north-south bypass road between the receiving elevators and the silos, so traffic can go around Pit 1 and Pit 2
-  { const r = add(new T.BoxGeometry(8, 0.21, SZR - NROAD), mat(0x50555c), WXR - GDX, 0.1, (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
-  for (let z = NROAD + 6; z < SZR - 6; z += 6) box(0.35, 0.23, 3, mat(0xffd84d), WXR - GDX, 0.12, z - GDZ);
+  { const r = add(new T.PlaneGeometry(8, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('asphalt', false, 8, SZR - NROAD), WXR - GDX, 0.024, (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
+  for (let z = NROAD + 6; z < SZR - 6; z += 6) add(new T.PlaneGeometry(0.3, 3).rotateX(-Math.PI / 2), mat(0xffd84d), WXR - GDX, 0.03, z - GDZ, null, true);
 
   // bucket elevators: pit -> boot (in-floor drag conveyor) -> up the leg -> shared distributor head -> spout to Silo 1 or Silo 2
   const EH = SILOH + SILOR * 0.45 + 6, EX = -169;
@@ -5084,15 +5087,15 @@ function init(container) {
   });
   box(3.4, 2.6, 8.4, mat(0xff8c42), EX, EH + 1.3, 0, 'recv');                                               // distributor head (all 3 legs)
   add(new T.SphereGeometry(1.1, 12, 8), mat(0xd94848), EX, EH + 2.9, 0, 'recv');
-  const spout = (zEnd) => { const pts = [[EX + 1.7, EH, zEnd > 0 ? 1.8 : -1.8], [SILOX - 1, SILOH + SILOR * 0.45 - 0.5, zEnd]]; pipe(pts, null, 0.55); return flow(pts.map(q => V3(...q)), kernel, 0xffc61a, 26, { spread: 0.3, speed: 8, tumble: true }); };
+  const spout = (zEnd) => { const pts = [[EX + 1.7, EH, zEnd > 0 ? 1.8 : -1.8], [SILOX - 1, SILOH + 0.15, zEnd]]; pipe(pts, null, 0.55); return flow(pts.map(q => V3(...q)), kernel, 0xffc61a, 26, { spread: 0.3, speed: 8, tumble: true }); };
   O.fSpout = [spout(SILOZ), spout(-SILOZ)];      // to Tin Bin 1 (south) and Tin Bin 2 (north)
   buildTrain();
 
-  O.silos = [tank(SILOX, SILOZ, SILOR, SILOH, 0xf4c430, 0xffcf33, 'silo0', { top: 0xd94848, level: 0.6, noRail: true }),     // Tin Bin 1 — south
-             tank(SILOX, -SILOZ, SILOR, SILOH, 0xf4c430, 0xffcf33, 'silo1', { top: 0xd94848, level: 0.6, noRail: true })];
+  O.silos = [tank(SILOX, SILOZ, SILOR, SILOH, 0xf4c430, 0xffcf33, 'silo0', { top: 0xd94848, level: 0.6, dome: false, noRail: true }),     // Tin Bin 1 — south
+             tank(SILOX, -SILOZ, SILOR, SILOH, 0xf4c430, 0xffcf33, 'silo1', { top: 0xd94848, level: 0.6, dome: false, noRail: true })];
   siloClimb(SILOX, SILOZ, SILOR, SILOH); siloClimb(SILOX, -SILOZ, SILOR, SILOH);   // Tin Bin 2 — north
   // Tin Bins 3 & 4, north of Tin Bin 2: big storage bins, not connected yet
-  TB34Z.forEach((z, i) => { tank(TB34X, z, TB34R, SILOH, 0xf4c430, 0xffcf33, 'tb' + (i + 3), { top: 0xd94848, level: 0.5, noRail: true }); siloClimb(TB34X, z, TB34R, SILOH); nameplate('TIN BIN #' + (i + 3), TB34X, 2.5, z, TB34R, 1, 0); });
+  TB34Z.forEach((z, i) => { tank(TB34X, z, TB34R, SILOH, 0xf4c430, 0xffcf33, 'tb' + (i + 3), { top: 0xd94848, level: 0.5, dome: false, noRail: true }); siloClimb(TB34X, z, TB34R, SILOH); nameplate('TIN BIN #' + (i + 3), TB34X, 2.5, z, TB34R, 1, 0); });
   nameplate('TIN BIN #1', SILOX, 2.5, SILOZ, SILOR, 1, 0); nameplate('TIN BIN #2', SILOX, 2.5, -SILOZ, SILOR, 1, 0);   // on the east side, facing the pits
 
   // ---------- SILOS -> DAY BINS ----------
@@ -5172,7 +5175,7 @@ function init(container) {
   }
   for (let i = G0; i < scene.children.length; i++) { const o = scene.children[i]; o.position.x += GDX; o.position.z += GDZ; }   // whole grain yard to its real spot
   // then a straight line of conveyors, end to end, right into the slurry blender
-  const FA = V3(FLOURX + 1 + GDX, MY + 1.6, -2 + GDZ), FB = V3(BLX - 0.1, BLY + 0.6, -2), fp = t => FA.clone().lerp(FB, t).toArray();
+  const FA = V3(FLOURX + 1 + GDX, MY + 1.6, -2 + GDZ), FB = V3(BLX - 0.1, BLY + 0.6, -5.5), fp = t => FA.clone().lerp(FB, t).toArray();
   // short run south from the mills, then one straight elevated run due east across the road to the blender (satellite)
   const FK = V3(FA.x, FA.y, FB.z), FM = FK.clone().lerp(FB, 0.5);
   O.fFlour = flow(belt(FA.toArray(), FK.toArray(), 2, 0xff8c42, null), meal, 0xe9c98a, 20, { spread: 1.2, lift: 0.3, speed: 8 });
@@ -5182,7 +5185,7 @@ function init(container) {
   // ---------- SLURRY: horizontal blender (470 gal, N-S, motor on the north end) on a stand just above Slurry Tank 1 ----------
   // flour drops in at the south end; slurry gravity-drops out the east side down into the top of Slurry Tank 1
   {
-    const BX = BLX, BZ0 = -5.4, BZ1 = -1.6, BCZ = (BZ0 + BZ1) / 2, BY = BLY;
+    const BX = BLX, BZ0 = -8.9, BZ1 = -5.1, BCZ = (BZ0 + BZ1) / 2, BY = BLY;
     box(1.0, 0.8, BZ1 - BZ0, mat(0xe3b04b), BX, BY, BCZ, 'blend');                  // trough
     nameplate('TS-2831|BLEND TANK', BX, BY, BCZ, 0.5, 1, 0);
     box(1.15, 0.15, BZ1 - BZ0 + 0.1, mat(0xffffff), BX, BY + 0.45, BCZ, null);        // lid rim
@@ -5200,40 +5203,40 @@ function init(container) {
     box(0.6, 0.6, 0.5, mat(0x6f7a85), BX, BY + 0.05, BZ0 - 0.3, 'blend');
     add(new T.CylinderGeometry(0.28, 0.28, 0.7, 12).rotateX(Math.PI / 2), mat(0x1e88e5), BX, BY + 0.05, BZ0 - 0.9, 'blend');
     // discharge spout: short sloped chute from the trough down into the tank roof
-    const dp = [[BX + 0.5, BY - 0.3, -5], [-71.87, ST1H + 1.2, -5], [-71.5, ST1H + 0.7, -5]];
+    const dp = [[BX + 0.5, BY - 0.3, -8.5], [-71.87, ST1H + 1.2, -8.5], [-71.5, ST1H + 0.7, -8.5]];
     pipe(dp, 'st1', 0.25);
     O.fBlend = flow(dp.map(q => V3(...q)), new T.SphereGeometry(0.2, 6, 5), 0xe8c88a, 8, { speed: 3 });
   }
-  O.st1 = tank(-70.88, -5, ST1R, ST1H, 0xe3b04b, 0xe8c88a, 'st1', { level: 0.6 });
-  nameplate('SLURRY TANK #1', -70.88, 2.1, -5, ST1R, 0, 1);   // faces the cook alley aisle
-  add(new T.CylinderGeometry(ST1R + 0.3, ST1R + 0.3, 0.6, 32), mat(0xb5b0a6), -70.88, 0.3, -5, null);   // concrete curb ring around the tank base (photo)
+  O.st1 = tank(-70.88, -8.5, ST1R, ST1H, 0xe3b04b, 0xe8c88a, 'st1', { level: 0.6 });
+  nameplate('SLURRY TANK #1', -70.88, 2.1, -8.5, ST1R, 0, 1);   // faces the cook alley aisle
+  add(new T.CylinderGeometry(ST1R + 0.3, ST1R + 0.3, 0.6, 32), mat(0xb5b0a6), -70.88, 0.3, -8.5, null);   // concrete curb ring around the tank base (photo)
   // Slurry Pump 1 (photo, facing north): E-W on a yellow pad just south of the tank, motor west, Sulzer pump east;
   // suction comes in from the east (insulated line from the tank bottom), discharge goes straight up with a handwheel valve
   {
     const PX = SP1X, PZ = SP1Z, Y = 0.945;
-    pipe([[-69.0, Y, -3.2], [-69.0, Y, PZ], [PX + 0.25, Y, PZ]], 'st1', 0.42);         // suction from the tank bottom, into the pump end
+    pipe([[-69.0, Y, -6.7], [-69.0, Y, PZ], [PX + 0.25, Y, PZ]], 'st1', 0.42);         // suction from the tank bottom, into the pump end
     pumpSet(PX, PZ, 'x', -1, 'st1', 0.9);
     add(new T.TorusGeometry(0.32, 0.04, 6, 18), mat(0x2f6fa8), PX, 2.3, PZ + 0.35, null, true);   // discharge valve handwheel (blue)
     box(0.25, 0.25, 0.25, mat(0x2f6fa8), PX, 2.3, PZ + 0.15);
     cyl(0.16, 1.0, mat(0xd8dde2), PX + 0.9, 2.6, PZ + 0.25, null, 12);                   // seal pot
   }
   // CIP tank sits between the slurry tanks; not piped to anything yet
-  tank(-65.3, -5, 2.5, 4.8, 0x1e88e5, 0x9fe0ff, 'cip', { level: 0.7 });   // 25,000 gal
-  nameplate('TF-12111|CIP TANK', -65.3, 2.1, -5, 2.5, 0, 1);
+  tank(-65.3, -8.5, 2.5, 4.8, 0x1e88e5, 0x9fe0ff, 'cip', { level: 0.7 });   // 25,000 gal
+  nameplate('TF-12111|CIP TANK', -65.3, 2.1, -8.5, 2.5, 0, 1);
   // duty/standby strainers south of the hydroheater (Strainer 1 west, Strainer 2 east).
   // Slurry Pump 1's line comes in from the west and splits into the bottom of each strainer;
   // the strainer tops join a header that runs north, then west to Slurry Tank 2.
   O.str = [];
-  const SZ = 5, SMX = -51.75;
+  const SZ = -3, SMX = -51.75;
   [[-54, 'strA'], [-49.5, 'strB']].forEach(([x, id], i) => {
     const t = tank(x, SZ, 0.6, 2.2, 0xc9b48a, 0x8a6a3c, id, { level: 0.1, top: 0xc9b48a });
     const ringMat = new T.MeshBasicMaterial({ color: 0x3ddc84 });
     const ring = add(new T.TorusGeometry(0.78, 0.12, 6, 20), ringMat, x, 2.6, SZ, null, true); ring.rotation.x = Math.PI / 2;
     // feed runs overhead (walkway clearance), then drops beside each strainer into its bottom
-    const OH = 7.5, FZ = 7.2;
-    const feed = [[-69.0, 0.95, -3.2], [-69.0, 0.95, SP1Z], [SP1X, 0.95, SP1Z], [SP1X, OH, SP1Z], [SP1X, OH, FZ], [x, OH, FZ]];
+    const OH = 7.5, FZ = -2.15;
+    const feed = [[-69.0, 0.95, -6.7], [-69.0, 0.95, SP1Z], [SP1X, 0.95, SP1Z], [SP1X, OH, SP1Z], [SP1X, OH, FZ], [x, OH, FZ]];
     const branch = [[x, OH, FZ], [x, 0.9, FZ], [x, 0.9, SZ + 0.6]];
-    const head = [[x, 2.6, SZ], [x, 6.4, SZ], [SMX, 6.4, SZ], [SMX, 6.4, 2.4], [-59.1, 6.4, 2.4], [-59.1, 6.4, -3.6]];
+    const head = [[x, 2.6, SZ], [x, 6.4, SZ], [SMX, 6.4, SZ], [SMX, 6.4, -4.7], [-59.1, 6.4, -4.7], [-59.1, 6.4, -7.1]];
     if (i === 0) {                                                                 // shared overhead feed line from Slurry Pump 1, on a pipe rack
       pipe([[SP1X, 1.4, SP1Z], [SP1X, OH, SP1Z], [SP1X, OH, FZ], [-49.5, OH, FZ]], null, 0.45);
     }
@@ -5244,7 +5247,7 @@ function init(container) {
   });
   // forklift-style self-dumping trash hopper for strainer rejects, between Strainer 2 and the cook tubes
   {
-    const WX = -45.8, WZ = 1.6, hop = new T.Group();   // straight out from the lab's north door; cook tube 2 to its right, strainer B to its left
+    const WX = -45.8, WZ = -3.5, hop = new T.Group();   // straight out from the lab's north door; cook tube 2 to its right, strainer B to its left
     hop.position.set(WX, 0, WZ);
     const g = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; hop.add(o); return o; };
     const body = mat(0xd9772e), dark = mat(0x3b3f45);   // orange, like the real one
@@ -5258,18 +5261,18 @@ function init(container) {
     // ME2203 slurry strainer hoist: overhead beam (1/2 ton) over the strainers with a red chain hoist
     box(9.6, 0.35, 0.3, mat(0x3f4a44), -52, 6.6, SZ - 1.2 + 1.2); box(0.5, 0.6, 0.45, mat(0xc8312f), -49.5, 6.1, SZ); box(0.04, 2.2, 0.04, mat(0x777777), -49.5, 4.7, SZ);
   }
-  O.st2 = tank(-59.1, -5, 2.6, 5.2, 0xe3b04b, 0xe8c88a, 'st2', { level: 0.6 });   // 29,000 gal
-  nameplate('SLURRY TANK #2', -59.1, 2.1, -5, 2.6, 0, 1);
+  O.st2 = tank(-59.1, -8.5, 2.6, 5.2, 0xe3b04b, 0xe8c88a, 'st2', { level: 0.6 });   // 29,000 gal
+  nameplate('SLURRY TANK #2', -59.1, 2.1, -8.5, 2.6, 0, 1);
 
   // ---------- COOK: slurry pump 2 -> hydroheater (E-W, steam from north, mash from south) -> cook tube 1 -> cook tube 2 -> (flash vessel, later) ----------
-  const HX = -51, HZ = -4, HY = 3.6;
+  const HX = -51, HZ = -8.5, HY = 3.6;
   // slurry pump 2: fed from the bottom of Slurry Tank 2
   {
-    const PX = -57.49, PZ = 0.6;
-    pipe([[PX, 0.9, -1.8], [PX, 0.9, PZ - 0.6]], 'st2', 0.42);                           // suction from tank bottom
+    const PX = -57.49, PZ = -2.9;
+    pipe([[PX, 0.9, -5.3], [PX, 0.9, PZ - 0.6]], 'st2', 0.42);                           // suction from tank bottom
     pumpSet(PX, PZ, 'x', -1, 'st2', 0.9);
   }
-  const mashIn = [[-57.49, 0.9, -1.8], [-57.49, 1.6, 0.6], [-57.49, 1.6, 1.4], [HX, 1.6, 1.4], [HX, 1.6, HZ], [HX, HY - 1, HZ]];
+  const mashIn = [[-57.49, 0.9, -5.3], [-57.49, 1.6, -2.9], [-57.49, 1.6, -2.1], [HX, 1.6, -2.1], [HX, 1.6, HZ], [HX, HY - 1, HZ]];
   pipe(mashIn.slice(1), 'hydro', 0.42);
   O.fToHydro = flow(mashIn.map(q => V3(...q)), blob, 0xe8c88a, 16, { speed: 6 });
   // hydroheater body lying east-west on a stand, actuator on the west end
@@ -5281,11 +5284,11 @@ function init(container) {
   // discharge cone on the east end
   add(new T.CylinderGeometry(0.45, 1, 1.4, 16).rotateZ(Math.PI / 2), mat(0xff6b6b), HX + 2.95, HY, HZ, 'hydro');
   // steam comes in from the north into the top
-  const steam = [[HX, 7.8, HZ - 9], [HX, 7.8, HZ], [HX, HY + 1, HZ]];
+  const steam = [[HX, 7.8, HZ - 4], [HX, 7.8, HZ], [HX, HY + 1, HZ]];
   pipe(steam, 'hydro', 0.35);
   O.fSteamIn = flow(steam.map(q => V3(...q)), new T.SphereGeometry(0.28, 6, 5), 0xffffff, 12, { speed: 7, glow: true });
   // cook tubes: tube 1 east of the hydroheater, tube 2 directly south of it
-  const CTX = -42, CZ1 = -4, CZ2 = 4;
+  const CTX = -42, CZ1 = -8.5, CZ2 = -4.0;
   const ctube = (x, z, id) => {
     add(new T.CylinderGeometry(1.0, 1.0, 6.5, 20, 1, true), glass(0xdfe4ea, 0.62), x, 4.05, z, id, true);        // TS-2301: 5,200 gal, ~2.0 m x 6.5 m, aluminum-jacketed
     const inner = add(new T.CylinderGeometry(0.9, 0.9, 6.3, 16), new T.MeshLambertMaterial({ color: 0xf0a84a, transparent: true, opacity: 0.45, depthWrite: false }), x, 4.05, z, null, true);
@@ -5297,9 +5300,9 @@ function init(container) {
   };
   O.ct = [ctube(CTX, CZ1, 'ct1'), ctube(CTX, CZ2, 'ct2')];
   const toCt1 = [[HX + 3.65, HY, HZ], [CTX - 2.5, HY, HZ], [CTX - 2.5, 1.8, HZ], [CTX - 1.0, 1.8, CZ1]];
-  const ovf = [[CTX, 7.5, CZ1], [CTX, 7.8, CZ1], [CTX, 7.8, 0], [CTX - 1.3, 7.8, 0], [CTX - 1.3, 1.8, 0], [CTX - 1.3, 1.8, CZ2], [CTX - 1.0, 1.8, CZ2]];
+  const ovf = [[CTX, 7.5, CZ1], [CTX, 7.8, CZ1], [CTX, 7.8, -4.5], [CTX - 1.3, 7.8, -4.5], [CTX - 1.3, 1.8, -4.5], [CTX - 1.3, 1.8, CZ2], [CTX - 1.0, 1.8, CZ2]];
   // flash vessel east of cook tube 1: tube 2 overflows out its top, east, north, into the vessel's west side
-  const FVX = -34, FVZ = -4, FVY = 4.2, FVR = 1.2, FVH = 3.8;
+  const FVX = -34, FVZ = -8.5, FVY = 4.2, FVR = 1.2, FVH = 3.8;
   const out2 = [[CTX, 7.5, CZ2], [CTX, 7.8, CZ2], [-38.5, 7.8, CZ2], [-38.5, 7.8, FVZ], [-38.5, FVY + 2.6, FVZ], [FVX - FVR, FVY + 2.6, FVZ]];
   pipe(toCt1, 'ct1', 0.45); pipe(ovf, 'ct2', 0.42); pipe(out2, 'flash', 0.45);
   tank(FVX, FVZ, FVR, FVH, 0xff5a5f, 0xf0a84a, 'flash', { level: 0.45, y: FVY });
@@ -5308,10 +5311,10 @@ function init(container) {
   // Liq Tanks 1 and 2 sit outside the building, north of the cook area; Liq pumps are inside, east of the wall
   const LQ1 = [-46.5, -18], LQ2 = [-36.5, -18], LQR = 3.7, LQH = 11.5, WALLZ = -10, WALLX = -31;
   {
-    const PZ = 1.0;
+    const PZ = -3.5;
     pumpSet(FVX, PZ, 'x', 1, 'flash', 0.9);
   }
-  const flashOut = [[FVX, FVY - 1.8, FVZ], [FVX, 0.9, FVZ], [FVX, 0.9, 1.0], [FVX, 1.4, 1.6], [-37.5, 1.4, 1.6], [-37.5, 1.4, -12.5], [LQ1[0], 1.4, -12.5], [LQ1[0], 1.4, LQ1[1] + LQR + 0.1]];
+  const flashOut = [[FVX, FVY - 1.8, FVZ], [FVX, 0.9, FVZ], [FVX, 0.9, -3.5], [FVX, 1.4, -2.9], [-37.5, 1.4, -2.9], [-37.5, 1.4, -12.5], [LQ1[0], 1.4, -12.5], [LQ1[0], 1.4, LQ1[1] + LQR + 0.1]];
   pipe([flashOut[0], flashOut[1], flashOut[2]], 'flash', 0.42); pipe(flashOut.slice(3), 'liq1', 0.42);
   const cblob = new T.SphereGeometry(0.42, 8, 6);
   O.fCook = flow([...toCt1, [CTX, 1.8, CZ1], ...ovf, [CTX, 1.8, CZ2], ...out2].map(q => V3(...q)), cblob, 0xf08a3a, 80, { speed: 6, glow: true });
@@ -5482,7 +5485,7 @@ function init(container) {
   // One tall metal building. West block, north → south: cook alley | office block | evap alley. The indoor ferm alley runs
   // the full length down its east side (walls on the fermenter column lines cut through the tanks). Liq tanks stay outside.
   {
-    const PH = 8.3, WW = -74, EW = FXW, NZ = -12.5, SZ = 44, OZN = 11, OZS = 17.95, OZH = 15.75, OH = 3.5, DOOR = 1.0, DH0 = 2.13, DH = DH0;
+    const PH = 8.3, WW = WEST_WING.west, EW = FXW, NZ = WEST_WING.north, WZS = WEST_WING.south, SZ = 44, OZN = WEST_WING.officeNorth, OZS = OZN + 6.95, OZH = OZN + 4.75, OH = 3.5, DOOR = 1.0, DH0 = 2.13, DH = DH0;
     // white metal wall sheeting: faint gray vertical ribs every foot (texture repeats along each wall's length)
     const ribTex = (() => { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 4; const g = cv.getContext('2d');
       g.fillStyle = '#f3f4f3'; g.fillRect(0, 0, 64, 4); g.fillStyle = '#cfd3d7'; g.fillRect(0, 0, 3, 4); g.fillStyle = '#e4e7e9'; g.fillRect(3, 0, 3, 4); g.fillRect(30, 0, 2, 4);
@@ -5557,7 +5560,7 @@ function init(container) {
     };
     // outer walls of the west block
     wall(WW, NZ, EW, NZ, PH, wm, [], { trim: true });                                          // north wall (liq tanks outside)
-    wall(WW, NZ, WW, SZ, PH, wm, [[OZN - 2.6 - NZ, 3.1, 3.55], [OZS - 1.3 - NZ, DOOR], [SZ - 1.7 - NZ, DOOR]], { trim: true, leaf: -1 });   // west wall: big roll-up door at the end of the cook alley aisle, office exit (faces the silos), evap alley SW door
+    wall(WW, NZ, WW, WZS, PH, wm, [[OZN - 2.6 - NZ, 3.1, 3.55], [OZS - 1.3 - NZ, DOOR]], { trim: true, leaf: -1 });   // west wall: big roll-up door at the end of the cook alley aisle, office exit (faces the silos)
     // roll-up doors that open when Squeeg walks up to them: (cx, cz) center of the opening, alongX = wall runs along x,
     // side = which side the bollards and housing sit on (+1 / -1 across the wall), style 'mesh' (high-speed curtain) or 'slat' (coiling steel)
     const rollDoor = (cx, cz, alongX, w, h, side, style, bside) => {
@@ -5581,7 +5584,7 @@ function init(container) {
    // housing inside, bollards outside (photos)                                                     // north end of the ferm alley, between Ferm 4 and 5
 
     // south end of the ferm alley (photo looking north up the alley): ~9.5 ft x 10 ft roll-up centered on the trench drain, green man door just west of it
-    wall(WW, SZ, 37.4, SZ, PH, wm, [[AC - WW, 2.95, 3.05], [AC - 2.35 - WW, 0.95]], { trim: true, leaf: -1 });
+    wall(WW, SZ, 19, SZ, PH, wm, [[AC - WW, 2.95, 3.05], [AC - 2.35 - WW, 0.95]], { trim: true, leaf: -1 });
     rollDoor(AC, SZ - 0.05, true, 2.9, 3.0, 1, 'slat', -1);
     { // CMT AREA (paced + photo facing south at the thin stillage tank): three identical 35 ft x 52 ft tanks (374,000 gal, nameplates) on tall concrete
       // ring foundations, in a row 24 paces from the south wall and 1.8 paces apart. East to west: thin stillage (centered on the line of the building's SE
@@ -5602,7 +5605,7 @@ function init(container) {
     }
     // 10 ft concrete path along the outside of the south wall, SW corner to SE corner: DISTILLATION ALLEY west of the south roll-up, CMT ALLEY east of it
     // (CMT: thin stillage, meth feed and cook water tanks will go south of the east half)
-    { const pw = 3.05, p = add(new T.BoxGeometry(37.4 - WW, 0.1, pw), mat(0x9c9a94), (WW + 37.4) / 2, 0.08, SZ + 0.15 + pw / 2, null); p.castShadow = false; p.receiveShadow = true; }                                        // south wall (distillation outside), runs on past the ferm alley under the maintenance shop
+    { const pw = 3.05, p = add(new T.BoxGeometry(19 - WW, 0.1, pw), mat(0x9c9a94), (WW + 19) / 2, 0.08, SZ + 0.15 + pw / 2, null); p.castShadow = false; p.receiveShadow = true; }                                        // south wall (distillation outside), runs on past the ferm alley under the maintenance shop
     // wall decal (drawn in code, one flat panel): outside the south wall, west of the man door (photo facing north) — an outlet box
     // with its conduit running up the wall, then the fire extinguisher sign with the extinguisher in its red cover below it
     { const W = 1.7, H = 3.0, cv = document.createElement('canvas'); cv.width = 170; cv.height = 300; const c = cv.getContext('2d');   // 100 px per m
@@ -5652,16 +5655,17 @@ function init(container) {
     wall(FXE, Z1 + FR, FXE, -23.7, PH, wm, [], { trim: true });                                  // east side, F1 down to the south edge of Ferm MCC; retain its enclosure
     // Open ferm aisle to the shop side from z=-23.7 to SZ: no divider meshes, trim, door leaves or collision.
     // roofs: west block and ferm alley (tanks and evaporators poke up through)
-    add(new T.BoxGeometry(EW - WW + 0.6, 0.3, SZ - NZ + 0.6), roofM, (WW + EW) / 2, PH + 0.15, (NZ + SZ) / 2, null, true);
+    add(new T.BoxGeometry(EW - WW + 0.6, 0.3, WZS - NZ + 0.6), roofM, (WW + EW) / 2, PH + 0.15, (NZ + WZS) / 2, null, true);
     add(new T.BoxGeometry(FXE - FXW + 0.6, 0.3, SZ - ZN + 0.6), roofM, AC, PH + 0.15, (SZ + ZN) / 2, null, true);
     // concrete floor with a trench drain down the ferm alley and along the evap alley aisle
     const conc = new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 }), grate = mat(0x3f444a); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
     const slab = (w, d, x, z) => { const o = add(new T.BoxGeometry(w, 0.1, d), conc, x, 0.17, z, null, true); o.receiveShadow = true; };
-    slab(EW - WW, SZ - NZ, (WW + EW) / 2, (NZ + SZ) / 2);
+    slab(EW - WW, WZS - NZ, (WW + EW) / 2, (NZ + WZS) / 2);
     slab(FXE - FXW, SZ - ZN, AC, (SZ + ZN) / 2);
     box(0.45, 0.06, SZ - ZN - 1, grate, AC, 0.23, (SZ + ZN) / 2);
-    box(EW - WW - 2, 0.06, 0.45, grate, (WW + EW) / 2, 0.23, OZS + 3);
-    box(36.4 - (WW + 1), 0.06, 0.45, grate, (WW + 1 + 36.4) / 2, 0.23, OZN - 2.6);   // trench drain down the aisle, cook alley to the east wall
+    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, 0.23, OZS + 1.1);
+    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, 0.23, OZN - 2.6);
+    box(18.0 - AC, 0.06, 0.45, grate, (AC + 18.0) / 2, 0.23, OZN - 2.6);   // trench drain down the aisle, cook alley to the east wall
     // office block floor: tan/brown ceramic tile with darker grout
     {
       const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d');
@@ -5832,7 +5836,7 @@ function init(container) {
       const desk = (x0, z0, x1, z1) => { const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = Math.abs(x1 - x0), d = Math.abs(z1 - z0);
         box(w - 0.06, 0.72, d - 0.06, baseM, cx, 0.36, cz); box(w, 0.04, d, topM, cx, 0.76, cz); };
       desk(-34.2, N, E - D, N + D); desk(E - D, N, E, S); desk(-35.6, S - D, E - D, S);
-      { const op = seatedPerson(-32.55, 12.75, -Math.PI / 4, 0x3b6fb0, 0); NPCS.push({ id: 'op', g: op });   // the board operator, in his chair facing the NE control board, in a woodland-camo hard hat
+      { const op = seatedPerson(-32.55, OZN + 1.75, -Math.PI / 4, 0x3b6fb0, 0); NPCS.push({ id: 'op', g: op });   // the board operator, in his chair facing the NE control board, in a woodland-camo hard hat
         const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#6b7a45'; c.fillRect(0, 0, 64, 64);
         let r = 7; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
         for (const col of ['#4a5a2e', '#7a6040', '#2a2a22', '#8d9a5a']) { c.fillStyle = col; for (let i = 0; i < 7; i++) { c.beginPath(); c.ellipse(rnd() * 64, rnd() * 64, 4 + rnd() * 9, 3 + rnd() * 5, rnd() * 3, 0, 7); c.fill(); } }
@@ -5890,11 +5894,12 @@ function init(container) {
     // Main shop with three offices along its west side; a yard to the north; then a row of smaller rooms (shop room, utility/air room)
     // and four small outdoor tanks at the northeast corner. Same scale as the process building.
     {
-      const MX0 = 0, MX1 = 37.4, MZ0 = 16.2, MZ1 = SZ, MH = 7, OFX = 9;
+      const MX0 = FXE, MX1 = 19, MZ0 = 16.2, MZ1 = SZ, MH = 7, OFX = 0;
+      const BNZ = -37.1, BEX = 4.6, BSZ = -23.7, MCZ = -29.8;   // north wall z, east wall x, south corner z, MCC room north partition
       const mt = officeTile.clone(); mt.needsUpdate = true; mt.repeat.set((OFX - MX0) / 1.22, (MZ1 - MZ0) / 1.22); const tileM = new T.MeshLambertMaterial({ map: mt });   // same 1 ft tiles
       // main shop: walls, doors (north double door to the yard, east man door), roof, concrete floor
       // one envelope with the rest of the process building: east wall, north walls, roof and floor over the shop, its yard and the north rooms
-      wall(MX1, -6.3, MX1, SZ, PH, wm, [[OZN - 2.6 - -6.3, 3.1, 3.55], [30.0 - -6.3, 0.95], [34.5 - -6.3, 4.32, 4.95], [40.5 - -6.3, 3.1, 3.25]], { trim: true, leaf: -1 });
+      wall(MX1, BSZ, MX1, SZ, PH, wm, [[-8.0 - BSZ, DOOR], [OZN - 2.6 - BSZ, 3.1, 3.55], [30.0 - BSZ, 0.95], [34.5 - BSZ, 4.32, 4.95], [40.5 - BSZ, 3.1, 3.25]], { trim: true, leaf: -1 });
       // shop east wall (photos, scaled from the man door): man door with EXIT sign, big Cornell roll-up (~14 x 14 ft), then a smaller roll-up (~10 x 10 ft) ~5.5 ft from the SE corner
       rollDoor(MX1 - 0.05, 34.5, false, 4.27, 4.9, -1, 'slat', 1);   // yellow bollards outside, both sides   // outside photo: ~14 ft wide x ~16 ft tall
       rollDoor(MX1 - 0.05, 40.5, false, 3.05, 3.2, -1, 'slat', 1);
@@ -5902,16 +5907,15 @@ function init(container) {
       rollDoor(MX1 - 0.05, OZN - 2.6, false, 3.05, 3.5, -1, 'slat', 1);   // east roll-up door at the end of the aisle
       // NE block (satellite + paced): from Ferm 1 the wall jogs 8 ft south (ferm alley wall line), runs 40 ft east, then the east face
       // runs 44 ft south past the methanator tanks: 8 ft wall, green double man door (FERM MCC, 6.5 ft), 9 ft wall, 10 ft mesh roll-up, 10.5 ft wall
-      const BNZ = -37.1, BEX = 4.6, BSZ = -23.7, MCZ = -29.8;   // north wall z, east wall x, south corner z, MCC room north partition
       wall(FXE, BNZ, BEX, BNZ, PH, wm, [], { trim: true });
       wall(BEX, BNZ, BEX, BSZ, PH, wm, [[BEX - BEX + (BSZ - 2.4 - 1.0 - BNZ), 2.0, 0, ['FERM MCC', 'OUTSIDE']], [BSZ - 8.7 - BNZ, 3.05, 3.3]], { trim: true, leaf: -1 });
       O.swingDoors.slice(-2).forEach(d => { d.g.children[0].material = mat(0x2f5a3a); });   // green leaves (photo)
       rollDoor(BEX + 0.05, BSZ - 8.7, false, 3.05, 3.3, -1, 'mesh', 1);   // into the process building; bollards outside
-      wall(BEX, BSZ, 19, BSZ, PH, wm, [], { trim: true }); wall(19, BSZ, 19, -6.3, PH, wm, [[-8.0 - BSZ, DOOR]], { trim: true }); wall(19, -6.3, MX1, -6.3, PH, wm, [], { trim: true });
-      add(new T.BoxGeometry(19 - FXE + 0.3, 0.3, SZ + 10 + 0.3), roofM, (FXE + 19) / 2, PH + 0.15, (SZ - 10) / 2, null, true);
+      wall(BEX, BSZ, MX1, BSZ, PH, wm, [[13.6 - BEX, 1.74, 2.5, null, true]], { trim: true });
+      add(new T.BoxGeometry(MX1 - FXE + 0.3, 0.3, SZ + 10 + 0.3), roofM, (FXE + MX1) / 2, PH + 0.15, (SZ - 10) / 2, null, true);
       add(new T.BoxGeometry(BEX - FXE + 0.3, 0.3, -10 - BNZ), roofM, (FXE + BEX) / 2, PH + 0.15, (BNZ - 10) / 2, null, true);
-      add(new T.BoxGeometry(19 - BEX, 0.3, -10 - BSZ), roofM, (BEX + 19) / 2, PH + 0.15, (BSZ - 10) / 2, null, true);
-      slab(BEX - FXE, -10 - BNZ, (FXE + BEX) / 2, (BNZ - 10) / 2); slab(19 - BEX, -10 - BSZ, (BEX + 19) / 2, (BSZ - 10) / 2);
+      add(new T.BoxGeometry(MX1 - BEX, 0.3, -10 - BSZ), roofM, (BEX + MX1) / 2, PH + 0.15, (BSZ - 10) / 2, null, true);
+      slab(BEX - FXE, -10 - BNZ, (FXE + BEX) / 2, (BNZ - 10) / 2); slab(MX1 - BEX, -10 - BSZ, (BEX + MX1) / 2, (BSZ - 10) / 2);
       { // east face decals (photos): DANGER HIGH VOLTAGE + NOTICE by the double door, DANGER sign + louver north of the roll-up; AC condensers on the corner wall
         const deco = (draw, w, h, x, y, z) => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = Math.round(128 * h / w); const c = cv.getContext('2d'); draw(c, cv.width, cv.height);
           const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) })); m.position.set(x, y, z); m.rotation.y = Math.PI / 2; m.userData.noHit = true; scene.add(m); };
@@ -5925,10 +5929,9 @@ function init(container) {
         deco((c, W, H) => { c.fillStyle = '#6d7268'; c.fillRect(0, 0, W, H); c.fillStyle = '#4a4e47'; for (let y = 6; y < H - 4; y += 7) c.fillRect(6, y, W - 12, 3); c.strokeStyle = '#3b3e39'; c.lineWidth = 4; c.strokeRect(2, 2, W - 4, H - 4); }, 1.1, 1.4, BEX + 0.17, 2.0, BSZ - 8.7 - 3.0);
         for (const x of [BEX + 1.4, BEX + 3.0]) { box(1.0, 1.0, 1.0, mat(0xc9c6bd), x, 0.5, BSZ - 0.75); const f = add(new T.CylinderGeometry(0.4, 0.4, 0.03, 16), mat(0x3a3d40), x, 1.0, BSZ - 0.75, null); extraCols.push([x, BSZ - 0.75, 0.7]); }
       }
-      add(new T.BoxGeometry(MX1 - 19 + 0.3, 0.3, SZ + 6.3 + 0.3), roofM, (19 + MX1) / 2, PH + 0.15, (SZ - 6.3) / 2, null, true);
-      slab(19 - FXE, SZ + 10, (FXE + 19) / 2, (SZ - 10) / 2); slab(MX1 - 19, SZ + 6.3, (19 + MX1) / 2, (SZ - 6.3) / 2);
+      slab(MX1 - FXE, SZ + 10, (FXE + MX1) / 2, (SZ - 10) / 2);
       // the shop itself: inside walls (north double door to the open bay, west wall along the walkway by the ferm alley)
-      wall(MX0, MZ0, MX1, MZ0, MH, wm, [[13.8 - MX0, 2.2, 0, ['AISLE', 'MAINTENANCE']]], { trim: true });
+      wall(MX0, MZ0, MX1, MZ0, MH, wm, [[2.2 - MX0, 2.2, 0, ['AISLE', 'MAINTENANCE']]], { trim: true });
       wall(MX0, MZ0, MX0, MZ1, MH, wm, [], { trim: true });
       add(new T.BoxGeometry(MX1 - MX0, 0.2, MZ1 - MZ0), ceilM, (MX0 + MX1) / 2, MH + 0.1, (MZ0 + MZ1) / 2, null, true);
       // three offices along the west wall, doors into the shop
@@ -5937,9 +5940,9 @@ function init(container) {
       add(new T.BoxGeometry(OFX - MX0, 0.2, MZ1 - MZ0), ceilM, (MX0 + OFX) / 2, OH + 0.1, (MZ0 + MZ1) / 2, null, true);
       add(new T.BoxGeometry(OFX - MX0 - 0.3, 0.06, MZ1 - MZ0 - 0.3), tileM, (MX0 + OFX) / 2, 0.25, (MZ0 + MZ1) / 2, null, true);
       // shop furniture: workbenches along the north wall, tool cabinets, a forklift-size clear floor
-      for (const x of [19, 24, 29]) box(3.6, 0.95, 0.9, mat(0x4f5862), x, 0.48, MZ0 + 0.8);
-      for (const x of [33.5, 35.2]) box(1.2, 1.9, 0.7, mat(0xc8312f), x, 0.95, MZ0 + 0.6);
-      buildShopRadio(24.8, 0.95, MZ0 + 0.7); buildToolWall(27.0, MZ0);   // little paint-spattered job-site radio on the middle bench (X / E: on → next song → … → off)
+      for (const x of [5.2, 8.7, 12.2]) box(3.0, 0.95, 0.9, mat(0x4f5862), x, 0.48, MZ0 + 0.8);
+      for (const x of [16.0, 17.5]) box(1.2, 1.9, 0.7, mat(0xc8312f), x, 0.95, MZ0 + 0.6);
+      buildShopRadio(9.3, 0.95, MZ0 + 0.7); buildToolWall(10.1, MZ0);   // little paint-spattered job-site radio on the middle bench (X / E: on → next song → … → off)
       // two forklifts parked on the shop floor, forks toward the north benches: a really old LP one (faded, rusty, pipe guard, exhaust
       // stack, solid tires) and a brand-new electric one (red + graphite, LED work lights, amber beacon, blue floor spot light behind it)
       const forklift = (x, z, ry, modern) => {
@@ -5984,7 +5987,7 @@ function init(container) {
         }
         regVehBox(g); extraCols.push([x + Math.sin(ry) * 0.5, z + Math.cos(ry) * 0.5, 1.0], [x - Math.sin(ry) * 0.6, z - Math.cos(ry) * 0.6, 0.9]);
       };
-      forklift(15.5, 37, Math.PI, false); forklift(20.5, 37, Math.PI, true);
+      forklift(5.5, 37, Math.PI, false); forklift(10.5, 37, Math.PI, true);
       // north row: the FERM MCC room (motor control center), utility/air equipment out in the open east of it
       // FERM MCC room: behind the east double door, between the ferm alley wall and the east face, south of the roll-up
       const MW0 = wallSegs.length;
@@ -6046,20 +6049,20 @@ function init(container) {
       // between #3 and #4 on the north side. Out of service: not connected to anything, kept as landmarks (empty, tagged OUT OF SERVICE).
       { const OX = 13.6, OZ = BSZ - 8.7, SP = 4.9, CR = 1.75, TH = 14;   // placed from the satellite photo: in the notch just east of Ferm 1, north of the building
         const band = new T.CylinderGeometry(CR + 0.03, CR + 0.03, 0.08, 20, 1, true), bandM = mat(0xe4e8eb), manM = mat(0x9ea4aa);
-        for (const dx of [-0.5, 0.5]) for (const dz of [-0.5, 0.5]) { const x = OX + dx * SP, z = OZ + dz * SP, n = (dz < 0 ? 2 : 0) + (dx < 0 ? 1 : 2);
+        for (const dx of [-0.5, 0.5]) for (const dz of [-0.5, 0.5]) { const x = OX + dx * SP, z = OZ + dz * SP, n = (dz < 0 ? 2 : 0) + (dx < 0 ? 1 : 2), inS = dx < 0 ? 1 : -1;
           tank(x, z, CR, TH, 0xb4bac0, 0xd9a441, null, { level: 0.001, top: 0xc9ced3, flat: true });
           for (let y = 1.2; y < TH; y += 1.25) { const b = new T.Mesh(band, bandM); b.position.set(x, y, z); scene.add(b); }
-          const mw = add(new T.CylinderGeometry(0.42, 0.42, 0.14, 14), manM, x + dx * 2 * (CR + 0.05), 0.9, z, null); mw.rotation.z = Math.PI / 2;   // manway on the outer side
-          nameplate('TS-1050' + (3 + n) + '|METHANATOR #' + n, x, 2.2, z, CR, dx < 0 ? -1 : 1, 0); extraCols.push([x, z, CR + 0.15]); }
+          const mw = add(new T.CylinderGeometry(0.36, 0.36, 0.22, 16), manM, x + inS * (CR + 0.05), 1.0, z, null); mw.rotation.z = Math.PI / 2; const pf = add(new T.CylinderGeometry(0.44, 0.44, 0.045, 16), mat(0x7d848b), x + inS * (CR + 0.17), 1.0, z, null); pf.rotation.z = Math.PI / 2; for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, bt = add(new T.CylinderGeometry(0.02, 0.02, 0.08, 6), mat(0x4a5056), x + inS * (CR + 0.17), 1.0 + Math.cos(a) * 0.38, z + Math.sin(a) * 0.38, null); bt.rotation.z = Math.PI / 2; }   // inner manway + bolted pancake blind flange protruding into the hallway
+          nameplate('TS-1050' + (3 + n) + '|METHANATOR #' + n, x, 2.2, z, CR, dx < 0 ? -1 : 1, 0); extraCols.push([x, z, CR]); }
         { // pump house between #3 and #4 (photo facing south): white vertical-panel shed with green corner trim, gable roof with white fascia,
           // green door with a big window and a NOTICE (hard hats + eye protection) sign, V-shaped FIRE EXTINGUISHER sign + extinguisher to its left, two vent pipes behind the roof
-          const px = OX, pz = OZ - SP / 2 - 0.5, W = 1.9, D = 2.4, H = 2.6, fz = pz - D / 2;
+          const px = OX, fz = OZ - SP / 2 - 1.7, D = BSZ - fz, pz = (fz + BSZ) / 2, W = 1.9, H = 2.6;
           const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#e6e6df'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#c4c5bd'; for (let k = 0; k < 4; k++) c.fillRect(k * 16, 0, 2, 64);
           const sid = new T.CanvasTexture(cv); sid.wrapS = T.RepeatWrapping; sid.repeat.x = 3;
           const sm = new T.MeshLambertMaterial({ map: sid }), DX0 = px - 0.08 - 0.47, DX1 = px - 0.08 + 0.47;   // hollow now: walls with a doorway, so the door can open
-          box(W, H, 0.08, sm, px, H / 2, pz + D / 2); for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
+          for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
           box(DX0 - (px - W / 2), H, 0.08, sm, (px - W / 2 + DX0) / 2, H / 2, fz); box(px + W / 2 - DX1, H, 0.08, sm, (DX1 + px + W / 2) / 2, H / 2, fz); box(DX1 - DX0, H - 2.15, 0.08, sm, px - 0.08, (H + 2.15) / 2, fz);
-          box(W - 0.1, 0.06, D - 0.1, mat(0x8d9196), px, 0.03, pz); pumpSet(px - 0.35, pz + 0.45, 'x', 1, null, 0.32);   // concrete floor + a small pump inside
+          box(W - 0.06, 0.14, D, mat(0x8d9196), px, 0.1, pz); for (const lz of [fz + 3.5, fz + 9.0]) box(0.35, 0.06, 1.1, new T.MeshBasicMaterial({ color: 0xfff5d6 }), px, H - 0.05, lz);   // concrete floor + hallway ceiling lights
           const grn = mat(0x23584a), wht = mat(0xf0f0ea);
           for (const sx of [-1, 1]) box(0.1, H, 0.1, grn, px + sx * (W / 2 + 0.01), H / 2, fz + 0.04);                       // green corner trim
           const sh = new T.Shape([new T.Vector2(-W / 2, 0), new T.Vector2(W / 2, 0), new T.Vector2(0, 0.6)]);
@@ -6081,8 +6084,8 @@ function init(container) {
             'FIRE'.split('').forEach((ch, k) => c2.fillText(ch, Wd / 2, 28 + k * 22)); c2.font = 'bold 15px Arial'; 'EXTINGUISHER'.split('').forEach((ch, k) => c2.fillText(ch, Wd / 2, 130 + k * 17)); };
           for (const sx of [-1, 1]) pl(ext, 0.09, 0.4, px + 0.62 + sx * 0.035, 1.65, fz - 0.06, Math.PI + sx * 0.6);        // V-shaped (two-sided) sign
           add(new T.CylinderGeometry(0.09, 0.09, 0.5, 10), mat(0xc8211c), px + 0.62, 0.72, fz - 0.12); box(0.1, 0.07, 0.1, mat(0x222222), px + 0.62, 1.0, fz - 0.12);
-          for (const sx of [-0.35, 0.35]) { add(new T.CylinderGeometry(0.08, 0.08, 1.4, 8), mat(0x50555a), px + sx, H + 0.5, pz + 0.6); add(new T.CylinderGeometry(0.1, 0.1, 0.12, 8), mat(0x3a3e42), px + sx, H + 1.2, pz + 0.6); }   // vent pipes
-          wallSegs.push([px - W / 2, fz, DX0, fz], [DX1, fz, px + W / 2, fz], [px - W / 2, fz, px - W / 2, pz + D / 2], [px + W / 2, fz, px + W / 2, pz + D / 2], [px - W / 2, pz + D / 2, px + W / 2, pz + D / 2]); }
+          for (const sx of [-0.35, 0.35]) { add(new T.CylinderGeometry(0.08, 0.08, 1.4, 8), mat(0x50555a), px + sx, H + 0.5, fz + 1.8); add(new T.CylinderGeometry(0.1, 0.1, 0.12, 8), mat(0x3a3e42), px + sx, H + 1.2, fz + 1.8); }   // vent pipes
+          wallSegs.push([px - W / 2, fz, DX0, fz], [DX1, fz, px + W / 2, fz], [px - W / 2, fz, px - W / 2, BSZ], [px + W / 2, fz, px + W / 2, BSZ]); }
         { // 4 CORN OIL TANKS (photos + nameplate: 8 ft dia x 23 ft straight wall, 8,800 gal, all identical): insulated ribbed stainless shells with bands,
           // cone bottoms on four steel legs, in a yellow containment curb 13.5 paces (~4.1 m) east of the process building wall; yellow railed tops joined by
           // a platform, caged ladders (west of #2, east of #4). Layout: #2 NW, #3 NE, #1 SW, #4 SE. Not connected yet.
@@ -6129,7 +6132,7 @@ function init(container) {
 
   // ---------- DISTILLATION (placeholder): a marked area outside, south of the cook building ----------
   // distillation: outdoor concrete pad south of the evap alley, as wide as the evap alley (process building west block), north of the cross road
-  const DISTX = -52.5, DISTD = 11.5, DISTZ = 44 + 3.3 + DISTD / 2, DISTW = 43, DISTZ0 = DISTZ - DISTD / 2;   // starts south of the 10 ft walkway along the building
+  const DISTX = (WEST_WING.west + WEST_WING.east) / 2, DISTD = 11.5, DISTZ = WEST_WING.south + 3.3 + DISTD / 2, DISTW = WEST_WING.east - WEST_WING.west, DISTZ0 = DISTZ - DISTD / 2;   // starts south of the 10 ft walkway along the building
   for (const [w, d, x, z] of [[DISTW, 0.6, DISTX, DISTZ0], [DISTW, 0.6, DISTX, DISTZ0 + DISTD], [0.6, DISTD, DISTX - DISTW / 2, DISTZ], [0.6, DISTD, DISTX + DISTW / 2, DISTZ]])
     box(w, 0.35, d, mat(0xa0a6ad), x, 0.2, z, 'col');                                              // curb
   box(DISTW, 0.25, DISTD, mat(0xc9ccd1), DISTX, 0.15, DISTZ, 'col');                              // concrete pad
@@ -6153,7 +6156,7 @@ function init(container) {
       add(new T.CylinderGeometry(1.3, 1.3, topY - (y0 + 5.2), 20), jacket, x, (topY + y0 + 5.2) / 2, z, null);   // tube body
       add(new T.SphereGeometry(1.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), jacket, x, topY, z, null);    // domed head
     };
-    const SZ = 44, PH = 8.3, EZ = SZ - 3.4, xs = [-70.6, -64.8, -59.6, -54.4, -49.2, -44.0, -38.8, -33.6];
+    const SZ = WEST_WING.south, PH = 8.3, EZ = SZ - 3.4, xs = [-70.6, -64.8, -59.6, -54.4, -49.2, -44.0, -38.8, -33.6];
     const STORY = 4.2, TOWER = PH + 4 * STORY, TOP = TOWER + 3.2;   // 4 more stories over Evaps 3-8; tops stick out ~3 m above the top deck
     xs.forEach((x, i) => { evap(x, EZ, 0.1, TOP); extraCols.push([x, EZ, 2.3]); nameplate('EVAP #' + (i + 1), x, 2.4, EZ, 2.24, 0, -1); });   // faces the evap alley aisle
     // enclosure over Evaps 3-8, from the main roof up to the top deck (see-through from above like the other walls)
@@ -6291,11 +6294,11 @@ function init(container) {
   // unisex restroom, safety office, computer-training room. West end: open area with snack + soda machines and the glass entrance
   // doors facing west, with steps and a wheelchair ramp.
   {
-    const er = add(new T.BoxGeometry(245 - (EXR - 4), 0.2, 8), mat(0x50555c), (245 + EXR - 4) / 2, 0.11, SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
-    for (let x = EXR + 8; x < 240; x += 10) box(3, 0.22, 0.25, mat(0xffffff), x, 0.12, SCZ_OUT);                       // dashes
+    const ew = 245 - (EXR - 4), er = add(new T.PlaneGeometry(ew, 8).rotateX(-Math.PI / 2), groundMat('asphalt', false, ew, 8), (245 + EXR - 4) / 2, 0.024, SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
+    for (let x = EXR + 8; x < 240; x += 10) add(new T.PlaneGeometry(3, 0.25).rotateX(-Math.PI / 2), mat(0xffffff), x, 0.03, SCZ_OUT, null, true);                       // dashes
     for (const [x, z] of [[SCXI, SCZ_IN], [SCXO, SCZ_OUT_L]]) {   // each scale in the lane right beside the scale house, so the driver's window lines up with the drive-through window
-      box(21.3, 0.32, 3.6, mat(0x7d838a), x, 0.16, z);                                                                 // 70 ft truck scale deck
-      for (const dz of [-1.85, 1.85]) box(21.3, 0.34, 0.12, mat(0xf2c200), x, 0.17, z + dz);                          // yellow edges
+      box(21.3, 0.08, 3.6, mat(0x7d838a), x, 0.04, z);                                                                 // 70 ft truck scale deck
+      for (const dz of [-1.85, 1.85]) box(21.3, 0.1, 0.12, mat(0xf2c200), x, 0.05, z + dz);                          // yellow edges
     }
     const SH0 = scene.children.length, SHW = wallSegs.length, SHS = WALK_SURF.length, SHD = (O.swingDoors || []).length;   // everything after this moves east with the road
     const X0 = 56, X1 = 90, ZN = NROAD + 4.5, ZS = SCZ_OUT - 4.5, FY = 0.3, H = 3.2, HZ = (ZN + ZS) / 2;   // building outline, floor height
@@ -6385,10 +6388,9 @@ function init(container) {
     NPCS.push({ id: 'vern', g: vern });
   }
   // ---------- SHOP YARD: big concrete apron east of the maintenance shop, from its east wall out to the east road
-  { const y = add(new T.BoxGeometry(EXR - 4 - 37.4, 0.12, 59 - -12), mat(0x9c9a94), (EXR - 4 + 37.4) / 2, 0.06, (59 + -12) / 2, null); y.castShadow = false; }
+  { const y = add(new T.BoxGeometry(EXR - 4 - 19, 0.12, 59 - -12), mat(0x9c9a94), (EXR - 4 + 19) / 2, 0.06, (59 + -12) / 2, null); y.castShadow = false; }
   // concrete extended north of the shop as well: around the oil tanks and the acid tank, west to the fermenters, joining the yard
   { const X0 = -7.6, X1 = EXR - 4, Z0 = -40, Z1 = -10, y = add(new T.BoxGeometry(X1 - X0, 0.12, Z1 - Z0), mat(0x9c9a94), (X0 + X1) / 2, 0.06, (Z0 + Z1) / 2, null); y.castShadow = false; }
-  { const y = add(new T.BoxGeometry(37.4 - 19, 0.12, 3.7), mat(0x9c9a94), (19 + 37.4) / 2, 0.06, -8.15, null); y.castShadow = false; }   // patch north of the shop's utility room
   // ---------- YEAST COOLER (photo, facing south from in front of the maintenance shop): walk-in cooler for yeast totes on the
   // concrete just south of the shop's east end. Simple galvanized box, 26 ft x 10 ft (user's paces, ~1 ft each) x ~10 ft tall,
   // four doors facing north, two condensing units on the roof.
@@ -6532,19 +6534,19 @@ function init(container) {
   // and from the east road (west side); curb all around, rows of painted stalls with drive aisles between them.
   {
     const X0 = 54 + SH_DX, X1 = 114 + SH_DX, Z0 = SCZ_OUT + 5, Z1 = -48, asph = mat(0x50555c), curb = mat(0xb5b0a6);
-    const lot = add(new T.BoxGeometry(X1 - X0, 0.2, Z1 - Z0), asph, (X0 + X1) / 2, 0.105, (Z0 + Z1) / 2, null); lot.castShadow = false;
+    const lot = add(new T.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X1 - X0, Z1 - Z0), (X0 + X1) / 2, 0.024, (Z0 + Z1) / 2, null); lot.castShadow = false;
     const AX0 = 56 + SH_DX, AX1 = 63 + SH_DX, BZ0 = -66.3, BZ1 = -59.7;                                                      // driveway openings
-    const drA = add(new T.BoxGeometry(AX1 - AX0, 0.2, Z0 - (SCZ_OUT + 4) + 0.2), asph, (AX0 + AX1) / 2, 0.105, (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
-    const drB = add(new T.BoxGeometry(X0 - (EXR + 4) + 0.2, 0.2, BZ1 - BZ0), asph, (X0 + EXR + 4) / 2, 0.105, (BZ0 + BZ1) / 2, null); drB.castShadow = false;
-    const cb = (x0, z0, x1, z1) => { if (Math.abs(x1 - x0) > 0.01 || Math.abs(z1 - z0) > 0.01) box(Math.max(0.3, Math.abs(x1 - x0)), 0.18, Math.max(0.3, Math.abs(z1 - z0)), curb, (x0 + x1) / 2, 0.2, (z0 + z1) / 2); };
+    const drA = add(new T.PlaneGeometry(AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2).rotateX(-Math.PI / 2), groundMat('asphalt', false, AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2), (AX0 + AX1) / 2, 0.024, (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
+    const drB = add(new T.PlaneGeometry(X0 - (EXR + 4) + 0.2, BZ1 - BZ0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X0 - (EXR + 4) + 0.2, BZ1 - BZ0), (X0 + EXR + 4) / 2, 0.024, (BZ0 + BZ1) / 2, null); drB.castShadow = false;
+    const cb = (x0, z0, x1, z1) => { if (Math.abs(x1 - x0) > 0.01 || Math.abs(z1 - z0) > 0.01) box(Math.max(0.3, Math.abs(x1 - x0)), 0.1, Math.max(0.3, Math.abs(z1 - z0)), curb, (x0 + x1) / 2, 0.05, (z0 + z1) / 2); };
     cb(X0, Z0, AX0, Z0); cb(AX1, Z0, X1, Z0);                // north curb, gap for driveway A
     cb(X0, Z0, X0, BZ0); cb(X0, BZ1, X0, Z1);                // west curb, gap for driveway B
     cb(X1, Z0, X1, Z1); cb(X0, Z1, X1, Z1);                  // east + south curbs
     // stall lines (instanced): rows of 2.7 m x 5.5 m stalls along x, starting past a cross aisle by the driveways
     const rows = [0.3, 12.8, 18.3, 30.8, 36.3, 48.8].map(r => Z0 + r);   // top edge of each stall row (z): single row by the north curb, then back-to-back pairs, 7 m drive aisles between
-    const SX0 = 66 + SH_DX; extStation(SX0 - 1.6, 0.2, rows[0] + 1.0, Math.PI / 2);
+    const SX0 = 66 + SH_DX; extStation(SX0 - 1.6, 0.025, rows[0] + 1.0, Math.PI / 2);
     const n = Math.floor((X1 - 0.5 - SX0) / 2.7) + 1, lines = new T.InstancedMesh(new T.BoxGeometry(0.12, 0.02, 5.5), mat(0xffffff), rows.length * n);
-    let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, 0.22, rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
+    let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, 0.032, rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
     lines.count = k; lines.userData.noHit = true; scene.add(lines);
     // five employees' vehicles parked in stalls, very simple: body, cabin, windows, wheels (nose in toward the stall's back)
     const car = (kind, col, si, ri) => {
@@ -6556,7 +6558,7 @@ function init(container) {
       P(W - 0.1, CH * 0.7, CL - 0.25, 0x3a4a5a, 0, 0.35 + BH + CH * 0.45, CO * flip);   // windows (dark glass band)
       if (kind === 'pickup') P(W - 0.1, 0.12, 1.9, 0x2b2f36, 0, 0.35 + BH + 0.06, -1.6 * flip);   // bed liner
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new T.Mesh(new T.CylinderGeometry(0.34, 0.34, 0.24, 10).rotateZ(Math.PI / 2), mat(0x1e1f22)); w.position.set(sx * (W / 2 - 0.08), 0.34, sz * (L / 2 - 0.85)); g.add(w); }
-      g.position.set(x, 0.2, z); g.userData.noHit = false; scene.add(g); regVehBox(g);
+      g.position.set(x, 0.025, z); g.userData.noHit = false; scene.add(g); regVehBox(g);
       extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);       // solid to walk into
     };
     // a forest green Jeep Gladiator (crew-cab pickup): same simple boxes, but tall, square, black hardtop + fender flares, 7-slot grille, round lights
@@ -6575,7 +6577,7 @@ function init(container) {
       for (const wz of [1.85, -1.65]) { for (const sx of [-1, 1]) {
         P(0.16, 0.12, 1.2, blk, sx * (W / 2 + 0.05), 0.9, wz);   // fender flares (arched over the tires)
         const w = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.3, 12).rotateZ(Math.PI / 2), mat(0x1e1f22)); w.position.set(sx * (W / 2 - 0.05), 0.42, wz * f); g.add(w); } }
-      g.position.set(x, 0.2, z); scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
+      g.position.set(x, 0.025, z); scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
     };
     // a black 2017 Chevy Equinox (compact crossover): one side-profile shape pushed out to the car's width (sloped hood, raked windshield
     // and hatch), dark glass, Chevy split grille with a chrome bar and gold bowtie, swept headlights, roof rails, black wheel-arch cladding
@@ -6597,10 +6599,10 @@ function init(container) {
         P(0.06, 0.1, 0.95, 0x15171a, sx * (W / 2 + 0.01), 0.76, wz);                                           // wheel-arch cladding
         const w = new T.Mesh(new T.CylinderGeometry(0.36, 0.36, 0.24, 12).rotateZ(Math.PI / 2), mat(0x1e1f22)); w.position.set(sx * (W / 2 - 0.08), 0.36, wz); g.add(w);
         const hub = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.02, 10).rotateZ(Math.PI / 2), mat(0xaeb3b8)); hub.position.set(sx * (W / 2 + 0.045), 0.36, wz); g.add(hub); }
-      g.position.set(x, 0.2, z); g.rotation.y = ri % 2 ? Math.PI : 0; scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
+      g.position.set(x, 0.025, z); g.rotation.y = ri % 2 ? Math.PI : 0; scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
     };
     // shared bits for the profile-shape vehicles: a side profile (z forward, y up) pushed out to width w; boxes; wheels with hubs
-    const veh = (si, ri, at) => { const g = new T.Group(), x = at ? at[0] : SX0 + 1.35 + si * 2.7, z = at ? at[1] : rows[ri] + 2.75, ry = at ? at[2] : ri % 2 ? Math.PI : 0, gy = at ? 0 : 0.2;   // at = [x, z, heading] for vehicles parked outside the lot
+    const veh = (si, ri, at) => { const g = new T.Group(), x = at ? at[0] : SX0 + 1.35 + si * 2.7, z = at ? at[1] : rows[ri] + 2.75, ry = at ? at[2] : ri % 2 ? Math.PI : 0, gy = at ? 0 : 0.025;   // at = [x, z, heading] for vehicles parked outside the lot
       return { g, x, z,
         side: (pts, w, c) => { const sh = new T.Shape(pts.map(([a, b]) => new T.Vector2(a, b))); const geo = new T.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2); g.add(new T.Mesh(geo, mat(c))); },
         P: (w, h, d, c, px, py, pz) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(px, py, pz); g.add(m); return m; },
@@ -7097,21 +7099,21 @@ function init(container) {
   {
     const asph = mat(0x50555c), wht = mat(0xffffff), ylw = mat(0xffd84d);
     // Road P: a plain two-lane county road, two 12 ft lanes (7.3 m), no center line
-    const rp = add(new T.BoxGeometry(7.3, 0.2, RDP_Z1 - RDP_Z0), asph, RDPX, 0.11, (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
+    const rp = add(new T.PlaneGeometry(7.3, RDP_Z1 - RDP_Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 7.3, RDP_Z1 - RDP_Z0), RDPX, 0.024, (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
     buildRail(); buildUTV();
     // divided highway built to real dimensions: per direction two 12 ft (3.66 m) lanes, a 4 ft inside shoulder and a 10 ft outside
     // shoulder; yellow edge line on the inside, white edge line outside, white 10 ft dashes every 40 ft between the lanes; grass median
     const [x0, x1] = [-1500, 1700], L = (x1 - x0) / HWY.c, phi = Math.atan(HWY.k), MED = 15, LANE = 3.66, SIN = 1.2, SOUT = 3.0;
     const midX = (x0 + x1) / 2, at = (n, u) => [midX + n * HWY.s + u * HWY.c, HWY.z(midX) + n * HWY.c - u * HWY.s];   // n: across (+ = SE), u: along
-    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.BoxGeometry(L, y === 0.11 ? 0.2 : 0.02, w), m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.11; return r; };
+    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.PlaneGeometry(L, w).rotateX(-Math.PI / 2), y === 0.024 ? groundMat('asphalt', false, L, w) : m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.024; return r; };
     for (const side of [-1, 1]) {
       const n0 = side * MED / 2, dir = side;                        // inner edge of the paved surface, then outward
       const w = SIN + 2 * LANE + SOUT, nc = n0 + dir * w / 2;
-      strip(nc, w, asph, 0.11);                                                                          // pavement: shoulders + 2 lanes
-      strip(n0 + dir * SIN, 0.15, ylw, 0.215);                                                           // yellow inside edge line
-      strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, 0.215);                                              // white outside edge line
+      strip(nc, w, asph, 0.024);                                                                          // pavement: shoulders + 2 lanes
+      strip(n0 + dir * SIN, 0.15, ylw, 0.032);                                                           // yellow inside edge line
+      strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, 0.032);                                              // white outside edge line
       const nd = n0 + dir * (SIN + LANE), cnt = Math.floor(L / 12.2), d = new T.InstancedMesh(new T.BoxGeometry(3.05, 0.02, 0.15), wht, cnt);
-      for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, 0.215, z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
+      for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, 0.032, z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
       d.userData.noHit = true; scene.add(d);                                                             // lane divider dashes
     }
   }
@@ -8801,22 +8803,22 @@ function chuteFly(dt, f) {
 // ---------- SILO TOPS: a caged ladder up the west side of each tin bin to the eave, a yellow guardrail around the top edge, and the
 // domed roof made walkable (stacked flat steps that follow the dome) so you can walk up to the peak
 function siloClimb(x, z, R, H) {   // x, z: grain-yard coords (the yard's meshes get shifted by GDX/GDZ afterwards; the walk data is shifted here)
-  const SX = GDX, SZ2 = GDZ, yel = mat(0xf2c200), lrail = mat(0xd8b23a), LX = x - R - 0.3, top = H + 0.05, DOMEK = 0.45;
+  const SX = GDX, SZ2 = GDZ, yel = mat(0xf2c200), lrail = mat(0xd8b23a), LX = x - R - 0.3, top = H + 0.15; const d = add(new T.CylinderGeometry(R, R, 0.15, 32), mat(0xd94848), x, H + 0.075, z, null); d.receiveShadow = true;
   for (const sz of [-0.25, 0.25]) box(0.06, top + 1.1, 0.06, lrail, LX, (top + 1.1) / 2, z + sz);
   for (let y = 0.3; y < top; y += 0.3) box(0.035, 0.035, 0.5, lrail, LX, y, z);
   for (let y = 2.4; y < top + 1; y += 1.2) { const hoop = new T.Mesh(new T.TorusGeometry(0.38, 0.025, 4, 14, Math.PI), lrail); hoop.rotation.x = Math.PI / 2; hoop.rotation.z = -Math.PI / 2; hoop.position.set(LX, y, z); scene.add(hoop); }
   LADDERS.push({ x: LX - 0.1 + SX, z: z + SZ2, top, dx: 1, dz: 0 });
   // yellow guardrail around the eave (gap at the ladder), stops you walking off the edge
-  const N = 36, rr = R - 0.2, half = 0.6 / rr;
-  for (let i = 0; i < N; i++) { const a0 = i / N * Math.PI * 2, a1 = (i + 1) / N * Math.PI * 2, mid = (a0 + a1) / 2;
+  const N = 36, rr = R - 0.2, half = 0.85 / rr;
+  for (let i = 0; i < N; i++) { const a0 = (i - 0.5) / N * Math.PI * 2, a1 = (i + 0.5) / N * Math.PI * 2, mid = (a0 + a1) / 2;
     if (Math.abs(Math.atan2(Math.sin(mid - Math.PI), Math.cos(mid - Math.PI))) < half) continue;   // ladder is on the west (angle pi)
     const ax = x + Math.cos(a0) * rr, az = z + Math.sin(a0) * rr, bx = x + Math.cos(a1) * rr, bz = z + Math.sin(a1) * rr, L = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az);
     for (const hh of [1.07, 0.55]) { const r = box(0.05, 0.05, L, yel, (ax + bx) / 2, top + hh, (az + bz) / 2); r.rotation.y = ang; }
     box(0.05, 1.07, 0.05, yel, ax, top + 0.535, az); wallSegs.push([ax + SX, az + SZ2, bx + SX, bz + SZ2, top - 0.4, top + 2.2]); }
   // walkable dome: rings of flat steps, each ~0.35 m higher than the one outside it
-  const DH = R * DOMEK, n = Math.ceil(DH / 0.35);
-  for (let k = 0; k <= n; k++) { const yk = DH * k / n, rho = R * Math.sqrt(Math.max(0, 1 - (yk / DH) ** 2)) - (k ? 0 : 0.05);
-    const q = Math.max(0.4, rho); WALK_SURF.push({ x0: x + SX - q, x1: x + SX + q, z0: z + SZ2 - q, z1: z + SZ2 + q, y0: top + yk, y1: top + yk }); }
+  WALK_SURF.push({ x0: x + SX - R, x1: x + SX + R, z0: z + SZ2 - R, z1: z + SZ2 + R, y0: top, y1: top });
+  // flat walkable roof deck across the entire silo top
+  // (all 4 tin bins: Tin Bin 1, Tin Bin 2, Tin Bin 3, Tin Bin 4)
 }
 // ---------- EVIL SCARECROWS: four flat billboard scarecrows standing in the corn circle, drawn in code (burlap sack head with a stitched
 // grin and glowing red eyes, floppy hat, ragged flannel, straw poking out, crucified on a pole). Get within ~14 m of one and it lets you
@@ -9070,6 +9072,18 @@ function toolHit() {   // a swing: whatever is right in front of you (about arm 
       const r = dmgHit(tk, -15, true); wrenchSound(); if (DMG_NOTIFY) DMG_NOTIFY(r || ('🔧 Repairing… ' + Math.round(dmgOf(tk).h) + '%' + (dmgOf(tk).h >= 100 ? ' · good as new' : ''))); return; } }   // no vehicle: the swing goes on (the wrench can patch the acid tank)
   if (tk) dmgHit(tk, 6, true);   // tools dent cars a bit too
   const o = V3(walk.x, walk.y + EYE, walk.z), dir = V3(); camera.getWorldDirection(dir);
+  if (birds) for (const b of birds) if (b.state === 'perch' || b.state === 'fly') {
+    const bc = b.g.position.clone(); bc.y += 0.25; const t = Math.max(0, Math.min(2.3, bc.clone().sub(o).dot(dir)));
+    if (bc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.65) { hitBird(b, null); splatSnd(bc); return; }
+  }
+  if (critters) for (const c of critters) if (c.state === 'idle' || c.state === 'run') {
+    const cc = c.g.position.clone(); cc.y += 0.06; const t = Math.max(0, Math.min(2.3, cc.clone().sub(o).dot(dir)));
+    if (cc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.45) { hitCritter(c, null); splatSnd(cc); return; }
+  }
+  if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const f of pondFrogs) if (f.state === 'live' && f.group.visible) {
+    const fc = f.group.position.clone(); fc.y += 0.2; const t = Math.max(0, Math.min(2.3, fc.clone().sub(o).dot(dir)));
+    if (fc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.5) { hitPondFrog(f, null); splatSnd(fc); return; }
+  }
   ray.set(o, dir); ray.far = 2.3; ray.camera = camera; let hit = null;
   for (const h of ray.intersectObjects(scene.children, true)) { let q = h.object, skip = !q.isMesh || q.userData.noHit || q.isSprite || q.isInstancedMesh; while (q && !skip) { skip = q === camera || q === VIEW.av || q === SR.g; q = q.parent; } if (!skip) { hit = h; break; } }
   ray.far = Infinity; TOOL_LAST = hit ? { p: hit.point.toArray().map(v => +v.toFixed(2)), c: hit.object.material && hit.object.material.color && hit.object.material.color.getHexString(), d: +hit.distance.toFixed(2) } : null;
@@ -10115,7 +10129,7 @@ function farPerch(b, minFromPlayer) {
   return perches[Math.random() * perches.length | 0];
 }
 function perchAt(b, p) {
-  b.state = 'perch'; b.g.visible = true; b.g.position.copy(p); b.g.rotation.set(0, Math.random() * 6.28, 0);
+  b.state = 'perch'; b.held = false; b.thrown = false; b.g.visible = true; b.g.position.copy(p); b.g.rotation.set(0, Math.random() * 6.28, 0);
   b.wl.rotation.set(0, 1.45, 0); b.wr.rotation.set(0, -1.45, 0); b.idle = 15 + Math.random() * 30;   // wings folded back
 }
 function flyTo(b, p) {
@@ -10128,7 +10142,7 @@ function scareNear(p, r) { if (birds) for (const b of birds) if (b.state === 'pe
 // ---------- critters: a rat and a lizard that turn up at random spots on the process building floor and scurry around.
 // They run from Squeeg, and a paintball knocks them over (they disappear a few seconds later and come back somewhere else).
 let critters = null, critterHits = 0, crSolids = [], crSolidsT = 99;
-const CR_AREA = [[-73.5, -12, -31.5, 10.5], [-73.5, 18.5, -31.5, 43.5]];   // cook alley, evap alley (not the office block)
+const CR_AREA = [[-73.5, -12, -31.5, WEST_WING.officeNorth - 0.5], [-73.5, WEST_WING.officeNorth + 7.5, -31.5, WEST_WING.south - 0.5]];   // cook alley, evap alley (not the office block)
 function makeCritter(kind) {
   const g = new T.Group(), mats = [], m = c => { const x = new T.MeshLambertMaterial({ color: c }); mats.push(x); return x; };
   const part = (geo, mt, x, y, z, sx, sy, sz) => { const o = new T.Mesh(geo, mt); o.position.set(x, y, z); if (sx) o.scale.set(sx, sy, sz); g.add(o); return o; };
@@ -10160,7 +10174,7 @@ function crSpawn(c) {
     const a = CR_AREA[Math.random() * CR_AREA.length | 0], x = a[0] + Math.random() * (a[2] - a[0]), z = a[1] + Math.random() * (a[3] - a[1]);
     if (walk.on && Math.hypot(x - walk.x, z - walk.z) < 6) continue;   // not right under Squeeg's nose
     const y = crFloor(x, z); if (y == null) continue;
-    c.g.position.set(x, y, z); c.g.rotation.set(0, Math.random() * 6.3, 0); c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i])); if (c.g.userData.sprite) c.g.userData.sprite.material.rotation = 0;
+    c.g.position.set(x, y, z); c.g.rotation.set(0, Math.random() * 6.3, 0); c.held = false; c.thrown = false; c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i])); if (c.g.userData.sprite) c.g.userData.sprite.material.rotation = 0;
     c.g.visible = true; c.state = 'idle'; c.t = 0.5 + Math.random() * 2; c.life = 60 + Math.random() * 90; return;
   }
   c.t = 2;   // try again shortly
@@ -10183,7 +10197,7 @@ function updateCritters(dt) {
   for (const c of critters) {
     const p = c.g.position;
     if (c.state === 'gone') { if ((c.t -= dt) <= 0) crSpawn(c); continue; }
-    if (c.state === 'hit') { if ((c.t -= dt) <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 10 + Math.random() * 30; } continue; }
+    if (c.state === 'hit') { if (!c.held && !c.thrown && (c.t -= dt) <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 10 + Math.random() * 30; } continue; }
     c.life -= dt;
     const near = walk.on && !walk.dead && Math.hypot(p.x - walk.x, p.z - walk.z) < 4;
     if (c.state === 'idle') {
@@ -10197,12 +10211,12 @@ function updateCritters(dt) {
   }
 }
 function hitCritter(c, col) {
-  critterHits++; c.state = 'hit'; c.t = 5; c.mats.forEach(m => m.color.setHex(col));
+  critterHits++; c.state = 'hit'; c.t = 45; c.held = false; c.thrown = false; if (col != null) c.mats.forEach(m => m.color.setHex(col));
   const sp = c.g.userData.sprite; if (sp) sp.material.rotation = Math.PI; else { c.g.rotation.z = Math.PI; c.g.position.y += 0.13; }   // knocked belly-up
   for (let i = 0; i < 3; i++) puff(c.g.position.clone().add(V3((Math.random() - 0.5) * 0.3, 0.1, (Math.random() - 0.5) * 0.3)), 0.08, 0xf2f2f2);
 }
 function hitBird(b, c) {
-  pigeonHits++; b.state = 'fall'; b.mats.forEach(m => m.color.setHex(c));
+  pigeonHits++; b.state = 'fall'; b.held = false; b.thrown = false; if (c != null) b.mats.forEach(m => m.color.setHex(c));
   b.vel = V3((Math.random() - 0.5) * 3, 2.5, (Math.random() - 0.5) * 3); b.spin = V3(Math.random() * 8, Math.random() * 4, Math.random() * 8);
   const at = b.g.position.clone(); at.y += 0.3;
   for (let i = 0; i < 4; i++) puff(at.clone().add(V3((Math.random() - 0.5) * 0.4, Math.random() * 0.3, (Math.random() - 0.5) * 0.4)), 0.1, 0xf2f2f2);
@@ -10265,10 +10279,13 @@ function updateBirds(dt) {
       const f = Math.sin(clock * 32) * 0.9 * (b.t > 0.85 ? 0.5 : 1); b.wl.rotation.z = f; b.wr.rotation.z = -f;
       if (b.t >= 1) perchAt(b, b.to);
     } else if (b.state === 'fall') {
+      if (b.held || b.thrown) continue;
       b.vel.y -= 9.8 * dt; g.position.addScaledVector(b.vel, dt);
       g.rotation.x += b.spin.x * dt; g.rotation.y += b.spin.y * dt; g.rotation.z += b.spin.z * dt;
-      if (g.position.y <= 0.05) { g.position.y = 0.05; g.rotation.set(0, g.rotation.y, Math.PI / 2); b.state = 'down'; b.t = 8; }
+      const fy = Math.max(0.05, floorAt(g.position.x, g.position.z, g.position.y + 0.2) + 0.05);
+      if (g.position.y <= fy) { g.position.y = fy; g.rotation.set(0, g.rotation.y, Math.PI / 2); b.state = 'down'; b.t = 45; }
     } else if (b.state === 'down') {
+      if (b.held || b.thrown) continue;
       b.t -= dt; if (b.t <= 0) { g.visible = false; b.state = 'gone'; b.t = 6 + Math.random() * 8; }
     } else if (b.state === 'gone') {
       b.t -= dt; if (b.t <= 0) { b.mats[0].color.setHex(0x8a8f99); b.mats[1].color.setHex(0x4b5260); perchAt(b, farPerch(null, 25)); }
@@ -10284,7 +10301,7 @@ function updateBirds(dt) {
 const MAG = 6;                                  // shots per magazine (paint or water)
 const mags = { paint: MAG, water: MAG };        // each ammo type has its own magazine
 let pumpT = 0, idleT = 0, reloadT = 0, reloadTo = null, reloadFill = true, aimK = 0, aimWant = false, sgBob = 0, sgLast = null, sgTilt = 0;
-const shellsLeft = () => mags[ammo];
+
 function gunClick(f, d, v) { const C = tsnd.ctx; if (!C) return; const t = C.currentTime, o = C.createOscillator(), g = C.createGain(); o.type = 'square'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v || 0.05, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0005, t + d); o.connect(g); g.connect(C.destination); o.start(t); o.stop(t + d + 0.01); }
 let SG_MATS = null;
 function sgMats() {
@@ -10449,10 +10466,10 @@ function makeHand() {
 // power washer: hold fire to spray a stream of water; it washes paint splats off whatever it hits and scatters pigeons and critters
 function makeWasher() {
   const g = new T.Group(); g.userData.noHit = true;
-  hudPart(g, new T.BoxGeometry(0.05, 0.12, 0.05), hudMat(0x2b2f36), 0.2, -0.24, -0.38).rotation.x = 0.3;          // grip
-  hudPart(g, new T.BoxGeometry(0.07, 0.06, 0.16), hudMat(0xffc531), 0.2, -0.18, -0.44);                            // yellow trigger gun body
-  const lance = hudPart(g, new T.CylinderGeometry(0.008, 0.008, 0.62, 8), hudMat(0xc0c8d0), 0.2, -0.165, -0.82); lance.rotation.x = Math.PI / 2;   // steel lance
-  hudPart(g, new T.CylinderGeometry(0.016, 0.012, 0.05, 10), hudMat(0x1d2a3a), 0.2, -0.165, -1.14).rotation.x = Math.PI / 2;                      // nozzle
+
+
+
+
   g.visible = false; camera.add(g); return g;
 }
 const wash = { t: 0, rayT: 0, drops: null, d: [], snd: null };
@@ -10917,7 +10934,7 @@ function controlsMenu(code, fromTitle) {
     ['Walking (Squeeg mode)', [
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
-      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
+      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
       ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
@@ -10936,13 +10953,13 @@ function controlsMenu(code, fromTitle) {
       ['Pan', 'W A S D / drag', 'Left stick', 'One finger drag'], ['Turn', 'Q / E / right-drag', 'Right stick', 'Two-finger twist'], ['Tilt', 'R / F', 'Right stick', 'Two fingers up / down'],
       ['Zoom', 'Wheel or - / =', 'L2 / R2', 'Pinch or + / −'], ['Open equipment', 'Click it', 'L1 / R1 cycle, A open', 'Tap it'], ['Close a panel', 'Esc', 'B', '✕']]],
     ['Menus', [
-      ['Squeeg / Savior mode', 'button', 'Y (whole plant)', 'Squeeg / Whole plant buttons'], ['Main menu (incl. 2 Player)', 'M', 'Start', '☰'], ['Debug menu (this)', 'H', 'Select', 'small square button'], ['Pause', 'button', '—', '❚❚']]],
+      ['Squeeg / Savior mode', 'button', 'Y (whole plant)', 'Squeeg / Whole plant buttons'], ['Main menu (incl. 2 Player)', 'M', 'Start', '☰'], ['Debug menu', 'H', 'Select', 'small square button'], ['Pause', 'button', '—', '❚❚']]],
   ];
   const td = 'padding:3px 6px;border-bottom:1px solid #e3e7ec;vertical-align:top';
   const html = '<h1>Controls</h1><div style="max-height:60vh;overflow:auto;font-size:12.5px;text-align:left">' + S.map(([title, rows]) =>
     '<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">' + title + '</div><table style="width:100%;border-collapse:collapse"><tr style="color:#5d6b7c"><th style="' + td + ';text-align:left">Action</th><th style="' + td + ';text-align:left">Keyboard / mouse</th><th style="' + td + ';text-align:left">Controller</th><th style="' + td + ';text-align:left">Phone</th></tr>' +
     rows.map(r => '<tr>' + r.map((c, i) => '<td style="' + td + (i ? '' : ';font-weight:bold') + '">' + c + '</td>').join('') + '</tr>').join('') + '</table>').join('') + '</div>';
-  modal(html, fromTitle ? [['Back', null]] : [['Back', () => debugMenu(code)], ['Close', null]], true);
+  modal(html, fromTitle ? [['Back', null]] : [['Back', () => code === 'pause' ? menu() : debugMenu(code)], ['Close', null]], true);
 }
 // ---------- TALKING TO PEOPLE: walk up to someone, look at them, ✋ / E / X. They answer with a line (spoken by the device voice) and you
 // reply by picking a preset phrase, typing anything, or 🎤 saying it out loud (speech recognition: Android's own in the app, the browser's on PC).
@@ -10951,7 +10968,7 @@ const pick = a => a[Math.random() * a.length | 0];
 const coolerSay = () => { const c = P3.cooler; if (!c) return 'Cooler? Ask maintenance.'; const t = Math.round(c.T);
   return c.alarm ? 'Yeast cooler is at ' + t + ' degrees and alarming. ' + (c.open ? 'Somebody left ' + (c.open > 1 ? c.open + ' doors' : 'a door') + ' open. Go shut it.' : 'Doors are shut, it should come back.') : 'Yeast cooler is reading ' + t + ' degrees. That\'s fine. Leave the doors shut.'; };
 const alarmSay = () => { const a = P3.alarms; return a.length ? 'Right now I\'ve got ' + a.length + ' alarm' + (a.length > 1 ? 's' : '') + ': ' + a.map(x => x.desc.replace(/\s+/g, ' ').toLowerCase()).join(', ') + '. Fun day.' : 'Board\'s quiet. No alarms. Don\'t jinx it.'; };
-const wxSay = () => { const el = $('wx'); return 'Out there it\'s ' + (P3.weather || 'sunny') + (el && el.style.display !== 'none' ? ', ' + el.textContent.replace('·', 'with wind') : '') + '. Check the wind sock by the cake house before you mess with ammonia.'; };
+const wxSay = () => { const el = $('wx'); return 'Out there it\'s ' + (P3.weather || 'sunny') + (el && el.style.display !== 'none' ? ', ' + el.textContent.replace('·', 'with wind') : '') + '. Check the wind socks by the wet cake pad and ammonia tank before you mess with ammonia.'; };
 const NPC_DEF = {
   op: { name: 'Rick · Board Op', pitch: 0.8, rate: 1.0,
     hi: ['Army taught me to watch my sector. Now my sector is this board and a cold cup of coffee.', 'If you brought coffee, speak. If you brought an alarm, take a number.', 'Yeah? Make it useful. The plant does not run on conversation.', 'I can watch the DCS and complain at the same time. What do you need?'],
@@ -10998,7 +11015,7 @@ const NPC_DEF = {
       testing: { k: ['test','testing','mycotoxin','mycotoxins','aflatoxin','fumonisin','humidity','moisture','probe','sample','quality'], say: ['Moisture and quality. Mycotoxins when required.', 'We sample the grain and check it against receiving limits.', 'There is a procedure. Go read it.', 'Ask Vern if you want the long version.'], opts: ['Where is Vern?', 'How are the loads looking?'] },
       weight: { k: ['scale','weight','weigh','ticket','paperwork'], say: ['Loaded weight minus empty weight. That is the net.', 'I handle the inbound weights and tickets.'], opts: ['What do you test for?', 'Bye.'] },
       vern: { k: ['vern','grain guys','grain receiving','sent me','who should i ask'], say: ['Vern is over at grain receiving. Go ask him.', 'He has been here forever. He knows.', 'Ask Vern. If he talks, listen.'], opts: ['Bye.'] },
-      late: { k: ['late','ride','boyfriend','car','pink car','drive','driving'], say: ['My boyfriend gives me a ride. Why?', 'I got here, did\'t I?', 'That pink car is not mine.'], opts: ['Bye.'] },
+      late: { k: ['late','ride','boyfriend','car','pink car','drive','driving'], say: ['My boyfriend gives me a ride. Why?', 'I got here, didn\'t I?', 'That pink car is not mine.'], opts: ['Bye.'] },
       rick: { k: ['rick','board operator','control room'], say: ['Rick is in the control room. Ask him about process.', 'He can answer that. I have trucks.'], opts: ['Bye.'] },
       tammy: { k: ['tammy','outbound'], say: ['Tammy handles outbound. I handle inbound.', 'Go see Tammy if it is leaving the plant.'], opts: ['Bye.'] },
       thanks: { k: ['thanks','thank you','thx'], say: ['Yep.', 'Sure.', 'Mm-hm.'], opts: ['Bye.'] },
@@ -11531,7 +11548,7 @@ function frameBody(now) {
     deathT = 4.2; document.body.classList.add('dead');
     try { if (window.Android && Android.vibrate) Android.vibrate(300); else if (navigator.vibrate) navigator.vibrate(300); } catch (e) {}
     if (P3.walking) toggleWalk();
-    const msg = hit === 'pond' ? 'Squeeg waded into the retention pond. Toxic water!' : hit === 'train' ? 'Squeeg got run over by the train.' : hit === 'fall' ? 'Fell too far.' : hit === 'paint' ? 'Squeeg got tagged by the other player!' : hit === 'ammonia' ? 'Squeeg breathed in anhydrous ammonia. Stay upwind of a leak and shut that valve!' : hit === 'acid' ? 'Squeeg walked through sulfuric acid. Stay out of the containment when it leaks!' : 'Squeeg got run over by a semi.';
+    const msg = hit === 'pond' ? 'Squeeg waded into the retention pond. Toxic water!' : hit === 'train' ? 'Squeeg got run over by the train.' : hit === 'fall' ? 'Fell too far.' : hit === 'paint' ? 'Squeeg got tagged by the other player!' : hit === 'mower' ? 'Squeeg got mowed down by the other player!' : hit === 'ammonia' ? 'Squeeg breathed in anhydrous ammonia. Stay upwind of a leak and shut that valve!' : hit === 'acid' ? 'Squeeg walked through sulfuric acid. Stay out of the containment when it leaks!' : 'Squeeg got run over by a semi.';
     { const f = $('fired'); const caps = hit === 'pond' ? ['POISONED', 'SLIMED OUT', 'MELTED', 'DISSOLVED', 'MUTATED'] : hit === 'acid' ? ['ACID BATH', 'BOOTS DISSOLVED', 'CHEMICAL BURN', 'READ THE SDS', 'SHOULD HAVE WORN RUBBER BOOTS'] : hit === 'ammonia' ? ['GASSED', 'LUNGS SEARED', 'NH3 EXPOSURE', 'SHOULD HAVE WORN A RESPIRATOR', 'EVACUATE UPWIND', 'IDLH EXCEEDED'] : ['FIRED', 'YOU HAVE BEEN LET GO', 'LAME!', 'INCIDENT REPORT FILED', 'OSHA HAS BEEN NOTIFIED', 'RECORDABLE INJURY'];
       f.textContent = caps[Math.random() * caps.length | 0]; f.classList.toggle('slime', hit === 'pond'); f.classList.toggle('gas', hit === 'ammonia'); setTimeout(() => f.classList.add('on'), 1300); setTimeout(() => f.classList.remove('on'), 4300); }   // GTA-style "WASTED"
     setTimeout(() => { $('squish').classList.add('on'); }, 4200);
@@ -11541,7 +11558,7 @@ function frameBody(now) {
   if (deathT > 0) deathT -= dt;
   try { P3.update(sim, sdt, evs); } catch (e) { if (!window.__sceneErr) { window.__sceneErr = 1; if (window.__showErr) __showErr('3D: ' + (e && e.message)); } }
   const panelW = $('panel').classList.contains('open') ? $('panel').offsetWidth : 0;
-  for (const id in labels) {
+  if ($('labels').offsetParent) for (const id in labels) {
     const p = P3.project(id), el = labels[id];
     const hide = !p.vis || p.x < 20 || p.y < 56 || p.x > window.innerWidth - panelW - 20 || p.y > window.innerHeight - 10;
     el.style.display = hide ? 'none' : '';
@@ -11550,7 +11567,7 @@ function frameBody(now) {
   uiT += dt;
   if (uiT > 0.2) {
     uiT = 0; updateOuts(); refreshPanel(); setTxt($('birdCount'), '🐦 ' + P3.pigeonHits + (P3.critterHits ? ' · 🐀 ' + P3.critterHits : ''));
-    for (const id in labels) { const s = Sim.stationStatus(sim, id); setCls(labels[id].querySelector('.dot'), 'dot ' + (s === 'good' ? '' : s)); }
+    if ($('labels').offsetParent) for (const id in labels) { const s = Sim.stationStatus(sim, id); setCls(labels[id].querySelector('.dot'), 'dot ' + (s === 'good' ? '' : s)); }
   }
   { const a = P3.nh3 || 0, el = $('nh3'); if (el.dataset.a !== a.toFixed(2)) { el.dataset.a = a.toFixed(2); el.style.opacity = Math.min(0.92, a * 1.1); view.style.filter = a > 0.15 ? 'blur(' + ((a - 0.15) * 4).toFixed(1) + 'px)' : ''; } }   // ammonia: eyes burn and water
   { const t = P3.toxic || 0, el = $('toxic'); if (el.dataset.t !== t.toFixed(2)) { el.dataset.t = t.toFixed(2); el.style.opacity = Math.min(0.75, t * t * 0.75 + t * 0.1); } }   // pond poison: screen goes green

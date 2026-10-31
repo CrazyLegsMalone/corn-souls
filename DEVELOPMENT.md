@@ -298,6 +298,14 @@ Copy/update this section at the end of each work session:
 - **Recommended next step:**
 
 ## Important
+### 2026-10-30 — LIVE promotion to Alpha v1.98
+- Owner requested updating the live game. Promote the complete TEST v1.97.17 game and launcher behavior from commit `02dfbe9`, including subsequent methanator sign removal. This uses the latest test layout, including centered offices and the straight east wall; it does not recreate the earlier superseded satellite-layout draft.
+- Preserve LIVE manifest/install identity and root URL. Adapt the tested launcher to root asset paths, Alpha labels and LIVE-only update checks; bump LIVE service-worker cache to v7 while retaining its offline fallback and exclusion of `/test/`. Add a LIVE-only refresh page; publish `version.json` 1.98. TEST files remain independent.
+- Promote sound-menu and developer-inbox fixes with LIVE inbox links/configuration paths. Keep all existing models and gameplay patches.
+- Backup: local Git branch `backup/pre-live-1.98` at `02dfbe9`; full source ZIP saved outside the repository as `corn-souls-before-live-1.98.zip`.
+- Passed: real Three.js layout construction before promotion; LIVE launcher execution and generated-script parsing; Rick menus/context/variation and NPC parity; traffic/HUD/car boost/dead wildlife interactions; windsocks; extinguisher; sound; acid; cooler door audio; note-sharing suites; diff whitespace check.
+- Existing `validate-inbox.cjs` fails because its mock lacks `window` for the already-existing page navigation in `inboxOpen`; no new inbox routing change. Browser walkthrough, Android and two-player network play were not performed for this promotion. Browser origin approval remained unavailable in this chat.
+
 GitHub synchronizes committed files, **not** assistant conversations or uncommitted edits. Always fetch the latest state before continuing. If a user has uncommitted local work, request it before editing overlapping files.
 
 ## TEST v1.97.12 — satellite west-wing proportions (2026-10-30)
