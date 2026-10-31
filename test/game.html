@@ -4669,7 +4669,7 @@ function groundTex(kind) {
     blot(['#8a6a47', '#7d5f3f'], 260, 1.5, 4, 0.55);                     // clods
     blot(['#c9b393', '#bfa784', '#d6c5a8'], 320, 0.8, 2.2, 0.75);       // pebbles
     blot(['#6f5538'], 120, 0.6, 1.4, 0.6);                               // dark grit
-    c.strokeStyle = 'rgba(120,92,62,.18)'; c.lineWidth = 7; for (const y of [70, 170]) { c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(90, y + 12, 170, y - 10, N, y); c.stroke(); }   // faint ruts
+    c.strokeStyle = 'rgba(120,92,62,.18)'; c.lineWidth = 7; for (const y of [70, 170]) { c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(90, y + 12, 170, y - 10, N, y); c.stroke(); } } else if (kind === 'asphalt') { c.fillStyle = '#474c53'; c.fillRect(0, 0, N, N); blot(['#3e434a', '#50565e', '#42474e'], 48, 16, 42, 0.4); blot(['#646b74', '#727982', '#353940'], 520, 0.7, 1.9, 0.65); blot(['#2c3036'], 180, 0.6, 1.5, 0.5); } else if (kind === 'dirtroad') { c.fillStyle = '#9b7f5d'; c.fillRect(0, 0, N, N); blot(['#8f7250', '#ab8f6c', '#846847'], 45, 16, 42, 0.42); blot(['#c7b293', '#d4c3a8', '#785d3f'], 460, 0.8, 2.3, 0.75); c.strokeStyle = 'rgba(95,72,46,.26)'; c.lineWidth = 10; for (const y of [68, 188]) { c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(85, y + 8, 175, y - 8, N, y); c.stroke(); }   // faint ruts
   } else {
     c.fillStyle = '#76bd62'; c.fillRect(0, 0, N, N);
     blot(['#6cb259', '#82c76d', '#70b85c'], 50, 16, 44, 0.4);           // mottling
@@ -4682,7 +4682,7 @@ function groundTex(kind) {
 }
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
   const t = groundTex(kind).clone(); t.needsUpdate = true; if (worldUV) t.repeat.set(1 / 8, 1 / 8); else t.repeat.set(w / 8, d / 8);
-  return new T.MeshLambertMaterial({ map: t });
+  return new T.MeshLambertMaterial({ map: t, polygonOffset: kind !== 'grass', polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -4958,10 +4958,10 @@ function init(container) {
     add(new T.ShapeGeometry(g), groundMat('grass', true), 0, 0, 0, null, true).rotation.x = -Math.PI / 2;
   }
   scene.children[scene.children.length - 1].receiveShadow = true;
-  const pad = (x, z, w, d, c) => { const p = add(new T.BoxGeometry(w, 0.16, d), mat(c), x, 0.12, z, null); p.castShadow = false; };
+  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat(c), x, 0.015, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
-  { const p = add(new T.BoxGeometry(EXR - WXR, 0.1, SZR - NROAD), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.05, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
-  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.1, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
+  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.01, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
+  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.01, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
     // the pit itself: four sloped sides and a flat bottom, one mesh; walkable (ramps), and the ground over it is cut away
     const r = P.run, D = -P.d, O = [[P.x0, P.z0], [P.x1, P.z0], [P.x1, P.z1], [P.x0, P.z1]], I = [[P.x0 + r, P.z0 + r], [P.x1 - r, P.z0 + r], [P.x1 - r, P.z1 - r], [P.x0 + r, P.z1 - r]];
     const v = [], quad = (a, b, c, d) => v.push(...a, ...b, ...c, ...a, ...c, ...d);
@@ -4980,30 +4980,30 @@ function init(container) {
     const s = STATIONS[st], c = new T.Color(s.color).lerp(new T.Color(0xffffff), 0.55);
     const size = { receiving: [64, 58], milling: [22, 28], slurry: [35, 30], cook: [30, 24], ferm: [48, 78], dist: [26, 22], storage: [58, 72] }[st];
     const at = { receiving: [-175 + GDX, GDZ], milling: [-131 + GDX, -2 + GDZ], slurry: [-76.5, -0.5], cook: [-44, 2] }[st] || [s.pos[0], s.pos[2]];
-    if (st === 'receiving') { const p = add(holeySlab(at[0] - size[0] / 2, at[1] - size[1] / 2, at[0] + size[0] / 2, at[1] + size[1] / 2, 0.16, [...RPITS, RSTAIR].map(([x, z, w, d]) => [x + GDX, z + GDZ, w, d])), mat(c.getHex()), 0, 0.04, 0, null); p.castShadow = false; continue; }
+    if (st === 'receiving') { const p = add(holeySlab(at[0] - size[0] / 2, at[1] - size[1] / 2, at[0] + size[0] / 2, at[1] + size[1] / 2, 0.012, [...RPITS, RSTAIR].map(([x, z, w, d]) => [x + GDX, z + GDZ, w, d])), mat(c.getHex()), 0, 0.005, 0, null); p.castShadow = false; continue; }
     pad(at[0], at[1], size[0], size[1], c.getHex());
   }
   // ---------- ROADS: a loop around the plant (north, south, east, west), a middle north-south road, and a cross road
   // south of the cook building. All trucks enter and leave at the northeast corner. A short road runs south past the tank farm.
   {
     const asphalt = mat(0x50555c), dash = mat(0xffffff), RW = 8, RC = 12, SRW = 10.7;
-    const rd = (x0, z0, x1, z1, W = RW) => {
+    const rd = (x0, z0, x1, z1, W = RW, kind = 'asphalt') => {
       const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-      const r = add(new T.BoxGeometry(alongX ? len : W, 0.2, alongX ? W : len), asphalt, (x0 + x1) / 2, 0.11, (z0 + z1) / 2, null); r.castShadow = false;
-      for (let t = 6; t < len - 6; t += 8) box(alongX ? 4 : 0.4, 0.22, alongX ? 0.4 : 4, dash, alongX ? Math.min(x0, x1) + t : x0, 0.12, alongX ? z0 : Math.min(z0, z1) + t);
+      const rw = alongX ? len : W, rd2 = alongX ? W : len, r = add(new T.PlaneGeometry(rw, rd2).rotateX(-Math.PI / 2), groundMat(kind, false, rw, rd2), (x0 + x1) / 2, 0.024, (z0 + z1) / 2, null); r.castShadow = false;
+      if (kind === 'asphalt') for (let t = 6; t < len - 6; t += 8) add(new T.PlaneGeometry(alongX ? 4 : 0.25, alongX ? 0.25 : 4).rotateX(-Math.PI / 2), dash, alongX ? Math.min(x0, x1) + t : x0, 0.03, alongX ? z0 : Math.min(z0, z1) + t, null, true);
     };
     rd(-235, NROAD, 245, NROAD);                              // north road, continuing east out the NE entrance (west end meets the grain yard roads)
     rd(-235, SZR, EXR - RC, SZR, SRW);                        // south road, 35 paces (~10.7 m) wide (paced) (west end meets the grain yard roads)
     rd(EXR, NROAD, EXR, SZR - RC);                            // east road
     rd(MXR, NROAD, MXR, SZR);                                 // middle road
-    { const r = add(new T.BoxGeometry(EXR - MXR, 0.2, 7.6), mat(0xa3a39c), (MXR + EXR) / 2, 0.11, CZR, null); r.castShadow = false; }   // cross road: plain concrete, 25 paces wide, no lines, just south of the CMT berm
-    const corner = (cx, cz, start, W = RW) => { const r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), asphalt, cx, 0.21, cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
+    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('dirtroad', false, EXR - MXR, 7.6), (MXR + EXR) / 2, 0.024, CZR, null); r.castShadow = false; }   // cross road: flat dirt/gravel road, 25 paces wide, just south of the CMT berm
+    const corner = (cx, cz, start, W = RW, kind = 'asphalt') => { const d = (RC + W / 2) * 2, r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), groundMat(kind, false, d, d), cx, 0.024, cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
     corner(EXR - RC, SZR - RC, -Math.PI / 2, SRW);                 // rounded SE corner of the plant loop
     // road around the tank farm: south on the east side, west along the south side, north on the west side back to the south road
     const tfE = TFX + TFW / 2 + 6, tfW = TFX - TFW / 2 - 6, tfS = TFZ + TFD / 2 + 6;
-    rd(tfE, SZR, tfE, tfS - RC); rd(tfE - RC, tfS, tfW + RC, tfS); rd(tfW, tfS - RC, tfW, SZR);
+    rd(tfE, SZR, tfE, tfS - RC, RW, 'dirtroad'); rd(tfE - RC, tfS, tfW + RC, tfS, RW, 'dirtroad'); rd(tfW, tfS - RC, tfW, SZR, RW, 'dirtroad');
     if (tfW < WXR) rd(tfW, SZR, WXR, SZR, SRW);                     // south road runs on west to meet the tank farm's west road
-    corner(tfE - RC, tfS - RC, -Math.PI / 2); corner(tfW + RC, tfS - RC, Math.PI);
+    corner(tfE - RC, tfS - RC, -Math.PI / 2, RW, 'dirtroad'); corner(tfW + RC, tfS - RC, Math.PI, RW, 'dirtroad');
   }
 
 
@@ -5065,13 +5065,13 @@ function init(container) {
       G(SX0, SZ0, SX1, SZ0, -20, -0.6);                                                                       // stairwell north end, below the floor
     }
     // lane markings through the building
-    for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) box(0.3, 0.05, 2.4, mat(0xffffff), x, 0.27, z);
+    for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) add(new T.PlaneGeometry(0.3, 2.4).rotateX(-Math.PI / 2), mat(0xffffff), x, 0.03, z, null, true);
   }
   // access roads: full trucks arrive from the east on the north road, empties leave south onto the main road
-  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.BoxGeometry(18, 0.21, z1 - z0), mat(0x50555c), -182, 0.1, (z0 + z1) / 2, null); r.castShadow = false; }
+  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.PlaneGeometry(18, z1 - z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 18, z1 - z0), -182, 0.024, (z0 + z1) / 2, null); r.castShadow = false; }
   // north-south bypass road between the receiving elevators and the silos, so traffic can go around Pit 1 and Pit 2
-  { const r = add(new T.BoxGeometry(8, 0.21, SZR - NROAD), mat(0x50555c), WXR - GDX, 0.1, (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
-  for (let z = NROAD + 6; z < SZR - 6; z += 6) box(0.35, 0.23, 3, mat(0xffd84d), WXR - GDX, 0.12, z - GDZ);
+  { const r = add(new T.PlaneGeometry(8, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('asphalt', false, 8, SZR - NROAD), WXR - GDX, 0.024, (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
+  for (let z = NROAD + 6; z < SZR - 6; z += 6) add(new T.PlaneGeometry(0.3, 3).rotateX(-Math.PI / 2), mat(0xffd84d), WXR - GDX, 0.03, z - GDZ, null, true);
 
   // bucket elevators: pit -> boot (in-floor drag conveyor) -> up the leg -> shared distributor head -> spout to Silo 1 or Silo 2
   const EH = SILOH + SILOR * 0.45 + 6, EX = -169;
@@ -5911,7 +5911,7 @@ function init(container) {
       wall(BEX, BNZ, BEX, BSZ, PH, wm, [[BEX - BEX + (BSZ - 2.4 - 1.0 - BNZ), 2.0, 0, ['FERM MCC', 'OUTSIDE']], [BSZ - 8.7 - BNZ, 3.05, 3.3]], { trim: true, leaf: -1 });
       O.swingDoors.slice(-2).forEach(d => { d.g.children[0].material = mat(0x2f5a3a); });   // green leaves (photo)
       rollDoor(BEX + 0.05, BSZ - 8.7, false, 3.05, 3.3, -1, 'mesh', 1);   // into the process building; bollards outside
-      wall(BEX, BSZ, MX1, BSZ, PH, wm, [], { trim: true });
+      wall(BEX, BSZ, MX1, BSZ, PH, wm, [[13.6 - BEX, 1.74, 2.5, null, true]], { trim: true });
       add(new T.BoxGeometry(MX1 - FXE + 0.3, 0.3, SZ + 10 + 0.3), roofM, (FXE + MX1) / 2, PH + 0.15, (SZ - 10) / 2, null, true);
       add(new T.BoxGeometry(BEX - FXE + 0.3, 0.3, -10 - BNZ), roofM, (FXE + BEX) / 2, PH + 0.15, (BNZ - 10) / 2, null, true);
       add(new T.BoxGeometry(MX1 - BEX, 0.3, -10 - BSZ), roofM, (BEX + MX1) / 2, PH + 0.15, (BSZ - 10) / 2, null, true);
@@ -6049,20 +6049,20 @@ function init(container) {
       // between #3 and #4 on the north side. Out of service: not connected to anything, kept as landmarks (empty, tagged OUT OF SERVICE).
       { const OX = 13.6, OZ = BSZ - 8.7, SP = 4.9, CR = 1.75, TH = 14;   // placed from the satellite photo: in the notch just east of Ferm 1, north of the building
         const band = new T.CylinderGeometry(CR + 0.03, CR + 0.03, 0.08, 20, 1, true), bandM = mat(0xe4e8eb), manM = mat(0x9ea4aa);
-        for (const dx of [-0.5, 0.5]) for (const dz of [-0.5, 0.5]) { const x = OX + dx * SP, z = OZ + dz * SP, n = (dz < 0 ? 2 : 0) + (dx < 0 ? 1 : 2);
+        for (const dx of [-0.5, 0.5]) for (const dz of [-0.5, 0.5]) { const x = OX + dx * SP, z = OZ + dz * SP, n = (dz < 0 ? 2 : 0) + (dx < 0 ? 1 : 2), inS = dx < 0 ? 1 : -1;
           tank(x, z, CR, TH, 0xb4bac0, 0xd9a441, null, { level: 0.001, top: 0xc9ced3, flat: true });
           for (let y = 1.2; y < TH; y += 1.25) { const b = new T.Mesh(band, bandM); b.position.set(x, y, z); scene.add(b); }
-          const mw = add(new T.CylinderGeometry(0.42, 0.42, 0.14, 14), manM, x + dx * 2 * (CR + 0.05), 0.9, z, null); mw.rotation.z = Math.PI / 2;   // manway on the outer side
-          nameplate('TS-1050' + (3 + n) + '|METHANATOR #' + n, x, 2.2, z, CR, dx < 0 ? -1 : 1, 0); extraCols.push([x, z, CR + 0.15]); }
+          const mw = add(new T.CylinderGeometry(0.36, 0.36, 0.22, 16), manM, x + inS * (CR + 0.05), 1.0, z, null); mw.rotation.z = Math.PI / 2; const pf = add(new T.CylinderGeometry(0.44, 0.44, 0.045, 16), mat(0x7d848b), x + inS * (CR + 0.17), 1.0, z, null); pf.rotation.z = Math.PI / 2; for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, bt = add(new T.CylinderGeometry(0.02, 0.02, 0.08, 6), mat(0x4a5056), x + inS * (CR + 0.17), 1.0 + Math.cos(a) * 0.38, z + Math.sin(a) * 0.38, null); bt.rotation.z = Math.PI / 2; }   // inner manway + bolted pancake blind flange protruding into the hallway
+          nameplate('TS-1050' + (3 + n) + '|METHANATOR #' + n, x, 2.2, z, CR, dx < 0 ? -1 : 1, 0); extraCols.push([x, z, CR]); }
         { // pump house between #3 and #4 (photo facing south): white vertical-panel shed with green corner trim, gable roof with white fascia,
           // green door with a big window and a NOTICE (hard hats + eye protection) sign, V-shaped FIRE EXTINGUISHER sign + extinguisher to its left, two vent pipes behind the roof
-          const px = OX, pz = OZ - SP / 2 - 0.5, W = 1.9, D = 2.4, H = 2.6, fz = pz - D / 2;
+          const px = OX, fz = OZ - SP / 2 - 1.7, D = BSZ - fz, pz = (fz + BSZ) / 2, W = 1.9, H = 2.6;
           const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#e6e6df'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#c4c5bd'; for (let k = 0; k < 4; k++) c.fillRect(k * 16, 0, 2, 64);
           const sid = new T.CanvasTexture(cv); sid.wrapS = T.RepeatWrapping; sid.repeat.x = 3;
           const sm = new T.MeshLambertMaterial({ map: sid }), DX0 = px - 0.08 - 0.47, DX1 = px - 0.08 + 0.47;   // hollow now: walls with a doorway, so the door can open
-          box(W, H, 0.08, sm, px, H / 2, pz + D / 2); for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
+          for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
           box(DX0 - (px - W / 2), H, 0.08, sm, (px - W / 2 + DX0) / 2, H / 2, fz); box(px + W / 2 - DX1, H, 0.08, sm, (DX1 + px + W / 2) / 2, H / 2, fz); box(DX1 - DX0, H - 2.15, 0.08, sm, px - 0.08, (H + 2.15) / 2, fz);
-          box(W - 0.1, 0.06, D - 0.1, mat(0x8d9196), px, 0.03, pz); pumpSet(px - 0.35, pz + 0.45, 'x', 1, null, 0.32);   // concrete floor + a small pump inside
+          box(W - 0.06, 0.14, D, mat(0x8d9196), px, 0.1, pz); for (const lz of [fz + 3.5, fz + 9.0]) box(0.35, 0.06, 1.1, new T.MeshBasicMaterial({ color: 0xfff5d6 }), px, H - 0.05, lz);   // concrete floor + hallway ceiling lights
           const grn = mat(0x23584a), wht = mat(0xf0f0ea);
           for (const sx of [-1, 1]) box(0.1, H, 0.1, grn, px + sx * (W / 2 + 0.01), H / 2, fz + 0.04);                       // green corner trim
           const sh = new T.Shape([new T.Vector2(-W / 2, 0), new T.Vector2(W / 2, 0), new T.Vector2(0, 0.6)]);
@@ -6084,8 +6084,8 @@ function init(container) {
             'FIRE'.split('').forEach((ch, k) => c2.fillText(ch, Wd / 2, 28 + k * 22)); c2.font = 'bold 15px Arial'; 'EXTINGUISHER'.split('').forEach((ch, k) => c2.fillText(ch, Wd / 2, 130 + k * 17)); };
           for (const sx of [-1, 1]) pl(ext, 0.09, 0.4, px + 0.62 + sx * 0.035, 1.65, fz - 0.06, Math.PI + sx * 0.6);        // V-shaped (two-sided) sign
           add(new T.CylinderGeometry(0.09, 0.09, 0.5, 10), mat(0xc8211c), px + 0.62, 0.72, fz - 0.12); box(0.1, 0.07, 0.1, mat(0x222222), px + 0.62, 1.0, fz - 0.12);
-          for (const sx of [-0.35, 0.35]) { add(new T.CylinderGeometry(0.08, 0.08, 1.4, 8), mat(0x50555a), px + sx, H + 0.5, pz + 0.6); add(new T.CylinderGeometry(0.1, 0.1, 0.12, 8), mat(0x3a3e42), px + sx, H + 1.2, pz + 0.6); }   // vent pipes
-          wallSegs.push([px - W / 2, fz, DX0, fz], [DX1, fz, px + W / 2, fz], [px - W / 2, fz, px - W / 2, pz + D / 2], [px + W / 2, fz, px + W / 2, pz + D / 2], [px - W / 2, pz + D / 2, px + W / 2, pz + D / 2]); }
+          for (const sx of [-0.35, 0.35]) { add(new T.CylinderGeometry(0.08, 0.08, 1.4, 8), mat(0x50555a), px + sx, H + 0.5, fz + 1.8); add(new T.CylinderGeometry(0.1, 0.1, 0.12, 8), mat(0x3a3e42), px + sx, H + 1.2, fz + 1.8); }   // vent pipes
+          wallSegs.push([px - W / 2, fz, DX0, fz], [DX1, fz, px + W / 2, fz], [px - W / 2, fz, px - W / 2, BSZ], [px + W / 2, fz, px + W / 2, BSZ]); }
         { // 4 CORN OIL TANKS (photos + nameplate: 8 ft dia x 23 ft straight wall, 8,800 gal, all identical): insulated ribbed stainless shells with bands,
           // cone bottoms on four steel legs, in a yellow containment curb 13.5 paces (~4.1 m) east of the process building wall; yellow railed tops joined by
           // a platform, caged ladders (west of #2, east of #4). Layout: #2 NW, #3 NE, #1 SW, #4 SE. Not connected yet.
@@ -6304,11 +6304,11 @@ function init(container) {
   // unisex restroom, safety office, computer-training room. West end: open area with snack + soda machines and the glass entrance
   // doors facing west, with steps and a wheelchair ramp.
   {
-    const er = add(new T.BoxGeometry(245 - (EXR - 4), 0.2, 8), mat(0x50555c), (245 + EXR - 4) / 2, 0.11, SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
-    for (let x = EXR + 8; x < 240; x += 10) box(3, 0.22, 0.25, mat(0xffffff), x, 0.12, SCZ_OUT);                       // dashes
+    const ew = 245 - (EXR - 4), er = add(new T.PlaneGeometry(ew, 8).rotateX(-Math.PI / 2), groundMat('asphalt', false, ew, 8), (245 + EXR - 4) / 2, 0.024, SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
+    for (let x = EXR + 8; x < 240; x += 10) add(new T.PlaneGeometry(3, 0.25).rotateX(-Math.PI / 2), mat(0xffffff), x, 0.03, SCZ_OUT, null, true);                       // dashes
     for (const [x, z] of [[SCXI, SCZ_IN], [SCXO, SCZ_OUT_L]]) {   // each scale in the lane right beside the scale house, so the driver's window lines up with the drive-through window
-      box(21.3, 0.32, 3.6, mat(0x7d838a), x, 0.16, z);                                                                 // 70 ft truck scale deck
-      for (const dz of [-1.85, 1.85]) box(21.3, 0.34, 0.12, mat(0xf2c200), x, 0.17, z + dz);                          // yellow edges
+      box(21.3, 0.08, 3.6, mat(0x7d838a), x, 0.04, z);                                                                 // 70 ft truck scale deck
+      for (const dz of [-1.85, 1.85]) box(21.3, 0.1, 0.12, mat(0xf2c200), x, 0.05, z + dz);                          // yellow edges
     }
     const SH0 = scene.children.length, SHW = wallSegs.length, SHS = WALK_SURF.length, SHD = (O.swingDoors || []).length;   // everything after this moves east with the road
     const X0 = 56, X1 = 90, ZN = NROAD + 4.5, ZS = SCZ_OUT - 4.5, FY = 0.3, H = 3.2, HZ = (ZN + ZS) / 2;   // building outline, floor height
@@ -6544,19 +6544,19 @@ function init(container) {
   // and from the east road (west side); curb all around, rows of painted stalls with drive aisles between them.
   {
     const X0 = 54 + SH_DX, X1 = 114 + SH_DX, Z0 = SCZ_OUT + 5, Z1 = -48, asph = mat(0x50555c), curb = mat(0xb5b0a6);
-    const lot = add(new T.BoxGeometry(X1 - X0, 0.2, Z1 - Z0), asph, (X0 + X1) / 2, 0.105, (Z0 + Z1) / 2, null); lot.castShadow = false;
+    const lot = add(new T.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X1 - X0, Z1 - Z0), (X0 + X1) / 2, 0.024, (Z0 + Z1) / 2, null); lot.castShadow = false;
     const AX0 = 56 + SH_DX, AX1 = 63 + SH_DX, BZ0 = -66.3, BZ1 = -59.7;                                                      // driveway openings
-    const drA = add(new T.BoxGeometry(AX1 - AX0, 0.2, Z0 - (SCZ_OUT + 4) + 0.2), asph, (AX0 + AX1) / 2, 0.105, (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
-    const drB = add(new T.BoxGeometry(X0 - (EXR + 4) + 0.2, 0.2, BZ1 - BZ0), asph, (X0 + EXR + 4) / 2, 0.105, (BZ0 + BZ1) / 2, null); drB.castShadow = false;
-    const cb = (x0, z0, x1, z1) => { if (Math.abs(x1 - x0) > 0.01 || Math.abs(z1 - z0) > 0.01) box(Math.max(0.3, Math.abs(x1 - x0)), 0.18, Math.max(0.3, Math.abs(z1 - z0)), curb, (x0 + x1) / 2, 0.2, (z0 + z1) / 2); };
+    const drA = add(new T.PlaneGeometry(AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2).rotateX(-Math.PI / 2), groundMat('asphalt', false, AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2), (AX0 + AX1) / 2, 0.024, (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
+    const drB = add(new T.PlaneGeometry(X0 - (EXR + 4) + 0.2, BZ1 - BZ0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X0 - (EXR + 4) + 0.2, BZ1 - BZ0), (X0 + EXR + 4) / 2, 0.024, (BZ0 + BZ1) / 2, null); drB.castShadow = false;
+    const cb = (x0, z0, x1, z1) => { if (Math.abs(x1 - x0) > 0.01 || Math.abs(z1 - z0) > 0.01) box(Math.max(0.3, Math.abs(x1 - x0)), 0.1, Math.max(0.3, Math.abs(z1 - z0)), curb, (x0 + x1) / 2, 0.05, (z0 + z1) / 2); };
     cb(X0, Z0, AX0, Z0); cb(AX1, Z0, X1, Z0);                // north curb, gap for driveway A
     cb(X0, Z0, X0, BZ0); cb(X0, BZ1, X0, Z1);                // west curb, gap for driveway B
     cb(X1, Z0, X1, Z1); cb(X0, Z1, X1, Z1);                  // east + south curbs
     // stall lines (instanced): rows of 2.7 m x 5.5 m stalls along x, starting past a cross aisle by the driveways
     const rows = [0.3, 12.8, 18.3, 30.8, 36.3, 48.8].map(r => Z0 + r);   // top edge of each stall row (z): single row by the north curb, then back-to-back pairs, 7 m drive aisles between
-    const SX0 = 66 + SH_DX; extStation(SX0 - 1.6, 0.2, rows[0] + 1.0, Math.PI / 2);
+    const SX0 = 66 + SH_DX; extStation(SX0 - 1.6, 0.025, rows[0] + 1.0, Math.PI / 2);
     const n = Math.floor((X1 - 0.5 - SX0) / 2.7) + 1, lines = new T.InstancedMesh(new T.BoxGeometry(0.12, 0.02, 5.5), mat(0xffffff), rows.length * n);
-    let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, 0.22, rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
+    let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, 0.032, rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
     lines.count = k; lines.userData.noHit = true; scene.add(lines);
     // five employees' vehicles parked in stalls, very simple: body, cabin, windows, wheels (nose in toward the stall's back)
     const car = (kind, col, si, ri) => {
@@ -6568,7 +6568,7 @@ function init(container) {
       P(W - 0.1, CH * 0.7, CL - 0.25, 0x3a4a5a, 0, 0.35 + BH + CH * 0.45, CO * flip);   // windows (dark glass band)
       if (kind === 'pickup') P(W - 0.1, 0.12, 1.9, 0x2b2f36, 0, 0.35 + BH + 0.06, -1.6 * flip);   // bed liner
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new T.Mesh(new T.CylinderGeometry(0.34, 0.34, 0.24, 10).rotateZ(Math.PI / 2), mat(0x1e1f22)); w.position.set(sx * (W / 2 - 0.08), 0.34, sz * (L / 2 - 0.85)); g.add(w); }
-      g.position.set(x, 0.2, z); g.userData.noHit = false; scene.add(g); regVehBox(g);
+      g.position.set(x, 0.025, z); g.userData.noHit = false; scene.add(g); regVehBox(g);
       extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);       // solid to walk into
     };
     // a forest green Jeep Gladiator (crew-cab pickup): same simple boxes, but tall, square, black hardtop + fender flares, 7-slot grille, round lights
@@ -6587,7 +6587,7 @@ function init(container) {
       for (const wz of [1.85, -1.65]) { for (const sx of [-1, 1]) {
         P(0.16, 0.12, 1.2, blk, sx * (W / 2 + 0.05), 0.9, wz);   // fender flares (arched over the tires)
         const w = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.3, 12).rotateZ(Math.PI / 2), mat(0x1e1f22)); w.position.set(sx * (W / 2 - 0.05), 0.42, wz * f); g.add(w); } }
-      g.position.set(x, 0.2, z); scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
+      g.position.set(x, 0.025, z); scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
     };
     // a black 2017 Chevy Equinox (compact crossover): one side-profile shape pushed out to the car's width (sloped hood, raked windshield
     // and hatch), dark glass, Chevy split grille with a chrome bar and gold bowtie, swept headlights, roof rails, black wheel-arch cladding
@@ -6609,10 +6609,10 @@ function init(container) {
         P(0.06, 0.1, 0.95, 0x15171a, sx * (W / 2 + 0.01), 0.76, wz);                                           // wheel-arch cladding
         const w = new T.Mesh(new T.CylinderGeometry(0.36, 0.36, 0.24, 12).rotateZ(Math.PI / 2), mat(0x1e1f22)); w.position.set(sx * (W / 2 - 0.08), 0.36, wz); g.add(w);
         const hub = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.02, 10).rotateZ(Math.PI / 2), mat(0xaeb3b8)); hub.position.set(sx * (W / 2 + 0.045), 0.36, wz); g.add(hub); }
-      g.position.set(x, 0.2, z); g.rotation.y = ri % 2 ? Math.PI : 0; scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
+      g.position.set(x, 0.025, z); g.rotation.y = ri % 2 ? Math.PI : 0; scene.add(g); regVehBox(g); extraCols.push([x, z - 1.2, 1.0], [x, z + 1.2, 1.0]);
     };
     // shared bits for the profile-shape vehicles: a side profile (z forward, y up) pushed out to width w; boxes; wheels with hubs
-    const veh = (si, ri, at) => { const g = new T.Group(), x = at ? at[0] : SX0 + 1.35 + si * 2.7, z = at ? at[1] : rows[ri] + 2.75, ry = at ? at[2] : ri % 2 ? Math.PI : 0, gy = at ? 0 : 0.2;   // at = [x, z, heading] for vehicles parked outside the lot
+    const veh = (si, ri, at) => { const g = new T.Group(), x = at ? at[0] : SX0 + 1.35 + si * 2.7, z = at ? at[1] : rows[ri] + 2.75, ry = at ? at[2] : ri % 2 ? Math.PI : 0, gy = at ? 0 : 0.025;   // at = [x, z, heading] for vehicles parked outside the lot
       return { g, x, z,
         side: (pts, w, c) => { const sh = new T.Shape(pts.map(([a, b]) => new T.Vector2(a, b))); const geo = new T.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2); g.add(new T.Mesh(geo, mat(c))); },
         P: (w, h, d, c, px, py, pz) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(px, py, pz); g.add(m); return m; },
@@ -7109,21 +7109,21 @@ function init(container) {
   {
     const asph = mat(0x50555c), wht = mat(0xffffff), ylw = mat(0xffd84d);
     // Road P: a plain two-lane county road, two 12 ft lanes (7.3 m), no center line
-    const rp = add(new T.BoxGeometry(7.3, 0.2, RDP_Z1 - RDP_Z0), asph, RDPX, 0.11, (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
+    const rp = add(new T.PlaneGeometry(7.3, RDP_Z1 - RDP_Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 7.3, RDP_Z1 - RDP_Z0), RDPX, 0.024, (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
     buildRail(); buildUTV();
     // divided highway built to real dimensions: per direction two 12 ft (3.66 m) lanes, a 4 ft inside shoulder and a 10 ft outside
     // shoulder; yellow edge line on the inside, white edge line outside, white 10 ft dashes every 40 ft between the lanes; grass median
     const [x0, x1] = [-1500, 1700], L = (x1 - x0) / HWY.c, phi = Math.atan(HWY.k), MED = 15, LANE = 3.66, SIN = 1.2, SOUT = 3.0;
     const midX = (x0 + x1) / 2, at = (n, u) => [midX + n * HWY.s + u * HWY.c, HWY.z(midX) + n * HWY.c - u * HWY.s];   // n: across (+ = SE), u: along
-    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.BoxGeometry(L, y === 0.11 ? 0.2 : 0.02, w), m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.11; return r; };
+    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.PlaneGeometry(L, w).rotateX(-Math.PI / 2), y === 0.024 ? groundMat('asphalt', false, L, w) : m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.024; return r; };
     for (const side of [-1, 1]) {
       const n0 = side * MED / 2, dir = side;                        // inner edge of the paved surface, then outward
       const w = SIN + 2 * LANE + SOUT, nc = n0 + dir * w / 2;
-      strip(nc, w, asph, 0.11);                                                                          // pavement: shoulders + 2 lanes
-      strip(n0 + dir * SIN, 0.15, ylw, 0.215);                                                           // yellow inside edge line
-      strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, 0.215);                                              // white outside edge line
+      strip(nc, w, asph, 0.024);                                                                          // pavement: shoulders + 2 lanes
+      strip(n0 + dir * SIN, 0.15, ylw, 0.032);                                                           // yellow inside edge line
+      strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, 0.032);                                              // white outside edge line
       const nd = n0 + dir * (SIN + LANE), cnt = Math.floor(L / 12.2), d = new T.InstancedMesh(new T.BoxGeometry(3.05, 0.02, 0.15), wht, cnt);
-      for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, 0.215, z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
+      for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, 0.032, z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
       d.userData.noHit = true; scene.add(d);                                                             // lane divider dashes
     }
   }

@@ -49,8 +49,12 @@ assert.ok(html.includes('CZ1 = -8.5, CZ2 = -4.0;'));
 assert.ok(html.includes('strA: [-54, -3,')&&html.includes('strB: [-49.5, -3,'));
 assert.ok(14-(-4+1.2)>16,'cook tube clears lab wall and aisle (~16.15m centered)');
 assert.ok(html.includes("'silo0', { top: 0xd94848, level: 0.6, dome: false, noRail: true }")&&html.includes("'silo1', { top: 0xd94848, level: 0.6, dome: false, noRail: true }")&&html.includes("'tb' + (i + 3), { top: 0xd94848, level: 0.5, dome: false, noRail: true }"),'all 4 silos use dome: false');
+assert.ok(!next.wallSegs.some(s=>s[1]===s[3]&&near(s[1],-23.7)&&s[0]<13.6&&s[2]>13.6),'methanator hallway opens through north wall at z=-23.7, x=13.6');
+assert.ok(next.wallSegs.some(s=>near(s[0],12.65)&&near(s[2],12.65)&&near(s[1],-36.55)&&near(s[3],-23.7)),'methanator west hallway wall runs to process building');
+assert.ok(next.wallSegs.some(s=>near(s[0],14.55)&&near(s[2],14.55)&&near(s[1],-36.55)&&near(s[3],-23.7)),'methanator east hallway wall runs to process building');
 const sc={...next,GDX:-12,GDZ:-28,LADDERS:[]};vm.createContext(sc);vm.runInContext(html.slice(html.indexOf('function siloClimb'),html.indexOf('// ---------- EVIL SCARECROWS')),sc);
 sc.siloClimb(-171,12.5,9.5,22);sc.siloClimb(-171,-12.5,9.5,22);sc.siloClimb(-164.5,-35,16,22);sc.siloClimb(-164.5,-71,16,22);
 const siloWalks=sc.WALK_SURF.slice(-4);assert.equal(siloWalks.length,4);
 for(const w of siloWalks){assert.equal(w.y0,22.15);assert.equal(w.y1,22.15);}
-console.log('PASS: real Three.js construction, roof footprint, populated rooms centered between cook alley & evaps, Rick relocation, trench drains, doors/collision, straight east wall, flat silo roofs, and all eight full-size evaporators with aisle clearance; all scripts parse');
+assert.ok(html.includes("groundMat('asphalt'")&&html.includes("groundMat('dirtroad'"),'flat textured asphalt and dirtroad materials used for roads');
+console.log('PASS: real Three.js construction, roof footprint, populated rooms centered between cook alley & evaps, Rick relocation, trench drains, doors/collision, straight east wall, flat silo roofs, flat textured roads, and all eight full-size evaporators with aisle clearance; all scripts parse');
