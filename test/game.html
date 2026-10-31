@@ -6121,17 +6121,7 @@ function init(container) {
           wallSegs.push([SX - cw / 2, SZ0 - cd / 2, SX + cw / 2, SZ0 - cd / 2], [SX - cw / 2, SZ0 + cd / 2, SX + cw / 2, SZ0 + cd / 2], [SX - cw / 2, SZ0 - cd / 2, SX - cw / 2, SZ0 + cd / 2], [SX + cw / 2, SZ0 - cd / 2, SX + cw / 2, SZ0 + cd / 2]); }
         const cw = SP + 2 * CR + 1.6;
         box(cw, 0.12, cw, mat(0x9a9fa4), OX, 0.06, OZ);   // just above the 10 cm site slab (equal heights flicker)
-        { // red OUT OF SERVICE tag sign on posts at the curb, facing the yard (east) and the shop side (south)
-          const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const c = cv.getContext('2d');
-          c.fillStyle = '#c8211c'; c.fillRect(0, 0, 256, 128); c.fillStyle = '#fff'; c.fillRect(8, 8, 240, 112); c.fillStyle = '#c8211c'; c.fillRect(14, 14, 228, 44);
-          c.fillStyle = '#fff'; c.font = 'bold 30px Arial'; c.textAlign = 'center'; c.fillText('OUT OF SERVICE', 128, 47);
-          c.fillStyle = '#111'; c.font = 'bold 22px Arial'; c.fillText('METHANATOR TANKS', 128, 84); c.font = '16px Arial'; c.fillText('NOT IN USE', 128, 108);
-          const sm = new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv), side: T.DoubleSide });
-          for (const [x, z, ry] of [[OX + cw / 2 + 0.6, OZ, Math.PI / 2], [OX, OZ + cw / 2 + 0.6, 0]]) {
-            for (const d of [-0.6, 0.6]) box(0.08, 1.9, 0.08, mat(0x5a5f66), x + (ry ? 0 : d), 0.95, z + (ry ? d : 0));
-            const sg = new T.Mesh(new T.PlaneGeometry(1.5, 0.75), sm); sg.position.set(x, 1.6, z); sg.rotation.y = ry; sg.userData.noHit = true; scene.add(sg);
-          }
-        }
+        // (out of service sign removed)
         }
     }
     // roof panels: stretch the line texture so the lines keep a 2 ft spacing across each roof's north–south depth
