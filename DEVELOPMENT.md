@@ -1,3 +1,7 @@
+## TEST v1.97.32 — dispatcher phone: round the ETA to whole tens (2026-11-01)
+- The call confirmation now rounds the arrival estimate down to whole tens of seconds (`Math.max(10, Math.floor(bestEta / 220) * 10)`), so "about 88 s" reads "about 80 s". The test asserts the value is a multiple of ten and never zero.
+- Bumped TEST to `1.97.32` / `corn-souls-test-shell-v59`.
+
 ## TEST v1.97.31 — dispatcher phone: fix "a train is already on the crossing" false refusals (2026-11-01)
 - Reported by the owner: calling a train to hold was refused with "already on the crossing" and no train appeared. Cause: the guard was `THRUS.some(R => R.u >= 0)`, which is true whenever **any** through freight is anywhere on the line — and they are running most of the time — so the call was nearly always rejected.
 - `railPhoneApply('hold')` now refuses only when a consist is actually occupying or within ~60 m of the crossing (`R.u > uc - TLEN - 60 && R.u - TLEN < uc + 60`). It also picks the consist that can get there soonest: a waiting train (started from `u = 0`) **or one already inbound**, which is simply halted at the crossing without losing its progress. The confirmation now states the ETA ("holding the Road P crossing in about 15 s").

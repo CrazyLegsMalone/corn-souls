@@ -11710,9 +11710,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 let first = true; try { first = !localStorage.getItem('ethsim4_seen'); localStorage.setItem('ethsim4_seen', '1'); } catch (e) {}
-// start straight into the plant — help is still in the ☰ menu
-{ const hint = () => setTimeout(() => toast('One finger: drag to move, tap to select · Two fingers: twist to turn, pinch to zoom, slide up/down to tilt'), 900);   // after the title screen is dismissed
-  if (window.__splashWas || !window.__splashOn) hint(); else window.__splashDone = () => { musicPlay(); hint(); }; }
+// start straight into the plant — no startup control hint; help lives in the ☰ menu
+if (!(window.__splashWas || !window.__splashOn)) window.__splashDone = () => { musicPlay(); };
 // title screen menu choices
 window.__splashMenu = { one() {}, host() { P3.netHost(); }, join(c) { P3.netJoin(c); }, controls() { controlsMenu('', true); } };
 requestAnimationFrame(frame);
