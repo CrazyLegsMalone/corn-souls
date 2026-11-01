@@ -34,6 +34,7 @@ function makeCtx() {
   const ctx = {
     console, Math, Set, Array, Object, Number,
     dayT: 0,
+    DAYLIGHT: { baseHemi: 1.15, baseSun: 1.7, hours: 13 },
     scene: { traverse(fn) { meshes.forEach(fn); }, background: color(0.56), fog: { color: color(0.56) } },
     hemi: { intensity: 1.15 },
     sunL: { intensity: 1.7 },
@@ -81,28 +82,45 @@ function makeCtx() {
   ctx.applyBlackout();
   assert.equal(screen.color.r, 0, 'screens stay black even if redrawn');
 
-  // per-frame pass clamps what daylight()/updateSky() produced this frame
+  // DAYTIME (13:00): artificial lights out, sun and sky untouched
+  ctx.DAYLIGHT.hours = 13;
   ctx.hemi.intensity = 1.15; ctx.sunL.intensity = 1.7;
   ctx.scene.background = color(0.56); ctx.scene.fog.color = color(0.56);
-  ctx.SKY.dome.material.uniforms.hor.value = color(0.56);
-  ctx.SKY.dome.material.uniforms.zen.value = color(0.2);
+  ctx.SKY.dome.material.uniforms.sunK.value = 1;
+  ctx.SKY.stars.material.opacity = 0.1;
+  ctx.applyBlackout();
+  assert.ok(Math.abs(ctx.hemi.intensity - 1.15 * 0.65) < 1e-9, 'daytime: hemisphere dipped to 65% of the daylight base');
+  assert.equal(ctx.sunL.intensity, 1.7, 'daytime: the sun keeps working');
+  assert.equal(ctx.scene.background.r, 0.56, 'daytime: the sky is untouched');
+  assert.equal(ctx.SKY.dome.material.uniforms.sunK.value, 1, 'daytime: the sun disc stays');
+  const hemiDay = ctx.hemi.intensity;
+  ctx.applyBlackout();
+  assert.equal(ctx.hemi.intensity, hemiDay, 'daytime dip does not compound');
+
+  // NIGHT in auto mode (02:00): the full crush
+  ctx.DAYLIGHT.hours = 2;
+  ctx.scene.background = color(0.2); ctx.scene.fog.color = color(0.2);
+  ctx.SKY.dome.material.uniforms.hor.value = color(0.2);
+  ctx.SKY.dome.material.uniforms.zen.value = color(0.1);
   ctx.SKY.dome.material.uniforms.sunK.value = 1;
   ctx.SKY.clouds.material.color = color(1);
   ctx.SKY.stars.material.opacity = 0.1;
   ctx.applyBlackout();
-  assert.ok(ctx.hemi.intensity <= 0.06, 'ambient crushed');
-  assert.equal(ctx.sunL.intensity, 0, 'sun off');
-  assert.ok(Math.abs(ctx.scene.background.r - 0.02) < 1e-9, 'sky background clamped to near black');
-  assert.equal(ctx.scene.fog.color.r, ctx.scene.background.r, 'fog matches the darkened sky');
-  assert.ok(ctx.SKY.dome.material.uniforms.hor.value.r < 0.04, 'sky dome horizon darkened');
-  assert.equal(ctx.SKY.dome.material.uniforms.sunK.value, 0, 'sun disc removed');
-  assert.ok(ctx.SKY.stars.material.opacity > 0.5, 'stars come out');
+  assert.ok(Math.abs(ctx.hemi.intensity - 1.15 * 0.05) < 1e-9, 'night: ambient crushed from the daylight base');
+  assert.equal(ctx.sunL.intensity, 0, 'night: sun off');
+  assert.ok(ctx.scene.background.r < 0.03, 'night: sky clamped near black');
+  assert.equal(ctx.scene.fog.color.r, ctx.scene.background.r, 'night: fog matches the darkened sky');
+  assert.equal(ctx.SKY.dome.material.uniforms.sunK.value, 0, 'night: sun disc removed');
+  assert.ok(ctx.SKY.stars.material.opacity > 0.5, 'night: stars come out');
 
-  // a second frame must not darken any further (no compounding)
-  const hemiAfter1 = ctx.hemi.intensity, bgAfter1 = ctx.scene.background.r;
+  // forced night while it is midday
+  ctx.DAYLIGHT.hours = 13;
+  ctx.scene.background = color(0.56);
+  ctx.setBlackout(true, 'night');
+  assert.equal(ctx.__BLACKOUT.mode, 'night', 'mode can be changed while the event is running');
   ctx.applyBlackout();
-  assert.equal(ctx.hemi.intensity, hemiAfter1, 'ambient does not compound');
-  assert.equal(ctx.scene.background.r, bgAfter1, 'sky does not compound');
+  assert.equal(ctx.sunL.intensity, 0, 'forced night overrides a bright sky');
+  assert.ok(ctx.hemi.intensity < 0.1, 'forced night crushes ambient');
 
   // restoring puts every material back exactly
   assert.equal(ctx.setBlackout(false), false);
@@ -128,12 +146,14 @@ function makeCtx() {
 {
   const start = html.indexOf("['Blackout: start'");
   const end = html.indexOf("['Blackout: end'");
-  assert.ok(start > 0 && end > start, 'debug menu has both blackout rows');
+  assert.ok(start > 0 && end > start, 'debug menu has the blackout rows');
   const rows = html.slice(start, end + 80);
-  assert.ok(rows.includes('P3.setBlackout('), 'menu rows call the exported P3.setBlackout');
+  assert.equal(rows.split('P3.setBlackout(').length - 1, 3, 'three debug rows drive the event (auto, force night, end)');
+  assert.ok(rows.includes("P3.setBlackout(true, 'night')"), 'the force-night row passes the mode');
   assert.ok(!/[^.\w]setBlackout\(/.test(rows), 'menu rows must not call the private function directly');
-  assert.ok(html.includes('setBlackout, get blackout()'), 'the event is exported on Plant3D');
+  assert.ok(html.includes('setBlackout, get blackout()') && html.includes('get blackoutMode()'), 'exports include state and mode');
   assert.ok(html.includes('m.userData.keepLit = true;   // fires survive a blackout'), 'flame sprites are marked keepLit');
+  assert.ok(html.includes('DAYLIGHT.baseHemi = hemi.intensity'), 'daylight() records the base the blackout scales from');
 }
 
 console.log('PASS: blackout dims emissive fixtures once, clamps ambient/sun/sky per frame without compounding, keeps fires lit, restores exactly, and is reachable from the debug menu through P3');

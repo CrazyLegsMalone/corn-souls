@@ -1,3 +1,10 @@
+## TEST v1.97.38 — blackout survives per-frame indicator rewrites (strainer / liquefaction pump lamps) (2026-11-01)
+- Owner feedback: the duty indicator lights for the slurry strainers and the liquefaction pumps were still lit. Those rings are `MeshBasicMaterial({color: 0x3ddc84})` whose colour is rewritten by the duty logic every frame, so the one-off dim was overwritten on the next frame.
+- The blackout now stores each material's **original colour components** and re-applies the dim from that base every frame via `BLACKOUT.apply()`, called at the end of `applyBlackout()` — after all simulation and UI updates. Because it is applied from the stored base (not multiplied in place) it stays idempotent: repeated frames cannot compound, and a colour rewritten by the sim is immediately re-dimmed.
+- Saved entries are `[material, base, kind]` with kinds `'emissive'` (base = original intensity), `'color'` (base = r/g/b, scaled to 12%) and `'dark'` (base = r/g/b, forced to black for screens). Restoring uses the stored base, so signs, lamps and screens return to exactly their original colours even if they changed mid-event.
+- `test/validate-blackout.cjs` now simulates that rewrite: a green duty lamp set bright is re-dimmed on the next `applyBlackout()`, and a screen redrawn mid-event stays black.
+- Bumped TEST to `1.97.38` / `corn-souls-test-shell-v65`.
+
 ## TEST v1.97.37 — control room monitors go black in a blackout (2026-11-01)
 - Owner feedback: the control room screens should go black, not just dim. They are unlit canvas-texture materials, so the 12% colour scale still left them readable.
 - Both screen builders now flag their material `userData.darkOnBlackout = true`: the `mk()` helper behind the process / web / desktop pictures, and the alarm-summary monitor (`ALARM_SCR.m`). `setBlackout()` checks that flag first and sets the colour to pure black instead of 12%, saving the original hex for an exact restore. The saved-entry format is now `[material, value, kind]` with `'emissive'` / `'color'` kinds.
