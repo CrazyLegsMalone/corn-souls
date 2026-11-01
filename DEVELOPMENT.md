@@ -1,3 +1,13 @@
+## TEST v1.97.55 — character and vending placement fixes (2026-11-01)
+- From the owner’s play-test: Rick sunk into the ground, Brenda and Tammy stood into the desks in front of them, Vern clipped the rail and stood in the train’s way, and the Milo Rade machine floated. All four were anchoring mistakes rather than model problems:
+- **Seated characters are anchored at the pelvis, not at their feet.** `seatedPerson()` builds its seat top at 0.47 and puts the box avatar’s hips at 0.49, so a seated model now gets its pelvis at **0.49** whatever the leg fold does - which lifts Rick out of the floor and drops Brenda and Tammy back behind their counters in one change. Standing models still get their feet put on the floor from their posed bounds.
+- **Vern stepped off the loop track.** He stood at x -238 (`-194 + GDX` with GDX -44), which is **2 m from the unit-train loop’s east leg at x -240** - the rail he was clipping, on a line trains actually use. He now stands at **x -232**, 8 m clear.
+- **The vending machines are measured onto the floor.** A spot’s `y` now means the floor level (0 in the break room, `FY` in the scale house) and the base is snapped with `g.position.y += s.y - bb.min.y` from the loaded model, so an origin that sits above its base can no longer float.
+- Every NPC also accepts world nudges (`x`, `z`) and local offsets (`dx`, `dy`, `dz`) in `NPC_MODELS`, so any remaining placement tweak is one number rather than a code change.
+- Tests updated: the pelvis seat anchor, the standing feet-from-bounds rule, the per-NPC nudge hooks and the measured vending-machine base are all asserted.
+- Verified locally: 10 repo-root suites + 3 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.55` / `corn-souls-test-shell-v82`.
+
 ## TEST v1.97.54 — four NPCs get real character models (Vern, Rick, Brenda, Tammy) (2026-11-01)
 - The owner's four character models are in: **Vern** (`operator_vern_rig.glb`, 1.64 m, gloves + hard hat, headlamp, ear muffs, walkie-talkie, pipe wrench, 4-gas sniffer, ID badge), **Rick the board operator** (`boardop_rick_rig.glb`, 1.64 m) and the scale-house techs **Brenda** and **Tammy** (`*_scalehouse_rig.glb`, 1.57 m). All are the same rigid-part rig family as Squeeg - `Operator_Rig_Root`, named parts, no skins, no textures, no animations.
 - **One shared rig builder.** `rigPivot()` + `characterRig()` reparent the limbs onto generated shoulder / elbow / hip / knee pivots (the same technique Squeeg's engine uses), with the hand group as a per-model option (`Hand_Glove_*` for Vern, `Hand_Bare_*` for the other three). Missing parts are skipped.

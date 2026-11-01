@@ -344,8 +344,9 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   // wiring: one model, two machines, both old soda boxes gone
   assert.ok(html.includes("'/corn-souls/assets/models/milorade_machine.glb'"), 'the machine model is fetched');
   assert.equal((html.match(/DRINK_SPOTS\.push\(/g) || []).length, 2, 'two vending machines');
-  assert.ok(html.includes('DRINK_SPOTS.push({ x: -61.35, y: 0.16, z: OZN + 0.46'), 'replaces the process break-room soda machine');
-  assert.ok(html.includes('DRINK_SPOTS.push({ x: 59, y: FY + 0.16, z: ZN + 0.46'), 'replaces the scale-house soda machine');
+  assert.ok(html.includes('DRINK_SPOTS.push({ x: -61.35, y: 0, z: OZN + 0.46'), 'replaces the process break-room soda machine');
+  assert.ok(html.includes('DRINK_SPOTS.push({ x: 59, y: FY, z: ZN + 0.46'), 'replaces the scale-house soda machine');
+  assert.ok(html.includes('g.position.y += s.y - bb.min.y;'), 'the machine base is measured onto the floor instead of floating');
   // the scale house is laid out at x 56..90 and shifted east by SH_DX; the machine has to ride that shift or it
   // stands 26 m west of the building (the bug the owner spotted: a machine outside the entrance)
   assert.ok(html.includes('DRINK_SPOTS[i].x += DX'), 'the scale-house machine moves east with the building');
@@ -397,7 +398,9 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function characterRig(') && html.includes('function rigPivot('), 'one shared rig builder');
   assert.ok(html.includes("rig['leg' + s].rotation.x = -1.5"), 'seated pose swings the thighs forward');
   assert.ok(html.includes("rig['knee' + s].rotation.x = 1.5"), 'and the shins back down');
-  assert.ok(html.includes('root.position.set(0, -bb.min.y, 0)'), 'feet are set on the floor from the posed bounds');
+  assert.ok(html.includes('const seatY = 0.49;'), 'seated models are anchored at the seat, not at their feet');
+  assert.ok(html.includes("(cfg.pose === 'sit' ? seatY : -bb.min.y)"), 'standing feet on the floor, seated pelvis on the seat');
+  assert.ok(html.includes('if (cfg.x !== undefined) npc.g.position.x = cfg.x;'), 'a per-NPC world nudge exists');
   assert.ok(html.includes('root.rotation.y = cfg.face === undefined ? Math.PI : cfg.face'), 'models are flipped to face like the box avatars');
   assert.ok(html.includes('if (seated.length) for (const c of seated) c.visible = false;'), 'only the box body is hidden - the chair stays');
   assert.ok(html.includes('function loadNpcModels()') && html.includes('loadNpcModels();'), 'loaded at init');
