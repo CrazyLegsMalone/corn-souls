@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.17';
+ const TEST_VERSION='1.97.18';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -182,10 +182,12 @@
   // Refresh from the API more frequently; Open-Meteo readings still determine
   // direction and speed, not the player's own clock or a random animation.
   html=html.replace('setInterval(fetchWeather, 20 * 60 * 1000);','setInterval(fetchWeather, 5 * 60 * 1000);');
+  // <TEST-ONLY> lines in this block are stripped when LIVE is generated.
   // TEST-only status indicates whether weather really loaded, so a fallback
   // south wind cannot be mistaken for a broken rotation.
   const windDebug="<div id='wind-readout' style='position:fixed;left:8px;bottom:8px;z-index:2147483600;background:rgba(0,26,47,.88);color:#ffe7a6;padding:5px 8px;font:12px monospace;pointer-events:none'>Wind: waiting for live weather...</div><script>setInterval(()=>{const w=window.__cornWindSockState,d=document.getElementById('wind-readout');if(!d||!w)return;d.textContent='WIND '+(window.__cornWindWeatherAt?'LIVE':'FALLBACK')+' '+w.mph+' mph FROM '+w.from+'° · sock TO '+w.towards+'°';},900);</scr"+"ipt>";
   html=html.replace(/<\/body>/i,windDebug+'</body>');
+  // </TEST-ONLY>
   // Crossing bell is local: full volume inside ~20 world units, a smooth
   // quadratic fade, and completely silent beyond 85 world units.
   // The original inverse-distance calculation was audible across the map.

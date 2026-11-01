@@ -1,0 +1,54 @@
+name: Validate launchers
+
+# Guards the fragile part of this project: both launchers patch a 3.3 MB
+# single-file game with ~60 ordered string replacements. A missing anchor either
+# throws at load or silently disables a feature. This runs on every push.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  launchers:
+    name: Launcher anchors + LIVE wiring (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Every patch anchor matches the game source
+        run: python scripts/check_launcher_anchors.py
+      - name: LIVE version / cache / refresh / validator agree
+        run: python scripts/sync_test_to_live.py --consistency
+
+  suites:
+    name: Gameplay suites (report only)
+    runs-on: ubuntu-latest
+    continue-on-error: true          # flip to false once green on a few pushes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Repo-root suites
+        run: |
+          node test/validate-live-promotion.cjs
+          node test/validate-traffic.cjs
+          node test/validate-acid.cjs
+      - name: test/ suites
+        working-directory: test
+        run: |
+          # validate-inbox.cjs is excluded: its mock lacks `window` for the
+          # existing inboxOpen page navigation (pre-existing, not a real bug).
+          for f in validate-mcc-extinguisher.cjs validate-npc.cjs \
+                   validate-west-wing.cjs validate-windsocks.cjs \
+                   validate-door-audio.cjs validate-notes.cjs validate-sound.cjs; do
+            echo "== $f"
+            node "$f"
+          done
