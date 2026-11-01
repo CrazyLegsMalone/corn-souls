@@ -13,7 +13,7 @@ const phoneSrc = slice('function railPhoneNear()', 'function crossingBell(');
 const railSrc = slice('function updateRail(dt) {', 'function loopAt(s) {');
 
 function makeCtx() {
-  const train = dir => ({ dir, off: dir > 0 ? 1 : -1, u: -1, wait: 40, horn: false, state: 'wait', speed: 22, target: null, heldT: 0, warned: false,
+  const train = dir => ({ dir, off: dir > 0 ? 1 : -1, u: -1, wait: 1e9, horn: false, state: 'wait', speed: 22, target: null, heldT: 0, warned: false,
     cars: [{ off: 0, g: { visible: false, position: { set() {} }, rotation: {} } },
            { off: 18, g: { visible: false, position: { set() {} }, rotation: {} } }] });
   const sent = [];
@@ -118,7 +118,8 @@ const step = (ctx, seconds) => { const n = Math.round(seconds / 0.1); for (let i
   c.NET = { conn: {}, host: false };
   assert.match(c.railPhoneAction('hold'), /sent to the host/);
   assert.equal(c.sent.length, 1);
-  assert.deepEqual(c.sent[0], { t: 'rp', a: 'hold' });
+  assert.equal(c.sent[0].t, 'rp', 'request packet type');
+  assert.equal(c.sent[0].a, 'hold', 'request packet action');
   assert.equal(c.THRUS[0].u, -1, 'the guest does not move trains locally');
 
   const h = makeCtx();

@@ -22,9 +22,9 @@ for(const file of ['note-sharing.js','inbox.js','acid-liquid.js','cooler-door-au
 // Reuse existing behavioral coverage against the promoted root launcher and helpers.
 const traffic=read('test/validate-traffic.cjs').replaceAll("'test/", "'");
 vm.runInNewContext(traffic,{require,console,process,URL},{filename:'live-traffic-validation.cjs'});
-// NPC preservation is relative to the promoted test build, including its intentional text fixes.
+// NPC preservation is checked against LIVE's own HEAD state: while TEST runs
+// ahead, LIVE and TEST game sources legitimately differ.
 let npc=read('test/validate-npc.cjs');
-npc=npc.replace(/const original=.*?;\n/,"const original=fs.readFileSync('test/game.html','utf8').replaceAll('\\r\\n','\\n');\n");
 npc=npc.split('\n').filter(line=>!line.includes("'launcher unchanged'")).join('\n');
 vm.runInNewContext(npc,{require,console,process,URL},{filename:'live-npc-validation.cjs'});
 console.log('PASS: complete promotion, LIVE version/asset base/install identity, independent cache/refresh scope, and helper parity');
