@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.27';
+ const TEST_VERSION='1.97.28';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -108,19 +108,6 @@
   const testVersionDisplay="document.getElementById('ver').textContent = 'TEST v"+TEST_VERSION+"'; document.getElementById('spVer').textContent = 'TEST v"+TEST_VERSION+"';";
   if(!html.includes(originalVersionDisplay)) throw new Error('Game version display changed; TEST label not applied.');
   html=html.replace(originalVersionDisplay,testVersionDisplay);
-  // TEST controller diagnosis: report each newly pressed gamepad button.
-  // Helps identify non-standard Retroid stick-click mappings without remapping others.
-  const gpMappingMarker="if (down !== !!gpPrev[key]) { gpPrev[key] = down;";
-  const gpMappingDiagnostic="if (down !== !!gpPrev[key]) { if(down){ const diag=document.getElementById('corn-pad-diagnostic'); if(diag){ diag.textContent='Controller '+gp.index+' · Button '+i+' · '+n+' · '+gp.mapping; diag.style.display='block'; diag.dataset.lastButton=String(i); } } gpPrev[key] = down;";
-  if(!html.includes(gpMappingMarker))throw new Error('Gamepad event loop changed; controller diagnostic not applied.');
-  html=html.replace(gpMappingMarker,gpMappingDiagnostic);
-  // Poll even controllers reporting additional buttons beyond the standard 16.
-  const gpExtraMarker="  const ax = i => gp.axes[i] || 0, bv = i => gp.buttons[i] ? gp.buttons[i].value : 0;";
-  const gpExtraDiagnostic="  for(let i=16;i<gp.buttons.length;i++){ const b=gp.buttons[i]; if(!b)continue; const down=b.pressed||b.value>0.5,key=gp.index+'BTN'+i; if(down!==!!gpPrev[key]){gpPrev[key]=down;if(down){const d=document.getElementById('corn-pad-diagnostic');if(d){d.textContent='Controller '+gp.index+' · Extra button '+i+' · '+gp.mapping;d.style.display='block';d.dataset.lastButton=String(i);}}}}\n"+gpExtraMarker;
-  if(!html.includes(gpExtraMarker))throw new Error('Controller axis loop changed; extra button probe not applied.');
-  html=html.replace(gpExtraMarker,gpExtraDiagnostic);
-  // A low-profile TEST-only overlay, never part of the stable game.
-  html=html.replace(/<\/body>/i,"<div id='corn-pad-diagnostic' style='position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);display:none;padding:8px 12px;border-radius:8px;background:rgba(7,17,31,.92);color:#ffe68b;font:14px monospace;pointer-events:none'>Press R3 to identify button</div></body>");
   // R3 is detected correctly, but the generic controller menu route can swallow it.
   // Route stick-click directly to the same button handler as the working touch toggle.
   const r3PressMarker="function press(n) {\n  nav = 'pad';";
