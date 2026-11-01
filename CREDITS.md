@@ -14,7 +14,9 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 
 - **"Operator (male, PSX style)"** — made by the project owner with an AI-assisted character creator (Gemini); not obtained from a third-party marketplace. Used as Squeeg's third-person character in the TEST channel (`test/models/operator_male_psx_rig.glb`). Registered in [assets/registry.json](assets/registry.json) as `first-party-operator-male-psx-rig`. No third-party licence terms apply.
 
-- **"Main Power Building"** — made by the project owner and exported from Blender as a GLB; not obtained from a third-party marketplace. The main substation south of the retention ponds in the TEST channel (`assets/models/main_power_building.glb`): its compound gate faces north, and its MAIN BREAKER is the master reset for a power outage. Registered in [assets/registry.json](assets/registry.json).
+- **"Main Power Building"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The main substation south of the retention ponds in the TEST channel (`assets/models/main_power_building.glb`): its compound gate faces north, and its MAIN BREAKER is the master reset for a power outage. Registered in [assets/registry.json](assets/registry.json).
+
+- **"1x4 Cooling Tower (Raised Sill)"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The cooling tower south of the south road in the TEST channel (`assets/models/1x4_cooling_tower_raised_sill.glb`): its four fans and drift plume stop with the plant during a power outage. Registered in [assets/registry.json](assets/registry.json).
 
 ## Attribution template
 

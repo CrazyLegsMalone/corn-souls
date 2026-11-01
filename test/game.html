@@ -4855,9 +4855,12 @@ function glbBuild(buf) {
   const byName = {};
   const mk = i => {
     const n = d.nodes[i], o = new T.Group(); o.name = n.name || ('node' + i); byName[o.name] = o;
-    if (n.translation) o.position.fromArray(n.translation);
-    if (n.rotation) o.quaternion.fromArray(n.rotation);
-    if (n.scale) o.scale.fromArray(n.scale);
+    if (n.matrix) new T.Matrix4().fromArray(n.matrix).decompose(o.position, o.quaternion, o.scale);   // glTF column-major
+    else {
+      if (n.translation) o.position.fromArray(n.translation);
+      if (n.rotation) o.quaternion.fromArray(n.rotation);
+      if (n.scale) o.scale.fromArray(n.scale);
+    }
     (n.children || []).forEach(c => o.add(mk(c)));
     if (n.mesh !== undefined) for (const q of (prims[n.mesh] || [])) {
       const piece = q.mode === 1 ? new T.LineSegments(q.g, q.mat) : new T.Mesh(q.g, q.mat);
@@ -4869,10 +4872,15 @@ function glbBuild(buf) {
   ((d.scenes[d.scene || 0] || {}).nodes || []).forEach(i => root.add(mk(i)));
   return { root, byName };
 }
-function loadSubstation() {   // absolute URL: the page carries <base href="../">, so a relative path would miss
-  fetch('/corn-souls/assets/models/main_power_building.glb', { cache: 'force-cache' })
+// Shared model fetch: absolute URLs (the page carries <base href="../">), cached, and a failure only warns.
+function loadGlbModel(url, onReady, tag) {
+  fetch(url, { cache: 'force-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
-    .then(buf => {
+    .then(buf => onReady(glbBuild(buf)))
+    .catch(e => console.warn('[' + (tag || 'glb') + '] ' + url.split('/').pop() + ' not loaded:', e && e.message));
+}
+function loadSubstation() {
+  loadGlbModel('/corn-souls/assets/models/main_power_building.glb', ({ root, byName }) => {
       const { root, byName } = glbBuild(buf);
       const g = new T.Group(); g.position.set(SUBSTATION.x, 0, SUBSTATION.z); g.rotation.y = SUBSTATION.yaw;
       g.add(root); scene.add(g); scene.updateMatrixWorld(true);
@@ -4887,8 +4895,27 @@ function loadSubstation() {   // absolute URL: the page carries <base href="../"
       wallSegs.push([bb.min.x, bb.min.z, gx - gw / 2, bb.min.z], [gx + gw / 2, bb.min.z, bb.max.x, bb.min.z],
         [bb.min.x, bb.max.z, bb.max.x, bb.max.z], [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
       SUBSTATION.ready = true;
-    })
-    .catch(e => console.warn('[substation] main_power_building.glb not loaded:', e && e.message));
+  }, 'substation');
+}
+// ---------- COOLING TOWER: the owner's 1x4 raised-sill model, on the cooling-tower area south of the south road.
+// Its four fans turn with the plant and stop dead in an outage; the white drift off the fan deck joins STACKS as a
+// grid-fed plume, so it dies with the plant the same way the RTO's does.
+const TOWER = { x: 50, z: 198, yaw: 0, fans: [], ready: false };   // EXR - 22, SZR + 13: the old painted placeholder
+function loadCoolingTower() {
+  loadGlbModel('/corn-souls/assets/models/1x4_cooling_tower_raised_sill.glb', ({ root, byName }) => {
+    const g = new T.Group(); g.position.set(TOWER.x, 0, TOWER.z); g.rotation.y = TOWER.yaw;
+    g.add(root); scene.add(g); scene.updateMatrixWorld(true);
+    for (let i = 0; i < 4; i++) { const r = byName['Fan_Rotor_' + i]; if (r) TOWER.fans.push(r); }
+    const bb = new T.Box3().setFromObject(g);                                   // the casing footprint, in world space
+    wallSegs.push([bb.min.x, bb.min.z, bb.max.x, bb.min.z], [bb.min.x, bb.max.z, bb.max.x, bb.max.z],
+      [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
+    STACKS.push({ x: TOWER.x, y: bb.max.y - 0.3, z: TOWER.z, r: 2.6, rate: 6, grid: true });   // drift off the fan deck
+    TOWER.ready = true;
+  }, 'cooling tower');
+}
+function updateCoolingTower(dt) {
+  if (!TOWER.fans.length || POWER_OUTAGE.on) return;   // no power: the fans stop where they are
+  for (const f of TOWER.fans) f.rotateY(dt * 7.5);
 }
 // Dirt tracks for the Ranger: from the end of the paved south road, across the loop track, then splitting to run
 // round both ponds and meet at the substation forecourt. Every node clears the ponds and the track (checked in CI).
@@ -6682,7 +6709,13 @@ function init(container) {
     const pile = add(new T.ConeGeometry(12, 9, 24), mat(0xb8862f), (X0 + X1) / 2 + 2, 4.5, (Z0 + Z1) / 2 - 4, null); pile.castShadow = false;
   }
                   // SE block, southwest corner
-  mark('COOLING\nTOWER', EXR - 22, SZR + 13, 40, 10);
+  // ---------- COOLING TOWER: the owner's 1x4 raised-sill model on a hardstand, where the painted placeholder was
+  {
+    add(new T.PlaneGeometry(27, 8.5).rotateX(-Math.PI / 2), groundMat('asphalt', false, 27, 8.5), TOWER.x, 0.028, TOWER.z);   // pad
+    for (const s2 of [-1, 1]) box(27, 0.18, 0.35, mat(0xb5b0a6), TOWER.x, 0.09, TOWER.z + s2 * 4.2);                          // curbs
+    nameplate('COOLING TOWER|CELLS 1-4', TOWER.x, 3.4, TOWER.z - 3.6, 0.2, 0, -1, 1.2);
+    loadCoolingTower();
+  }
   makeTote(EXR - 22, SZR - 12, 0.15);                                  // a liquid tote sitting in the dirt north of the cooling tower, across the south road                 // south of the south road
   mark('FIRE &\nPROCESS\nWATER', -62, SZR + 30, 24, 40);
   // ---------- EMPLOYEE PARKING: east of the east road, south of the exit road. Driveways in from the exit road (NW corner)
@@ -7183,7 +7216,7 @@ function init(container) {
     }
     { const rx = -76.2, rz = 100.2;                                    // RTO (pink): oxidizer chambers + exhaust stack
       building(rx - 5.2, rx + 5.2, rz - 3.9, rz + 3.9, 5, [[rx + 2.5, 0.95, 2.13]]); keyHook('flower', rx - 1.8, rz - 3.9 + 0.28, 0);   // the pink Kia's key manDoor(rx + 2.5, rz - 3.9, true, null, 1); concreteFloor(rx - 5.2, rx + 5.2, rz - 3.9, rz + 3.9);   // RTO shack: hollow, man door on the north side
-      cyl(0.9, 16, mat(0x8a9097), rx - 6.5, 0, rz, null, 12); extraCols.push([rx - 6.5, rz, 1.0]); STACKS.push({ x: rx - 6.5, y: 16.1, z: rz, r: 0.9, rate: 7 });   /* stack on the west side (plume) */ }
+      cyl(0.9, 16, mat(0x8a9097), rx - 6.5, 0, rz, null, 12); extraCols.push([rx - 6.5, rz, 1.0]); STACKS.push({ x: rx - 6.5, y: 16.1, z: rz, r: 0.9, rate: 7, grid: true });   /* stack on the west side (plume) */ }
     // WIND SOCK by the wet cake pad (west end): orange/white striped sock on a 20 ft pole. It swings to point downwind with the live
     // weather and fills out with the wind speed (limp and hanging when it's calm), fluttering a little.
     // Keep the wet cake windsock; add an identical one northeast of ammonia, clear of the tank, valves and south pump rack.
@@ -8396,7 +8429,7 @@ function updatePlumes(dt) {
   const to = (WIND.from + 180) * Math.PI / 180, ws = Math.max(0.5, WIND.mph * 0.447 * 0.6), wx = Math.sin(to) * ws, wz = -Math.cos(to) * ws;
   for (const S of STACKS) {
     if (!S.parts) S.parts = [];
-    S.acc = (S.acc || 0) + dt * (POWER_OUTAGE.on && S === STACKS[0] ? 0 : S.rate);   // the RTO stack goes cold with the plant
+    S.acc = (S.acc || 0) + dt * (POWER_OUTAGE.on && S.grid ? 0 : S.rate);   // grid-fed stacks (RTO, cooling tower) go cold with the plant
     while (S.acc >= 1) { S.acc -= 1; let q = S.parts.find(o => !o.alive);
       if (!q) { if (S.parts.length >= 70) break; const sp = new T.Sprite(new T.SpriteMaterial({ map: plumeTex, color: 0xf4f6f7, transparent: true, depthWrite: false, opacity: 0 })); sp.userData.noHit = true; scene.add(sp); q = { s: sp }; S.parts.push(q); }
       q.alive = true; q.age = 0; q.life = 9 + Math.random() * 4; q.p = V3(S.x + (Math.random() - 0.5) * S.r, S.y, S.z + (Math.random() - 0.5) * S.r); q.v = V3((Math.random() - 0.5) * 0.4, 2.6 + Math.random(), (Math.random() - 0.5) * 0.4); q.s.visible = true; }
@@ -8646,7 +8679,7 @@ function update(sim, dt, events) {
     puffT = 0;
   }
   updatePuffs(dt); updateWeather(dt);
-  updateBirds(dt); updateCritters(dt); updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
+  updateBirds(dt); updateCritters(dt); updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateCoolingTower(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
 
   // trucks come when the simulation calls them
   for (const e of events) spawn(e.kind, e.ship);

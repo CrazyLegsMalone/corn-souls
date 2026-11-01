@@ -245,4 +245,66 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
 }
 
 
+
+// ---------------------------------------------------------------- the cooling tower model
+{
+  const glb = fs.readFileSync('assets/models/1x4_cooling_tower_raised_sill.glb');
+  assert.equal(glb.readUInt32LE(0), 0x46546c67, 'cooling tower GLB magic');
+  let off = 12, doc = null, hasBin = false;
+  while (off < glb.length) {
+    const len = glb.readUInt32LE(off), type = glb.readUInt32LE(off + 4), body = off + 8;
+    if (type === 0x4e4f534a) doc = JSON.parse(glb.slice(body, body + len).toString('utf8'));
+    else if (type === 0x004e4942) hasBin = true;
+    off = body + len + ((4 - (len % 4)) % 4);
+  }
+  assert.ok(doc && hasBin, 'JSON + embedded BIN chunk');
+  assert.ok(!(doc.images || []).length && (doc.buffers || []).every(b2 => !b2.uri), 'single-file asset: nothing external');
+  const names = new Set((doc.nodes || []).map(n => n.name));
+  assert.ok(names.has('Cooling_Tower_1x4_Assembly'), 'the assembly root node');
+  for (let i = 0; i < 4; i++) assert.ok(names.has('Fan_Rotor_' + i), 'fan rotor ' + i + ' exists (the game spins it)');
+  const withMatrix = (doc.nodes || []).filter(n => n.matrix).length;
+  assert.ok(withMatrix > 100, 'the parts are placed with matrices (' + withMatrix + ' of ' + doc.nodes.length + ' nodes)');
+  assert.ok(html.includes('n.matrix') && html.includes('.decompose(o.position, o.quaternion, o.scale)'),
+    'the glTF reader honours node matrices (without this the tower would load as a pile at the origin)');
+
+  // assembled bounds, computed exactly the way the reader builds it
+  const I = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  const mul = (a, b) => a.map(r => [0, 1, 2, 3].map(j => r[0] * b[0][j] + r[1] * b[1][j] + r[2] * b[2][j] + r[3] * b[3][j]));
+  const nmat = n => {
+    if (!n.matrix) return I;
+    const m2 = n.matrix;   // glTF stores column-major
+    return [[m2[0], m2[4], m2[8], m2[12]], [m2[1], m2[5], m2[9], m2[13]], [m2[2], m2[6], m2[10], m2[14]], [m2[3], m2[7], m2[11], m2[15]]];
+  };
+  const ap = (mm, p) => [0, 1, 2].map(i => mm[i][0] * p[0] + mm[i][1] * p[1] + mm[i][2] * p[2] + mm[i][3]);
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  const walk = (i, parent) => {
+    const n = doc.nodes[i], mm = mul(parent, nmat(n));
+    if (n.mesh !== undefined) for (const pr of doc.meshes[n.mesh].primitives) {
+      const ac = doc.accessors[pr.attributes.POSITION];
+      for (const cx of [ac.min[0], ac.max[0]]) for (const cy of [ac.min[1], ac.max[1]]) for (const cz of [ac.min[2], ac.max[2]]) {
+        const p = ap(mm, [cx, cy, cz]);
+        for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], p[k]); mx[k] = Math.max(mx[k], p[k]); }
+      }
+    }
+    for (const c of n.children || []) walk(c, mm);
+  };
+  for (const i of doc.scenes[doc.scene || 0].nodes) walk(i, I);
+  const w = mx[0] - mn[0], h = mx[1] - mn[1], d = mx[2] - mn[2];
+  assert.ok(Math.abs(w - 23.6) < 0.6 && Math.abs(h - 6.0) < 0.4 && Math.abs(d - 5.8) < 0.4,
+    'assembled size ' + w.toFixed(2) + ' x ' + h.toFixed(2) + ' x ' + d.toFixed(2) + ' m');
+  assert.ok(Math.abs(mn[1]) < 0.1, 'the basin sits at y 0, so it needs no vertical offset');
+
+  // wiring in game.html
+  assert.ok(html.includes("'/corn-souls/assets/models/1x4_cooling_tower_raised_sill.glb'"), 'the tower model is fetched by absolute URL');
+  assert.ok(html.includes('const TOWER = { x: 50, z: 198, yaw: 0'), 'placed where the painted placeholder was (EXR-22, SZR+13)');
+  assert.ok(html.includes('loadCoolingTower();') && html.includes('updateCoolingTower(dt);'), 'built at load, updated every frame');
+  assert.ok(html.includes('if (!TOWER.fans.length || POWER_OUTAGE.on) return;'), 'the fans stop dead with the plant');
+  assert.ok(html.includes('POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'grid-fed stacks (RTO, cooling tower) go cold with the plant');
+  assert.ok(html.includes('rate: 7, grid: true });'), 'the RTO stack is flagged grid-fed');
+  assert.ok(html.includes("nameplate('COOLING TOWER|CELLS 1-4'"), 'the hardstand is labelled');
+  assert.ok(!html.includes("mark('COOLING"), 'the painted placeholder is gone');
+  const roadEdge = 185 + 10.7 / 2, towerNorth = 198 + mn[2];
+  assert.ok(towerNorth - roadEdge > 3, 'the tower clears the south road by ' + (towerNorth - roadEdge).toFixed(1) + ' m');
+}
+
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');
