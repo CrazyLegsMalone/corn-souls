@@ -36,23 +36,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Repo-root suites
+      - name: Repo-root suites (LIVE side, plus helpers that read test/ paths)
         run: |
           # Report every suite; never stop at the first failure.
           fail=0
-          for f in test/validate-live-promotion.cjs test/validate-traffic.cjs test/validate-acid.cjs; do
+          for f in test/validate-live-promotion.cjs test/validate-traffic.cjs \
+                   test/validate-acid.cjs test/validate-npc.cjs \
+                   test/validate-door-audio.cjs test/validate-notes.cjs \
+                   test/validate-sound.cjs; do
             if node "$f"; then echo "::notice::PASS $f"; else echo "::warning::FAIL $f"; fail=1; fi
           done
           exit $fail
-      - name: test/ suites
+      - name: test/ suites (compare test/game.html against game.html)
         working-directory: test
         run: |
           # validate-inbox.cjs is excluded: its mock lacks `window` for the
           # existing inboxOpen page navigation (pre-existing test gap).
           fail=0
-          for f in validate-mcc-extinguisher.cjs validate-npc.cjs \
-                   validate-west-wing.cjs validate-windsocks.cjs \
-                   validate-door-audio.cjs validate-notes.cjs validate-sound.cjs; do
-            if node "$f"; then echo "::notice::PASS $f"; else echo "::warning::FAIL $f"; fail=1; fi
+          for f in validate-west-wing.cjs validate-windsocks.cjs \
+                   validate-mcc-extinguisher.cjs; do
+            if node "$f"; then echo "::notice::PASS test/$f"; else echo "::warning::FAIL test/$f"; fail=1; fi
           done
           exit $fail

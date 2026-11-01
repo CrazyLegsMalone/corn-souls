@@ -56,6 +56,21 @@ python scripts/sync_test_to_live.py --live-version 1.99   # step 6
 python scripts/sync_test_to_live.py --consistency         # LIVE version/cache wiring
 ```
 
+Test suites, and the directory each must be run from:
+
+| From repo root | From `test/` |
+| --- | --- |
+| `test/validate-live-promotion.cjs` | `validate-west-wing.cjs` |
+| `test/validate-traffic.cjs` | `validate-windsocks.cjs` |
+| `test/validate-acid.cjs` | `validate-mcc-extinguisher.cjs` |
+| `test/validate-npc.cjs` | |
+| `test/validate-door-audio.cjs` | |
+| `test/validate-notes.cjs` | |
+| `test/validate-sound.cjs` | |
+
+`validate-npc.cjs` also requires a clean working tree: it asserts `index.html`
+matches `git show HEAD:index.html`.
+
 ## Rules that prevent failures we have actually hit
 
 1. **Never hand-edit LIVE `game.html` / `index.html`.** Generate them; that is how
