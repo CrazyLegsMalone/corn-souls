@@ -7408,7 +7408,7 @@ const SPUR = (() => {
 })();
 const RXING = { x: RDPX_C, z: mainZ(RDPX_C), active: false, gates: [], lights: [], blink: 0, bellT: 0 };   // railroad crossing where the main line crosses Road P
 const SWITCHES = [];   // turnout switch stands (X / E next to one throws it)
-const THRUS = [{ dir: 1, off: TRACK_SP / 2, cars: [], u: -1, wait: 40, horn: false }, { dir: -1, off: -TRACK_SP / 2, cars: [], u: -1, wait: 130, horn: false }];   // through freights: eastbound on the south track, westbound on the north track
+const THRUS = [{ dir: 1, off: TRACK_SP / 2, cars: [], u: -1, wait: 40, horn: false, state: 'wait', speed: 22, target: null, heldT: 0, warned: false }, { dir: -1, off: -TRACK_SP / 2, cars: [], u: -1, wait: 130, horn: false, state: 'wait', speed: 22, target: null, heldT: 0, warned: false }];   // through freights: eastbound on the south track, westbound on the north track
 // one track along a path of points: a ballast strip with ties painted on at real spacing (8.5 ft ties every 20 in) and two steel rails
 // at standard gauge. The ballast/tie strip is a single ribbon mesh; rails are long boxes on straights and short instanced pieces on curves.
 let tieTex = null;
@@ -7507,6 +7507,7 @@ function buildRail() {
     T2.cars.push({ g: mk(20, j ? 0xc8312f : 0x1f4e8c, 3.4), off: 0, loco: true });
     for (let k = 0; k < 24; k++) T2.cars.push({ g: mk(16.5, [0x7a3b2a, 0x5f6b73, 0x8a5a2b, 0x3f5f4a][(k + j) % 4], 3.6), off: 19 + k * 18 });
   });
+  buildRailPhone();   // dispatcher phone on the north side of the crossing
 }
 // ---------- SULFURIC ACID LEAKS (the existing TP-12501 tank): a tool swing on the shell punches a hole; acid streams out and pools inside
 // the containment curb. Step in the puddle and it eats through your boots (a few seconds and you're done). Each hole runs ~40 s; the
@@ -7799,6 +7800,80 @@ function throwSwitch() {
   sw.thrown = !sw.thrown; sw.tgt.rotation.y = sw.thrown ? Math.PI / 2 : 0; sw.face.material.color.setHex(sw.thrown ? 0xffc531 : 0x3ddc84);
   return sw.thrown ? 'Switch thrown: lined for the main line' : 'Switch normal: lined for the loop';
 }
+// ---------- ROADSIDE DISPATCHER PHONE at the Road P crossing: a weatherproof cabinet on the north side of the tracks.
+// X / E at the phone opens a menu: hold a freight across the crossing (the gates stay down and the road is blocked),
+// send a held train on its way, or call one straight through. A hold releases itself after five minutes so the
+// crossing cannot stay blocked forever. In 2P the guest radios the host, who owns the trains.
+const RAIL_PHONE = { x: 0, z: 0, r: 2.3, notice: '' };
+function buildRailPhone() {
+  const px = RXING.x - 5.2, pz = mainZ(px) - 9;              // southbound-approach mast line: west side, north of the tracks
+  const x = px - 1.9, z = pz - 1.2;                          // further from Road P, clear of the mast and the gate arm
+  const g = new T.Group(); g.position.set(x, 0, z);
+  const cab = mat(0x4c5c54), trim = mat(0x2b3238), pale = mat(0xd8dbd5), dark = mat(0x14171a);
+  const B = (w, h, d, m, ox, oy, oz) => { const q = new T.Mesh(new T.BoxGeometry(w, h, d), m); q.position.set(ox, oy, oz); q.castShadow = true; q.userData.noHit = true; g.add(q); return q; };
+  B(0.52, 0.16, 0.52, mat(0x8d8d86), 0, 0.08, 0);            // concrete pad
+  B(0.14, 0.92, 0.14, trim, 0, 0.62, 0);                     // post
+  B(0.52, 0.76, 0.30, cab, 0, 1.44, 0);                      // cabinet
+  B(0.46, 0.68, 0.02, mat(0x56665d), 0, 1.44, 0.16);         // door
+  B(0.05, 0.10, 0.03, pale, 0.17, 1.32, 0.17);               // latch
+  B(0.56, 0.05, 0.34, trim, 0, 1.84, 0);                     // rain hood
+  B(0.08, 0.26, 0.07, dark, -0.02, 1.36, 0.19);              // handset
+  B(0.11, 0.05, 0.08, dark, -0.02, 1.50, 0.19);              // handset cradle
+  { const cord = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.44, 6), dark); cord.position.set(0.06, 1.14, 0.19); cord.rotation.z = 0.2; cord.userData.noHit = true; g.add(cord); }
+  { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96; const c = cv.getContext('2d');
+    c.fillStyle = '#f4f4ef'; c.fillRect(0, 0, 256, 96); c.strokeStyle = '#16181c'; c.lineWidth = 6; c.strokeRect(3, 3, 250, 90);
+    c.fillStyle = '#16181c'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = 'bold 30px Arial'; c.fillText('RAILROAD', 128, 34);
+    c.font = 'bold 19px Arial'; c.fillText('DISPATCHER PHONE', 128, 68);
+    const plate = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv), side: T.DoubleSide }));
+    plate.position.set(0, 2.0, 0.02); plate.userData.noHit = true; g.add(plate); }
+  scene.add(g); extraCols.push([x, z, 0.42]);
+  RAIL_PHONE.x = x; RAIL_PHONE.z = z;
+}
+function railPhoneNear() {
+  return !!walk.on && !walk.dead && Math.hypot(walk.x - RAIL_PHONE.x, walk.z - RAIL_PHONE.z) < RAIL_PHONE.r;
+}
+function railPhoneCross(R) {   // distance along this train's path to the crossing, plus its consist length
+  const [[x0, z0], [x1, z1]] = mainTrack(R.off);
+  const start = R.dir > 0 ? [x0, z0] : [x1, z1], dx = MAIN_DIR.x * R.dir, dz = MAIN_DIR.z * R.dir;
+  return { uc: (RXING.x - start[0]) * dx + (RXING.z - start[1]) * dz, TLEN: R.cars[R.cars.length - 1].off + 10 };
+}
+function railPhoneState() {   // what the menu may offer right now
+  return { held: THRUS.some(R => R.state === 'hold'), moving: THRUS.some(R => R.u >= 0 && R.state !== 'hold') };
+}
+function railPhoneApply(action) {
+  const held = THRUS.find(R => R.state === 'hold');
+  const waiting = () => { let best = null, bestUc = Infinity; for (const R of THRUS) { if (R.u >= 0) continue; const { uc } = railPhoneCross(R); if (uc > 0 && uc < bestUc) { bestUc = uc; best = R; } } return best; };
+  if (action === 'send') {
+    if (!held) return 'Dispatcher: nothing is holding at Road P';
+    held.state = 'leave'; held.target = null; held.speed = 8; held.heldT = 0; held.warned = false;
+    return 'Dispatcher: the freight is rolling again — Road P clears shortly';
+  }
+  if (action === 'hold') {
+    if (held) return 'Dispatcher: a train is already holding at Road P';
+    if (THRUS.some(R => R.u >= 0)) return 'Dispatcher: a train is already on the crossing — try again once it clears';
+    const best = waiting();
+    if (!best) return 'Dispatcher: no train is available right now';
+    const { uc, TLEN } = railPhoneCross(best);
+    best.u = 0; best.horn = false; best.state = 'run'; best.speed = 22; best.heldT = 0; best.warned = false;
+    best.target = uc + TLEN / 2; best.cars.forEach(c => { c.g.visible = true; });
+    return (best.dir > 0 ? 'Eastbound' : 'Westbound') + ' freight called — holding it on the Road P crossing';
+  }
+  if (action === 'through') {
+    const best = waiting();
+    if (!best) return 'Dispatcher: a train is already on the line';
+    best.u = 0; best.horn = false; best.state = 'run'; best.speed = 22; best.target = null; best.heldT = 0; best.warned = false;
+    best.cars.forEach(c => { c.g.visible = true; });
+    return (best.dir > 0 ? 'Eastbound' : 'Westbound') + ' freight called through Road P';
+  }
+  return null;
+}
+function railPhoneAction(action) {   // the guest radios the host, who owns the trains
+  if (!walk.on || walk.dead) return null;
+  if (NET.conn && !NET.host) { netSend({ t: 'rp', a: action }); return 'Dispatcher: request sent to the host'; }
+  return railPhoneApply(action);
+}
+function railPhoneNotice() { const n = RAIL_PHONE.notice; RAIL_PHONE.notice = ''; return n; }
 function crossingBell(vol, pan) {   // electronic crossing bell: a sharp metallic strike (several inharmonic partials) with a quick ring-out
   const C = tsnd.ctx; if (!C || vol < 0.02) return;
   const t = C.currentTime, out = C.createGain(); out.gain.value = 0.16 * vol;
@@ -7813,11 +7888,21 @@ function updateRail(dt) {
     const [[x0, z0], [x1, z1]] = mainTrack(R.off), ML = Math.hypot(x1 - x0, z1 - z0), TLEN = R.cars[R.cars.length - 1].off + 10;
     const start = R.dir > 0 ? [x0, z0] : [x1, z1], dx = MAIN_DIR.x * R.dir, dz = MAIN_DIR.z * R.dir, a = Math.atan2(-dz, dx);
     const uc = (RXING.x - start[0]) * dx + (RXING.z - start[1]) * dz;   // distance along this train's path to the crossing
-    if (R.u < 0) { if ((R.wait -= dt) <= 0) { R.u = 0; R.horn = false; R.cars.forEach(c => { c.g.visible = true; }); } continue; }
-    R.u += 22 * dt;
+    if (R.u < 0) { if ((R.wait -= dt) <= 0) { R.u = 0; R.horn = false; R.state = 'run'; R.speed = 22; R.target = null; R.cars.forEach(c => { c.g.visible = true; }); } continue; }
+    // dispatcher hold: ease up to the stop point, park across the crossing, release after five minutes
+    if (R.state === 'hold') {
+      R.heldT = (R.heldT || 0) + dt;
+      if (R.heldT > 285 && !R.warned) { R.warned = true; RAIL_PHONE.notice = 'Dispatcher: the hold at Road P expires in 15 seconds'; }
+      if (R.heldT > 300) { R.state = 'leave'; R.target = null; R.speed = 8; R.warned = false; }
+    } else if (R.target !== null && R.target !== undefined) {
+      const gap = R.target - R.u;
+      R.speed = Math.max(1.5, Math.min(22, gap * 0.8));
+      if (gap <= 0.3) { R.u = R.target; R.speed = 0; R.target = null; R.state = 'hold'; R.heldT = 0; R.warned = false; R.horn = false; }
+    } else if (R.speed < 22) R.speed = Math.min(22, R.speed + 5 * dt);
+    R.u += R.speed * dt;
     for (const c of R.cars) { const u = R.u - c.off; c.g.position.set(start[0] + dx * u, 0.25, start[1] + dz * u); c.g.rotation.y = a; }
     if (!R.horn && R.u > uc - 300) { R.horn = true; const d = camera.position.distanceTo(R.cars[0].g.position); if (tsnd.ctx) { const keep = tsnd.hornAt; tsnd.hornAt = -99; trainHorn(Math.min(1, 40 / (d + 10))); tsnd.hornAt = keep; } }
-    if (R.u - TLEN > ML) { R.u = -1; R.wait = 150 + Math.random() * 150; R.cars.forEach(c => { c.g.visible = false; }); }
+    if (R.u - TLEN > ML) { R.u = -1; R.wait = 150 + Math.random() * 150; R.state = 'wait'; R.speed = 22; R.target = null; R.heldT = 0; R.warned = false; R.cars.forEach(c => { c.g.visible = false; }); }
     if (R.u > uc - 260 && R.u - TLEN < uc + 15) RXING.active = true;
   }
   // sequence: lights + bell start, gates start down ~5 s later (take ~8 s), stay down while the train passes, rise when it's clear; lights/bell stop once up
@@ -8423,6 +8508,7 @@ function netRecv(m) {
     if (NET.rr && NET.rr.flame) NET.rr.flame.visible = !!m.nb && m.d;
     if (m.u) { const Q = NET.rr; Q.tx = m.u[0]; Q.tz = m.u[1]; Q.ta = m.u[2]; Q.steer = m.u[3]; Q.ty = m.u[4]; }
   } else if (m.t === 'swap') { if (!walk.drive) swapRangers();
+  } else if (m.t === 'rp') { if (NET.host) railPhoneApply(m.a);   // a guest rang the dispatcher
   } else if (m.t === 'shot') {
     if (!ballGeo) ballGeo = new T.SphereGeometry(0.07, 8, 6);
     if (solidsT > 2) { solids = collectSolids(false); solidsT = 0; }
@@ -10623,7 +10709,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { get scene() { return scene; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
+root.Plant3D = { get scene() { return scene; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
 })(this);
 </script>
 <script>// =====================================================================
@@ -10929,12 +11015,25 @@ function debugMenu(code) {
     [['Close', null], ['📝 Leave a note (bug / idea / message)', () => noteForm()], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')]], true);
 }
 // every control in the game, grouped by what you're doing: keyboard + mouse · controller · phone
+function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for depends on what the line is doing
+  const S = P3.railPhoneState();
+  const note = S.held ? 'A freight is holding the crossing and the gates are down.'
+    : S.moving ? 'A train is already on the crossing.'
+    : 'No train on the crossing.';
+  const rows = [];
+  if (S.held) rows.push(['Send the blocked train on', () => { const r = P3.railPhoneAction('send'); if (r) toast(r); }]);
+  else rows.push(['Call a train — hold the crossing', () => { const r = P3.railPhoneAction('hold'); if (r) toast(r); }]);
+  rows.push(['Call a train straight through', () => { const r = P3.railPhoneAction('through'); if (r) toast(r); }]);
+  rows.push(['Hang up', () => {}]);
+  modal(`<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">Road P crossing · dispatcher phone</div>
+    <div style="font-size:14px;line-height:1.45;color:#33404d">${note} A hold releases itself after five minutes.</div>`, rows, true);
+}
 function controlsMenu(code, fromTitle) {
   const S = [
     ['Walking (Squeeg mode)', [
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
-      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
+      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
       ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
@@ -11384,6 +11483,7 @@ let nav = 'touch';
 document.addEventListener('pointerdown', e => { if (e.pointerType === 'touch' || e.pointerType === 'pen') nav = 'touch'; }, true);
 let navShown = '';
 setInterval(() => { const pm = nav === 'pad'; if (navShown !== String(pm)) { navShown = String(pm); document.body.classList.toggle('padmode', pm); } }, 200);
+setInterval(() => { const n = P3.railPhoneNotice && P3.railPhoneNotice(); if (n) toast(n); }, 500);   // dispatcher hold about to expire
 const pad = { lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0, held: {} };
 const aimIn = { mouse: false, tog: false };   // aim down sights: right mouse (held), LT / L2 (held), or the AIM button (toggle)
 view.addEventListener('mousedown', e => { if (e.button === 2 && P3.walking && document.pointerLockElement === view) aimIn.mouse = true; });
@@ -11397,6 +11497,7 @@ function press(n) {
     if (n === 'L3') { pad.sprint = !pad.sprint; return; }
     if (n === 'R3') { toggleView(); return; }   // click the right stick: 1st / 3rd person
     if (n === 'X') { { const who = P3.npcAt(); if (who && NPC_DEF[who]) { talk(who); return; } }   // talk to whoever you're looking at
+    if (P3.railPhoneNear()) { railPhoneMenu(); return; }   // Road P dispatcher phone
     const r = P3.kiaToggle() || P3.radioToggle() || P3.takeTool() || P3.takeExtinguisher() || P3.pickChute() || P3.takeKey() || P3.carToggle() || P3.mowerToggle() || P3.coolerHandle() || P3.nh3Valve() || P3.throwSwitch() || P3.rideToggle(); if (r) { toast(r); return; } const id = P3.interactTarget(); if (id === 'BOARD') openBoard(); else if (id === 'BOARD_BUSY') toast('The Board Op is using this board — use the other one'); else if (id) selectUnit(id); else toast('Nothing to interact with here'); return; }
     if (n === 'B') { if (cur) closePanel(); return; }   // B only backs out of panels/menus; it doesn't leave Squeeg mode
     if (n === 'A' && !cur) { P3.walkJump(); return; }
