@@ -4954,17 +4954,25 @@ function loadCharacter(id, cfg) {
   if (!npc || !npc.g) return;
   loadGlbModel(cfg.url, ({ root }) => {
     const rig = characterRig(root, { hands: cfg.hands });
-    if (cfg.pose === 'sit') for (const s of ['L', 'R']) {          // thighs forward, shins down: a standing export sits
-      if (rig['leg' + s]) rig['leg' + s].rotation.x = -1.5;
-      if (rig['knee' + s]) rig['knee' + s].rotation.x = 1.5;
+    if (cfg.pose === 'sit') for (const s of ['L', 'R']) {          // thighs forward but sloping down, shins down: a standing export sits
+      if (rig['leg' + s]) rig['leg' + s].rotation.x = -1.15;
+      if (rig['knee' + s]) rig['knee' + s].rotation.x = 1.15;
     }
     root.scale.setScalar(cfg.scale || 1);
     root.updateMatrixWorld(true);
     const bb = new T.Box3().setFromObject(root);
-    // A seated model is anchored at the PELVIS, not the feet: seatedPerson() puts the seat top at 0.47 and the box
-    // avatar's hips at 0.49, so that is where the pelvis belongs whatever the leg fold does. Standing: feet on the floor.
+    // A seated model is anchored at the PELVIS, not at its origin: seatY is where the HIP JOINTS belong (seatedPerson()'s
+    // seat top is 0.47 and the box avatar's hips are 0.49), and the root sits at the model's FEET, 0.62 m below that in
+    // these rigs - so anchoring the root at seatY left every seated worker floating half a metre above the chair.
     const seatY = 0.49;
-    root.position.set(cfg.dx || 0, (cfg.pose === 'sit' ? seatY : -bb.min.y) + (cfg.dy || 0), (cfg.dz || 0));
+    let base = -bb.min.y;                                          // standing: feet on the floor
+    if (cfg.pose === 'sit') {
+      const hip = root.getObjectByName('Leg_Upper_L');
+      let hipY = 0.62;                                             // measured in all four rigs, and re-read from the model below
+      if (hip) { const v = V3(); hip.getWorldPosition(v); hipY = v.y; }
+      base = seatY - hipY;                                         // drop the feet until the PELVIS reaches the seat
+    }
+    root.position.set(cfg.dx || 0, base + (cfg.dy || 0), (cfg.dz || 0));
     root.rotation.y = cfg.face === undefined ? Math.PI : cfg.face; // the models face +Z; the box avatars face -Z
     if (cfg.pose !== 'sit') npc.g.position.y = 0;                  // drop the box avatar's own lift
     if (cfg.x !== undefined) npc.g.position.x = cfg.x;            // world nudges, e.g. off a track
@@ -6655,7 +6663,12 @@ function init(container) {
     sign('PLANT MANAGER', 78, HS, -1); sign('HR', 71, HS, -1); sign('RECEPTION', 65, HS, -1);
     // furniture: tech counters under the windows, a desk per office, training desks with monitors, restroom fixtures, vending machines
     const desk = (x, z, w, d) => { box(w, 0.06, d, mat(0x9a7b55), x, FY + 0.75, z); box(w - 0.1, 0.72, 0.05, mat(0x6f5a40), x, FY + 0.38, z + d / 2 - 0.05); };
-    for (const z of [ZN + 0.5, ZS - 0.5]) box(6.5, 1.0, 0.7, mat(0xd8d3c4), 86, FY + 0.5, z);           // tech counters along both window walls
+    // tech counters along both window walls: a top slab on two end panels, like a real service desk - the techs sit in the
+    // chairs behind them with their knees UNDER the counter instead of buried in a solid 1 m box. Top stays at sill height.
+    for (const z of [ZN + 0.5, ZS - 0.5]) {
+      box(6.5, 0.06, 0.7, mat(0xd8d3c4), 86, FY + 0.97, z);                                               // counter top, flush with the window sill
+      for (const sx of [-1, 1]) box(0.08, 0.94, 0.7, mat(0xcfc9ba), 86 + sx * 3.21, FY + 0.47, z);          // end panels
+    }
     desk(85.5, HZ, 1.6, 0.8);
     desk(78, ZS - 1.2, 1.6, 0.8); desk(71, ZS - 1.2, 1.6, 0.8); desk(65, ZS - 1.2, 1.8, 0.8);          // manager, HR, reception
     desk(75, ZN + 1.2, 1.6, 0.8);                                                                      // safety
@@ -10196,7 +10209,7 @@ function makeCharacter(vest, seated, opt) {
 function seatedPerson(x, z, yaw, shirt, fy, opt) {
   const g = new T.Group(), ch = mat(0x26292d);
   const P = (w, h, d, m, px, py, pz) => { const q = new T.Mesh(new T.BoxGeometry(w, h, d), m); q.position.set(px, py, pz); g.add(q); };
-  P(0.5, 0.08, 0.5, ch, 0, 0.47, 0); P(0.48, 0.55, 0.07, ch, 0, 0.8, 0.26); P(0.06, 0.42, 0.06, ch, 0, 0.23, 0); P(0.55, 0.04, 0.06, ch, 0, 0.03, 0); P(0.06, 0.04, 0.55, ch, 0, 0.03, 0);   // chair
+  P(0.5, 0.08, 0.5, ch, 0, 0.43, 0); P(0.48, 0.55, 0.07, ch, 0, 0.78, 0.26); P(0.06, 0.42, 0.06, ch, 0, 0.23, 0); P(0.55, 0.04, 0.06, ch, 0, 0.03, 0); P(0.06, 0.04, 0.55, ch, 0, 0.03, 0);   // chair: seat TOP at 0.47, which is what the pelvis is anchored to
   const p = makeCharacter(shirt, true, opt); p.position.set(0, -0.37, 0.04); g.add(p);
   g.position.set(x, fy || 0, z); g.rotation.y = yaw; scene.add(g); extraCols.push([x, z, 0.4]); return g;
 }

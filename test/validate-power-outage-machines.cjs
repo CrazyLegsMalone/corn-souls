@@ -396,10 +396,11 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.ok(npcTable.includes(file), 'NPC_MODELS wires ' + id + ' to ' + file);
   }
   assert.ok(html.includes('function characterRig(') && html.includes('function rigPivot('), 'one shared rig builder');
-  assert.ok(html.includes("rig['leg' + s].rotation.x = -1.5"), 'seated pose swings the thighs forward');
-  assert.ok(html.includes("rig['knee' + s].rotation.x = 1.5"), 'and the shins back down');
+  assert.ok(html.includes("rig['leg' + s].rotation.x = -1.15"), 'seated pose swings the thighs forward and slightly down');
+  assert.ok(html.includes("rig['knee' + s].rotation.x = 1.15"), 'and the shins back down to the floor');
   assert.ok(html.includes('const seatY = 0.49;'), 'seated models are anchored at the seat, not at their feet');
-  assert.ok(html.includes("(cfg.pose === 'sit' ? seatY : -bb.min.y)"), 'standing feet on the floor, seated pelvis on the seat');
+  assert.ok(html.includes('base = seatY - hipY;'), 'the PELVIS lands on the seat: the root sits at the feet, 0.62 m lower');
+  assert.ok(html.includes('let base = -bb.min.y;'), 'standing models still put their feet on the floor');
   assert.ok(html.includes('if (cfg.x !== undefined) npc.g.position.x = cfg.x;'), 'a per-NPC world nudge exists');
   assert.ok(html.includes('root.rotation.y = cfg.face === undefined ? Math.PI : cfg.face'), 'models are flipped to face like the box avatars');
   assert.ok(html.includes('if (seated.length) for (const c of seated) c.visible = false;'), 'only the box body is hidden - the chair stays');
