@@ -1,3 +1,12 @@
+## TEST v1.97.39 — blackout is now day/night aware (2026-11-01)
+- A power outage at midday no longer darkens the world. It kills the plant's artificial light (emissive fixtures, unlit signs, screen textures, indicator lamps, sprites) and dips the hemisphere light to **65% of the current daylight value**, while the sun, its shadows, the sky dome, the fog and the stars stay exactly as `daylight()` set them.
+- At night (before 07:00 or from 19:00) the event keeps its original response: ambient crushed to 5% of the daylight base, sun off, sky clamped to 2% luminance, sun disc removed, stars out.
+- `daylight()` now records what it computed (`DAYLIGHT.baseHemi`, `baseSun`, `hours`); `applyBlackout()` rebuilds its result from that base every frame instead of scaling whatever is currently in the light, so it stays idempotent and stays correct when the clock rolls from day into night mid-event (auto mode switches to the night response by itself).
+- `setBlackout(on, mode)` accepts `'auto' | 'day' | 'night'` (default auto), `P3.blackoutMode` exposes the current choice, and the mode can be changed while the event is already running.
+- Debug menu now has three rows: `Blackout: start` (auto), `Blackout: force night` (preview the night look at any hour) and `Blackout: end`; all routed through `P3.setBlackout`.
+- `test/validate-blackout.cjs` covers daytime (hemisphere dip only, sun/sky untouched, no compounding), night (full crush from the daylight base), forced night at 13:00 overriding a bright sky, plus the three menu rows and the new exports.
+- Bumped TEST to `1.97.39` / `corn-souls-test-shell-v66`.
+
 ## TEST v1.97.38 — blackout survives per-frame indicator rewrites (strainer / liquefaction pump lamps) (2026-11-01)
 - Owner feedback: the duty indicator lights for the slurry strainers and the liquefaction pumps were still lit. Those rings are `MeshBasicMaterial({color: 0x3ddc84})` whose colour is rewritten by the duty logic every frame, so the one-off dim was overwritten on the next frame.
 - The blackout now stores each material's **original colour components** and re-applies the dim from that base every frame via `BLACKOUT.apply()`, called at the end of `applyBlackout()` — after all simulation and UI updates. Because it is applied from the stored base (not multiplied in place) it stays idempotent: repeated frames cannot compound, and a colour rewritten by the sim is immediately re-dimmed.
