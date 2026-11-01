@@ -317,6 +317,27 @@
       "public_repository_redistribution_review": "owner-directed; published with owner approval",
       "required_notice": "None (first-party asset).",
       "notes": "Tammy, the outbound scale-house tech in the TEST channel: pivoted and posed seated at the drive-through window, feet on the raised floor."
+    },
+    {
+      "id": "first-party-ethanol-plant-steam-boiler",
+      "title": "Ethanol Plant Steam Boiler (narrow, long)",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/ethanol_plant_steam_boiler_narrow_long.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale: 6.34 x 8.14 x 9.96 m, base already on the floor. Turned -90 degrees so the long axis runs east-west with the burner facing west, placed once per bay (north Boiler 1, south Boiler 2) with the second instance cloned from the first, base snapped to the floor from its own bounds. Geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/ethanol_plant_steam_boiler_narrow_long.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter (2.0). 259 nodes, 258 meshes, 11 flat materials, no textures, no skins, no animations, node transforms authored as matrices; own exhaust stack, burner + forced-draft blower, steam drum, blowdown valve, gauges, sight glasses and ladder. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The two package boilers in the energy centre in the TEST channel (north = Boiler 1, south = Boiler 2)."
     }
   ]
 }

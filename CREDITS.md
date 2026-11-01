@@ -25,6 +25,8 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 - **"Scale House Tech - Brenda rig"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. Character model in the TEST channel (`assets/models/brenda_scalehouse_rig.glb`). Registered in [assets/registry.json](assets/registry.json).
 - **"Scale House Tech - Tammy rig"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. Character model in the TEST channel (`assets/models/tammy_scalehouse_rig.glb`). Registered in [assets/registry.json](assets/registry.json).
 
+- **"Ethanol Plant Steam Boiler (narrow, long)"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The two package boilers in the energy centre in the TEST channel (`assets/models/ethanol_plant_steam_boiler_narrow_long.glb`). Registered in [assets/registry.json](assets/registry.json).
+
 ## Attribution template
 
 **“Asset Title”** — by Creator ([source](https://example.com/)). [License Name](https://creativecommons.org/licenses/by/4.0/). Modifications: describe exactly what changed. No endorsement implied.

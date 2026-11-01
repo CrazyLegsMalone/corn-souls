@@ -4976,6 +4976,22 @@ function loadCharacter(id, cfg) {
   }, 'npc:' + id);
 }
 function loadNpcModels() { for (const id in NPC_MODELS) loadCharacter(id, NPC_MODELS[id]); }
+// ---------- PACKAGE BOILERS: the owner's ethanol_plant_steam_boiler_narrow_long.glb - 259 nodes, matrix transforms,
+// and its own stack, burner, blower, steam drum, gauges and ladder. One upload, one clone: both bays share the geometry.
+const BOILER = { ready: false };
+const BOILER_SPOTS = [];
+function loadBoilers() {
+  loadGlbModel('/corn-souls/assets/models/ethanol_plant_steam_boiler_narrow_long.glb', ({ root }) => {
+    BOILER_SPOTS.forEach((s, i) => {
+      const g = i ? root.clone(true) : root;
+      g.position.set(s.x, s.y, s.z); g.rotation.y = s.yaw || 0; if (s.scale) g.scale.setScalar(s.scale);
+      scene.add(g); g.updateMatrixWorld(true);
+      const bb = new T.Box3().setFromObject(g);
+      g.position.y += s.y - bb.min.y;                     // s.y is the floor: sit the base on it, whatever the origin is
+    });
+    BOILER.ready = true;
+  }, 'boilers');
+}
 const DRINK = { ready: false };
 const DRINK_SPOTS = [];
 function loadDrinkMachines() {
@@ -7148,17 +7164,14 @@ function init(container) {
       box(2.2, 5.0, 4.4, drum, x1 + 0.1, 2.5, cz); box(1.4, 12 - 5.0, 1.4, mat(0x8a8f94), x1 + 0.1, 5.0 + (12 - 5.0) / 2, cz);   // discharge breeching + duct up through the roof
       ecBox(x0 - 1.2, x1 + 1.2, cz - 2.3, cz + 2.3);
       nameplate(nm, (x0 + x1) / 2, cy + R + 0.4, cz, 0.2, 0, -1).position.z = cz - R - 0.06; });
-    // package boilers: big blue casing with a rounded top, red burner on the west end, stack up through the roof on the east end
-    [[19.4, 25.4, 'BOILER A'], [32.0, 38.6, 'BOILER B']].forEach(([za, zb, nm]) => {
-      const cz = EZ0 + (za + zb) / 2, x0 = E0 + 6.4, x1 = E0 + 18.8, W = zb - za - 0.6, H = 4.6, bl = mat(0x4f6d8a);
-      box(x1 - x0, H - 1.0, W, bl, (x0 + x1) / 2, (H - 1.0) / 2, cz);
-      const top = add(new T.CylinderGeometry(W / 2, W / 2, x1 - x0, 20, 1, false, 0, Math.PI), bl, (x0 + x1) / 2, H - 1.0, cz, null); top.rotation.set(Math.PI / 2, 0, Math.PI / 2); top.scale.z = 0.4;   // rounded roof of the casing
-      box(0.3, H - 0.6, W + 0.1, mat(0x3c556c), x0 + 0.15, (H - 0.6) / 2, cz);                                    // front plate
-      const bu = add(new T.CylinderGeometry(0.7, 0.8, 1.4, 16), mat(0xc8211c), x0 - 0.7, 2.0, cz, null); bu.rotation.z = Math.PI / 2;   // burner
-      box(1.2, 1.4, 1.0, mat(0x5a5f66), x0 - 0.9, 0.7, cz + 1.4);                                                 // FD fan
-      cyl(0.65, 15.5 - H, mat(0x9aa0a6), x1 - 1.2, H - 0.3, cz, null, 16);                                        // stack through the roof
-      ecBox(x0 - 1.5, x1, cz - W / 2 - 0.1, cz + W / 2 + 0.1);
-      nameplate(nm, (x0 + x1) / 2, 2.6, cz, W / 2, 0, -1); });
+    // package boilers: the owner's ethanol_plant_steam_boiler_narrow_long.glb, one per bay - NORTH IS BOILER 1, SOUTH IS
+    // BOILER 2. Turned -90 degrees so the ~10 m casing runs east-west and its burner faces west, like the old pair did.
+    [[19.4, 25.4, 'BOILER 1'], [32.0, 38.6, 'BOILER 2']].forEach(([za, zb, nm]) => {
+      const cz = EZ0 + (za + zb) / 2, cx = E0 + 12.6;
+      BOILER_SPOTS.push({ x: cx, y: 0, z: cz, yaw: -Math.PI / 2, name: nm });
+      ecBox(cx - 5.0, cx + 5.0, cz - 3.2, cz + 3.2);
+      nameplate(nm, cx, 3.2, cz - 3.3, 3.2, 0, -1); });
+    loadBoilers();
     // floor trenches (steel grating over them): one east-west between the boilers and one north-south along the east side; the three runs
     // meet at the sump in the middle of the east side
     { const cv = document.createElement('canvas'); cv.width = 32; cv.height = 32; const c = cv.getContext('2d'); c.fillStyle = '#1a1c1e'; c.fillRect(0, 0, 32, 32);

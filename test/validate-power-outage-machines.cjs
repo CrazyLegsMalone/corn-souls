@@ -406,4 +406,58 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function loadNpcModels()') && html.includes('loadNpcModels();'), 'loaded at init');
 }
 
+
+// ---------------------------------------------------------------- the package boiler model
+{
+  const glb = fs.readFileSync('assets/models/ethanol_plant_steam_boiler_narrow_long.glb');
+  assert.equal(glb.readUInt32LE(0), 0x46546c67, 'boiler GLB magic');
+  let off = 12, doc = null, hasBin = false;
+  while (off < glb.length) {
+    const len = glb.readUInt32LE(off), type = glb.readUInt32LE(off + 4), body = off + 8;
+    if (type === 0x4e4f534a) doc = JSON.parse(glb.slice(body, body + len).toString('utf8'));
+    else if (type === 0x004e4942) hasBin = true;
+    off = body + len + ((4 - (len % 4)) % 4);
+  }
+  assert.ok(doc && hasBin, 'JSON + embedded BIN');
+  assert.equal(doc.nodes[doc.scenes[doc.scene || 0].nodes[0]].name, 'Ethanol_Plant_Steam_Boiler', 'the boiler root');
+  assert.equal((doc.images || []).length, 0, 'flat materials only');
+  assert.ok(doc.nodes.filter(n => n.matrix).length > 200, 'the parts are placed with matrices');
+  const names = new Set(doc.nodes.map(n => n.name));
+  for (const part of ['Exhaust_Stack', 'Burner_Housing', 'Forced_Draft_Blower', 'Upper_Steam_Drum', 'Insulated_Boiler_Casing', 'Boiler_Nameplate']) {
+    assert.ok(names.has(part), 'the model carries its own ' + part);
+  }
+  // assembled bounds through the matrices, exactly as the reader builds it
+  const I = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  const mul = (a, b2) => a.map(r => [0, 1, 2, 3].map(j => r[0] * b2[0][j] + r[1] * b2[1][j] + r[2] * b2[2][j] + r[3] * b2[3][j]));
+  const nmat = n => {
+    if (!n.matrix) return I;
+    const m2 = n.matrix;
+    return [[m2[0], m2[4], m2[8], m2[12]], [m2[1], m2[5], m2[9], m2[13]], [m2[2], m2[6], m2[10], m2[14]], [m2[3], m2[7], m2[11], m2[15]]];
+  };
+  const ap = (mm, p) => [0, 1, 2].map(i => mm[i][0] * p[0] + mm[i][1] * p[1] + mm[i][2] * p[2] + mm[i][3]);
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  const walk = (i, parent) => {
+    const n = doc.nodes[i], mm = mul(parent, nmat(n));
+    if (n.mesh !== undefined) for (const pr of doc.meshes[n.mesh].primitives) {
+      const ac = doc.accessors[pr.attributes.POSITION];
+      for (const cx of [ac.min[0], ac.max[0]]) for (const cy of [ac.min[1], ac.max[1]]) for (const cz of [ac.min[2], ac.max[2]]) {
+        const p = ap(mm, [cx, cy, cz]);
+        for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], p[k]); mx[k] = Math.max(mx[k], p[k]); }
+      }
+    }
+    for (const c of n.children || []) walk(c, mm);
+  };
+  for (const i of doc.scenes[doc.scene || 0].nodes) walk(i, I);
+  const bw = mx[0] - mn[0], bh = mx[1] - mn[1], bd = mx[2] - mn[2];
+  assert.ok(Math.abs(bw - 6.34) < 0.6 && Math.abs(bh - 8.14) < 0.6 && Math.abs(bd - 9.96) < 0.6,
+    'assembled ' + bw.toFixed(2) + ' x ' + bh.toFixed(2) + ' x ' + bd.toFixed(2) + ' m');
+  assert.ok(Math.abs(mn[1]) < 0.1, 'the base already sits at y 0');
+  // wiring: two bays, north is Boiler 1
+  assert.ok(html.includes("[[19.4, 25.4, 'BOILER 1'], [32.0, 38.6, 'BOILER 2']]"), 'north is Boiler 1, south is Boiler 2');
+  assert.ok(html.includes('BOILER_SPOTS.push({ x: cx, y: 0, z: cz, yaw: -Math.PI / 2'), 'turned so the long axis runs east-west and the burner faces west');
+  assert.ok(html.includes('loadBoilers();') && html.includes('root.clone(true)'), 'one upload shared by both boilers');
+  assert.ok(html.includes('ecBox(cx - 5.0, cx + 5.0, cz - 3.2, cz + 3.2)'), 'each boiler keeps its collision box');
+  assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
+}
+
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');
