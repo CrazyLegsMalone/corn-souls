@@ -13,6 +13,7 @@ function build(source, westWing){
  ctx.tank=(x,z,r,h,c)=>ctx.add(new T.CylinderGeometry(r,r,h,12),ctx.mat(c),x,h/2,z);
  ctx.regVehBox=noop;ctx.buildShopRadio=noop;ctx.buildToolWall=noop;ctx.pumpSet=noop;ctx.pipe=noop;ctx.nameplate=noop;
  ctx.egressStrobe=noop;ctx.gridLight=m=>m;ctx.batteryLight=m=>m;   // power-outage hooks: this block only needs them to exist
+ ctx.exitSignMat=()=>new T.MeshBasicMaterial({color:0xc8211c});ctx.exitHalo=noop;   // EXIT signage helpers
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);
  vm.runInContext(source.slice(source.indexOf('  // ---------- PROCESS BUILDING'),source.indexOf('  // beer well pump inside the alley')),ctx);

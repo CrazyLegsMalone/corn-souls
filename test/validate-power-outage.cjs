@@ -134,11 +134,16 @@ function makeCtx() {
 
   // every emitter is classified where it is built, so nothing is dimmed by accident
   assert.equal((html.match(/gridLight\(/g) || []).length, 23, '23 mains emitters are flagged gridLight');
-  assert.equal((html.match(/batteryLight\(/g) || []).length, 11, '10 self-powered ones + the egress strobe lens');
+  assert.equal((html.match(/batteryLight\(/g) || []).length, 8, 'self-powered gear: vehicles, radio, egress lens, EXIT signs');
+  assert.equal((html.match(/exitSignMat\(\)/g) || []).length, 5, 'four lettered EXIT signs + the shared builder');
+  assert.equal((html.match(/exitHalo\(/g) || []).length, 5, 'a halo per sign + the builder');
+  assert.ok(html.includes("c.fillText('EXIT', 64, 44)"), 'the signs are lettered, not flat red boxes');
   assert.ok(html.includes('m.userData.keepLit = true;   // fires survive an outage'), 'flame sprites are marked keepLit');
 
   // egress strobes: 1 definition + 1 in manDoor + 1 in the turbine door helper + 11 explicit doorways
   assert.equal((html.match(/egressStrobe\(/g) || []).length, 14, 'egress strobe call sites');
+  assert.ok(html.includes('const EGRESS_OFF = 0.24, EGRESS_Y = 2.78;'), 'strobes sit clear of the wall face and above the door-name plates at 2.45');
+  assert.ok(!html.includes('egressStrobe(MX1, BSZ'), 'the shop east-door strobes use the doorway centre, not a wall-start offset');
   const shack = html.indexOf('{ g: dg, rot: 0, dir: 1, x: x + h, z, open: 0 }');   // ethanol load-out shack door
   assert.ok(shack > 0, 'found the ethanol load-out shack door');
   assert.ok(!html.slice(shack, shack + 200).includes('egressStrobe'), 'no strobe in the ethanol load-out shack');

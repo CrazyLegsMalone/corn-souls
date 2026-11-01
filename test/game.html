@@ -4781,11 +4781,37 @@ function manDoor(x, z, alongX, col, inward) {   // inward: +1/-1 = which way is 
 // lands on the interior face. Battery-backed, so it keeps working in an outage - it only blinks while the plant is dead.
 // One shared lens material: every door flashes on the same emergency circuit, for one colour write per frame.
 const EGRESS = { list: [], lens: null };
+const EGRESS_OFF = 0.24, EGRESS_Y = 2.78;   // clear of the wall face (walls are 0.25-0.3 thick) and above the door-name plates at 2.45
 function egressStrobe(x, z, ix, iz) {
   const lens = EGRESS.lens || (EGRESS.lens = batteryLight(new T.MeshBasicMaterial({ color: 0x3a0e0e })));
   const m = new T.Mesh(new T.SphereGeometry(0.085, 10, 7), lens);
-  m.position.set(x + ix * 0.17, 2.42, z + iz * 0.17); m.scale.set(1, 1, 0.7);
+  m.position.set(x + ix * EGRESS_OFF, EGRESS_Y, z + iz * EGRESS_OFF); m.scale.set(1, 1, 0.7);
   m.rotation.y = Math.atan2(ix, iz); m.userData.noHit = true; scene.add(m); EGRESS.list.push(m);
+}
+// EXIT signage: one shared lit texture (red face, cream letters) plus a soft additive halo, so the signs read as
+// illuminated emergency signage instead of flat red boxes. Battery-backed: they stay lit in a power outage.
+const EXIT_SIGN = { mat: null, halo: null };
+function exitSignMat() {
+  if (EXIT_SIGN.mat) return EXIT_SIGN.mat;
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 56;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#c8211c'; c.fillRect(0, 0, 128, 56);
+  c.strokeStyle = '#222'; c.lineWidth = 6; c.strokeRect(3, 3, 122, 50);
+  c.fillStyle = '#f4eee0'; c.font = 'bold 40px Arial'; c.textAlign = 'center'; c.fillText('EXIT', 64, 44);
+  const t = new T.CanvasTexture(cv); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+  return (EXIT_SIGN.mat = batteryLight(new T.MeshBasicMaterial({ map: t })));
+}
+function exitHaloMat() {
+  if (EXIT_SIGN.halo) return EXIT_SIGN.halo;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
+  const gr = c.createRadialGradient(32, 32, 1, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,74,62,0.50)'); gr.addColorStop(0.55, 'rgba(214,20,20,0.16)'); gr.addColorStop(1, 'rgba(120,0,0,0)');
+  c.fillStyle = gr; c.fillRect(0, 0, 64, 64);
+  return (EXIT_SIGN.halo = new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv), transparent: true, blending: T.AdditiveBlending, depthWrite: false, fog: false }));
+}
+function exitHalo(w, h, x, y, z, rotY) {   // the soft glow just in front of a sign face
+  const m = new T.Mesh(new T.PlaneGeometry(w, h), exitHaloMat());
+  m.position.set(x, y, z); m.rotation.y = rotY || 0; m.userData.noHit = true; scene.add(m);
 }
 function concreteFloor(x0, x1, z0, z1) { box(x1 - x0 - 0.3, 0.1, z1 - z0 - 0.3, mat(0x8d9196), (x0 + x1) / 2, 0.16, (z0 + z1) / 2); }
 // ---------- pipe-rack support: a steel post with a short cross-arm under an overhead pipe ----------
@@ -5660,7 +5686,7 @@ function init(container) {
     wall(FXW + FR - 0.3, ZN, FXE - FR + 0.3, ZN, PH, wm, [[AC - 1.0 - (FXW + FR - 0.3), 2.95, 3.05], [AC + 2.2 - (FXW + FR - 0.3), 0.95]], { trim: true, leaf: 1 });   // north end of the ferm alley: roll-up door (west) + man door (east)
       egressStrobe(AC + 2.2, ZN, 0, 1);   // north-end man door of the ferm alley, strobe inside
     rollDoor(AC - 1.0, ZN + 0.05, true, 2.9, 3.0, -1, 'slat', 1);                                   // housing inside (south), bollards outside
-    box(0.7, 0.3, 0.12, batteryLight(new T.MeshBasicMaterial({ color: 0xd8262c })), AC + 2.2, DH0 + 0.35, ZN + 0.25);   // EXIT sign inside
+    box(0.7, 0.3, 0.12, exitSignMat(), AC + 2.2, DH0 + 0.35, ZN + 0.25); exitHalo(1.1, 0.55, AC + 2.2, DH0 + 0.35, ZN + 0.318, 0);   // EXIT sign inside
     { // open steel tower with catwalks between Ferm 4 and 5, from the end wall up to the tank tops (photo)
       const st = mat(0x6f7378), rail = mat(0xb8a24a), x0 = AC - 3.0, x1 = AC + 3.0, z0 = ZN - 2.6, z1 = ZN + 2.6, top = FH + 1.2;
       for (const x of [x0, x1]) for (const z of [z0, z1]) box(0.35, top - PH, 0.35, st, x, (top + PH) / 2, z);
@@ -5716,9 +5742,8 @@ function init(container) {
           c.fillStyle = '#111'; c.font = 'bold ' + Math.round(H * 0.11) + 'px Arial'; ['HARD HATS AND', 'EYE PROTECTION', 'REQUIRED', 'IN THIS AREA'].forEach((t, i) => c.fillText(t, W / 2, H * (0.46 + i * 0.15))); }, 0.34, 0.25, -lw / 2 + 0.06, 1.25);
         pl((c, W, H) => { c.fillStyle = '#f7f7f4'; c.fillRect(0, 0, W, H); c.strokeStyle = '#555'; c.lineWidth = 1.5; for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) { c.beginPath(); c.arc(60 + j * 14, 18 + i * 13, 6, 0, 7); c.stroke(); }
           c.strokeRect(10, 70, 60, 22); c.strokeRect(80, 60, 34, 32); c.fillStyle = '#333'; c.font = 'bold 9px Arial'; c.fillText('PROCESS AREA', 10, 62); c.fillText('North \u2191', 88, 22); }, 0.28, 0.23, -lw / 2 + 0.04, 1.58); }
-      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 56; const c = cv.getContext('2d'); c.fillStyle = '#c8211c'; c.fillRect(0, 0, 128, 56); c.strokeStyle = '#222'; c.lineWidth = 6; c.strokeRect(3, 3, 122, 50);
-      c.fillStyle = '#f4eee0'; c.font = 'bold 40px Arial'; c.textAlign = 'center'; c.fillText('EXIT', 64, 44);
-      const ex = new T.Mesh(new T.PlaneGeometry(0.42, 0.18), batteryLight(new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv) }))); ex.position.set(-45.8, DH0 + 0.66, OZN + 0.135); ex.userData.noHit = true; scene.add(ex);
+      const ex = new T.Mesh(new T.PlaneGeometry(0.42, 0.18), exitSignMat()); ex.position.set(-45.8, DH0 + 0.66, OZN + 0.135); ex.userData.noHit = true; scene.add(ex);
+      exitHalo(0.68, 0.34, -45.8, DH0 + 0.66, OZN + 0.143, 0);   // lab EXIT sign halo, same shared signage
     }
     wall(WW, OZS, EW, OZS, OH, blockM, [[-69.0 - WW, DOOR, 0, ['HALLWAY', 'EVAP ALLEY']], [-58.3 - WW, DOOR, 0, ['HALLWAY', 'EVAP ALLEY']], [-47.7 - WW, 0.95, 0, ['LAB', 'EVAP ALLEY']], [-38.0 - WW, 0.95, 0, ['CONTROL ROOM', 'EVAP ALLEY']], [-32.0 - WW, 1.1, 1.97, 0, 0, 1.0]], { stripe: true, th: 0.25 });   // south side → evap alley
     wall(EW, OZN, EW, OZS, OH, blockM, [[1.6, 2.0, 1.97, 0, 0, 1.0], [4.9, 2.2, 1.97, 0, 0, 1.0]], { stripe: true, th: 0.25 });   // control room east wall: two windows into the ferm alley
@@ -5807,7 +5832,7 @@ function init(container) {
     }
     wallSegs.push([WW + 0.2, OZS - 0.6, WW + 0.3 + 14 * 0.305, OZS - 0.6]);
     box(0.08, 0.3, 0.7, batteryLight(new T.MeshBasicMaterial({ color: 0xd8262c })), WW + 0.2, DH + 0.3, OZS - 1.3);
-    box(0.06, 0.2, 0.55, batteryLight(new T.MeshBasicMaterial({ color: 0xff6b6b })), WW + 0.25, DH + 0.3, OZS - 1.3);
+    box(0.06, 0.2, 0.55, exitSignMat(), WW + 0.25, DH + 0.3, OZS - 1.3); exitHalo(0.9, 0.4, WW + 0.288, DH + 0.3, OZS - 1.3, Math.PI / 2);   // lit, lettered face over the hall door
     // break room table, lab island, control room console (simple shapes)
     // ---- laboratory (from the four corner photos): white base cabinets with dark tops along the walls, a center island,
     // instruments (HPLCs, GCs, analyzer), a desk at the control room window, glass-front upper cabinets on the south wall.
@@ -5919,11 +5944,11 @@ function init(container) {
       // main shop: walls, doors (north double door to the yard, east man door), roof, concrete floor
       // one envelope with the rest of the process building: east wall, north walls, roof and floor over the shop, its yard and the north rooms
       wall(MX1, BSZ, MX1, SZ, PH, wm, [[-8.0 - BSZ, DOOR], [OZN - 2.6 - BSZ, 3.1, 3.55], [30.0 - BSZ, 0.95], [34.5 - BSZ, 4.32, 4.95], [40.5 - BSZ, 3.1, 3.25]], { trim: true, leaf: -1 });
-      egressStrobe(MX1, BSZ - 8.0, -1, 0); egressStrobe(MX1, BSZ + 30.0, -1, 0);   // the shop's two east-wall man doors
+      egressStrobe(MX1, -8.0, -1, 0); egressStrobe(MX1, 30.0, -1, 0);   // the shop's two east-wall man doors (offsets are measured from the wall start)
       // shop east wall (photos, scaled from the man door): man door with EXIT sign, big Cornell roll-up (~14 x 14 ft), then a smaller roll-up (~10 x 10 ft) ~5.5 ft from the SE corner
       rollDoor(MX1 - 0.05, 34.5, false, 4.27, 4.9, -1, 'slat', 1);   // yellow bollards outside, both sides   // outside photo: ~14 ft wide x ~16 ft tall
       rollDoor(MX1 - 0.05, 40.5, false, 3.05, 3.2, -1, 'slat', 1);
-      box(0.12, 0.3, 0.7, batteryLight(new T.MeshBasicMaterial({ color: 0xd8262c })), MX1 - 0.25, DH0 + 0.35, 17.7);
+      box(0.12, 0.3, 0.7, exitSignMat(), MX1 - 0.25, DH0 + 0.35, 17.7); exitHalo(1.1, 0.55, MX1 - 0.318, DH0 + 0.35, 17.7, -Math.PI / 2);   // shop EXIT sign
       rollDoor(MX1 - 0.05, OZN - 2.6, false, 3.05, 3.5, -1, 'slat', 1);   // east roll-up door at the end of the aisle
       // NE block (satellite + paced): from Ferm 1 the wall jogs 8 ft south (ferm alley wall line), runs 40 ft east, then the east face
       // runs 44 ft south past the methanator tanks: 8 ft wall, green double man door (FERM MCC, 6.5 ft), 9 ft wall, 10 ft mesh roll-up, 10.5 ft wall
