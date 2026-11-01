@@ -1,3 +1,7 @@
+## TEST v1.97.45 — the pivot diesel is louder (owner request) (2026-11-01)
+- The gen-set idle gain goes from `0.06` to `0.13` at full closeness (roughly +7 dB) - clearly audible as soon as you come into the circle, still fading out at the same ~80 m. Only the volume changed: the lope, the pitch wobble and the lowpass are untouched.
+- Bumped TEST to `1.97.45` / `corn-souls-test-shell-v72`.
+
 ## TEST v1.97.44 — fix `PIVOT_GEN is not defined` at load (scope bug) (2026-11-01)
 - **Reported by the owner as a red error card on load: `PIVOT_GEN is not defined`.** The gen-set state was declared with `const` beside the pivot field block - two spaces of indentation, which in that spot meant it landed *inside* an enclosing building block (brace depth 3) instead of at closure scope (depth 2). `updatePivot()`, `pivotGenAction()` and the `P3.pivotGen` getter all sit at closure scope, so on the first frame the world threw and the whole scene failed to build. Nothing was wrong with the feature itself, only with where its state was declared.
 - `PIVOT_GEN` and `CAN` now live next to the other world-level state (beside `EXIT_SIGN`, `EGRESS` and the light helpers), with a comment recording why the placement matters.

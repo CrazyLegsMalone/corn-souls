@@ -10254,7 +10254,7 @@ function pivotGenSound() {   // the pivot's diesel: a low lope you only hear nea
   const near = Math.max(0, Math.min(1, 1 - (d - 25) / 55));   // audible inside ~80 m, silent beyond
   const on = G.running && G.fuel > 0 && near > 0, t = C.currentTime, f = 44 + Math.sin(t * 2.1) * 1.1;
   S.o.frequency.setTargetAtTime(f, t, 0.25); S.o2.frequency.setTargetAtTime(f * 0.5, t, 0.25);
-  S.g.gain.setTargetAtTime(on ? 0.06 * near : 0, t, 0.25);
+  S.g.gain.setTargetAtTime(on ? 0.13 * near : 0, t, 0.25);   // a stationary diesel carries: louder up close, same 80 m falloff
 }
 function utvCam(dt) {
   scene.fog.near = 120; scene.fog.far = 900;
