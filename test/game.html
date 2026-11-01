@@ -8279,7 +8279,7 @@ function setBlackout(on) {
   on = !!on;
   if (on === BLACKOUT.on) return on;
   BLACKOUT.on = on;
-  if (on) {                       // dim every self-lit / unlit material once (fixtures, signs, screens, lamps)
+  if (on) {                       // capture every self-lit / unlit material once (fixtures, signs, screens, lamps)
     BLACKOUT.saved.length = 0;
     const seen = new Set();
     const skip = new Set([SKY.clouds && SKY.clouds.material, SKY.stars && SKY.stars.material]);   // handled per frame
@@ -8289,27 +8289,36 @@ function setBlackout(on) {
         if (!m || seen.has(m.uuid) || skip.has(m) || (m.userData && m.userData.keepLit)) continue;   // keepLit: fires
         if (m.userData && m.userData.darkOnBlackout && m.color) {     // screens: go fully black, not just dim
           seen.add(m.uuid);
-          BLACKOUT.saved.push([m, m.color.getHex(), 'color']);
-          m.color.setHex(0x000000);
+          BLACKOUT.saved.push([m, { r: m.color.r, g: m.color.g, b: m.color.b }, 'dark']);
         } else if (m.emissive) {                                      // lit materials: kill the self-glow
           seen.add(m.uuid);
-          const k = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
-          BLACKOUT.saved.push([m, k, 'emissive']);
-          m.emissiveIntensity = k * 0.06;
+          BLACKOUT.saved.push([m, m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity, 'emissive']);
         } else if (m.color && (m.isMeshBasicMaterial || m.isSpriteMaterial || m.isPointsMaterial)) {
           seen.add(m.uuid);                                           // unlit: signs, indicator lamps, sprites, decals
-          BLACKOUT.saved.push([m, m.color.getHex(), 'color']);
-          m.color.multiplyScalar(0.12);
+          BLACKOUT.saved.push([m, { r: m.color.r, g: m.color.g, b: m.color.b }, 'color']);
         }
       }
     });
+    BLACKOUT.apply();
   } else {
-    for (const [m, k, kind] of BLACKOUT.saved) { if (kind === 'color') m.color.setHex(k); else m.emissiveIntensity = k; }
+    for (const [m, k, kind] of BLACKOUT.saved) {
+      if (kind === 'emissive') m.emissiveIntensity = k;
+      else m.color.setRGB(k.r, k.g, k.b);
+    }
     BLACKOUT.saved.length = 0;
   }
   dayT = 99;   // force daylight() to re-apply on the next frame in both directions
   return on;
 }
+// Re-applied every frame: duty lamps, strainer rings and pump indicators rewrite their
+// colours in their own update loops, so a one-off dim would be overwritten immediately.
+BLACKOUT.apply = function () {
+  for (const [m, k, kind] of BLACKOUT.saved) {
+    if (kind === 'emissive') m.emissiveIntensity = k * 0.06;
+    else if (kind === 'dark') m.color.setRGB(0, 0, 0);
+    else m.color.setRGB(k.r * 0.12, k.g * 0.12, k.b * 0.12);
+  }
+};
 function applyBlackout() {   // idempotent: clamps whatever daylight()/updateSky() left behind
   if (!BLACKOUT.on) return;
   hemi.intensity = Math.min(hemi.intensity, 0.06);
@@ -8321,6 +8330,7 @@ function applyBlackout() {   // idempotent: clamps whatever daylight()/updateSky
   if (U) { U.hor.value.multiplyScalar(0.06); U.zen.value.multiplyScalar(0.06); U.sunK.value = 0; }
   if (SKY.clouds) SKY.clouds.material.color.multiplyScalar(0.18);
   if (SKY.stars) SKY.stars.material.opacity = Math.max(SKY.stars.material.opacity, 0.55);   // stars come out
+  BLACKOUT.apply();   // last: overwrite any colour a duty lamp / indicator rewrote this frame
 }
 // ---------- weather (real conditions fetched by the UI; 'sunny' | 'cloudy' | 'rain' | 'snow') ----------
 const weather = { kind: 'sunny', pts: null, lastDay: 0 };

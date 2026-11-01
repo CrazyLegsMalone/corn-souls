@@ -1,3 +1,9 @@
+## TEST v1.97.37 — control room monitors go black in a blackout (2026-11-01)
+- Owner feedback: the control room screens should go black, not just dim. They are unlit canvas-texture materials, so the 12% colour scale still left them readable.
+- Both screen builders now flag their material `userData.darkOnBlackout = true`: the `mk()` helper behind the process / web / desktop pictures, and the alarm-summary monitor (`ALARM_SCR.m`). `setBlackout()` checks that flag first and sets the colour to pure black instead of 12%, saving the original hex for an exact restore. The saved-entry format is now `[material, value, kind]` with `'emissive'` / `'color'` kinds.
+- `test/validate-blackout.cjs` gained a screen case: colour must hit 0 during the event, restore to 1 afterwards, and the saved-entry count is asserted at 5.
+- Office desk monitors are plain dark boxes with no picture, so they already read as off. Bumped TEST to `1.97.37` / `corn-souls-test-shell-v64`.
+
 ## TEST v1.97.36 — blackout also kills unlit signs and indicator lamps (2026-11-01)
 - Owner feedback: signs and the lamps on motors/pumps still looked lit. Those are **unlit** materials (`MeshBasicMaterial`) and sprites, which ignore lighting entirely, so the emissive-only pass could not touch them.
 - `setBlackout()` now also walks unlit materials (`isMeshBasicMaterial` / `isSpriteMaterial` / `isPointsMaterial`), saves their colour and scales it to 12%, restoring the exact hex on exit. Emissive materials are still handled by `emissiveIntensity`. The scene traversal no longer requires `o.isMesh`, so sprites and points are included too.

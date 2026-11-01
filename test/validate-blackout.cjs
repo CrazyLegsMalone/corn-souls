@@ -16,7 +16,8 @@ const color = v => ({ r: v, g: v, b: v,
 const white = () => ({ r: 1, g: 1, b: 1, hex: 0xffffff,
   multiplyScalar(k) { this.r *= k; this.g *= k; this.b *= k; return this; },
   getHex() { return this.hex; },
-  setHex(h) { this.hex = h; this.r = ((h >> 16) & 255) / 255; this.g = ((h >> 8) & 255) / 255; this.b = (h & 255) / 255; } });
+  setHex(h) { this.hex = h; this.r = ((h >> 16) & 255) / 255; this.g = ((h >> 8) & 255) / 255; this.b = (h & 255) / 255; },
+  setRGB(r, g, b) { this.r = r; this.g = g; this.b = b; } });
 
 function makeCtx() {
   const lit = { emissive: { r: 0.2 }, emissiveIntensity: 1, uuid: 'lit-1' };
@@ -71,6 +72,14 @@ function makeCtx() {
   ctx.setBlackout(true);                       // idempotent start
   assert.ok(Math.abs(lit.emissiveIntensity - 0.06) < 1e-9, 'repeated start does not compound');
   assert.ok(Math.abs(sign.color.r - 0.12) < 1e-9, 'and does not dim the sign twice');
+
+  // a duty lamp / strainer ring rewrites its colour every frame: the per-frame pass must win
+  lamp.color.setRGB(0.24, 0.86, 0.52);         // bright green, as the sim would set it
+  ctx.applyBlackout();
+  assert.ok(Math.abs(lamp.color.g - 0.86 * 0.12) < 1e-9, 'per-frame indicator rewrite is re-dimmed');
+  screen.color.setRGB(0.2, 0.6, 1);            // a screen re-drawing itself
+  ctx.applyBlackout();
+  assert.equal(screen.color.r, 0, 'screens stay black even if redrawn');
 
   // per-frame pass clamps what daylight()/updateSky() produced this frame
   ctx.hemi.intensity = 1.15; ctx.sunL.intensity = 1.7;
