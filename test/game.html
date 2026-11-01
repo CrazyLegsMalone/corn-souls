@@ -4809,7 +4809,87 @@ const EXIT_SIGN = { mat: null, halo: null };
 const PIVOT_GEN = { x: 0, z: 0, r: 2.8, fuel: 120, cap: 120, burn: 1.2, running: true, lamp: null, snd: null };
 const CAN = { cap: 20, charge: 20 };   // the diesel can you carry (litres)
 // Main substation south of the retention ponds: its main breaker is the master reset for the whole plant.
-const POWER_RESET = { x: 0, z: 0, r: 2.8, lever: null, lamp: null, gates: [] };
+const POWER_RESET = { x: -608.6, z: 565.3, r: 3.0, model: null, handle: null, gate: null, door: null, gateOpen: 0, doorOpen: 0 };
+// ---------- MAIN SUBSTATION MODEL (the owner's main_power_building.glb): the three.js bundle ships no GLTFLoader, so
+// this is a small glTF 2.0 reader - buffer views to BufferGeometry, pbr factors to MeshStandardMaterial, nodes to an
+// Object3D tree. Keeping the node names is the whole point: it lets the game drive the compound gate, the building
+// door, the main-breaker handle and the reset button. Any failure just leaves bare ground and never breaks the game.
+const SUBSTATION = { x: -610, z: 562, yaw: Math.PI, ready: false };   // the compound gate faces the model's +Z, so the yaw puts it north
+const Q_CLOSED = new T.Quaternion(), Q_OPEN = new T.Quaternion(0, -Math.SQRT1_2, 0, Math.SQRT1_2);   // the exported -90 deg hinge pose
+const GLB_CT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
+const GLB_N = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+function glbChunks(buf) {
+  const dv = new DataView(buf);
+  if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('not a GLB');
+  let off = 12, json = null, bin = null;
+  while (off < buf.byteLength) {
+    const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true), body = off + 8;
+    if (type === 0x4E4F534A) json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, body, len)));
+    else if (type === 0x004E4942) bin = new Uint8Array(buf, body, len);
+    off = body + len + ((4 - (len % 4)) % 4);
+  }
+  return { json, bin };
+}
+function glbAccessor(d, bin, i) {
+  const a = d.accessors[i], bv = d.bufferViews[a.bufferView], C = GLB_CT[a.componentType], n = GLB_N[a.type];
+  const start = bin.byteOffset + (bv.byteOffset || 0) + (a.byteOffset || 0), el = C.BYTES_PER_ELEMENT, stride = bv.byteStride || 0;
+  if (!stride || stride === n * el) return new C(bin.buffer, start, a.count * n);
+  const out = new C(a.count * n);   // interleaved: copy out element by element
+  for (let k = 0; k < a.count; k++) out.set(new C(bin.buffer, start + k * stride, n), k * n);
+  return out;
+}
+function glbBuild(buf) {
+  const { json: d, bin } = glbChunks(buf);
+  const mats = (d.materials || []).map(m => {
+    const pr = m.pbrMetallicRoughness || {}, c = new T.Color().fromArray(pr.baseColorFactor || [1, 1, 1, 1]);
+    return new T.MeshStandardMaterial({ color: c, metalness: pr.metallicFactor === undefined ? 1 : pr.metallicFactor,
+      roughness: pr.roughnessFactor === undefined ? 1 : pr.roughnessFactor, side: T.DoubleSide });
+  });
+  const prims = (d.meshes || []).map(m => m.primitives.map(pr => {
+    const g = new T.BufferGeometry();
+    const at = (name, acc, size) => { if (acc !== undefined) g.setAttribute(name, new T.BufferAttribute(glbAccessor(d, bin, acc), size)); };
+    at('position', pr.attributes.POSITION, 3); at('normal', pr.attributes.NORMAL, 3);
+    if (pr.indices !== undefined) g.setIndex(new T.BufferAttribute(glbAccessor(d, bin, pr.indices), 1));
+    return { g, mat: pr.material === undefined ? mats[0] : mats[pr.material], mode: pr.mode === undefined ? 4 : pr.mode };
+  }));
+  const byName = {};
+  const mk = i => {
+    const n = d.nodes[i], o = new T.Group(); o.name = n.name || ('node' + i); byName[o.name] = o;
+    if (n.translation) o.position.fromArray(n.translation);
+    if (n.rotation) o.quaternion.fromArray(n.rotation);
+    if (n.scale) o.scale.fromArray(n.scale);
+    (n.children || []).forEach(c => o.add(mk(c)));
+    if (n.mesh !== undefined) for (const q of (prims[n.mesh] || [])) {
+      const piece = q.mode === 1 ? new T.LineSegments(q.g, q.mat) : new T.Mesh(q.g, q.mat);
+      piece.castShadow = q.mode !== 1; piece.receiveShadow = true; piece.userData.noHit = true; o.add(piece);
+    }
+    return o;
+  };
+  const root = new T.Group();
+  ((d.scenes[d.scene || 0] || {}).nodes || []).forEach(i => root.add(mk(i)));
+  return { root, byName };
+}
+function loadSubstation() {   // absolute URL: the page carries <base href="../">, so a relative path would miss
+  fetch('/corn-souls/assets/models/main_power_building.glb', { cache: 'force-cache' })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .then(buf => {
+      const { root, byName } = glbBuild(buf);
+      const g = new T.Group(); g.position.set(SUBSTATION.x, 0, SUBSTATION.z); g.rotation.y = SUBSTATION.yaw;
+      g.add(root); scene.add(g); scene.updateMatrixWorld(true);
+      const R = POWER_RESET, wp = o => { const v = V3(); o.getWorldPosition(v); return v; };
+      R.model = g; R.handle = byName['MAIN_BREAKER_HANDLE'] || null;
+      R.gate = byName['Compound_Access_Gate_Hinge'] || null; R.door = byName['Electrical_Building_Door'] || null;
+      if (byName['PLANT_POWER_RESET_BUTTON']) { const v = wp(byName['PLANT_POWER_RESET_BUTTON']); R.x = v.x; R.z = v.z; }
+      if (R.gate) { const v = wp(R.gate); R.gateX = v.x; R.gateZ = v.z; }
+      if (R.door) { const v = wp(R.door); R.doorX = v.x; R.doorZ = v.z; }
+      const bb = new T.Box3().setFromObject(g);                                   // the compound fence line
+      const gx = R.gateX === undefined ? (bb.min.x + bb.max.x) / 2 : R.gateX, gw = 6.6;
+      wallSegs.push([bb.min.x, bb.min.z, gx - gw / 2, bb.min.z], [gx + gw / 2, bb.min.z, bb.max.x, bb.min.z],
+        [bb.min.x, bb.max.z, bb.max.x, bb.max.z], [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
+      SUBSTATION.ready = true;
+    })
+    .catch(e => console.warn('[substation] main_power_building.glb not loaded:', e && e.message));
+}
 // Dirt tracks for the Ranger: from the end of the paved south road, across the loop track, then splitting to run
 // round both ponds and meet at the substation forecourt. Every node clears the ponds and the track (checked in CI).
 const DIRT_ROADS = [
@@ -7252,49 +7332,12 @@ function init(container) {
     g.traverse(o => { if (o.isMesh) { o.userData.noHit = true; o.castShadow = o.material !== wm && o.material !== gm; } });
   }
 
-  // ---------- MAIN SUBSTATION south of the retention ponds: two gates facing north, the plant's MAIN BREAKER inside
-  // (the master reset for a power outage), reached by the Ranger's dirt tracks round the ponds.
+  // ---------- MAIN SUBSTATION south of the retention ponds: the owner's main_power_building.glb, its compound gate
+  // turned to face north, reached by the Ranger's dirt tracks. Its MAIN BREAKER is the master reset for a power outage.
   {
     for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w);
     add(new T.PlaneGeometry(22, 16).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, 0.031, 545);   // forecourt / turnaround
-    const X0 = -623, X1 = -597, Z0 = 554, Z1 = 570, H = 6.6;
-    building(X0, X1, Z0, Z1, H, [[-617.5, 6.4, 5.2], [-602.5, 6.4, 5.2]], null, null, null);   // two gate openings, north wall
-    concreteFloor(X0, X1, Z0, Z1);
-    nameplate('MAIN SUBSTATION|13.8 kV', -610, 5.5, Z0, 0.2, 0, -1, 1.5);
-    { // gates: steel panels that slide aside by hand - they still work with the plant dead, which is the point
-      const gm = new T.MeshLambertMaterial({ color: 0x9aa1a8 }), rib = mat(0x6f777e);
-      for (const [cx, dir] of [[-617.5, -1], [-602.5, 1]]) {
-        const g = new T.Mesh(new T.BoxGeometry(6.3, 5.0, 0.12), gm); g.position.set(cx, 2.55, Z0); g.castShadow = true; g.userData.noHit = true; scene.add(g);
-        for (let k = 0; k < 4; k++) { const r2 = new T.Mesh(new T.BoxGeometry(6.2, 0.07, 0.15), rib); r2.position.set(0, -1.65 + k * 1.1, 0); g.add(r2); }
-        POWER_RESET.gates.push({ g, cx, dir, z: Z0, open: 0 });
-      } }
-    { // switchgear line along the south wall, bus bars overhead, emergency work lamp
-      const cab = mat(0x8d9298), drk = mat(0x23272b), led = gridLight(new T.MeshBasicMaterial({ color: 0x3ddc84 }));
-      for (let i = 0; i < 5; i++) { const x = -620.4 + i * 2.1;
-        box(1.85, 2.5, 0.95, cab, x, 1.25, Z1 - 1.4);
-        box(1.55, 0.55, 0.04, drk, x, 2.0, Z1 - 1.9);
-        box(0.1, 0.1, 0.05, led, x + 0.7, 1.7, Z1 - 1.93);   // panel LED: on the plant supply, so it dies in an outage
-        extraCols.push([x, Z1 - 1.4, 0.95]); }
-      for (const dz of [-0.9, 0.2, 1.3]) box(23, 0.09, 0.09, mat(0xc9a227), -610, 4.7, Z0 + 3 + dz);   // bus bars
-      box(23, 0.06, 1.6, mat(0x4a4f54), -610, 5.35, Z0 + 4.2);                                          // cable tray
-      for (const x of [-620, -614, -606, -600]) box(0.16, 0.95, 0.16, mat(0x6f777e), x, 4.05, Z1 - 1.4); // bus drops
-      const wl = new T.Mesh(new T.BoxGeometry(1.7, 0.12, 0.22), batteryLight(new T.MeshBasicMaterial({ color: 0xffe9b0 })));
-      wl.position.set(-610, 5.05, Z0 + 2.4); wl.userData.noHit = true; scene.add(wl); }                   // emergency lamp on its own battery
-    { // MAIN BREAKER: the master reset, on the south wall facing the gates
-      box(1.7, 2.0, 0.5, mat(0x8f2b22), -610, 1.55, Z1 - 0.4);
-      box(1.35, 1.15, 0.06, mat(0x1f2427), -610, 1.75, Z1 - 0.68);
-      const lv = new T.Mesh(new T.BoxGeometry(0.15, 0.75, 0.11), mat(0xe8c82a)); lv.position.set(-610, 1.6, Z1 - 0.76); scene.add(lv); POWER_RESET.lever = lv;
-      const lp = new T.Mesh(new T.SphereGeometry(0.075, 8, 6), batteryLight(new T.MeshBasicMaterial({ color: 0x2fdc84 })));
-      lp.position.set(-609.25, 2.0, Z1 - 0.74); lp.userData.noHit = true; scene.add(lp); POWER_RESET.lamp = lp;
-      nameplate('MAIN BREAKER|TRIP / RESET', -610, 2.62, Z1 - 0.35, 0.2, 0, -1, 1.15);
-      extraCols.push([-610, Z1 - 0.4, 0.55]);
-      POWER_RESET.x = -610; POWER_RESET.z = Z1 - 1.5; }
-    { // outside: transformer bank, HV bushings, bollards
-      box(4.4, 2.7, 2.7, mat(0x8a8f94), -618.5, 1.35, Z0 - 5.6);
-      for (const dx of [-1.3, 0, 1.3]) add(new T.CylinderGeometry(0.11, 0.11, 1.0, 8), mat(0xd8d3c4), -618.5 + dx, 3.2, Z0 - 5.6, null);
-      for (let i = 0; i < 3; i++) box(0.22, 0.95, 0.22, mat(0xf2c200), -624 + i * 5.4, 0.48, Z0 - 8.4);
-      extraCols.push([-618.5, Z0 - 5.6, 2.7]);
-      nameplate('DANGER|HIGH VOLTAGE', -618.5, 3.6, Z0 - 4.2, 0.2, 0, -1, 1.1); }
+    loadSubstation();
   }
 
   // trees and fields
@@ -9317,15 +9360,16 @@ function powerResetAction() {
   setPowerOutage(false);
   return '⚡ Main breaker closed - power restored.';
 }
-function updatePowerReset(dt) {   // the lever, the tripped lamp and the two hand-slid gates
-  const R = POWER_RESET;
-  if (R.lever) R.lever.rotation.x += ((POWER_OUTAGE.on ? -0.6 : 0) - R.lever.rotation.x) * Math.min(1, dt * 6);
-  if (R.lamp) R.lamp.material.color.setHex(POWER_OUTAGE.on ? 0xff3b30 : 0x2fdc84);
-  for (const g of R.gates) {
-    const near = walk.on && !walk.dead && Math.hypot(walk.x - g.cx, walk.z - g.z) < 7;
-    g.open = Math.max(0, Math.min(1, g.open + (near ? 1.5 : -1.1) * dt));
-    g.g.position.x = g.cx + g.dir * 5.9 * g.open; g.g.visible = g.open < 0.98;
-  }
+function updatePowerReset(dt) {   // the model's breaker handle, its compound gate and its building door
+  const R = POWER_RESET, k = Math.min(1, dt * 6);
+  if (R.handle) R.handle.rotation.x += ((POWER_OUTAGE.on ? -0.55 : 0) - R.handle.rotation.x) * k;   // the handle drops when the main trips
+  const swing = (o, key, near) => {
+    if (!o) return;
+    R[key] = Math.max(0, Math.min(1, R[key] + (near ? 1.5 : -1.1) * dt));
+    o.quaternion.copy(Q_CLOSED).slerp(Q_OPEN, R[key]);   // the exported hinge / door swing, reproduced without a mixer
+  };
+  swing(R.gate, 'gateOpen', walk.on && !walk.dead && R.gateX !== undefined && Math.hypot(walk.x - R.gateX, walk.z - R.gateZ) < 7);
+  swing(R.door, 'doorOpen', walk.on && !walk.dead && R.doorX !== undefined && Math.hypot(walk.x - R.doorX, walk.z - R.doorZ) < 5.5);
 }
 
 // ---------- HAND TOOLS: crowbar, shovel, pickaxe and pitchfork hang on a pegboard on the maintenance shop's north wall (they're always there;

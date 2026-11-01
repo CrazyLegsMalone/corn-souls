@@ -170,6 +170,27 @@
       "public_repository_redistribution_review": "owner-authored; published with owner approval",
       "required_notice": "None (first-party asset).",
       "notes": "Squeeg's third-person character in the TEST channel (test/models/, loaded by test/squeeg-model.js). Not yet promoted to LIVE; intended to be reused for the remaining humanoids."
+    },
+    {
+      "id": "first-party-main-power-building",
+      "title": "Main Power Building (electrical substation)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-made, exported from Blender as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/main_power_building.glb",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale (16.6 x 14.6 m footprint, 4.5 m tall). Placed at runtime with a 180 degree yaw so the compound gate faces north; the exported node animations Open_Fence_Gate / Open_Building_Door are reproduced by slerping the hinge and door nodes toward the exported -90 degree pose, and the MAIN_BREAKER_HANDLE node is rotated when the plant main trips. Geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/main_power_building.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (asset author)",
+      "evidence": "Authored by the project owner for this project; exported with THREE.GLTFExporter (2.0). 20,893 triangles, 29 nodes, 14 flat materials, embedded buffer, no textures, no skins, 2 node animations (gate, building door).",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-authored; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The main substation south of the retention ponds in the TEST channel: reached by the Ranger dirt tracks, its MAIN BREAKER / PLANT_POWER_RESET_BUTTON is the master reset for a power outage."
     }
   ]
 }

@@ -6,6 +6,7 @@ Shipped 3D GLB models in `assets/models/`:
 - `psx_fire_extinguisher.glb` — "psx fire extinguisher" by zynxeror — CC BY 4.0.
 - `corn_cube.glb` — "Corn Cube" by tg — CC BY 4.0.
 - `corn_low_poly.glb` — "Corn (Low Poly)" by Low Poly Fox — CC BY 4.0.
+- `main_power_building.glb` — "Main Power Building" — first-party (project owner), main substation in the TEST channel.
 - `pallet.glb` — "Pallet" by Thingits — CC BY 4.0.
 
 See `../../assets/registry.json`, `../../CREDITS.md`, `../../credits.html`, and `../../ASSET_POLICY.md` for full creator attribution, source URLs, license links, and modification notes.

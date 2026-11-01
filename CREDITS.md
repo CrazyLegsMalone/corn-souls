@@ -14,6 +14,8 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 
 - **"Operator (male, PSX style)"** — made by the project owner with an AI-assisted character creator (Gemini); not obtained from a third-party marketplace. Used as Squeeg's third-person character in the TEST channel (`test/models/operator_male_psx_rig.glb`). Registered in [assets/registry.json](assets/registry.json) as `first-party-operator-male-psx-rig`. No third-party licence terms apply.
 
+- **"Main Power Building"** — made by the project owner and exported from Blender as a GLB; not obtained from a third-party marketplace. The main substation south of the retention ponds in the TEST channel (`assets/models/main_power_building.glb`): its compound gate faces north, and its MAIN BREAKER is the master reset for a power outage. Registered in [assets/registry.json](assets/registry.json).
+
 ## Attribution template
 
 **“Asset Title”** — by Creator ([source](https://example.com/)). [License Name](https://creativecommons.org/licenses/by/4.0/). Modifications: describe exactly what changed. No endorsement implied.

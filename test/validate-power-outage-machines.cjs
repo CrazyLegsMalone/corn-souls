@@ -163,34 +163,57 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("groundMat('dirtroad', true)"), 'dirt texture with UVs in metres');
 }
 
-// ---------------------------------------------------------------- the substation and its main breaker
+// ---------------------------------------------------------------- the substation is the owner's GLB, used as built
 {
-  // two gates on the NORTH wall (the first opening list of building()), on a hand-slid panel, not a roll-up
-  assert.ok(html.includes('building(X0, X1, Z0, Z1, H, [[-617.5, 6.4, 5.2], [-602.5, 6.4, 5.2]], null, null, null)'),
-    'two gate openings on the north wall, nothing on the other three');
-  assert.ok(html.includes('POWER_RESET.gates.push({ g, cx, dir, z: Z0, open: 0 })'), 'the gates are tracked for sliding');
-  const gatesBlock = html.slice(html.indexOf('gates: steel panels that slide aside by hand'), html.indexOf('switchgear line along the south wall'));
-  assert.ok(!gatesBlock.includes('rollDoors'), 'the gates are hand-operated, not powered roll-ups (they must work in an outage)');
-  assert.ok(html.includes('POWER_RESET.lever = lv') && html.includes('POWER_RESET.lamp = lp'), 'the breaker has a lever and a tripped lamp');
-  assert.ok(html.includes("'MAIN BREAKER|TRIP / RESET'"), 'the panel is labelled');
-  assert.ok(html.includes('powerResetNear: () => powerResetNear()') && html.includes('powerResetAction: () => powerResetAction()'), 'reachable from the UI');
-  assert.ok(html.includes('if (P3.powerResetNear()) { powerResetMenu(); return; }'), 'E opens the breaker panel');
-  assert.ok(html.includes('updatePowerReset(dt);'), 'the lever, lamp and gates update every frame');
-  // the breaker sits inside the building footprint
-  const inside = (x, z) => x > -623 && x < -597 && z > 554 && z < 570;
-  assert.ok(inside(-610, 570 - 1.5), 'the breaker stand is inside the substation');
+  const glb = fs.readFileSync('assets/models/main_power_building.glb');
+  assert.equal(glb.readUInt32LE(0), 0x46546c67, 'GLB magic');
+  assert.equal(glb.readUInt32LE(4), 2, 'glTF 2.0');
+  let off = 12, doc = null, hasBin = false;
+  while (off < glb.length) {
+    const len = glb.readUInt32LE(off), type = glb.readUInt32LE(off + 4), body = off + 8;
+    if (type === 0x4e4f534a) doc = JSON.parse(glb.slice(body, body + len).toString('utf8'));
+    else if (type === 0x004e4942) hasBin = true;
+    off = body + len + ((4 - (len % 4)) % 4);
+  }
+  assert.ok(doc && hasBin, 'JSON + embedded BIN chunk');
+  assert.ok(!(doc.images || []).length && (doc.buffers || []).every(b2 => !b2.uri), 'single-file asset: nothing external to fetch');
+  const names = new Set((doc.nodes || []).map(n => n.name));
+  for (const n of ['Plant_Main_Electrical_Building', 'Electrical_Building_Door', 'Compound_Access_Gate_Hinge', 'MAIN_BREAKER_HANDLE', 'PLANT_POWER_RESET_BUTTON']) {
+    assert.ok(names.has(n), 'the model has the node ' + n);
+    if (n !== 'Plant_Main_Electrical_Building') assert.ok(html.includes("'" + n + "'"), 'game.html wires the node ' + n);
+  }
+  assert.ok(html.includes("fetch('/corn-souls/assets/models/main_power_building.glb'"), 'fetched by absolute URL (the page carries a <base href>)');
+  assert.ok(html.includes('function glbBuild(buf)'), 'a self-contained glTF reader builds it (the bundle ships no GLTFLoader)');
+  assert.ok(html.includes('loadSubstation();'), 'built at load');
+  assert.ok(html.includes('const SUBSTATION = { x: -610, z: 562, yaw: Math.PI'), 'placed and yawed 180 so the compound gate faces north');
+  // true scale, so the site and the dirt roads stay valid
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  for (const msh of doc.meshes || []) for (const pr of msh.primitives || []) {
+    const ac = doc.accessors[pr.attributes.POSITION];
+    for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], ac.min[k]); mx[k] = Math.max(mx[k], ac.max[k]); }
+  }
+  const w = mx[0] - mn[0], d = mx[2] - mn[2], h = mx[1] - mn[1];
+  assert.ok(Math.abs(w - 16.6) < 0.6 && Math.abs(d - 14.6) < 0.6, 'true scale footprint ' + w.toFixed(1) + ' x ' + d.toFixed(1) + ' m');
+  assert.ok(h > 4 && h < 5, 'about 4.5 m tall');
+  assert.ok((doc.animations || []).map(x => x.name).includes('Open_Fence_Gate'), 'gate animation exported');
+  assert.ok((doc.animations || []).map(x => x.name).includes('Open_Building_Door'), 'door animation exported');
+  assert.ok(html.includes('Q_OPEN = new T.Quaternion(0, -Math.SQRT1_2, 0, Math.SQRT1_2)'), 'the game reproduces the exported -90 deg swing pose');
+  assert.ok(html.includes('gw = 6.6;'), 'fence colliders leave a gap at the gate');
 }
 
-// ---------------------------------------------------------------- tripping it back in
+// ---------------------------------------------------------------- tripping the main back in
 {
   const a = html.indexOf("// The substation's main breaker"), b = html.indexOf('// ---------- HAND TOOLS');
   assert.ok(a > 0 && b > a, 'found the reset code');
+  const q = () => ({ t: null, copy() { return this; }, slerp(x, t) { this.t = t; return this; } });
+  const gate = { quaternion: q() }, door = { quaternion: q() }, handle = { rotation: { x: 0 } };
   let tripped = null;
   const ctx = {
     POWER_OUTAGE: { on: false },
-    POWER_RESET: { x: -610, z: 568.5, r: 2.8, lever: null, lamp: null,
-      gates: [{ g: { position: { x: -617.5 }, visible: true }, cx: -617.5, dir: -1, z: 554, open: 0 }] },
-    walk: { on: true, dead: false, x: -610, z: 568.5 },
+    POWER_RESET: { x: -608.6, z: 565.3, r: 3.0, handle, gate, door, gateOpen: 0, doorOpen: 0,
+      gateX: -605.3, gateZ: 555.1, doorX: -605.7, doorZ: 560.8 },
+    Q_CLOSED: { closed: true }, Q_OPEN: { open: true },
+    walk: { on: true, dead: false, x: -608.6, z: 565.3 },
     setPowerOutage: on => { tripped = on; ctx.POWER_OUTAGE.on = !!on; },
     Math
   };
@@ -199,20 +222,26 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
 
   assert.equal(ctx.powerResetAction(), 'The main breaker is already closed - the plant has power.');
   assert.equal(tripped, null, 'a live plant is left alone');
-
   ctx.POWER_OUTAGE.on = true;
   assert.ok(/power restored/.test(ctx.powerResetAction()), 'tripping it back in restores the plant');
   assert.equal(tripped, false, 'it cleared the outage');
 
-  // the gates slide aside as you walk up, and close behind you
-  ctx.walk.x = -617.5; ctx.walk.z = 554;         // standing in the gate
+  ctx.walk.x = -605.3; ctx.walk.z = 555.1;         // walk up to the compound gate
   ctx.updatePowerReset(1);
-  assert.ok(ctx.POWER_RESET.gates[0].open > 0.5, 'the gate slides open as you approach');
-  assert.ok(ctx.POWER_RESET.gates[0].g.position.x < -618, 'and physically moves aside');
-  ctx.walk.x = -400; ctx.walk.z = 400;
-  for (let i = 0; i < 6; i++) ctx.updatePowerReset(1);
-  assert.equal(ctx.POWER_RESET.gates[0].open, 0, 'the gate closes behind you');
-  assert.ok(ctx.powerResetNear() === false, 'and the panel is out of reach from there');
+  assert.ok(handle.rotation.x < -0.3, 'the breaker handle drops while the main is tripped');
+  assert.ok(gate.quaternion.t > 0.5, 'the compound gate swings open as you approach');
+  ctx.walk.x = -605.7; ctx.walk.z = 560.8;         // and up to the building door
+  ctx.updatePowerReset(1);
+  assert.ok(door.quaternion.t > 0.5, 'the building door opens too');
+
+  ctx.POWER_OUTAGE.on = false;
+  ctx.walk.x = -400; ctx.walk.z = 400;             // walk away
+  for (let i = 0; i < 8; i++) ctx.updatePowerReset(1);
+  assert.ok(Math.abs(handle.rotation.x) < 0.05, 'the handle comes back up when the main is closed');
+  assert.equal(gate.quaternion.t, 0, 'the gate closes behind you');
+  assert.equal(door.quaternion.t, 0, 'and so does the door');
+  assert.equal(ctx.powerResetNear(), false, 'and the breaker is out of reach from there');
 }
+
 
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');
