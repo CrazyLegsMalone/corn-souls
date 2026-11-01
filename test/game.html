@@ -8278,21 +8278,28 @@ function setBlackout(on) {
   on = !!on;
   if (on === BLACKOUT.on) return on;
   BLACKOUT.on = on;
-  if (on) {                       // dim every self-lit material once (interior fixtures, signs, screens)
+  if (on) {                       // dim every self-lit / unlit material once (fixtures, signs, screens, lamps)
     BLACKOUT.saved.length = 0;
     const seen = new Set();
+    const skip = new Set([SKY.clouds && SKY.clouds.material, SKY.stars && SKY.stars.material]);   // handled per frame
     scene.traverse(o => {
-      if (!o.isMesh || !o.material) return;
+      if (!o.material) return;
       for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
-        if (!m || !m.emissive || seen.has(m.uuid) || (m.userData && m.userData.keepLit)) continue;   // keepLit: fires
-        seen.add(m.uuid);
-        const k = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
-        BLACKOUT.saved.push([m, k]);
-        m.emissiveIntensity = k * 0.06;
+        if (!m || seen.has(m.uuid) || skip.has(m) || (m.userData && m.userData.keepLit)) continue;   // keepLit: fires
+        if (m.emissive) {                                            // lit materials: kill the self-glow
+          seen.add(m.uuid);
+          const k = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
+          BLACKOUT.saved.push([m, k, false]);
+          m.emissiveIntensity = k * 0.06;
+        } else if (m.color && (m.isMeshBasicMaterial || m.isSpriteMaterial || m.isPointsMaterial)) {
+          seen.add(m.uuid);                                          // unlit: signs, indicator lamps, sprites, decals
+          BLACKOUT.saved.push([m, m.color.getHex(), true]);
+          m.color.multiplyScalar(0.12);
+        }
       }
     });
   } else {
-    for (const [m, k] of BLACKOUT.saved) m.emissiveIntensity = k;
+    for (const [m, k, isColor] of BLACKOUT.saved) { if (isColor) m.color.setHex(k); else m.emissiveIntensity = k; }
     BLACKOUT.saved.length = 0;
   }
   dayT = 99;   // force daylight() to re-apply on the next frame in both directions
@@ -9303,7 +9310,8 @@ function flameTex() {
   }
   FLAME_TEX = new T.CanvasTexture(cv); if (T.SRGBColorSpace) FLAME_TEX.colorSpace = T.SRGBColorSpace; FLAME_TEX.magFilter = T.NearestFilter; return FLAME_TEX;
 }
-function flameSprite() { const t = flameTex().clone(); t.needsUpdate = true; t.repeat.set(1 / FLAME_N, 1); const s = new T.Sprite(new T.SpriteMaterial({ map: t, transparent: true, alphaTest: 0.1, depthWrite: false })); s.userData.noHit = true; s.userData.ph = Math.random() * FLAME_N; return s; }
+function flameSprite() { const t = flameTex().clone(); t.needsUpdate = true; t.repeat.set(1 / FLAME_N, 1); const m = new T.SpriteMaterial({ map: t, transparent: true, alphaTest: 0.1, depthWrite: false }); m.userData.keepLit = true;   // fires survive a blackout
+  const s = new T.Sprite(m); s.userData.noHit = true; s.userData.ph = Math.random() * FLAME_N; return s; }
 let DMG_NOTIFY = null;
 function updateDamage(dt) {
   for (const k in DMG) { const d = DMG[k], g = dmgG(k); if (!g) continue;

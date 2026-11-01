@@ -1,3 +1,16 @@
+## TEST v1.97.36 — blackout also kills unlit signs and indicator lamps (2026-11-01)
+- Owner feedback: signs and the lamps on motors/pumps still looked lit. Those are **unlit** materials (`MeshBasicMaterial`) and sprites, which ignore lighting entirely, so the emissive-only pass could not touch them.
+- `setBlackout()` now also walks unlit materials (`isMeshBasicMaterial` / `isSpriteMaterial` / `isPointsMaterial`), saves their colour and scales it to 12%, restoring the exact hex on exit. Emissive materials are still handled by `emissiveIntensity`. The scene traversal no longer requires `o.isMesh`, so sprites and points are included too.
+- Exclusions: `userData.keepLit` (fire sprites, now flagged inside `flameSprite()`), and the sky's own cloud/star materials, which `applyBlackout()` handles per frame.
+- `test/validate-blackout.cjs` extended: unlit sign and lamp dim to 12% and restore, flame sprites stay lit, cloud/star materials are skipped, saved-entry count checked, plus a source assertion that `flameSprite()` marks its material keepLit.
+- Bumped TEST to `1.97.36` / `corn-souls-test-shell-v63`.
+
+## TEST v1.97.35 — fix `setBlackout is not defined` from the debug menu (2026-11-01)
+- Reported by the owner as a red error card. Cause: `setBlackout()` lives inside the world closure (brace depth 1 at its definition), while `debugMenu()` is declared in the separate top-level UI script (depth 0). The menu rows called the private function directly, so the click threw `ReferenceError: setBlackout is not defined`.
+- The debug menu now goes through the export (`P3.setBlackout(true|false)`), which was already wired for exactly this reason. `applyBlackout()` was never affected: it is called from the frame loop inside the same closure.
+- `test/validate-blackout.cjs` now also asserts that both menu rows call `P3.setBlackout(`, never the bare function, and that the event is exported on `Plant3D` — a guard for this whole class of cross-script scope mistake.
+- Bumped TEST to `1.97.35` / `corn-souls-test-shell-v62`.
+
 ## TEST v1.97.34 — blackout event: all plant power out, only headlamps, fires and stars (2026-11-01)
 - Added `BLACKOUT` / `setBlackout(on)` / `applyBlackout()` in `game.html`. Starting the event dims every self-lit material once (walks the scene, saves `emissiveIntensity` per unique material and drops it to 6%), then the per-frame pass crushes the ambient hemisphere to 0.06, kills the sun, clamps the sky background to 2% luminance, matches the fog to it, removes the sun disc from the sky shader and brings the stars out. Ending it restores every saved material exactly.
 - The per-frame pass is **idempotent** (clamps rather than multiplies) because `daylight()` only re-runs every ~20 s; `setBlackout` sets `dayT = 99` so the sky re-applies immediately in both directions. The headlamp spotlight is never touched, and materials flagged `userData.keepLit` (fires) are skipped.
