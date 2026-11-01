@@ -10,6 +10,10 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 - **“Corn (Low Poly)”** — by **Low Poly Fox** ([Sketchfab source](https://sketchfab.com/3d-models/corn-low-poly-c640a2fbe4914b8092b2f3aff0dbf538)). Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Modifications: Resized, centered, and instanced at runtime for throwable corn ears in trash cans outside the scale house and grain receiving building; original GLB mesh/texture unchanged. No endorsement implied.
 - **“Pallet”** — by **Thingits** ([Sketchfab source](https://sketchfab.com/3d-models/pallet-dfa3a345c6924a5683404d4817396621)). Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Modifications: None; original GLB stored in `assets/models/pallet.glb`. No endorsement implied.
 
+## First-party assets
+
+- **"Operator (male, PSX style)"** — made by the project owner with an AI-assisted character creator (Gemini); not obtained from a third-party marketplace. Used as Squeeg's third-person character in the TEST channel (`test/models/operator_male_psx_rig.glb`). Registered in [assets/registry.json](assets/registry.json) as `first-party-operator-male-psx-rig`. No third-party licence terms apply.
+
 ## Attribution template
 
 **“Asset Title”** — by Creator ([source](https://example.com/)). [License Name](https://creativecommons.org/licenses/by/4.0/). Modifications: describe exactly what changed. No endorsement implied.

@@ -149,6 +149,27 @@
       "commercial_use_review": "not cleared; franchise design rights need verification",
       "public_repository_redistribution_review": "not cleared; DO NOT publish or ship while provenance uncertain",
       "notes": "82 triangles; 38,504-byte converted GLB. Only private evaluation until rights are resolved. Removed from the Corn Souls test selector at owner's request on 2026-10-29; never shipped."
+    },
+    {
+      "id": "first-party-operator-male-psx-rig",
+      "title": "Operator (male, PSX style)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-made with an AI-assisted character creator (Gemini)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/test/models/operator_male_psx_rig.glb",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Exported as GLB by the creator tool; at runtime the model is scaled to 1.68 m, rotated 180 degrees to face the game's forward axis, re-rigged onto generated shoulder/elbow/hip/knee pivots for the walk cycle, and every mesh is flagged noHit. Geometry and materials unchanged.",
+      "files": [
+        "test/models/operator_male_psx_rig.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (asset author)",
+      "evidence": "Authored by the project owner for this project; not obtained from a third-party marketplace. 1,936 triangles, 84 nodes, 16 flat materials, no textures, no skins, no animations.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-authored; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "Squeeg's third-person character in the TEST channel (test/models/, loaded by test/squeeg-model.js). Not yet promoted to LIVE; intended to be reused for the remaining humanoids."
     }
   ]
 }
