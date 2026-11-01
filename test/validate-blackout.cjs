@@ -76,7 +76,7 @@ function makeCtx() {
   // a duty lamp / strainer ring rewrites its colour every frame: the per-frame pass must win
   lamp.color.setRGB(0.24, 0.86, 0.52);         // bright green, as the sim would set it
   ctx.applyBlackout();
-  assert.ok(Math.abs(lamp.color.g - 0.86 * 0.12) < 1e-9, 'per-frame indicator rewrite is re-dimmed');
+  assert.ok(Math.abs(lamp.color.g - 0.12) < 1e-9, 'per-frame indicator rewrite is re-dimmed to the blackout level');
   screen.color.setRGB(0.2, 0.6, 1);            // a screen re-drawing itself
   ctx.applyBlackout();
   assert.equal(screen.color.r, 0, 'screens stay black even if redrawn');
