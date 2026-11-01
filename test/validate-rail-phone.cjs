@@ -52,7 +52,11 @@ const step = (ctx, seconds) => { const n = Math.round(seconds / 0.1); for (let i
 // ------------------------------------------------------------ call and hold
 {
   const c = makeCtx();
-  assert.match(c.railPhoneApply('hold'), /holding the Road P crossing in about \d+ s/);
+  const holdMsg = c.railPhoneApply('hold');
+  assert.match(holdMsg, /holding the Road P crossing in about \d+ s/);
+  const eta = +holdMsg.match(/in about (\d+) s/)[1];
+  assert.equal(eta % 10, 0, 'ETA is rounded to whole tens of seconds');
+  assert.ok(eta >= 10, 'and never reads zero');
   const R = c.THRUS[0];
   const target = R.target;
   assert.equal(R.state, 'run');

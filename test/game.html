@@ -7883,7 +7883,7 @@ function railPhoneApply(action) {
     if (best.u < 0) { best.u = 0; best.cars.forEach(c => { c.g.visible = true; }); }
     best.horn = false; best.state = 'run'; best.speed = 22; best.heldT = 0; best.warned = false;
     best.target = uc + TLEN / 2;
-    const secs = Math.max(1, Math.round(bestEta / 22));
+    const secs = Math.max(10, Math.floor(bestEta / 220) * 10);   // round down to whole tens: 88 s reads "80 s"
     return (best.dir > 0 ? 'Eastbound' : 'Westbound') + ' freight called — holding the Road P crossing in about ' + secs + ' s';
   }
   if (action === 'through') {
