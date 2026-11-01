@@ -30,25 +30,29 @@ jobs:
   suites:
     name: Gameplay suites (report only)
     runs-on: ubuntu-latest
-    continue-on-error: true          # flip to false once green on a few pushes
+    continue-on-error: true          # flip to false once every suite is green
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Repo-root suites
         run: |
-          node test/validate-live-promotion.cjs
-          node test/validate-traffic.cjs
-          node test/validate-acid.cjs
+          # Report every suite; never stop at the first failure.
+          fail=0
+          for f in test/validate-live-promotion.cjs test/validate-traffic.cjs test/validate-acid.cjs; do
+            if node "$f"; then echo "::notice::PASS $f"; else echo "::warning::FAIL $f"; fail=1; fi
+          done
+          exit $fail
       - name: test/ suites
         working-directory: test
         run: |
           # validate-inbox.cjs is excluded: its mock lacks `window` for the
-          # existing inboxOpen page navigation (pre-existing, not a real bug).
+          # existing inboxOpen page navigation (pre-existing test gap).
+          fail=0
           for f in validate-mcc-extinguisher.cjs validate-npc.cjs \
                    validate-west-wing.cjs validate-windsocks.cjs \
                    validate-door-audio.cjs validate-notes.cjs validate-sound.cjs; do
-            echo "== $f"
-            node "$f"
+            if node "$f"; then echo "::notice::PASS $f"; else echo "::warning::FAIL $f"; fail=1; fi
           done
+          exit $fail
