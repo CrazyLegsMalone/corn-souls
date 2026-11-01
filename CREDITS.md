@@ -18,6 +18,8 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 
 - **"1x4 Cooling Tower (Raised Sill)"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The cooling tower south of the south road in the TEST channel (`assets/models/1x4_cooling_tower_raised_sill.glb`): its four fans and drift plume stop with the plant during a power outage. Registered in [assets/registry.json](assets/registry.json).
 
+- **"Milo Rade Vending Machine"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The vending machines in the process break room and the scale house in the TEST channel (`assets/models/milorade_machine.glb`). Registered in [assets/registry.json](assets/registry.json).
+
 ## Attribution template
 
 **“Asset Title”** — by Creator ([source](https://example.com/)). [License Name](https://creativecommons.org/licenses/by/4.0/). Modifications: describe exactly what changed. No endorsement implied.

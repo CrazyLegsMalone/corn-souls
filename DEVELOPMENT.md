@@ -1,3 +1,13 @@
+## TEST v1.97.52 — Milo Rade vending machines replace the flat soda boxes (2026-11-01)
+- The owner's `milorade_machine.glb` now stands where the two flat red soda-machine boxes were: one in the **process break room** (x -61.35, against the north wall of the break room) and one in the **scale house** (x 59, on its raised floor). Both are placed at export scale (1.14 x 2.23 x 0.98 m), lifted 0.16 m because the model hangs that far below its own origin, and each gets a 0.7 m collider.
+- **One upload, two machines**: the model is fetched and built once, then `clone()`d for the second spot, so the geometry, materials and the 3 MB embedded PNG are shared.
+- **The glTF reader learned textures.** The machine's advert panel is a PNG inside the BIN chunk (material 7 carries `baseColorTexture`), and until now the reader ignored images, `TEXCOORD_0` and material maps - it would have rendered as bare coloured boxes. It now builds a blob URL per embedded image, decodes it through `TextureLoader`, sets sRGB + `flipY = false` for glTF UVs, attaches `map` where a material asks for it, and uploads `uv`.
+- The snack machine (the black one) is untouched, and the colliders that used to sit in front of the soda boxes were kept.
+- Asset bookkeeping: registered in `assets/registry.json` (+ `CREDITS.md`, `assets/models/README.md`) as first-party work, 22 nodes / 19 meshes / 8 materials / one embedded PNG / one `Dispense_Milo_Rade` animation. Note for the LIVE review: the advert art uses the in-game "Milo Rade" brand - worth a look before promotion.
+- `test/validate-power-outage-machines.cjs` now parses this GLB too (root name, the embedded PNG, the textured material, the dispense animation, size and the 0.16 m offset) and pins both placements plus the removal of the old boxes. `test/validate-west-wing.cjs` records the soda-machine box and its glass panel as an intended replacement rather than a lost object.
+- Verified locally before pushing: all 10 repo-root suites and the 3 `test/` suites pass, plus the launcher anchors.
+- Bumped TEST to `1.97.52` / `corn-souls-test-shell-v79`.
+
 ## TEST v1.97.51 — the Debug menu only offers reading messages (2026-11-01)
 - Removed the compose entry (`📝 Leave a note (bug / idea / message)`) from the Debug menu, so the menu now carries **only the reader**: `📥 Developer Inbox` (which the launcher patches in over the old Controls row).
 - Writing a note is not lost - it still lives in the pause menu, where the launcher renames it to `✉ Message Developer`, and the loading-screen hint no longer claims the Debug menu has it.

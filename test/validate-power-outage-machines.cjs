@@ -312,4 +312,43 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(towerSouth < 260, 'the south face stays on the open ground: z ' + towerSouth.toFixed(1));
 }
 
+
+// ---------------------------------------------------------------- the vending machine model
+{
+  const glb = fs.readFileSync('assets/models/milorade_machine.glb');
+  assert.equal(glb.readUInt32LE(0), 0x46546c67, 'vending machine GLB magic');
+  let off = 12, doc = null, hasBin = false;
+  while (off < glb.length) {
+    const len = glb.readUInt32LE(off), type = glb.readUInt32LE(off + 4), body = off + 8;
+    if (type === 0x4e4f534a) doc = JSON.parse(glb.slice(body, body + len).toString('utf8'));
+    else if (type === 0x004e4942) hasBin = true;
+    off = body + len + ((4 - (len % 4)) % 4);
+  }
+  assert.ok(doc && hasBin, 'JSON + embedded BIN');
+  assert.equal(doc.nodes[doc.scenes[doc.scene || 0].nodes[0]].name, 'Milo_Rade_Vending_Machine', 'the model root');
+  // the advert panel is an embedded PNG, so the reader has to carry textures, UVs and material maps
+  assert.equal((doc.images || []).length, 1, 'one embedded advert image');
+  assert.equal(doc.images[0].mimeType, 'image/png');
+  assert.ok((doc.materials || []).some(m2 => (m2.pbrMetallicRoughness || {}).baseColorTexture), 'a material uses the advert texture');
+  assert.ok(html.includes('T.TextureLoader()') && html.includes("at('uv', pr.attributes.TEXCOORD_0, 2)") && html.includes('baseColorTexture'),
+    'the reader builds embedded textures, UVs and material maps');
+  assert.equal(doc.animations[0].name, 'Dispense_Milo_Rade', 'the dispense animation is in the file');
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  for (const msh of doc.meshes) for (const pr of msh.primitives) {
+    const ac = doc.accessors[pr.attributes.POSITION];
+    for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], ac.min[k]); mx[k] = Math.max(mx[k], ac.max[k]); }
+  }
+  assert.ok(Math.abs((mx[0] - mn[0]) - 1.14) < 0.2 && Math.abs((mx[1] - mn[1]) - 2.23) < 0.3,
+    'about 1.14 x 2.23 m, got ' + (mx[0] - mn[0]).toFixed(2) + ' x ' + (mx[1] - mn[1]).toFixed(2));
+  assert.ok(Math.abs(mn[1] + 0.16) < 0.05, 'it hangs 0.16 m below its origin, so placement lifts it');
+  // wiring: one model, two machines, both old soda boxes gone
+  assert.ok(html.includes("'/corn-souls/assets/models/milorade_machine.glb'"), 'the machine model is fetched');
+  assert.equal((html.match(/DRINK_SPOTS\.push\(/g) || []).length, 2, 'two vending machines');
+  assert.ok(html.includes('DRINK_SPOTS.push({ x: -61.35, y: 0.16, z: OZN + 0.46'), 'replaces the process break-room soda machine');
+  assert.ok(html.includes('DRINK_SPOTS.push({ x: 59, y: FY + 0.16, z: ZN + 0.46'), 'replaces the scale-house soda machine');
+  assert.ok(!html.includes('box(0.95, 1.85, 0.85, red'), 'the old break-room soda box is gone');
+  assert.ok(!html.includes('mat(0xc8312f), 59'), 'the old scale-house soda box is gone');
+  assert.ok(html.includes('loadDrinkMachines();') && html.includes('root.clone(true)'), 'built at load, one upload shared by both machines');
+}
+
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');

@@ -14,6 +14,7 @@ function build(source, westWing){
  ctx.regVehBox=noop;ctx.buildShopRadio=noop;ctx.buildToolWall=noop;ctx.pumpSet=noop;ctx.pipe=noop;ctx.nameplate=noop;
  ctx.egressStrobe=noop;ctx.gridLight=m=>m;ctx.batteryLight=m=>m;   // power-outage hooks: this block only needs them to exist
  ctx.exitSignMat=()=>new T.MeshBasicMaterial({color:0xc8211c});ctx.exitHalo=noop;   // EXIT signage helpers
+ ctx.DRINK_SPOTS=[];   // replaced soda machines are registered here, not built as boxes
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);
  vm.runInContext(source.slice(source.indexOf('  // ---------- PROCESS BUILDING'),source.indexOf('  // beer well pump inside the alley')),ctx);
@@ -30,7 +31,12 @@ const office=c=>c.scene.children.filter(o=>o.position.x < -31&&o.position.y<=4&&
 assert.ok(office(next).length>100,'populated office block retained');
 const signature=(o,dz=0)=>JSON.stringify([o.geometry?.type,o.geometry?.parameters,o.position.x,o.position.y,o.position.z+dz],(k,v)=>typeof v==='number'?+v.toFixed(6):v);
 const relocated=new Set(office(next).map(o=>signature(o)));
+// One box is deliberately replaced rather than moved: the break room's soda machine is now the Milo Rade vending
+// machine model (assets/models/milorade_machine.glb), so it is not built as a BoxGeometry any more.
+// The break room's soda machine + its glass panel were two boxes in this footprint; both are now the GLB machine.
+const replacedByModel=o=>{const p=o.position;return p.x>-62.1&&p.x<-60.8&&p.y<2&&(p.z+3)>14.3&&(p.z+3)<15.2;};
 for(const o of office(old).filter(o=>!(o.geometry?.parameters.depth>7))) {
+ if(replacedByModel(o))continue;
  assert.ok(relocated.has(signature(o,3)),'office object preserved at translated position: '+signature(o,3));
 }
 assert.deepEqual(next.NPCS.map(n=>n.id),old.NPCS.map(n=>n.id));

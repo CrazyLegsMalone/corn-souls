@@ -212,6 +212,27 @@
       "public_repository_redistribution_review": "owner-directed; published with owner approval",
       "required_notice": "None (first-party asset).",
       "notes": "Cooling tower on the cooling-tower area south of the south road in the TEST channel; its fans and drift plume stop with the plant during a power outage."
+    },
+    {
+      "id": "first-party-milo-rade-vending-machine",
+      "title": "Milo Rade Vending Machine",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/milorade_machine.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale (1.14 x 2.23 x 0.98 m). Two instances are placed from one upload - the process break room and the scale house - both lifted 0.16 m to sit on their floors, each with a 0.7 m collider. The advert panel keeps its embedded PNG. Geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/milorade_machine.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter (2.0). 22 nodes, 19 meshes, 8 materials, one embedded PNG advert texture, one animation (Dispense_Milo_Rade), about 1.14 x 2.23 x 0.98 m. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; the in-model advert is a fictional in-game brand",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "Displaces the flat soda-machine boxes in the process break room and the scale house in the TEST channel."
     }
   ]
 }
