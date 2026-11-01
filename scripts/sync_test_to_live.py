@@ -47,15 +47,18 @@ def sub(text, old, new, where, count=1):
 
 
 def strip_test_only(text):
-    text, n = TEST_ONLY.subn("", text)
-    if n != 1:
-        raise Fail(f"test/index.html: expected exactly 1 <TEST-ONLY> block, stripped {n}")
-    return text
+    """Remove every <TEST-ONLY> ... </TEST-ONLY> block (zero is normal)."""
+    text, stripped = TEST_ONLY.subn("", text)
+    if "<TEST-ONLY>" in text or "</TEST-ONLY>" in text:
+        raise Fail("test/index.html: unbalanced <TEST-ONLY> marker left behind")
+    return text, stripped
 
 
 def build_live_launcher(live_version):
     """Return the LIVE index.html text generated from test/index.html."""
-    text = strip_test_only(read("test/index.html"))
+    text, stripped = strip_test_only(read("test/index.html"))
+    if stripped:
+        print(f"  (stripped {stripped} TEST-ONLY block(s) from the launcher)")
     text = sub(text, re.search(r"const TEST_VERSION='[^']*';", text).group(0),
                f"const TEST_VERSION='{live_version}';", "version constant")
     text = sub(text, "<title>Corn Souls TEST</title>",
