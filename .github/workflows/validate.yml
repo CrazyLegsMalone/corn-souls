@@ -42,6 +42,7 @@ jobs:
           for f in test/validate-live-promotion.cjs test/validate-traffic.cjs \
                    test/validate-acid.cjs test/validate-npc.cjs \
                    test/validate-rail-phone.cjs test/validate-power-outage.cjs \
+                   test/validate-power-outage-machines.cjs \
                    test/validate-door-audio.cjs test/validate-notes.cjs \
                    test/validate-sound.cjs; do
             if node "$f"; then echo "::notice::PASS $f"; else echo "::warning::FAIL $f"; fail=1; fi
