@@ -4804,6 +4804,10 @@ function egressStrobe(x, z, ix, iz) {
 // EXIT signage: one shared lit texture (red face, cream letters) plus a soft additive halo, so the signs read as
 // illuminated emergency signage instead of flat red boxes. Battery-backed: they stay lit in a power outage.
 const EXIT_SIGN = { mat: null, halo: null };
+// The center pivot runs on its own diesel gen-set. Declared here, at closure scope, because updatePivot(), the
+// refuelling action and the P3 getter all read it - nesting it inside a building block throws ReferenceError.
+const PIVOT_GEN = { x: 0, z: 0, r: 2.8, fuel: 120, cap: 120, burn: 1.2, running: true, lamp: null, snd: null };
+const CAN = { cap: 20, charge: 20 };   // the diesel can you carry (litres)
 function exitSignMat() {
   if (EXIT_SIGN.mat) return EXIT_SIGN.mat;
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 56;
@@ -7181,11 +7185,7 @@ function init(container) {
       d.userData.noHit = true; scene.add(d);                                                             // lane divider dashes
     }
   }
-  // ---------- CENTER-PIVOT DIESEL GEN-SET: the pivot has its own engine, so a plant outage does not stop it. It runs
-  // until the 120 L day tank is dry (1.2 L/h). A diesel can carries 20 L, filled from the bulk tank on the same pad.
-  // ---------- center-pivot field inside the unit-train loop, with its irrigation arm
-  const PIVOT_GEN = { x: 0, z: 0, r: 2.8, fuel: 120, cap: 120, burn: 1.2, running: true, lamp: null, snd: null };
-  const CAN = { cap: 20, charge: 20 };   // the diesel can you carry (litres)
+  // center-pivot field inside the unit-train loop, with its irrigation arm
   {
     const cx = -675, cz = -99, R = 344;   // satellite: big pivot circle in the north part of the loop
     const f = add(new T.CylinderGeometry(R, R, 0.12, 64), mat(0x557d2f), cx, 0.07, cz, null); f.castShadow = false;   // green: it's planted (corn added below, with the corn field)

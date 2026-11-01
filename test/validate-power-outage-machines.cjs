@@ -114,6 +114,9 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
 
   // the pivot gen-set: prop, fuel, sound and the interaction
   assert.ok(html.includes('const PIVOT_GEN = { x: 0, z: 0, r: 2.8, fuel: 120, cap: 120, burn: 1.2'), 'tank and burn rate');
+  // closure scope or bust: a declaration nested in a building block is invisible to updatePivot()/the P3 getter
+  assert.ok(/^const PIVOT_GEN = \{/m.test(html), 'PIVOT_GEN must be declared at closure scope (column 0)');
+  assert.ok(/^const CAN = \{/m.test(html), 'CAN must be declared at closure scope (column 0)');
   assert.ok(html.includes('const CAN = { cap: 20, charge: 20 }'), 'the diesel can holds 20 L');
   assert.ok(html.includes('// ---- diesel gen-set on its own pad beside the pivot point'), 'the gen-set is built');
   assert.ok(html.includes('1 - (d - 25) / 55'), 'the diesel is only audible near the corn circle');
