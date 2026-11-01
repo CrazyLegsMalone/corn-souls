@@ -4899,16 +4899,20 @@ function loadSubstation() {
 // ---------- COOLING TOWER: the owner's 1x4 raised-sill model, on the cooling-tower area south of the south road.
 // Its four fans turn with the plant and stop dead in an outage; the white drift off the fan deck joins STACKS as a
 // grid-fed plume, so it dies with the plant the same way the RTO's does.
-const TOWER = { x: 50, z: 198, yaw: 0, fans: [], ready: false };   // EXR - 22, SZR + 13: the old painted placeholder
+const TOWER = { x: 50, z: 202, yaw: 0, scale: 2, fans: [], ready: false };   // doubled; pushed south so the north face clears the south road
 function loadCoolingTower() {
   loadGlbModel('/corn-souls/assets/models/1x4_cooling_tower_raised_sill.glb', ({ root, byName }) => {
-    const g = new T.Group(); g.position.set(TOWER.x, 0, TOWER.z); g.rotation.y = TOWER.yaw;
+    const g = new T.Group(); g.position.set(TOWER.x, 0, TOWER.z); g.rotation.y = TOWER.yaw; g.scale.setScalar(TOWER.scale);
     g.add(root); scene.add(g); scene.updateMatrixWorld(true);
     for (let i = 0; i < 4; i++) { const r = byName['Fan_Rotor_' + i]; if (r) TOWER.fans.push(r); }
-    const bb = new T.Box3().setFromObject(g);                                   // the casing footprint, in world space
+    const bb = new T.Box3().setFromObject(g);                                   // the placed footprint, in world space
+    const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, cz = (bb.min.z + bb.max.z) / 2;
+    add(new T.PlaneGeometry(w + 3, d + 3).rotateX(-Math.PI / 2), groundMat('asphalt', false, w + 3, d + 3), TOWER.x, 0.028, cz);   // hardstand
+    for (const s2 of [-1, 1]) box(w + 3, 0.18, 0.35, mat(0xb5b0a6), TOWER.x, 0.09, cz + s2 * (d / 2 + 1.5));                        // curbs
+    nameplate('COOLING TOWER|CELLS 1-4', TOWER.x, bb.max.y * 0.62, bb.min.z - 0.5, 0.2, 0, -1, 1.6);
     wallSegs.push([bb.min.x, bb.min.z, bb.max.x, bb.min.z], [bb.min.x, bb.max.z, bb.max.x, bb.max.z],
       [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
-    STACKS.push({ x: TOWER.x, y: bb.max.y - 0.3, z: TOWER.z, r: 2.6, rate: 6, grid: true });   // drift off the fan deck
+    STACKS.push({ x: TOWER.x, y: bb.max.y - 0.6, z: TOWER.z, r: Math.max(2.6, w * 0.12), rate: 8, grid: true });   // drift off the fan deck
     TOWER.ready = true;
   }, 'cooling tower');
 }
@@ -6708,13 +6712,9 @@ function init(container) {
     const pile = add(new T.ConeGeometry(12, 9, 24), mat(0xb8862f), (X0 + X1) / 2 + 2, 4.5, (Z0 + Z1) / 2 - 4, null); pile.castShadow = false;
   }
                   // SE block, southwest corner
-  // ---------- COOLING TOWER: the owner's 1x4 raised-sill model on a hardstand, where the painted placeholder was
-  {
-    add(new T.PlaneGeometry(27, 8.5).rotateX(-Math.PI / 2), groundMat('asphalt', false, 27, 8.5), TOWER.x, 0.028, TOWER.z);   // pad
-    for (const s2 of [-1, 1]) box(27, 0.18, 0.35, mat(0xb5b0a6), TOWER.x, 0.09, TOWER.z + s2 * 4.2);                          // curbs
-    nameplate('COOLING TOWER|CELLS 1-4', TOWER.x, 3.4, TOWER.z - 3.6, 0.2, 0, -1, 1.2);
-    loadCoolingTower();
-  }
+  // ---------- COOLING TOWER: the owner's 1x4 raised-sill model, doubled, on the cooling-tower area south of the road.
+  // The hardstand, curbs, plate and drift plume are all sized from the placed model, so the scale lives in one place.
+  loadCoolingTower();
   makeTote(EXR - 22, SZR - 12, 0.15);                                  // a liquid tote sitting in the dirt north of the cooling tower, across the south road                 // south of the south road
   mark('FIRE &\nPROCESS\nWATER', -62, SZR + 30, 24, 40);
   // ---------- EMPLOYEE PARKING: east of the east road, south of the exit road. Driveways in from the exit road (NW corner)

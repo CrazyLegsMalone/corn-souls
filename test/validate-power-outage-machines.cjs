@@ -296,15 +296,20 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
 
   // wiring in game.html
   assert.ok(html.includes("'/corn-souls/assets/models/1x4_cooling_tower_raised_sill.glb'"), 'the tower model is fetched by absolute URL');
-  assert.ok(html.includes('const TOWER = { x: 50, z: 198, yaw: 0'), 'placed where the painted placeholder was (EXR-22, SZR+13)');
+  assert.ok(html.includes('const TOWER = { x: 50, z: 202, yaw: 0, scale: 2'), 'doubled, and pushed south to clear the road');
+  assert.ok(html.includes('g.scale.setScalar(TOWER.scale)'), 'the scale is applied when the model loads');
+  assert.ok(html.includes("groundMat('asphalt', false, w + 3, d + 3)"), 'the hardstand is sized from the placed model');
   assert.ok(html.includes('loadCoolingTower();') && html.includes('updateCoolingTower(dt);'), 'built at load, updated every frame');
   assert.ok(html.includes('if (!TOWER.fans.length || POWER_OUTAGE.on) return;'), 'the fans stop dead with the plant');
   assert.ok(html.includes('POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'grid-fed stacks (RTO, cooling tower) go cold with the plant');
   assert.ok(html.includes('rate: 7, grid: true });'), 'the RTO stack is flagged grid-fed');
   assert.ok(html.includes("nameplate('COOLING TOWER|CELLS 1-4'"), 'the hardstand is labelled');
   assert.ok(!html.includes("mark('COOLING"), 'the painted placeholder is gone');
-  const roadEdge = 185 + 10.7 / 2, towerNorth = 198 + mn[2];
-  assert.ok(towerNorth - roadEdge > 3, 'the tower clears the south road by ' + (towerNorth - roadEdge).toFixed(1) + ' m');
+  const SC = 2, roadEdge = 185 + 10.7 / 2, towerNorth = 202 + mn[2] * SC, towerSouth = 202 + mx[2] * SC;
+  assert.ok(Math.abs((mx[0] - mn[0]) * SC - 47.3) < 1.2, 'the footprint really is doubled: ' + ((mx[0] - mn[0]) * SC).toFixed(1) + ' x ' + ((mx[2] - mn[2]) * SC).toFixed(1) + ' m');
+  assert.ok(towerNorth - roadEdge > 3, 'the doubled tower clears the south road by ' + (towerNorth - roadEdge).toFixed(1) + ' m');
+  assert.ok(towerNorth > roadEdge, 'and never crosses it (north face at z ' + towerNorth.toFixed(1) + ', road edge ' + roadEdge.toFixed(1) + ')');
+  assert.ok(towerSouth < 260, 'the south face stays on the open ground: z ' + towerSouth.toFixed(1));
 }
 
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');

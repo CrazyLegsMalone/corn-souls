@@ -1,3 +1,11 @@
+## TEST v1.97.50 — cooling tower doubled, and kept off the pavement (2026-11-01)
+- The tower is now **2x** (47.3 x 11.7 m footprint, 12 m tall) at (50, 202) - moved 4 m south so its north face sits at z 195.3, still **4.99 m clear of the south road's south edge** (z 190.35) and well off the pavement.
+- The hardstand, curbs, nameplate and drift plume are now **sized from the placed model's bounds** instead of hard-coded, so the scale lives in one number (`TOWER.scale`) and nothing can drift out of sync: 50.3 x 14.7 m pad, curbs on both long edges, the plate at 62% of the deck height, and the plume radius scaled to the casing width.
+- Collision follows automatically (it is built from the same bounds), and the fans spin about their own axes regardless of scale.
+- `test/validate-power-outage-machines.cjs` now pins the doubled footprint (47.3 m), the scale being applied at load, the bbox-derived pad, and the clearance: the north face must stay more than 3 m from the road edge and must never cross it.
+- Verified locally with the portable Node before pushing: all 10 repo-root suites and the 3 `test/` suites pass, plus the launcher anchors.
+- Bumped TEST to `1.97.50` / `corn-souls-test-shell-v77`.
+
 ## TEST v1.97.49 — fix a SyntaxError from the shared-loader refactor (v1.97.48 would not load) (2026-11-01)
 - **v1.97.48 shipped broken**: when `loadSubstation()` was refactored onto the shared `loadGlbModel(url, onReady)`, the old `const { root, byName } = glbBuild(buf);` line was left inside the new callback, redeclaring the callback’s own parameter - a `SyntaxError: Identifier 'root' has already been declared` that stopped the whole game script from loading. Removed; the callback now uses the pair it is handed.
 - Two test expectations had gone stale with the same release and are corrected: the RTO plume gate now keys on `S.grid` (the cooling tower shares it), and the substation model is checked by its absolute URL going through `loadGlbModel` rather than a bare `fetch(...)`.
