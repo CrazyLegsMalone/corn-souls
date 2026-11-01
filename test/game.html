@@ -7827,6 +7827,7 @@ function buildRailPhone() {
     c.font = 'bold 19px Arial'; c.fillText('DISPATCHER PHONE', 128, 68);
     const plate = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv), side: T.DoubleSide }));
     plate.position.set(0, 2.0, 0.02); plate.userData.noHit = true; g.add(plate); }
+  g.rotation.y = Math.PI;   // door, plate and handset face the road/approach
   scene.add(g); extraCols.push([x, z, 0.42]);
   RAIL_PHONE.x = x; RAIL_PHONE.z = z;
 }
@@ -11016,6 +11017,7 @@ function debugMenu(code) {
 }
 // every control in the game, grouped by what you're doing: keyboard + mouse · controller · phone
 function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for depends on what the line is doing
+  unlockMouse();   // free the cursor so the menu can be clicked with a mouse
   const S = P3.railPhoneState();
   const note = S.held ? 'A freight is holding the crossing and the gates are down.'
     : S.moving ? 'A train is already on the crossing.'

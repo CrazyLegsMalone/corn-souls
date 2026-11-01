@@ -1,3 +1,7 @@
+## TEST v1.97.30 — dispatcher phone: face the approach, and free the cursor for the menu (2026-11-01)
+- Rotated the cabinet 180 degrees so the door, sign plate and handset face the approach instead of the hillside behind it.
+- `railPhoneMenu()` now calls the existing `unlockMouse()` before it opens, so the pointer is released while the menu is up and its buttons can be clicked. Previously the pointer stayed locked, the mouse kept steering the first-person view, and selections had to be made with the controller or keyboard.
+
 ## TEST v1.97.29 — Road P dispatcher phone: hold a freight, release it, or call one through (2026-11-01)
 - Added an interactable dispatcher phone at the Road P crossing (`RAIL_PHONE`) on the **north side of the tracks**, beside the southbound-approach mast (`x = RDPX_C - 5.2 - 1.9`, `z = mainZ(px) - 9 - 1.2`) so it stands clear of the gate arm and the roadway. `buildRailPhone()` builds a concrete pad, post, weatherproof cabinet with door/latch/rain hood, a handset with a coiled cord and a `RAILROAD / DISPATCHER PHONE` plate; it registers a 0.42 m collider through `extraCols` and every mesh is `userData.noHit`.
 - `X` / `E` within 2.3 m opens `railPhoneMenu()` (built on `modal`), whose options follow the state of the line: **call a train and hold the crossing**, **send the blocked train on**, **call a train straight through**, hang up. A controls-help row was added for it.
