@@ -346,6 +346,11 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.equal((html.match(/DRINK_SPOTS\.push\(/g) || []).length, 2, 'two vending machines');
   assert.ok(html.includes('DRINK_SPOTS.push({ x: -61.35, y: 0.16, z: OZN + 0.46'), 'replaces the process break-room soda machine');
   assert.ok(html.includes('DRINK_SPOTS.push({ x: 59, y: FY + 0.16, z: ZN + 0.46'), 'replaces the scale-house soda machine');
+  // the scale house is laid out at x 56..90 and shifted east by SH_DX; the machine has to ride that shift or it
+  // stands 26 m west of the building (the bug the owner spotted: a machine outside the entrance)
+  assert.ok(html.includes('DRINK_SPOTS[i].x += DX'), 'the scale-house machine moves east with the building');
+  const shDX = +html.match(/const SH_DX = (\d+)/)[1];
+  assert.ok(59 + shDX > 56 + shDX && 59 + shDX < 90 + shDX, 'and ends up inside it (x ' + (59 + shDX) + ', building ' + (56 + shDX) + '..' + (90 + shDX) + ')');
   assert.ok(!html.includes('box(0.95, 1.85, 0.85, red'), 'the old break-room soda box is gone');
   assert.ok(!html.includes('mat(0xc8312f), 59'), 'the old scale-house soda box is gone');
   assert.ok(html.includes('loadDrinkMachines();') && html.includes('root.clone(true)'), 'built at load, one upload shared by both machines');

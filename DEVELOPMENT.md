@@ -1,3 +1,10 @@
+## TEST v1.97.53 — the scale-house vending machine is inside again (2026-11-01)
+- **Owner-spotted bug:** the machine stood outside the scale house, next to the glass entrance. Cause: the scale house is laid out at x 56..90 and then **shifted 26 m east** by the building's `DX` block, which moves `scene.children`, `wallSegs`, `WALK_SURF` and `O.swingDoors` - but a `DRINK_SPOTS` entry is plain data, so it stayed at its laid-out x and the model was built 26 m west of the building.
+- Fixed the same way the swing doors are handled: the spot's index is captured when it is registered, and the shift block now moves `DRINK_SPOTS` entries created inside that building. The machine lands at world **x 85**, inside the 82..116 footprint, on the raised floor (`FY`) and 0.46 m in from the north wall.
+- `test/validate-power-outage-machines.cjs` now proves it: it reads `SH_DX` from the game, applies the shift to the registered x, and asserts the result falls inside the building's laid-out span - so this can't regress silently.
+- Verified locally: 10 repo-root suites + 3 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.53` / `corn-souls-test-shell-v80`.
+
 ## TEST v1.97.52 — Milo Rade vending machines replace the flat soda boxes (2026-11-01)
 - The owner's `milorade_machine.glb` now stands where the two flat red soda-machine boxes were: one in the **process break room** (x -61.35, against the north wall of the break room) and one in the **scale house** (x 59, on its raised floor). Both are placed at export scale (1.14 x 2.23 x 0.98 m), lifted 0.16 m because the model hangs that far below its own origin, and each gets a 0.7 m collider.
 - **One upload, two machines**: the model is fetched and built once, then `clone()`d for the second spot, so the geometry, materials and the 3 MB embedded PNG are shared.

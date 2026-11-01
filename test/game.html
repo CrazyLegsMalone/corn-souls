@@ -6585,11 +6585,13 @@ function init(container) {
     box(0.45, 0.45, 0.65, mat(0xf4f4f4), 76.6 + 2.2, FY + 0.22, ZN + 0.5); box(0.5, 0.15, 0.4, mat(0xf4f4f4), 76.4 + 3.4, FY + 0.85, ZN + 0.35);   // toilet, sink
     box(0.9, 1.8, 0.8, mat(0x2b2f36), 57.5, FY + 0.9, ZN + 0.5); box(0.6, 1.1, 0.03, mat(0x8fb0c4), 57.4, FY + 1.1, ZN + 0.92);   // snack machine
     DRINK_SPOTS.push({ x: 59, y: FY + 0.16, z: ZN + 0.46, yaw: 0 });                                     // Milo Rade machine on the raised scale-house floor
+    const dS = DRINK_SPOTS.length - 1;                                                                   // ...which then moves east with the building
     { const DX = SH_DX;   // shift the building (laid out in its original numbers) east along with the east road
       for (let i = SH0; i < scene.children.length; i++) scene.children[i].position.x += DX;
       for (let i = SHW; i < wallSegs.length; i++) { wallSegs[i][0] += DX; wallSegs[i][2] += DX; }
       for (let i = SHS; i < WALK_SURF.length; i++) { WALK_SURF[i].x0 += DX; WALK_SURF[i].x1 += DX; }
-      for (let i = SHD; i < (O.swingDoors || []).length; i++) O.swingDoors[i].x += DX; }
+      for (let i = SHD; i < (O.swingDoors || []).length; i++) O.swingDoors[i].x += DX;
+      for (let i = dS; i < DRINK_SPOTS.length; i++) DRINK_SPOTS[i].x += DX; }   // vending machines standing in this building
     // two scale techs at the drive-through windows (inbound on the north wall, outbound on the south wall), facing the trucks
     NPCS.push({ id: 'brenda', g: seatedPerson(WINX + SH_DX, ZN + 0.85, 0, 0x8a5a9e, FY, { woman: 0x5a3a22 }) }, { id: 'tammy', g: seatedPerson(WINX + SH_DX, ZS - 0.85, Math.PI, 0x4f8f5a, FY, { woman: 0xc9a25a }) });   // scale techs: women, no hard hats (brunette, blonde)
   }
