@@ -39,6 +39,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(/No power/.test(st[1]), 'the readout says there is no power: ' + st[1]);
 
   s.power = false;                      // power comes back
+  s.sp.mill0.rate = s.sp.mill1.rate = 425;   // pin the setpoints and give the mills corn and room, so the
+  s.st1.L = 50; s.day[0].L = s.day[1].L = 100;   // check does not depend on where the settle left the plant
   Sim.step(s, 30);
   assert.ok(s.t > snap.t, 'the plant clock runs again');
   assert.ok(s.mills.some(m => m.rate > 0), 'the mills come back up');
@@ -60,18 +62,19 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   vm.runInContext(html.slice(a, b), ctx);
   const G = ctx.PIVOT_GEN, C = ctx.CAN, P = ctx.O.pivot;
 
-  ctx.updatePivot(3600);                                  // one hour of running
+  ctx.updatePivot(1);                                     // one second: the water picture scrolls
+  assert.ok(P.water[0].offset.y > 0, 'the water scrolls while the engine runs');
+  ctx.updatePivot(3599);                                  // and an hour of running burns the diesel
   assert.ok(Math.abs(G.fuel - 118.8) < 1e-6, 'it sips 1.2 L an hour, got ' + G.fuel);
-  assert.ok(P.g.rotation.y < 0, 'the arm turns while the engine runs');
-  assert.ok(P.water[0].offset.y > 0, 'and the water scrolls');
+  assert.ok(P.g.rotation.y < 0, 'and the arm turns');
 
   // the plant outage does not touch it: the pivot runs on its own diesel
   G.fuel = 0.5;
   let told = null; ctx.PIVOT_NOTIFY = m => { told = m; };
-  const rot = P.g.rotation.y;
-  ctx.updatePivot(3600);
+  ctx.updatePivot(3600);                                  // runs the tank dry
   assert.equal(G.running, false, 'it stops when the tank runs dry');
   assert.ok(told && /diesel/i.test(told), 'and the player is told: ' + told);
+  const rot = P.g.rotation.y;                             // from here the arm must not move again
   ctx.updatePivot(60);
   assert.equal(P.g.rotation.y, rot, 'the arm stays where it stopped');
   assert.ok(P.sheets.every(w => w.visible === false), 'the water is off');
@@ -81,6 +84,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(/starts up/.test(ctx.pivotGenAction('pour')), 'pouring diesel restarts the engine');
   assert.equal(G.fuel, 20, 'the can holds 20 L');
   assert.equal(C.charge, 0, 'and is empty afterwards');
+  ctx.updatePivot(0.001);                                 // next tick: the spray comes back with the engine
   assert.ok(P.sheets.every(w => w.visible !== false), 'the water comes back');
   assert.equal(ctx.pivotGenAction('pour'), 'The diesel can is empty - fill it at the bulk tank.');
   assert.equal(ctx.pivotGenAction('take'), '⛽ Diesel can (20 L)');
