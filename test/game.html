@@ -4808,6 +4808,15 @@ const EXIT_SIGN = { mat: null, halo: null };
 // refuelling action and the P3 getter all read it - nesting it inside a building block throws ReferenceError.
 const PIVOT_GEN = { x: 0, z: 0, r: 2.8, fuel: 120, cap: 120, burn: 1.2, running: true, lamp: null, snd: null };
 const CAN = { cap: 20, charge: 20 };   // the diesel can you carry (litres)
+// Main substation south of the retention ponds: its main breaker is the master reset for the whole plant.
+const POWER_RESET = { x: 0, z: 0, r: 2.8, lever: null, lamp: null, gates: [] };
+// Dirt tracks for the Ranger: from the end of the paved south road, across the loop track, then splitting to run
+// round both ponds and meet at the substation forecourt. Every node clears the ponds and the track (checked in CI).
+const DIRT_ROADS = [
+  { w: 5.5, pts: [[-252, 185], [-285, 205], [-420, 190], [-560, 190], [-700, 200], [-742, 300], [-748, 420], [-730, 500], [-672, 534], [-610, 540]] },
+  { w: 5.5, pts: [[-285, 205], [-310, 300], [-320, 400], [-360, 470], [-460, 505], [-560, 536], [-610, 540]] },
+  { w: 7.0, pts: [[-610, 540], [-610, 553.6]] }
+];
 function exitSignMat() {
   if (EXIT_SIGN.mat) return EXIT_SIGN.mat;
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 56;
@@ -7243,6 +7252,51 @@ function init(container) {
     g.traverse(o => { if (o.isMesh) { o.userData.noHit = true; o.castShadow = o.material !== wm && o.material !== gm; } });
   }
 
+  // ---------- MAIN SUBSTATION south of the retention ponds: two gates facing north, the plant's MAIN BREAKER inside
+  // (the master reset for a power outage), reached by the Ranger's dirt tracks round the ponds.
+  {
+    for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w);
+    add(new T.PlaneGeometry(22, 16).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, 0.031, 545);   // forecourt / turnaround
+    const X0 = -623, X1 = -597, Z0 = 554, Z1 = 570, H = 6.6;
+    building(X0, X1, Z0, Z1, H, [[-617.5, 6.4, 5.2], [-602.5, 6.4, 5.2]], null, null, null);   // two gate openings, north wall
+    concreteFloor(X0, X1, Z0, Z1);
+    nameplate('MAIN SUBSTATION|13.8 kV', -610, 5.5, Z0, 0.2, 0, -1, 1.5);
+    { // gates: steel panels that slide aside by hand - they still work with the plant dead, which is the point
+      const gm = new T.MeshLambertMaterial({ color: 0x9aa1a8 }), rib = mat(0x6f777e);
+      for (const [cx, dir] of [[-617.5, -1], [-602.5, 1]]) {
+        const g = new T.Mesh(new T.BoxGeometry(6.3, 5.0, 0.12), gm); g.position.set(cx, 2.55, Z0); g.castShadow = true; g.userData.noHit = true; scene.add(g);
+        for (let k = 0; k < 4; k++) { const r2 = new T.Mesh(new T.BoxGeometry(6.2, 0.07, 0.15), rib); r2.position.set(0, -1.65 + k * 1.1, 0); g.add(r2); }
+        POWER_RESET.gates.push({ g, cx, dir, z: Z0, open: 0 });
+      } }
+    { // switchgear line along the south wall, bus bars overhead, emergency work lamp
+      const cab = mat(0x8d9298), drk = mat(0x23272b), led = gridLight(new T.MeshBasicMaterial({ color: 0x3ddc84 }));
+      for (let i = 0; i < 5; i++) { const x = -620.4 + i * 2.1;
+        box(1.85, 2.5, 0.95, cab, x, 1.25, Z1 - 1.4);
+        box(1.55, 0.55, 0.04, drk, x, 2.0, Z1 - 1.9);
+        box(0.1, 0.1, 0.05, led, x + 0.7, 1.7, Z1 - 1.93);   // panel LED: on the plant supply, so it dies in an outage
+        extraCols.push([x, Z1 - 1.4, 0.95]); }
+      for (const dz of [-0.9, 0.2, 1.3]) box(23, 0.09, 0.09, mat(0xc9a227), -610, 4.7, Z0 + 3 + dz);   // bus bars
+      box(23, 0.06, 1.6, mat(0x4a4f54), -610, 5.35, Z0 + 4.2);                                          // cable tray
+      for (const x of [-620, -614, -606, -600]) box(0.16, 0.95, 0.16, mat(0x6f777e), x, 4.05, Z1 - 1.4); // bus drops
+      const wl = new T.Mesh(new T.BoxGeometry(1.7, 0.12, 0.22), batteryLight(new T.MeshBasicMaterial({ color: 0xffe9b0 })));
+      wl.position.set(-610, 5.05, Z0 + 2.4); wl.userData.noHit = true; scene.add(wl); }                   // emergency lamp on its own battery
+    { // MAIN BREAKER: the master reset, on the south wall facing the gates
+      box(1.7, 2.0, 0.5, mat(0x8f2b22), -610, 1.55, Z1 - 0.4);
+      box(1.35, 1.15, 0.06, mat(0x1f2427), -610, 1.75, Z1 - 0.68);
+      const lv = new T.Mesh(new T.BoxGeometry(0.15, 0.75, 0.11), mat(0xe8c82a)); lv.position.set(-610, 1.6, Z1 - 0.76); scene.add(lv); POWER_RESET.lever = lv;
+      const lp = new T.Mesh(new T.SphereGeometry(0.075, 8, 6), batteryLight(new T.MeshBasicMaterial({ color: 0x2fdc84 })));
+      lp.position.set(-609.25, 2.0, Z1 - 0.74); lp.userData.noHit = true; scene.add(lp); POWER_RESET.lamp = lp;
+      nameplate('MAIN BREAKER|TRIP / RESET', -610, 2.62, Z1 - 0.35, 0.2, 0, -1, 1.15);
+      extraCols.push([-610, Z1 - 0.4, 0.55]);
+      POWER_RESET.x = -610; POWER_RESET.z = Z1 - 1.5; }
+    { // outside: transformer bank, HV bushings, bollards
+      box(4.4, 2.7, 2.7, mat(0x8a8f94), -618.5, 1.35, Z0 - 5.6);
+      for (const dx of [-1.3, 0, 1.3]) add(new T.CylinderGeometry(0.11, 0.11, 1.0, 8), mat(0xd8d3c4), -618.5 + dx, 3.2, Z0 - 5.6, null);
+      for (let i = 0; i < 3; i++) box(0.22, 0.95, 0.22, mat(0xf2c200), -624 + i * 5.4, 0.48, Z0 - 8.4);
+      extraCols.push([-618.5, Z0 - 5.6, 2.7]);
+      nameplate('DANGER|HIGH VOLTAGE', -618.5, 3.6, Z0 - 4.2, 0.2, 0, -1, 1.1); }
+  }
+
   // trees and fields
   for (let i = 0; i < 56; i++) {
     const a = Math.random() * Math.PI * 2, r = 230 + Math.random() * 100, x = -45 + Math.cos(a) * r, z = Math.sin(a) * r * 0.65;
@@ -7537,6 +7591,22 @@ function trackPath(pts, closed) {
     [-GAUGE / 2, GAUGE / 2].forEach((sd, k) => { dummy.position.set(mx + Math.sin(a) * sd, 0.33, mz + Math.cos(a) * sd); dummy.rotation.set(0, a, 0); dummy.scale.set(L, 1, 1); dummy.updateMatrix(); rails.setMatrixAt(i * 2 + k, dummy.matrix); });
   });
   dummy.scale.set(1, 1, 1); rails.userData.noHit = true; scene.add(rails);
+}
+// Dust track for the Ranger: the same offset-ribbon trick as the ballast, with UVs in metres so the dirt texture
+// never stretches round a bend. No collider: it is ground you can drive on, nothing more.
+function dirtRoad(pts, w) {
+  const P = pts.map(p => new T.Vector3(p[0], 0, p[1])), pos = [], uv = [], idx = []; let dist = 0;
+  for (let i = 0; i < P.length; i++) {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], t = b.clone().sub(a).normalize(), n = V3(-t.z, 0, t.x);
+    if (i) dist += P[i].distanceTo(P[i - 1]);
+    pos.push(P[i].x + n.x * w / 2, 0.028, P[i].z + n.z * w / 2, P[i].x - n.x * w / 2, 0.028, P[i].z - n.z * w / 2);
+    uv.push(dist, 0, dist, w);
+    if (i) { const k = 2 * i; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx); g.computeVertexNormals();
+  const mesh = new T.Mesh(g, groundMat('dirtroad', true)); mesh.receiveShadow = true; mesh.userData.noHit = true; scene.add(mesh);
 }
 function buildRail() {
   trackPath(LSAMP.filter((p, i) => i % 2 === 0).map(p => ({ x: p.x, z: p.z })), true);   // the loop (points every ~4 m)
@@ -8533,7 +8603,7 @@ function update(sim, dt, events) {
     puffT = 0;
   }
   updatePuffs(dt); updateWeather(dt);
-  updateBirds(dt); updateCritters(dt); updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
+  updateBirds(dt); updateCritters(dt); updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
 
   // trucks come when the simulation calls them
   for (const e of events) spawn(e.kind, e.ship);
@@ -9237,6 +9307,25 @@ function pivotGenAction(kind) {
   }
   if (kind === 'dump') { PIVOT_GEN.fuel = 0; PIVOT_GEN.running = false; return 'Pivot day tank emptied - the engine has stopped.'; }
   return null;
+}
+// The substation's main breaker: throwing it back in is what restores power after an outage.
+function powerResetNear() {
+  return !!walk.on && !walk.dead && Math.hypot(walk.x - POWER_RESET.x, walk.z - POWER_RESET.z) < POWER_RESET.r;
+}
+function powerResetAction() {
+  if (!POWER_OUTAGE.on) return 'The main breaker is already closed - the plant has power.';
+  setPowerOutage(false);
+  return '⚡ Main breaker closed - power restored.';
+}
+function updatePowerReset(dt) {   // the lever, the tripped lamp and the two hand-slid gates
+  const R = POWER_RESET;
+  if (R.lever) R.lever.rotation.x += ((POWER_OUTAGE.on ? -0.6 : 0) - R.lever.rotation.x) * Math.min(1, dt * 6);
+  if (R.lamp) R.lamp.material.color.setHex(POWER_OUTAGE.on ? 0xff3b30 : 0x2fdc84);
+  for (const g of R.gates) {
+    const near = walk.on && !walk.dead && Math.hypot(walk.x - g.cx, walk.z - g.z) < 7;
+    g.open = Math.max(0, Math.min(1, g.open + (near ? 1.5 : -1.1) * dt));
+    g.g.position.x = g.cx + g.dir * 5.9 * g.open; g.g.visible = g.open < 0.98;
+  }
 }
 
 // ---------- HAND TOOLS: crowbar, shovel, pickaxe and pitchfork hang on a pegboard on the maintenance shop's north wall (they're always there;
@@ -10925,7 +11014,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { get scene() { return scene; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
+root.Plant3D = { get scene() { return scene; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
 })(this);
 </script>
 <script>// =====================================================================
@@ -11255,6 +11344,14 @@ function pivotGenMenu() {   // center pivot: take or fill the diesel can, then p
   rows.push(['Close', () => {}]);
   modal(`<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">Center pivot · diesel gen-set</div>
     <div style="font-size:14px;line-height:1.45;color:#33404d">${G.running ? 'Engine running - the pivot is turning and watering.' : 'Engine stopped - the pivot is not turning.'} Day tank ${Math.round(G.fuel)} of ${G.cap} L, can ${Math.round(G.can)} L. It burns about 1.2 L an hour.</div>`, rows, true);
+}
+function powerResetMenu() {   // main substation: the master reset for a power outage
+  unlockMouse();
+  const dead = P3.powerOutage, rows = [];
+  if (dead) rows.push(['⚡ Trip the main breaker back in', () => { const r = P3.powerResetAction(); if (r) toast(r); }]);
+  rows.push(['Close', () => {}]);
+  modal(`<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">Main substation · main breaker</div>
+    <div style="font-size:14px;line-height:1.45;color:#33404d">${dead ? 'The main is tripped - the plant is dead. Throw it back in to restore power.' : 'The main is closed and the plant has power.'}</div>`, rows, true);
 }
 function controlsMenu(code, fromTitle) {
   const S = [
@@ -11728,6 +11825,7 @@ function press(n) {
     if (n === 'X') { { const who = P3.npcAt(); if (who && NPC_DEF[who]) { talk(who); return; } }   // talk to whoever you're looking at
     if (P3.railPhoneNear()) { railPhoneMenu(); return; }   // Road P dispatcher phone
     if (P3.pivotGenNear()) { pivotGenMenu(); return; }   // center-pivot diesel gen-set
+    if (P3.powerResetNear()) { powerResetMenu(); return; }   // main substation breaker
     const r = P3.kiaToggle() || P3.radioToggle() || P3.takeTool() || P3.takeExtinguisher() || P3.pickChute() || P3.takeKey() || P3.carToggle() || P3.mowerToggle() || P3.coolerHandle() || P3.nh3Valve() || P3.throwSwitch() || P3.rideToggle(); if (r) { toast(r); return; } const id = P3.interactTarget(); if (id === 'BOARD') openBoard(); else if (id === 'BOARD_BUSY') toast('The Board Op is using this board — use the other one'); else if (id) selectUnit(id); else toast('Nothing to interact with here'); return; }
     if (n === 'B') { if (cur) closePanel(); return; }   // B only backs out of panels/menus; it doesn't leave Squeeg mode
     if (n === 'A' && !cur) { P3.walkJump(); return; }

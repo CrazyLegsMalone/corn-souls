@@ -127,4 +127,92 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('set pivotNotify(f) { PIVOT_NOTIFY = f; }'), 'the out-of-diesel notice reaches the HUD');
 }
 
+
+// ---------------------------------------------------------------- the dirt tracks never run through a pond or over the track
+{
+  assert.ok(html.includes('const PONDS = [[-603, 429, 0x4f9a6a], [-451, 309, 0x3f9f8f]]'), 'pond positions as measured');
+  assert.ok(html.includes('PONDS.phi = Math.atan(0.756); PONDS.half = 67.4; PONDS.hole = 70;'), 'pond geometry as measured');
+  const phi = Math.atan(0.756), cp = Math.cos(phi), sp = Math.sin(phi), HOLE = 70, PONDS = [[-603, 429], [-451, 309]];
+  const clearOfPonds = (x, z, m) => PONDS.every(([px, pz]) => {
+    const dx = x - px, dz = z - pz, u = dx * cp - dz * sp, v = dx * sp + dz * cp;
+    return Math.abs(u) >= HOLE + m || Math.abs(v) >= HOLE + m;
+  });
+  // the unit-train loop, from the satellite points the game itself uses
+  const raw = html.slice(html.indexOf('const LOOP_PTS = ['), html.indexOf('].map(', html.indexOf('const LOOP_PTS = [')) + 1)
+    .replace('const LOOP_PTS = ', '').replace(/(\w+):/g, '"$1":');
+  const loop = JSON.parse(raw).map(([px, py]) => [-240 + (px - 1062) * 1.6, (py - 507) * 1.6]);
+  const nearTrack = (x, z) => loop.reduce((best, a, i) => {
+    const b = loop[(i + 1) % loop.length], vx = b[0] - a[0], vz = b[1] - a[1], L2 = vx * vx + vz * vz;
+    const t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * vx + (z - a[1]) * vz) / L2)) : 0;
+    return Math.min(best, Math.hypot(x - (a[0] + vx * t), z - (a[1] + vz * t)));
+  }, 1e9);
+  const roadsSrc = html.slice(html.indexOf('const DIRT_ROADS = ['), html.indexOf('];', html.indexOf('const DIRT_ROADS = [')) + 1)
+    .replace('const DIRT_ROADS = ', '').replace(/(\w+):/g, '"$1":');
+  const roads = JSON.parse(roadsSrc);
+  assert.ok(roads.length === 3, 'three tracks: the north run, the south run and the forecourt apron');
+  let nodes = 0;
+  for (const r of roads) {
+    for (const [x, z] of r.pts) {
+      nodes++;
+      assert.ok(clearOfPonds(x, z, 8), 'road node clears both ponds by 8 m: ' + x + ',' + z);
+      assert.ok(nearTrack(x, z) >= 10, 'road node clears the loop track by 10 m: ' + x + ',' + z + ' (' + nearTrack(x, z).toFixed(1) + ' m)');
+    }
+  }
+  assert.ok(nodes >= 18, 'the tracks have enough nodes to curve round the ponds');
+  assert.ok(html.includes('for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w)'), 'the tracks are built');
+  assert.ok(html.includes("groundMat('dirtroad', true)"), 'dirt texture with UVs in metres');
+}
+
+// ---------------------------------------------------------------- the substation and its main breaker
+{
+  // two gates on the NORTH wall (the first opening list of building()), on a hand-slid panel, not a roll-up
+  assert.ok(html.includes('building(X0, X1, Z0, Z1, H, [[-617.5, 6.4, 5.2], [-602.5, 6.4, 5.2]], null, null, null)'),
+    'two gate openings on the north wall, nothing on the other three');
+  assert.ok(html.includes('POWER_RESET.gates.push({ g, cx, dir, z: Z0, open: 0 })'), 'the gates are tracked for sliding');
+  const gatesBlock = html.slice(html.indexOf('gates: steel panels that slide aside by hand'), html.indexOf('switchgear line along the south wall'));
+  assert.ok(!gatesBlock.includes('rollDoors'), 'the gates are hand-operated, not powered roll-ups (they must work in an outage)');
+  assert.ok(html.includes('POWER_RESET.lever = lv') && html.includes('POWER_RESET.lamp = lp'), 'the breaker has a lever and a tripped lamp');
+  assert.ok(html.includes("'MAIN BREAKER|TRIP / RESET'"), 'the panel is labelled');
+  assert.ok(html.includes('powerResetNear: () => powerResetNear()') && html.includes('powerResetAction: () => powerResetAction()'), 'reachable from the UI');
+  assert.ok(html.includes('if (P3.powerResetNear()) { powerResetMenu(); return; }'), 'E opens the breaker panel');
+  assert.ok(html.includes('updatePowerReset(dt);'), 'the lever, lamp and gates update every frame');
+  // the breaker sits inside the building footprint
+  const inside = (x, z) => x > -623 && x < -597 && z > 554 && z < 570;
+  assert.ok(inside(-610, 570 - 1.5), 'the breaker stand is inside the substation');
+}
+
+// ---------------------------------------------------------------- tripping it back in
+{
+  const a = html.indexOf("// The substation's main breaker"), b = html.indexOf('// ---------- HAND TOOLS');
+  assert.ok(a > 0 && b > a, 'found the reset code');
+  let tripped = null;
+  const ctx = {
+    POWER_OUTAGE: { on: false },
+    POWER_RESET: { x: -610, z: 568.5, r: 2.8, lever: null, lamp: null,
+      gates: [{ g: { position: { x: -617.5 }, visible: true }, cx: -617.5, dir: -1, z: 554, open: 0 }] },
+    walk: { on: true, dead: false, x: -610, z: 568.5 },
+    setPowerOutage: on => { tripped = on; ctx.POWER_OUTAGE.on = !!on; },
+    Math
+  };
+  vm.createContext(ctx);
+  vm.runInContext(html.slice(a, b), ctx);
+
+  assert.equal(ctx.powerResetAction(), 'The main breaker is already closed - the plant has power.');
+  assert.equal(tripped, null, 'a live plant is left alone');
+
+  ctx.POWER_OUTAGE.on = true;
+  assert.ok(/power restored/.test(ctx.powerResetAction()), 'tripping it back in restores the plant');
+  assert.equal(tripped, false, 'it cleared the outage');
+
+  // the gates slide aside as you walk up, and close behind you
+  ctx.walk.x = -617.5; ctx.walk.z = 554;         // standing in the gate
+  ctx.updatePowerReset(1);
+  assert.ok(ctx.POWER_RESET.gates[0].open > 0.5, 'the gate slides open as you approach');
+  assert.ok(ctx.POWER_RESET.gates[0].g.position.x < -618, 'and physically moves aside');
+  ctx.walk.x = -400; ctx.walk.z = 400;
+  for (let i = 0; i < 6; i++) ctx.updatePowerReset(1);
+  assert.equal(ctx.POWER_RESET.gates[0].open, 0, 'the gate closes behind you');
+  assert.ok(ctx.powerResetNear() === false, 'and the panel is out of reach from there');
+}
+
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');
