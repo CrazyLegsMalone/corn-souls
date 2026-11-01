@@ -1,3 +1,7 @@
+## TEST v1.97.33 — remove the startup control hint toast (2026-11-01)
+- Dropped the touch/keyboard hint that popped up 900 ms after the title screen was dismissed ("One finger: drag to move, tap to select · Two fingers: twist to turn, pinch to zoom, slide up/down to tilt"). The same controls remain in the ☰ menu and the Controls screen. `musicPlay()` on splash dismissal is untouched.
+- Bumped TEST to `1.97.33` / `corn-souls-test-shell-v60`.
+
 ## TEST v1.97.32 — dispatcher phone: round the ETA to whole tens (2026-11-01)
 - The call confirmation now rounds the arrival estimate down to whole tens of seconds (`Math.max(10, Math.floor(bestEta / 220) * 10)`), so "about 88 s" reads "about 80 s". The test asserts the value is a multiple of ten and never zero.
 - Bumped TEST to `1.97.32` / `corn-souls-test-shell-v59`.
