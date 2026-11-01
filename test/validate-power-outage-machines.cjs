@@ -226,6 +226,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(/power restored/.test(ctx.powerResetAction()), 'tripping it back in restores the plant');
   assert.equal(tripped, false, 'it cleared the outage');
 
+  ctx.POWER_OUTAGE.on = true;                       // the main is tripped again for the visual checks
   ctx.walk.x = -605.3; ctx.walk.z = 555.1;         // walk up to the compound gate
   ctx.updatePowerReset(1);
   assert.ok(handle.rotation.x < -0.3, 'the breaker handle drops while the main is tripped');
