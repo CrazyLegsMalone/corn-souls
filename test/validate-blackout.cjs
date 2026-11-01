@@ -93,4 +93,17 @@ function makeCtx() {
   assert.equal(ctx.sunL.intensity, 1.7);
 }
 
-console.log('PASS: blackout dims emissive fixtures once, clamps ambient/sun/sky per frame without compounding, keeps fires lit, restores exactly');
+// The debug menu is in a different script scope from the world closure, so it can
+// only reach the event through the P3 export. (This is exactly the bug that threw
+// "setBlackout is not defined" in TEST 1.97.34.)
+{
+  const start = html.indexOf("['Blackout: start'");
+  const end = html.indexOf("['Blackout: end'");
+  assert.ok(start > 0 && end > start, 'debug menu has both blackout rows');
+  const rows = html.slice(start, end + 80);
+  assert.ok(rows.includes('P3.setBlackout('), 'menu rows call the exported P3.setBlackout');
+  assert.ok(!/[^.\w]setBlackout\(/.test(rows), 'menu rows must not call the private function directly');
+  assert.ok(html.includes('setBlackout, get blackout()'), 'the event is exported on Plant3D');
+}
+
+console.log('PASS: blackout dims emissive fixtures once, clamps ambient/sun/sky per frame without compounding, keeps fires lit, restores exactly, and is reachable from the debug menu through P3');

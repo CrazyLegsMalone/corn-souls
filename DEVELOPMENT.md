@@ -1,3 +1,10 @@
+## TEST v1.97.34 — blackout event: all plant power out, only headlamps, fires and stars (2026-11-01)
+- Added `BLACKOUT` / `setBlackout(on)` / `applyBlackout()` in `game.html`. Starting the event dims every self-lit material once (walks the scene, saves `emissiveIntensity` per unique material and drops it to 6%), then the per-frame pass crushes the ambient hemisphere to 0.06, kills the sun, clamps the sky background to 2% luminance, matches the fog to it, removes the sun disc from the sky shader and brings the stars out. Ending it restores every saved material exactly.
+- The per-frame pass is **idempotent** (clamps rather than multiplies) because `daylight()` only re-runs every ~20 s; `setBlackout` sets `dayT = 99` so the sky re-applies immediately in both directions. The headlamp spotlight is never touched, and materials flagged `userData.keepLit` (fires) are skipped.
+- Trigger for now is the debug menu: `Blackout: start` / `Blackout: end`, plus `P3.setBlackout(on)` and `P3.blackout`. A random, environmental or in-world trigger can call the same functions later.
+- Tests: new `test/validate-blackout.cjs` (dim-once, shared material saved once, keepLit untouched, clamp without compounding, exact restore, `dayT` reset, no-op while off). Added to the CI suite list.
+- Bumped TEST to `1.97.34` / `corn-souls-test-shell-v61`. LIVE untouched at Alpha v1.98.
+
 ## TEST v1.97.33 — remove the startup control hint toast (2026-11-01)
 - Dropped the touch/keyboard hint that popped up 900 ms after the title screen was dismissed ("One finger: drag to move, tap to select · Two fingers: twist to turn, pinch to zoom, slide up/down to tilt"). The same controls remain in the ☰ menu and the Controls screen. `musicPlay()` on splash dismissal is untouched.
 - Bumped TEST to `1.97.33` / `corn-souls-test-shell-v60`.
