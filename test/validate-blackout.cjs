@@ -13,10 +13,10 @@ const src = html.slice(a, b);
 const color = v => ({ r: v, g: v, b: v,
   multiplyScalar(k) { this.r *= k; this.g *= k; this.b *= k; return this; },
   copy(o) { this.r = o.r; this.g = o.g; this.b = o.b; return this; } });
-const white = () => ({ r: 1, g: 1, b: 1,
+const white = () => ({ r: 1, g: 1, b: 1, hex: 0xffffff,
   multiplyScalar(k) { this.r *= k; this.g *= k; this.b *= k; return this; },
-  getHex() { return 0xffffff; },
-  setHex() { this.r = 1; this.g = 1; this.b = 1; } });
+  getHex() { return this.hex; },
+  setHex(h) { this.hex = h; this.r = ((h >> 16) & 255) / 255; this.g = ((h >> 8) & 255) / 255; this.b = (h & 255) / 255; } });
 
 function makeCtx() {
   const lit = { emissive: { r: 0.2 }, emissiveIntensity: 1, uuid: 'lit-1' };
@@ -26,9 +26,10 @@ function makeCtx() {
   const sign = { color: white(), isMeshBasicMaterial: true, uuid: 'sign' };     // unlit sign: must dim
   const lamp = { color: white(), isMeshBasicMaterial: true, uuid: 'lamp' };     // unlit indicator lamp: must dim
   const flame = { color: white(), isSpriteMaterial: true, userData: { keepLit: true }, uuid: 'flame' };
+  const screen = { color: white(), isMeshBasicMaterial: true, userData: { darkOnBlackout: true }, uuid: 'screen' };
   const cloudMat = { color: white(), isMeshBasicMaterial: true, uuid: 'clouds' };   // SKY: per-frame pass
   const starMat = { color: white(), isPointsMaterial: true, opacity: 0.1, uuid: 'stars' };        // SKY: per-frame pass
-  const meshes = [lit, shared, shared, fire, plain, sign, lamp, flame, cloudMat, starMat].map(m => ({ material: m }));
+  const meshes = [lit, shared, shared, fire, plain, sign, lamp, flame, screen, cloudMat, starMat].map(m => ({ material: m }));
   const ctx = {
     console, Math, Set, Array, Object, Number,
     dayT: 0,
@@ -44,12 +45,12 @@ function makeCtx() {
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(src + '\nvar __BLACKOUT = BLACKOUT;', ctx);   // const is not a VM global; expose it
-  return { ctx, lit, shared, fire, plain, sign, lamp, flame, cloudMat, starMat };
+  return { ctx, lit, shared, fire, plain, sign, lamp, flame, screen, cloudMat, starMat };
 }
 
 // ---------------------------------------------------------------- the event
 {
-  const { ctx, lit, shared, fire, plain, sign, lamp, flame, cloudMat, starMat } = makeCtx();
+  const { ctx, lit, shared, fire, plain, sign, lamp, flame, screen, cloudMat, starMat } = makeCtx();
   assert.equal(ctx.__BLACKOUT.on, false);
 
   assert.equal(ctx.setBlackout(true), true);
@@ -62,9 +63,10 @@ function makeCtx() {
   assert.ok(Math.abs(sign.color.r - 0.12) < 1e-9, 'unlit sign dimmed');
   assert.ok(Math.abs(lamp.color.r - 0.12) < 1e-9, 'unlit indicator lamp dimmed');
   assert.equal(flame.color.r, 1, 'flame sprites stay lit');
+  assert.equal(screen.color.r, 0, 'control room screens go fully black, not just dim');
   assert.equal(cloudMat.color.r, 1, 'sky clouds are left to the per-frame pass');
   assert.equal(starMat.color.r, 1, 'stars keep their colour; the per-frame pass raises opacity');
-  assert.equal(ctx.__BLACKOUT.saved.length, 4, 'two emissive + one shared dedupe + two unlit = 4 entries');
+  assert.equal(ctx.__BLACKOUT.saved.length, 5, 'two emissive + one shared dedupe + two unlit + one screen = 5 entries');
 
   ctx.setBlackout(true);                       // idempotent start
   assert.ok(Math.abs(lit.emissiveIntensity - 0.06) < 1e-9, 'repeated start does not compound');
@@ -100,6 +102,7 @@ function makeCtx() {
   assert.equal(fire.emissiveIntensity, 2);
   assert.equal(sign.color.r, 1, 'sign restored');
   assert.equal(lamp.color.r, 1, 'lamp restored');
+  assert.equal(screen.color.r, 1, 'screen restored to its picture');
   assert.equal(ctx.__BLACKOUT.saved.length, 0);
   assert.equal(ctx.dayT, 99, 'and daylight() is asked to re-apply on restore too');
 

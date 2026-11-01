@@ -5846,7 +5846,7 @@ function init(container) {
       // two control boards in the NE and SE corners: four 42 in monitors in a 2 x 2 wall on a stand, keyboard and mouse, angled to face into the room
       // screen pictures (drawn once): a process graphic, a web page, a desktop
       const scr = (() => {
-        const mk = draw => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 144; draw(cv.getContext('2d')); const t = new T.CanvasTexture(cv); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return new T.MeshBasicMaterial({ map: t }); };
+        const mk = draw => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 144; draw(cv.getContext('2d')); const t = new T.CanvasTexture(cv); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; const m = new T.MeshBasicMaterial({ map: t }); m.userData.darkOnBlackout = true; return m; };   // monitors go black in a blackout
         const proc = seed => mk(g => {
           g.fillStyle = '#8f969c'; g.fillRect(0, 0, 256, 144); g.fillStyle = '#2b3138'; g.fillRect(0, 0, 256, 16);
           for (let i = 0; i < 12; i++) { g.fillStyle = i === 7 + seed ? '#d23b3b' : '#4a525a'; g.fillRect(4 + i * 21, 3, 18, 10); }
@@ -5857,7 +5857,8 @@ function init(container) {
           for (let i = 0; i < 14; i++) { g.fillStyle = i % 4 ? '#3ddc84' : '#d23b3b'; g.fillRect(20 + ((i * 61 + seed * 17) % 216), 30 + ((i * 41) % 100), 6, 6); }
         });
         { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 144; const t = new T.CanvasTexture(cv); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
-          ALARM_SCR = { cv, t, m: new T.MeshBasicMaterial({ map: t }), shown: null }; drawAlarmScreen(true); }
+          const am = new T.MeshBasicMaterial({ map: t }); am.userData.darkOnBlackout = true;
+          ALARM_SCR = { cv, t, m: am, shown: null }; drawAlarmScreen(true); }
         return { procA: proc(0), procB: proc(1),
           web: mk(g => { g.fillStyle = '#f4f6f8'; g.fillRect(0, 0, 256, 144); g.fillStyle = '#2b6fa3'; g.fillRect(0, 0, 256, 22); g.fillStyle = '#c9d3dc';
             for (let r = 0; r < 9; r++) g.fillRect(60, 40 + r * 10, 170, 6); g.fillStyle = '#e1e6ea'; g.fillRect(6, 30, 48, 100); }),
@@ -8286,20 +8287,24 @@ function setBlackout(on) {
       if (!o.material) return;
       for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
         if (!m || seen.has(m.uuid) || skip.has(m) || (m.userData && m.userData.keepLit)) continue;   // keepLit: fires
-        if (m.emissive) {                                            // lit materials: kill the self-glow
+        if (m.userData && m.userData.darkOnBlackout && m.color) {     // screens: go fully black, not just dim
+          seen.add(m.uuid);
+          BLACKOUT.saved.push([m, m.color.getHex(), 'color']);
+          m.color.setHex(0x000000);
+        } else if (m.emissive) {                                      // lit materials: kill the self-glow
           seen.add(m.uuid);
           const k = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
-          BLACKOUT.saved.push([m, k, false]);
+          BLACKOUT.saved.push([m, k, 'emissive']);
           m.emissiveIntensity = k * 0.06;
         } else if (m.color && (m.isMeshBasicMaterial || m.isSpriteMaterial || m.isPointsMaterial)) {
-          seen.add(m.uuid);                                          // unlit: signs, indicator lamps, sprites, decals
-          BLACKOUT.saved.push([m, m.color.getHex(), true]);
+          seen.add(m.uuid);                                           // unlit: signs, indicator lamps, sprites, decals
+          BLACKOUT.saved.push([m, m.color.getHex(), 'color']);
           m.color.multiplyScalar(0.12);
         }
       }
     });
   } else {
-    for (const [m, k, isColor] of BLACKOUT.saved) { if (isColor) m.color.setHex(k); else m.emissiveIntensity = k; }
+    for (const [m, k, kind] of BLACKOUT.saved) { if (kind === 'color') m.color.setHex(k); else m.emissiveIntensity = k; }
     BLACKOUT.saved.length = 0;
   }
   dayT = 99;   // force daylight() to re-apply on the next frame in both directions
