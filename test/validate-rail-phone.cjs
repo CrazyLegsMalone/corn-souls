@@ -52,13 +52,15 @@ const step = (ctx, seconds) => { const n = Math.round(seconds / 0.1); for (let i
 // ------------------------------------------------------------ call and hold
 {
   const c = makeCtx();
-  assert.match(c.railPhoneApply('hold'), /holding it on the Road P crossing/);
+  assert.match(c.railPhoneApply('hold'), /holding the Road P crossing in about \d+ s/);
   const R = c.THRUS[0];
   const target = R.target;
   assert.equal(R.state, 'run');
   assert.equal(target, 314, 'stop target = crossing distance + half the consist');
   assert.equal(R.cars[0].g.visible, true, 'consist becomes visible');
-  assert.equal(c.railPhoneState().moving, true);
+  assert.equal(c.railPhoneState().running, 1, 'one consist on the line');
+  assert.equal(c.railPhoneState().held, false, 'nothing holding yet');
+  assert.equal(c.railPhoneState().moving, false, 'and it is not at the crossing yet');
 
   step(c, 40);
   assert.equal(R.state, 'hold', 'train parks and holds');
@@ -124,8 +126,35 @@ const step = (ctx, seconds) => { const n = Math.round(seconds / 0.1); for (let i
 
   const h = makeCtx();
   h.NET = { conn: {}, host: true };
-  assert.match(h.railPhoneAction('hold'), /holding it/);
+  assert.match(h.railPhoneAction('hold'), /holding the Road P crossing/);
   assert.equal(h.THRUS[0].u, 0, 'the host applies it');
+}
+
+// -------------------------------------- a train elsewhere must not block the call
+{
+  const c = makeCtx();
+  c.THRUS[1].u = 100; c.THRUS[1].state = 'run';   // westbound, mid-line, 600 m from the crossing
+  assert.match(c.railPhoneApply('hold'), /holding the Road P crossing/, 'an unrelated running train does not block the call');
+  assert.equal(c.THRUS[0].state, 'run', 'the nearer (waiting) consist is the one called');
+  assert.equal(c.THRUS[1].target, null, 'the far train is left alone');
+}
+
+// ------------------------------------- a train actually on the crossing does block
+{
+  const c = makeCtx();
+  c.THRUS[0].u = 300; c.THRUS[0].state = 'run';   // sitting right on the crossing
+  assert.match(c.railPhoneApply('hold'), /on the crossing right now/);
+}
+
+// ------------------------------------------- an inbound train can be halted on it
+{
+  const c = makeCtx();
+  c.THRUS[0].u = 60; c.THRUS[0].state = 'run'; c.THRUS[0].cars.forEach(x => { x.g.visible = true; });
+  assert.match(c.railPhoneApply('hold'), /holding the Road P crossing/, 'an inbound freight is halted at the crossing');
+  assert.equal(c.THRUS[0].u, 60, 'its progress is kept, not reset');
+  assert.equal(c.THRUS[0].target, 314, 'and it is given the same stop point');
+  step(c, 40);
+  assert.equal(c.THRUS[0].state, 'hold');
 }
 
 console.log('PASS: dispatcher phone proximity, hold/stop, send-on, call-through, 5-minute release and guest relay');

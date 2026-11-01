@@ -1,3 +1,10 @@
+## TEST v1.97.31 — dispatcher phone: fix "a train is already on the crossing" false refusals (2026-11-01)
+- Reported by the owner: calling a train to hold was refused with "already on the crossing" and no train appeared. Cause: the guard was `THRUS.some(R => R.u >= 0)`, which is true whenever **any** through freight is anywhere on the line — and they are running most of the time — so the call was nearly always rejected.
+- `railPhoneApply('hold')` now refuses only when a consist is actually occupying or within ~60 m of the crossing (`R.u > uc - TLEN - 60 && R.u - TLEN < uc + 60`). It also picks the consist that can get there soonest: a waiting train (started from `u = 0`) **or one already inbound**, which is simply halted at the crossing without losing its progress. The confirmation now states the ETA ("holding the Road P crossing in about 15 s").
+- `railPhoneState()` reports `held`, `moving` (genuinely at the crossing) and `running` (on the line) separately, so the menu no longer claims a train is on the crossing when it is hundreds of metres away.
+- `test/validate-rail-phone.cjs` gained three cases: a train elsewhere must not block the call, a train on the crossing must block it, and an inbound freight is halted with its progress preserved.
+- Bumped TEST to `1.97.31` / `corn-souls-test-shell-v58`.
+
 ## TEST v1.97.30 — dispatcher phone: face the approach, and free the cursor for the menu (2026-11-01)
 - Rotated the cabinet 180 degrees so the door, sign plate and handset face the approach instead of the hillside behind it.
 - `railPhoneMenu()` now calls the existing `unlockMouse()` before it opens, so the pointer is released while the menu is up and its buttons can be clicked. Previously the pointer stayed locked, the mouse kept steering the first-person view, and selections had to be made with the controller or keyboard.

@@ -7840,7 +7840,14 @@ function railPhoneCross(R) {   // distance along this train's path to the crossi
   return { uc: (RXING.x - start[0]) * dx + (RXING.z - start[1]) * dz, TLEN: R.cars[R.cars.length - 1].off + 10 };
 }
 function railPhoneState() {   // what the menu may offer right now
-  return { held: THRUS.some(R => R.state === 'hold'), moving: THRUS.some(R => R.u >= 0 && R.state !== 'hold') };
+  const held = THRUS.some(R => R.state === 'hold');
+  const moving = THRUS.some(R => {
+    if (R.u < 0) return false;
+    const { uc, TLEN } = railPhoneCross(R);
+    return R.u > uc - TLEN - 60 && R.u - TLEN < uc + 60;
+  });
+  const running = THRUS.filter(R => R.u >= 0).length;
+  return { held, moving, running };
 }
 function railPhoneApply(action) {
   const held = THRUS.find(R => R.state === 'hold');
@@ -7852,13 +7859,32 @@ function railPhoneApply(action) {
   }
   if (action === 'hold') {
     if (held) return 'Dispatcher: a train is already holding at Road P';
-    if (THRUS.some(R => R.u >= 0)) return 'Dispatcher: a train is already on the crossing — try again once it clears';
-    const best = waiting();
+    // Only refuse when a consist is actually occupying/near the crossing — a train
+    // running elsewhere on the line must not block the call.
+    const blocked = THRUS.some(R => {
+      if (R.u < 0) return false;
+      const { uc, TLEN } = railPhoneCross(R);
+      return R.u > uc - TLEN - 60 && R.u - TLEN < uc + 60;
+    });
+    if (blocked) return 'Dispatcher: a train is on the crossing right now — try again once it clears';
+    // Prefer whatever gets here soonest: a waiting consist, or one already inbound
+    // that has not reached the crossing yet (that one is simply halted there).
+    let best = null, bestEta = Infinity;
+    for (const R of THRUS) {
+      const { uc, TLEN } = railPhoneCross(R);
+      if (uc <= 0) continue;
+      const stopAt = uc + TLEN / 2, from = R.u < 0 ? 0 : R.u;
+      if (from >= stopAt - 40) continue;                 // already at or past the crossing
+      const eta = stopAt - from;
+      if (eta < bestEta) { bestEta = eta; best = R; }
+    }
     if (!best) return 'Dispatcher: no train is available right now';
     const { uc, TLEN } = railPhoneCross(best);
-    best.u = 0; best.horn = false; best.state = 'run'; best.speed = 22; best.heldT = 0; best.warned = false;
-    best.target = uc + TLEN / 2; best.cars.forEach(c => { c.g.visible = true; });
-    return (best.dir > 0 ? 'Eastbound' : 'Westbound') + ' freight called — holding it on the Road P crossing';
+    if (best.u < 0) { best.u = 0; best.cars.forEach(c => { c.g.visible = true; }); }
+    best.horn = false; best.state = 'run'; best.speed = 22; best.heldT = 0; best.warned = false;
+    best.target = uc + TLEN / 2;
+    const secs = Math.max(1, Math.round(bestEta / 22));
+    return (best.dir > 0 ? 'Eastbound' : 'Westbound') + ' freight called — holding the Road P crossing in about ' + secs + ' s';
   }
   if (action === 'through') {
     const best = waiting();
@@ -11020,7 +11046,8 @@ function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for de
   unlockMouse();   // free the cursor so the menu can be clicked with a mouse
   const S = P3.railPhoneState();
   const note = S.held ? 'A freight is holding the crossing and the gates are down.'
-    : S.moving ? 'A train is already on the crossing.'
+    : S.moving ? 'A train is on the crossing right now.'
+    : S.running ? 'A freight is already on the line.'
     : 'No train on the crossing.';
   const rows = [];
   if (S.held) rows.push(['Send the blocked train on', () => { const r = P3.railPhoneAction('send'); if (r) toast(r); }]);
