@@ -28,9 +28,8 @@ jobs:
         run: python scripts/sync_test_to_live.py --consistency
 
   suites:
-    name: Gameplay suites (report only)
+    name: Gameplay suites (blocking)
     runs-on: ubuntu-latest
-    continue-on-error: true          # flip to false once every suite is green
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
