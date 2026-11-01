@@ -4881,7 +4881,6 @@ function loadGlbModel(url, onReady, tag) {
 }
 function loadSubstation() {
   loadGlbModel('/corn-souls/assets/models/main_power_building.glb', ({ root, byName }) => {
-      const { root, byName } = glbBuild(buf);
       const g = new T.Group(); g.position.set(SUBSTATION.x, 0, SUBSTATION.z); g.rotation.y = SUBSTATION.yaw;
       g.add(root); scene.add(g); scene.updateMatrixWorld(true);
       const R = POWER_RESET, wp = o => { const v = V3(); o.getWorldPosition(v); return v; };

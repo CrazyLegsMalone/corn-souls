@@ -109,7 +109,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.ok(html.includes(gate), 'gated: ' + gate);
   }
   assert.ok(html.includes("(POWER_OUTAGE.on ? 0 : 1) * (s.k === 'mill'"), 'mill rotors, the blender and the agitators stop');
-  assert.ok(html.includes('POWER_OUTAGE.on && S === STACKS[0] ? 0 : S.rate'), 'the RTO stops smoking');
+  assert.ok(html.includes('POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'the RTO and cooling tower stacks stop smoking');
   assert.ok(html.includes('(OUT_F - C.T) * (0.0025 + 0.006 * openSum) * dt'), 'the cooler warms with no compressor');
 
   // the pivot gen-set: prop, fuel, sound and the interaction
@@ -182,7 +182,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.ok(names.has(n), 'the model has the node ' + n);
     if (n !== 'Plant_Main_Electrical_Building') assert.ok(html.includes("'" + n + "'"), 'game.html wires the node ' + n);
   }
-  assert.ok(html.includes("fetch('/corn-souls/assets/models/main_power_building.glb'"), 'fetched by absolute URL (the page carries a <base href>)');
+  assert.ok(html.includes("'/corn-souls/assets/models/main_power_building.glb'") && html.includes('function loadGlbModel('), 'fetched by absolute URL through the shared loader');
   assert.ok(html.includes('function glbBuild(buf)'), 'a self-contained glTF reader builds it (the bundle ships no GLTFLoader)');
   assert.ok(html.includes('loadSubstation();'), 'built at load');
   assert.ok(html.includes('const SUBSTATION = { x: -610, z: 562, yaw: Math.PI'), 'placed and yawed 180 so the compound gate faces north');
