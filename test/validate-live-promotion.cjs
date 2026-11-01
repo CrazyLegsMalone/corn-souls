@@ -11,7 +11,7 @@ assert.ok(loader.includes("scope:'/corn-souls/'"));
 assert.ok(loader.includes("const TEST_VERSION='1.98'"));
 assert.ok(loader.includes("'Alpha v\"+TEST_VERSION"));
 assert.equal(JSON.parse(read('version.json')).version,'1.98');
-assert.ok(sw.includes("corn-souls-live-shell-v7"));
+assert.ok(sw.includes("corn-souls-live-shell-v8"));
 assert.ok(sw.includes("url.pathname.startsWith(ROOT+'test/')"),'live worker excludes TEST');
 assert.ok(!read('developer-inbox.html').includes('/corn-souls/test/'));
 assert.ok(read('refresh.html').includes("pathname==='/corn-souls/'"),'refresh only unregisters LIVE worker');
