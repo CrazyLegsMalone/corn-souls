@@ -233,6 +233,90 @@
       "public_repository_redistribution_review": "owner-directed; published with owner approval",
       "required_notice": "None (first-party asset).",
       "notes": "Displaces the flat soda-machine boxes in the process break room and the scale house in the TEST channel."
+    },
+    {
+      "id": "first-party-operator-vern-rig",
+      "title": "Operator - Vern (grain operator rig)",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/operator_vern_rig.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale. Loaded through the in-game glTF reader, limbs reparented onto generated shoulder/elbow/hip/knee pivots, rotated 180 degrees to match the box avatar it replaces, lifted so its feet sit on the floor; geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/operator_vern_rig.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter (2.0). 121 nodes, 101 meshes, 22 flat materials, no textures, no skins, no animations, 1.64 m; gloves (Hand_Glove_*), hard hat + headlamp, hi-vis band, ear muffs, walkie-talkie, pipe wrench, 4-gas sniffer, ID badge. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "Vern, the grain operator standing outside the receiving building in the TEST channel: rigid-part rig pivoted at shoulder/elbow/hip/knee and flipped 180 degrees to face the way his box avatar did."
+    },
+    {
+      "id": "first-party-boardop-rick-rig",
+      "title": "Board Operator - Rick rig",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/boardop_rick_rig.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale. Loaded through the in-game glTF reader, limbs reparented onto generated shoulder/elbow/hip/knee pivots, rotated 180 degrees to match the box avatar it replaces, lifted so its feet sit on the floor; geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/boardop_rick_rig.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter (2.0). 76 nodes, 62 meshes, 15 flat materials, no textures, no skins, no animations, 1.64 m; bare hands (Hand_Bare_*). Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "Rick, the control-room board operator (NPC id ‘op’) in the TEST channel: pivoted and posed seated - thighs forward, shins down - with his feet on the floor and his back to the chair."
+    },
+    {
+      "id": "first-party-brenda-scalehouse-rig",
+      "title": "Scale House Tech - Brenda rig",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/brenda_scalehouse_rig.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale. Loaded through the in-game glTF reader, limbs reparented onto generated shoulder/elbow/hip/knee pivots, rotated 180 degrees to match the box avatar it replaces, lifted so its feet sit on the floor; geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/brenda_scalehouse_rig.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter (2.0). 73 nodes, 60 meshes, 15 flat materials, no textures, no skins, no animations, 1.57 m; bare hands (Hand_Bare_*). Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "Brenda, the inbound scale-house tech in the TEST channel: pivoted and posed seated at the drive-through window, feet on the raised floor."
+    },
+    {
+      "id": "first-party-tammy-scalehouse-rig",
+      "title": "Scale House Tech - Tammy rig",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/tammy_scalehouse_rig.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at export scale. Loaded through the in-game glTF reader, limbs reparented onto generated shoulder/elbow/hip/knee pivots, rotated 180 degrees to match the box avatar it replaces, lifted so its feet sit on the floor; geometry, materials and node names unchanged.",
+      "files": [
+        "assets/models/tammy_scalehouse_rig.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter (2.0). 72 nodes, 59 meshes, 15 flat materials, no textures, no skins, no animations, 1.57 m; bare hands (Hand_Bare_*). Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "Tammy, the outbound scale-house tech in the TEST channel: pivoted and posed seated at the drive-through window, feet on the raised floor."
     }
   ]
 }

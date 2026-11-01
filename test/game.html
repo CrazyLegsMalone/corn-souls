@@ -4916,6 +4916,61 @@ function loadSubstation() {
 const TOWER = { x: 50, z: 202, yaw: 0, scale: 2, fans: [], ready: false };
 // ---------- MILO RADE vending machines: one in the process break room, one in the scale house. Both instances share one
 // upload of the model (clone() shares geometry and materials), and the machine's advert panel is its embedded PNG.
+// ---------- NPC CHARACTER MODELS: same rigid-part rig family as Squeeg (flat export, named parts), so the limbs are
+// reparented onto generated shoulder / elbow / hip / knee pivots - which is also what lets a standing export sit down.
+function rigPivot(av, jointName, members) {
+  const joint = av.getObjectByName(jointName);
+  if (!joint || !joint.parent) return null;
+  const g = new T.Group(); g.name = 'pivot:' + jointName;
+  joint.parent.add(g); g.position.copy(joint.position);
+  for (const name of members) { const part = av.getObjectByName(name); if (part && part !== g && part.parent !== g) g.attach(part); }
+  return g;
+}
+function characterRig(av, opt) {
+  opt = opt || {};
+  const H = opt.hands || 'Hand_Bare';
+  const ARM = s => ['Shoulder_Cap_' + s, 'Arm_Upper_' + s, 'Arm_Lower_' + s, 'Jacket_Wrist_Cuff_' + s, H + '_' + s];
+  const FORE = s => ['Arm_Lower_' + s, 'Jacket_Wrist_Cuff_' + s, H + '_' + s];
+  const LEG = s => ['Leg_Upper_' + s, 'Cargo_Pocket_' + s, 'Knee_Guard_' + s, 'Leg_Lower_' + s, 'Boot_Lug_' + s];
+  const SHIN = s => ['Leg_Lower_' + s, 'Knee_Guard_' + s, 'Boot_Lug_' + s, 'Boot_Vamp_' + s, 'Boot_Ankle_Shaft_' + s, 'Boot_Steel_ToeCap_' + s];
+  const P = {};
+  for (const s of ['L', 'R']) {
+    P['arm' + s] = rigPivot(av, 'Arm_Upper_' + s, ARM(s));
+    P['elbow' + s] = P['arm' + s] && rigPivot(av, 'Arm_Lower_' + s, FORE(s));
+    P['leg' + s] = rigPivot(av, 'Leg_Upper_' + s, LEG(s));
+    P['knee' + s] = P['leg' + s] && rigPivot(av, 'Leg_Lower_' + s, SHIN(s));
+  }
+  return P;
+}
+// Who wears which model. Everything else about the NPC - position, facing, dialogue, chair - stays as it was.
+const NPC_MODELS = {
+  vern:   { url: '/corn-souls/assets/models/operator_vern_rig.glb', hands: 'Hand_Glove', pose: 'stand' },
+  op:     { url: '/corn-souls/assets/models/boardop_rick_rig.glb', pose: 'sit' },          // Rick, the board operator
+  brenda: { url: '/corn-souls/assets/models/brenda_scalehouse_rig.glb', pose: 'sit' },
+  tammy:  { url: '/corn-souls/assets/models/tammy_scalehouse_rig.glb', pose: 'sit' }
+};
+function loadCharacter(id, cfg) {
+  const npc = (NPCS || []).find(n => n.id === id);
+  if (!npc || !npc.g) return;
+  loadGlbModel(cfg.url, ({ root }) => {
+    const rig = characterRig(root, { hands: cfg.hands });
+    if (cfg.pose === 'sit') for (const s of ['L', 'R']) {          // thighs forward, shins down: a standing export sits
+      if (rig['leg' + s]) rig['leg' + s].rotation.x = -1.5;
+      if (rig['knee' + s]) rig['knee' + s].rotation.x = 1.5;
+    }
+    root.scale.setScalar(cfg.scale || 1);
+    root.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(root);
+    root.position.set(0, -bb.min.y, 0);                            // feet on the NPC's floor, not sunk into it
+    root.rotation.y = cfg.face === undefined ? Math.PI : cfg.face; // the models face +Z; the box avatars face -Z
+    if (cfg.pose !== 'sit') npc.g.position.y = 0;                  // drop the box avatar's own lift
+    const seated = npc.g.children.filter(c => c.isGroup);          // seatedPerson() = chair meshes + one body group
+    if (seated.length) for (const c of seated) c.visible = false;  // keep the chair, lose the box body
+    else for (const c of npc.g.children) c.visible = false;
+    npc.g.add(root); npc.model = root;                             // hidden only now: a failed load leaves the box
+  }, 'npc:' + id);
+}
+function loadNpcModels() { for (const id in NPC_MODELS) loadCharacter(id, NPC_MODELS[id]); }
 const DRINK = { ready: false };
 const DRINK_SPOTS = [];
 function loadDrinkMachines() {
@@ -6748,6 +6803,8 @@ function init(container) {
   loadCoolingTower();
   // ---------- the two Milo Rade vending machines (process break room + scale house)
   loadDrinkMachines();
+  // ---------- the NPC character models (Vern, Rick at the board, Brenda + Tammy in the scale house)
+  loadNpcModels();
   makeTote(EXR - 22, SZR - 12, 0.15);                                  // a liquid tote sitting in the dirt north of the cooling tower, across the south road                 // south of the south road
   mark('FIRE &\nPROCESS\nWATER', -62, SZR + 30, 24, 40);
   // ---------- EMPLOYEE PARKING: east of the east road, south of the exit road. Driveways in from the exit road (NW corner)

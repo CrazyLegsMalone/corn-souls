@@ -356,4 +356,51 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('loadDrinkMachines();') && html.includes('root.clone(true)'), 'built at load, one upload shared by both machines');
 }
 
+
+// ---------------------------------------------------------------- the NPC character models
+{
+  const chars = [
+    ['operator_vern_rig.glb', 'vern', 'Hand_Glove', 1.64],
+    ['boardop_rick_rig.glb', 'op', 'Hand_Bare', 1.64],
+    ['brenda_scalehouse_rig.glb', 'brenda', 'Hand_Bare', 1.57],
+    ['tammy_scalehouse_rig.glb', 'tammy', 'Hand_Bare', 1.57]
+  ];
+  // the joints the rig builder reparents: if a re-export renames one, this fails instead of dropping a limb
+  const JOINTS = s2 => ['Shoulder_Cap_' + s2, 'Arm_Upper_' + s2, 'Arm_Lower_' + s2, 'Jacket_Wrist_Cuff_' + s2,
+    'Leg_Upper_' + s2, 'Cargo_Pocket_' + s2, 'Knee_Guard_' + s2, 'Leg_Lower_' + s2, 'Boot_Lug_' + s2];
+  const npcTable = html.slice(html.indexOf('const NPC_MODELS'), html.indexOf('};', html.indexOf('const NPC_MODELS')));
+  for (const [file, id, hands, h] of chars) {
+    const path = 'assets/models/' + file;
+    assert.ok(fs.existsSync(path), 'model present: ' + path);
+    const glb = fs.readFileSync(path);
+    assert.equal(glb.readUInt32LE(0), 0x46546c67, file + ': GLB magic');
+    let off = 12, doc = null;
+    while (off < glb.length) {
+      const len = glb.readUInt32LE(off), type = glb.readUInt32LE(off + 4), body = off + 8;
+      if (type === 0x4e4f534a) doc = JSON.parse(glb.slice(body, body + len).toString('utf8'));
+      off = body + len + ((4 - (len % 4)) % 4);
+    }
+    const names = new Set(doc.nodes.map(n => n.name));
+    assert.equal(doc.nodes[doc.scenes[doc.scene || 0].nodes[0]].name, 'Operator_Rig_Root', file + ': rig root');
+    assert.equal((doc.skins || []).length, 0, file + ': rigid parts, no skin');
+    for (const s2 of ['L', 'R']) for (const j of JOINTS(s2)) assert.ok(names.has(j), file + ' has the joint ' + j);
+    assert.ok(names.has(hands + '_L') && names.has(hands + '_R'), file + ' uses ' + hands + '_*');
+    const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+    for (const m of doc.meshes) for (const pr of m.primitives) {
+      const ac = doc.accessors[pr.attributes.POSITION];
+      for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], ac.min[k]); mx[k] = Math.max(mx[k], ac.max[k]); }
+    }
+    assert.ok(Math.abs((mx[1] - mn[1]) - h) < 0.12, file + ' is ' + (mx[1] - mn[1]).toFixed(2) + ' m tall');
+    assert.ok(Math.abs(mn[1] + 0.19) < 0.05, file + ' hangs 0.19 m below its origin, so placement lifts it');
+    assert.ok(npcTable.includes(file), 'NPC_MODELS wires ' + id + ' to ' + file);
+  }
+  assert.ok(html.includes('function characterRig(') && html.includes('function rigPivot('), 'one shared rig builder');
+  assert.ok(html.includes("rig['leg' + s].rotation.x = -1.5"), 'seated pose swings the thighs forward');
+  assert.ok(html.includes("rig['knee' + s].rotation.x = 1.5"), 'and the shins back down');
+  assert.ok(html.includes('root.position.set(0, -bb.min.y, 0)'), 'feet are set on the floor from the posed bounds');
+  assert.ok(html.includes('root.rotation.y = cfg.face === undefined ? Math.PI : cfg.face'), 'models are flipped to face like the box avatars');
+  assert.ok(html.includes('if (seated.length) for (const c of seated) c.visible = false;'), 'only the box body is hidden - the chair stays');
+  assert.ok(html.includes('function loadNpcModels()') && html.includes('loadNpcModels();'), 'loaded at init');
+}
+
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');
