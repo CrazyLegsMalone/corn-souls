@@ -11393,7 +11393,7 @@ function debugMenu(code) {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }   // what the screen looked like when the menu was opened (for a bug note)
   const set = k => { wxForced = k; P3.setWeather(k || wxLive); if (!k) fetchWeather(); toast('Weather: ' + (k || 'live')); };   // back to live: real weather right away, then refresh
   modal('<h1>Debug</h1><p>Weather now: <b>' + P3.weather + '</b> (' + (wxForced ? 'forced' : 'live') + ')' + (code ? '<br>Button code: ' + code : '') + '</p>',
-    [['Close', null], ['📝 Leave a note (bug / idea / message)', () => noteForm()], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.setPowerOutage(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.setPowerOutage(false); toast('Power restored'); }], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
+    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.setPowerOutage(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.setPowerOutage(false); toast('Power restored'); }], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
 }
 // every control in the game, grouped by what you're doing: keyboard + mouse · controller · phone
 function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for depends on what the line is doing
@@ -11700,7 +11700,7 @@ const PATCH_NOTES = [
     '💨 Whack or ram the <b>ammonia tank</b> and it springs a leak. Get upwind!',
     '📻 <b>Every car has a stereo now</b>, and it\'s a lot louder. Hit R, D-pad up or 📻 while driving.',
     '🌸 The Kia is now the <b>Pink Sedan</b>.',
-    '📝 <b>Leave a note!</b> Spotted a bug or have an idea? Open the menu (❚❚) or the debug menu and leave a note. It even grabs a screenshot.',
+    '📝 <b>Leave a note!</b> Spotted a bug or have an idea? Open the menu (❚❚) and leave a note. It even grabs a screenshot.',
     '🛠️ Fixed menu buttons that sometimes did the wrong thing (conversation replies, notes).'] },
   { v: '1.89', title: 'Tools, Fire & Wrecks', notes: [
     '🪝 A pegboard of tools in the maintenance shop: <b>crowbar, shovel, pickaxe, pitchfork</b> and an <b>adjustable wrench</b>. Grab one and swing away!',

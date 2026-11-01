@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.50';
+ const TEST_VERSION='1.97.51';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -344,7 +344,7 @@
   const weatherChoices="['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')]";
   if(!html.includes(weatherChoices))throw new Error('Weather menu source changed; refusing partial patch.');
   html=html.replace(weatherChoices,"['Weather ▸',()=>debugWeather(code)]");
-  html=html.replaceAll('📝 Leave a note (bug / idea / message)','✉ Message Developer').replaceAll('📝 Leave a note','✉ Message Developer').replaceAll('<h1>Leave a note</h1>','<h1>Message Developer</h1>');
+  html=html.replaceAll('📝 Leave a note','✉ Message Developer')   // the debug menu no longer has the compose row; the pause menu does.replaceAll('<h1>Leave a note</h1>','<h1>Message Developer</h1>');
   const modalFocusSource="function markModal() { modalBtns.forEach((b, i) => b.classList.toggle('focus', nav === 'pad' && i === modalFocus)); }";
   if(!html.includes(modalFocusSource))throw new Error('Modal focus source changed; refusing partial patch.');
   html=html.replace(modalFocusSource,"function markModal() { modalBtns.forEach((b,i)=>b.classList.toggle('focus',nav==='pad'&&i===modalFocus));if(nav==='pad'&&modalBtns[modalFocus])modalBtns[modalFocus].scrollIntoView({block:'nearest'}); }");

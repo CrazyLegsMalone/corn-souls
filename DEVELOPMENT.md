@@ -1,3 +1,10 @@
+## TEST v1.97.51 — the Debug menu only offers reading messages (2026-11-01)
+- Removed the compose entry (`📝 Leave a note (bug / idea / message)`) from the Debug menu, so the menu now carries **only the reader**: `📥 Developer Inbox` (which the launcher patches in over the old Controls row).
+- Writing a note is not lost - it still lives in the pause menu, where the launcher renames it to `✉ Message Developer`, and the loading-screen hint no longer claims the Debug menu has it.
+- The TEST launcher's now-dead `replaceAll('📝 Leave a note (bug / idea / message)', ...)` was dropped; `check_launcher_anchors.py` treats every `replaceAll` target as a required anchor and flagged it, which is exactly what that check is for.
+- Verified against the **real patched output** by running the launcher in a VM and dumping the menu: `Close · 📥 Developer Inbox · Weather ▸ · Power outage: start · Power outage: end · Pivot engine: empty the day tank` - no compose row. All 10 repo-root suites and the 3 `test/` suites pass locally.
+- Bumped TEST to `1.97.51` / `corn-souls-test-shell-v78`.
+
 ## TEST v1.97.50 — cooling tower doubled, and kept off the pavement (2026-11-01)
 - The tower is now **2x** (47.3 x 11.7 m footprint, 12 m tall) at (50, 202) - moved 4 m south so its north face sits at z 195.3, still **4.99 m clear of the south road's south edge** (z 190.35) and well off the pavement.
 - The hardstand, curbs, nameplate and drift plume are now **sized from the placed model's bounds** instead of hard-coded, so the scale lives in one number (`TOWER.scale`) and nothing can drift out of sync: 50.3 x 14.7 m pad, curbs on both long edges, the plate at 62% of the deck height, and the plume radius scaled to the casing width.
