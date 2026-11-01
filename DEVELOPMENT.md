@@ -1,3 +1,12 @@
+## TEST v1.97.40 — the blackout event is now the **Power Outage** (2026-11-01)
+- Renamed the whole feature, not just the label: `BLACKOUT` → `POWER_OUTAGE`, `setBlackout()` → `setPowerOutage()`, `applyBlackout()` → `applyPowerOutage()`, `blackoutNightSky()` → `outageNightSky()`, and the screen flag `userData.darkOnBlackout` → `userData.darkOnOutage`.
+- Debug menu rows are now `Power outage: start` (auto), `Power outage: force night` and `Power outage: end`, matching the `Weather: live` sentence case used by the rows above them. Toasts read `Power outage: all plant power is out` / `Power outage: night look forced`; the release toast stays `Power restored`.
+- Exports renamed with it: `P3.setPowerOutage(on, mode)`, `P3.powerOutage`, `P3.powerOutageMode` (no back-compat alias — the debug menu is the only consumer and this has never shipped to LIVE, which contains zero references).
+- `test/validate-blackout.cjs` → `test/validate-power-outage.cjs`, with its slice markers, VM shim (`__POWER_OUTAGE`), menu lookups and exact-comment assertion moved in lockstep; the CI suite list in `.github/workflows/validate.yml` updated to the new path.
+- Behaviour is unchanged: day/night aware response, per-frame re-apply, idempotent from the `DAYLIGHT` base. Verified no launcher anchor referenced the old identifiers, so nothing about the LIVE launcher changed.
+- Bumped TEST to `1.97.40` / `corn-souls-test-shell-v67`.
+
+
 ## TEST v1.97.39 — blackout is now day/night aware (2026-11-01)
 - A power outage at midday no longer darkens the world. It kills the plant's artificial light (emissive fixtures, unlit signs, screen textures, indicator lamps, sprites) and dips the hemisphere light to **65% of the current daylight value**, while the sun, its shadows, the sky dome, the fog and the stars stay exactly as `daylight()` set them.
 - At night (before 07:00 or from 19:00) the event keeps its original response: ambient crushed to 5% of the daylight base, sun off, sky clamped to 2% luminance, sun disc removed, stars out.
