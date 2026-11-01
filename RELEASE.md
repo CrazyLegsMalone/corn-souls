@@ -91,9 +91,9 @@ matches `git show HEAD:index.html`.
 
 - **blocking** — every launcher patch anchor still matches the game source
   (`check_launcher_anchors.py`), and the LIVE version/cache wiring is consistent.
-- **report only** — the eleven Node gameplay suites, executed on GitHub's Node
-  (this machine has no Node installed). Flip `continue-on-error` to `false` once
-  the job is reliably green.
+- **blocking** — the ten Node gameplay suites, executed on GitHub's Node because
+  this development machine has none installed. All ten pass (first green run:
+  `7d584ac`).
 
 `validate-inbox.cjs` is excluded from CI: its mock lacks `window` for the existing
 `inboxOpen` page navigation. That is a pre-existing test gap, not a game bug.
