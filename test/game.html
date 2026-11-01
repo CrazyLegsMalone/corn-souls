@@ -9933,7 +9933,9 @@ function srStep(C, S, st, tt, sd, B, D) {   // one 16th-note step of a song: mel
 // ---------- THE BUZZARD: a turkey vulture (flat sprite, drawn in code) that sits on top of the RTO stack. Two minutes after somebody dies
 // he glides down, lands by the body, hops on it, grabs it and flaps off with it to the far wastewater pond, drops it in (splash), then
 // flies back to his perch to wait. Where the body was he leaves a white chalk outline, traced from how the ragdoll actually landed.
-const VULT = { s: null, tex: null, state: 'perch', pos: null, vel: null, perch: null, target: null, carry: null, t: 0, flapT: 0, croakT: 0, chalk: [] };
+const VULT = { s: null, tex: null, sprite: null, rig: null, joints: {}, state: 'perch', pos: null, vel: null, perch: null,
+  perchYaw: 0, yaw: 0, target: null, carry: null, t: 0, flapT: 0, croakT: 0, jawT: 0, chalk: [] };
+const VULT_SCALE = 0.8;   // the export is 2.94 m across the spread wings, so this is a 2.35 m bird - a big turkey vulture
 function vultureTex(kind) {   // 'perch' | 'up' | 'down' (wing positions)
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96; const c = cv.getContext('2d');
   const body = '#1e1a18', wing = '#2a2420', pale = '#8f8577', head = '#c0453a';
@@ -9956,15 +9958,63 @@ function vultureTex(kind) {   // 'perch' | 'up' | 'down' (wing positions)
   }
   const t = new T.CanvasTexture(cv); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t;
 }
+function vultureRig(root) {   // the export's joints are pure translations, so a pose is just a rotation on the named joint
+  const J = {};
+  for (const n of ['Joint_Shoulder_L', 'Joint_Shoulder_R', 'Joint_Elbow_L', 'Joint_Elbow_R', 'Joint_Wrist_L', 'Joint_Wrist_R',
+    'Joint_Neck_Base', 'Joint_Neck_Mid', 'Joint_Head', 'Joint_Jaw', 'Joint_Hip_L', 'Joint_Hip_R']) {
+    const j = root.getObjectByName(n); if (j) J[n.replace('Joint_', '')] = j; }
+  return J;
+}
+function vulturePose(dt) {   // perched: folded and tucked. Flying: a shallow V with the beat on top. Grab: half-open, neck down.
+  const V = VULT, J = V.joints, t = performance.now() / 1000;
+  const fold = V.state === 'perch', grab = V.state === 'grab';
+  V.jawT = Math.max(0, V.jawT - dt);
+  // the two wings are exact mirrors: whatever angle the left gets, the right gets it negated on Y and Z
+  if (fold) {   // folded: the elbow tucks to the flank, the forearm sweeps back and the primaries cross over the tail
+    if (J.Shoulder_L) J.Shoulder_L.rotation.set(0, 0.40, -0.55);
+    if (J.Shoulder_R) J.Shoulder_R.rotation.set(0, -0.40, 0.55);
+    if (J.Elbow_L) J.Elbow_L.rotation.set(0, 0.60, 0);
+    if (J.Elbow_R) J.Elbow_R.rotation.set(0, -0.60, 0);
+    if (J.Wrist_L) J.Wrist_L.rotation.set(0, 2.40, 0);
+    if (J.Wrist_R) J.Wrist_R.rotation.set(0, -2.40, 0);
+  } else {      // flight (and the half-open hop on the body): a shallow V with the beat lifting on top of it
+    const a = Math.sin(V.flapT * Math.PI), sh = 0.18 + a * 0.7, el = 0.16 - a * 0.12, wr = 0.10 - a * 0.08;
+    if (J.Shoulder_L) J.Shoulder_L.rotation.set(0, 0.05, sh);
+    if (J.Shoulder_R) J.Shoulder_R.rotation.set(0, -0.05, -sh);
+    if (J.Elbow_L) J.Elbow_L.rotation.set(0, el, 0);
+    if (J.Elbow_R) J.Elbow_R.rotation.set(0, -el, 0);
+    if (J.Wrist_L) J.Wrist_L.rotation.set(0, wr, 0);
+    if (J.Wrist_R) J.Wrist_R.rotation.set(0, -wr, 0);
+  }
+  const nb = grab ? 0.85 : fold ? 0.34 : 0.06;                                 // hunched on the stack, stretched out in flight
+  if (J.Neck_Base) J.Neck_Base.rotation.set(nb, 0, 0);
+  if (J.Neck_Mid) J.Neck_Mid.rotation.set(fold ? -0.18 : -0.05, 0, 0);
+  if (J.Head) J.Head.rotation.set(Math.sin(t * 1.7) * (fold ? 0.1 : 0.05), fold ? Math.sin(t * 0.37) * 0.5 : 0, 0);   // bobbing, scanning
+  if (J.Jaw) J.Jaw.rotation.set(-0.55 * Math.min(1, V.jawT / 0.45), 0, 0);     // opens on every hiss
+}
 function vultureInit() {
   if (VULT.s) return true;
   if (!STACKS.length) return false;
   const S = STACKS[0]; VULT.perch = V3(S.x + 0.3, S.y + 0.45, S.z + 0.5);   // sits on the RTO stack's lip
+  VULT.perchYaw = Math.atan2(-S.x, -S.z);                                    // scans back across the plant while he waits
+  VULT.s = new T.Group(); VULT.s.userData.noHit = true; scene.add(VULT.s);
   VULT.tex = { perch: vultureTex('perch'), up: vultureTex('up'), down: vultureTex('down') };
-  VULT.s = new T.Sprite(new T.SpriteMaterial({ map: VULT.tex.perch, transparent: true, alphaTest: 0.4 })); VULT.s.userData.noHit = true; scene.add(VULT.s);
-  VULT.pos = VULT.perch.clone(); VULT.vel = V3(); return true;
+  VULT.sprite = new T.Sprite(new T.SpriteMaterial({ map: VULT.tex.perch, transparent: true, alphaTest: 0.4 }));
+  VULT.sprite.userData.noHit = true; VULT.s.add(VULT.sprite);
+  loadGlbModel('/corn-souls/assets/models/vulture_rig.glb', ({ root }) => {   // the owner's model, drawn only once it is here
+    root.scale.setScalar(VULT_SCALE); root.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(root), sock = root.getObjectByName('Grip_Target_Socket');
+    let lift = -bb.min.y;                                                      // fallback: claws on the perch
+    if (sock) { const v = V3(); sock.getWorldPosition(v); lift = -v.y; }        // Grip_Target_Socket sits at 0.59 in the export: put THAT on the perch
+    root.position.y = lift;
+    root.traverse(o => { o.userData.noHit = true; });                           // never blocks a shot, a raycast or the chalk line
+    VULT.rig = root; VULT.joints = vultureRig(root); VULT.s.add(root);
+    if (VULT.sprite) VULT.sprite.visible = false;                              // hidden only now: a failed fetch leaves the drawn bird
+  }, 'vulture');
+  VULT.pos = VULT.perch.clone(); VULT.vel = V3(); VULT.yaw = VULT.perchYaw; return true;
 }
 function vultSound(kind, at) {
+  if (kind === 'hiss') VULT.jawT = 0.45;   // the beak opens whether or not the hiss is close enough to hear
   const C = tsnd.ctx; if (!C) return; const d = camera.position.distanceTo(at), v = Math.max(0, 1 - d / 120); if (v < 0.03) return; const t = C.currentTime;
   if (kind === 'flap') { const s = C.createBufferSource(); s.buffer = noiseBuf(C, 1); const f = C.createBiquadFilter(), g = C.createGain(); f.type = 'lowpass'; f.frequency.value = 420;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3 * v, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22); s.connect(f); f.connect(g); g.connect(C.destination); s.start(t); s.stop(t + 0.25); }
@@ -10045,15 +10095,22 @@ function updateVulture(dt) {
   if (V.dropping) { const b = V.dropping, P = b.pts[2];
     if (!b.splashed && P.y < PONDS.water + 0.3) { b.splashed = true; vultSound('splash', V3(P.x, P.y, P.z)); for (let i = 0; i < 6; i++) puff(V3(P.x, PONDS.water + 0.2, P.z), 0.25, 0xd8ecf2); }
     if (now - b.dropAt > 6) { const i = bodies.indexOf(b); if (i >= 0) bodies.splice(i, 1); scene.remove(b.g); if (b.fly) scene.remove(b.fly.m); V.dropping = null; } }
-  // sprite: perched pose or flapping (faster with a load), faces left/right the way he's flying
+  // body: the owner's rig once it is here, otherwise the drawn fallback. The beak is +Z, so the facing is the heading.
   const S = V.s; S.position.copy(V.pos);
-  let map;
-  if (V.state === 'perch' || V.state === 'grab') { map = V.tex.perch; S.scale.set(0.95, 0.72, 1); }
-  else { const rate = V.state === 'carry' ? 7 : (V.vel.y > 0.5 ? 5 : 1.2); V.flapT += dt * rate; const up = Math.sin(V.flapT * Math.PI) > 0;
-    map = up ? V.tex.up : V.tex.down; S.scale.set(1.8, 1.35, 1);
-    if (up && !V.wasUp && rate > 2) vultSound('flap', V.pos); V.wasUp = up;
-    const rt = V3().setFromMatrixColumn(camera.matrixWorld, 0); S.scale.x *= (V.vel.x * rt.x + V.vel.z * rt.z) >= 0 ? 1 : -1; }
-  if (S.material.map !== map) { S.material.map = map; S.material.needsUpdate = true; }
+  const flying = !(V.state === 'perch' || V.state === 'grab');
+  let up = false;
+  if (flying) {   // wing beat phase, shared: the flap sound fires on the upstroke for the model and the drawn bird alike
+    const rate = V.state === 'carry' ? 7 : (V.vel.y > 0.5 ? 5 : 1.2); V.flapT += dt * rate; up = Math.sin(V.flapT * Math.PI) > 0;
+    if (up && !V.wasUp && rate > 2) vultSound('flap', V.pos); V.wasUp = up; }
+  const wantYaw = V.state === 'perch' ? V.perchYaw : (flying && Math.hypot(V.vel.x, V.vel.z) > 0.5 ? Math.atan2(V.vel.x, V.vel.z) : V.yaw);
+  V.yaw += (((wantYaw - V.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 4); S.rotation.y = V.yaw;
+  if (V.rig) vulturePose(dt);
+  else if (V.sprite) {   // the drawn bird: perched pose or two-frame flap, flipped the way he is flying
+    const sp = V.sprite; let map;
+    if (!flying) { map = V.tex.perch; sp.scale.set(0.95, 0.72, 1); }
+    else { map = up ? V.tex.up : V.tex.down; sp.scale.set(1.8, 1.35, 1);
+      const rt = V3().setFromMatrixColumn(camera.matrixWorld, 0); sp.scale.x *= (V.vel.x * rt.x + V.vel.z * rt.z) >= 0 ? 1 : -1; }
+    if (sp.material.map !== map) { sp.material.map = map; sp.material.needsUpdate = true; } }
   if (V.state === 'perch' && (V.croakT -= dt) <= 0) { V.croakT = 25 + Math.random() * 30; if (camera.position.distanceTo(V.pos) < 40) vultSound('hiss', V.pos); }   // the odd grumble from up top
 }
 function onLadder() { for (const L of LADDERS) if (Math.abs(walk.x - L.x) < 0.6 && Math.abs(walk.z - L.z) < 0.7 && walk.y < L.top + 0.2) return L; return null; }

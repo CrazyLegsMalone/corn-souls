@@ -338,6 +338,27 @@
       "public_repository_redistribution_review": "owner-directed; published with owner approval",
       "required_notice": "None (first-party asset).",
       "notes": "The two package boilers in the energy centre in the TEST channel (north = Boiler 1, south = Boiler 2)."
+    },
+    {
+      "id": "first-party-vulture-rig",
+      "title": "Turkey Vulture rig",
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/vulture_rig.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at 0.8 scale (2.94 m bind wingspan -> 2.35 m), posed at runtime by rotating its own named joints (shoulders, elbows, wrists, neck, head, jaw) - no geometry, materials or names changed. The grip socket is what sits on the RTO stack lip.",
+      "files": [
+        "assets/models/vulture_rig.glb"
+      ],
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant at the project owner’s direction, exported with THREE.GLTFExporter. 105 nodes, 68 meshes, 6 materials, three embedded PNG feather textures, no skins, no baked animations; the limb joints are pure translations named Joint_Shoulder/Elbow/Wrist/Neck/Head/Jaw, plus a Grip_Target_Socket perch locator. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The buzzard that perches on the RTO stack and carries bodies to the far pond, in the TEST channel."
     }
   ]
 }
