@@ -582,8 +582,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   // ---------------------------------------------------------------- performance audit
   assert.ok(html.includes("const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fps) || 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;"),
     'the frame rate is capped from the quality tier (144 on a desktop, 60 on a phone)');
-  assert.ok(html.includes('fpsAcc = Math.min(fpsAcc - FPS_STEP, FPS_STEP);'), 'with a remainder accumulator, so the cap does not halve to half the display rate');
-  assert.ok(html.includes('if (fpsAcc < FPS_STEP - 0.01) { requestAnimationFrame(frame); return; }'), 'and a skipped frame still schedules the next one');
+  assert.ok(html.includes('if (PACE.k > 1 && (++PACE.n % PACE.k) !== 0) { requestAnimationFrame(frame); return; }'), 'the cap draws on every k-th screen refresh (even gaps), and a skipped refresh still schedules the next one');
+  assert.ok(!html.includes('fpsAcc'), 'the old time accumulator (it skipped frames on timing jitter) is gone');
   // NPC rigs never animate after their pose: folded to one mesh per material and out of the shadow pass
   assert.ok(html.includes('mergeModel(root, false);'), 'NPC rigs are merged after posing (the boiler and the vending props do the same)');
   assert.ok(html.includes('// The pose above is the last thing that ever moves these parts'), 'and the reason is written down');

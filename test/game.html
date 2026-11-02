@@ -4675,10 +4675,14 @@ const mat = (c, o) => o ? matU(c, o) : (MATS[c] || (MATS[c] = matU(c)));   // pl
 // The tier picks antialias, pixel ratio, shadow-map size and filter, how often the shadow map is redrawn, and the
 // frame cap. The manual override (localStorage cs_perf = 'low' | 'medium' | 'high') beats the guess every time,
 // because a heuristic always gets somebody wrong. Nothing here touches the THREE namespace, so it is plain data.
+// v1.97.92: every tier redraws the shadow map EVERY frame. Redrawing it every other frame made alternate frames ~80% more
+// expensive (measured 1155 vs 638 draw calls), which is judder however good the average looks. Instead the pass itself is
+// cheaper on low / medium: a smaller shadow box (shadowR, metres), objects smaller than minCaster (metres, bounding radius)
+// do not cast, and the box moves in coarse shadowStep jumps so walking does not force anything extra.
 const TIERS = {
-  low:    { name: 'low',    aa: false, px: 1.0,  shadow: 1024, shadowType: 'BasicShadowMap', shadowEvery: 2, fps: 60,  pbr: false },
-  medium: { name: 'medium', aa: true,  px: 1.25, shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 2, fps: 90,  pbr: false },
-  high:   { name: 'high',   aa: true,  px: 1.5,  shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, fps: 144, pbr: false }
+  low:    { name: 'low',    aa: false, px: 1.0,  shadow: 1024, shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 50, shadowStep: 4, minCaster: 0.5,  fps: 60,  pbr: false },
+  medium: { name: 'medium', aa: true,  px: 1.25, shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 65, shadowStep: 3, minCaster: 0.35, fps: 90,  pbr: false },
+  high:   { name: 'high',   aa: true,  px: 1.5,  shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 85, shadowStep: 2, minCaster: 0,    fps: 144, pbr: false }
 };
 function perfTier(env) {   // env is for the tests only: a real call reads the live navigator / window
   const e = env || {}, ls = e.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
@@ -7936,6 +7940,11 @@ function init(container) {
   buildBillboards(); mergeStatic();
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
+  if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
+    scene.updateMatrixWorld(true);
+    scene.traverse(o => { if (!o.isMesh || !o.castShadow || o.isSkinnedMesh || !o.geometry) return; const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) return;
+      o.getWorldScale(wsc); if (g.boundingSphere.radius * Math.max(wsc.x, wsc.y, wsc.z) < TIER.minCaster) { o.castShadow = false; off++; } });
+    PERF.smallCasters = off; }
   { let n = 0; scene.traverse(o => { if (o.isMesh && o.castShadow) n++; }); PERF.casters = n; }
   try { const t0 = performance.now(); renderer.compile(scene, camera); PERF.compile = performance.now() - t0; } catch (e) {}
   try { console.info('[perf] tier ' + TIER.name + ' · pixel ratio ' + renderer.getPixelRatio() + ' · shadows ' + TIER.shadow + ' ' + TIER.shadowType + ' every ' + TIER.shadowEvery + ' frame(s) · ' + PERF.casters + ' casters · shaders compiled in ' + Math.round(PERF.compile) + ' ms'); } catch (e) {}
@@ -7945,7 +7954,7 @@ function select(id) { selected = id; }
 // shadows: overview = one big fixed shadow box over the plant; walking = a tighter box that follows Squeeg.
 // Far fewer objects get drawn into the shadow map each frame (big draw-call saving on phones) and nearby shadows come out sharper.
 // The box is snapped to whole shadow-map texels so the edges don't shimmer as you walk.
-const SUN_DIR = new T.Vector3(-60, 140, 90).normalize(), SH = { on: false, R: 85, ax: null, moved: true, tick: 0, warm: 0 };
+const SUN_DIR = new T.Vector3(-60, 140, 90).normalize(), SH = { on: false, R: TIER.shadowR || 85, ax: null, moved: true, tick: 0, warm: 0 };
 function shadowFollow() {
   const sun = sunL, C = sun.shadow.camera, want = walk.on;
   if (want !== SH.on) { SH.on = want; SH.moved = true;
@@ -7955,7 +7964,8 @@ function shadowFollow() {
   if (!want) return;
   if (!SH.ax) { const z = SUN_DIR, x = new T.Vector3(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x); SH.ax = [x, y, z]; }
   const [x, y, z] = SH.ax, tx = 2 * SH.R / sun.shadow.mapSize.x, cx = camera.position.x, cy = walk.y, cz = camera.position.z;
-  const u = Math.round((cx * x.x + cy * x.y + cz * x.z) / tx) * tx, v = Math.round((cx * y.x + cy * y.y + cz * y.z) / tx) * tx, w = cx * z.x + cy * z.y + cz * z.z;
+  const st = Math.max(1, Math.round((TIER.shadowStep || 0) / tx)) * tx;   // coarse step, still a whole number of texels (no shimmer)
+  const u = Math.round((cx * x.x + cy * x.y + cz * x.z) / st) * st, v = Math.round((cx * y.x + cy * y.y + cz * y.z) / st) * st, w = Math.round((cx * z.x + cy * z.y + cz * z.z) / st) * st;
   const t = sun.target.position, ox = t.x, oy = t.y, oz = t.z;
   t.set(x.x * u + y.x * v + z.x * w, x.y * u + y.y * v + z.y * w, x.z * u + y.z * v + z.z * w); sun.target.updateMatrixWorld();
   sun.position.copy(t).addScaledVector(SUN_DIR, 220);
@@ -8056,7 +8066,8 @@ const spawnQueue = [];
 const RDPX_C = 240;
 const WALK_SURF = [], LADDERS = [];   // raised walkable surfaces: rectangles with a height that ramps from y0 (z0 edge) to y1 (z1 edge); stairs are ramps
 function floorAt(x0, z0, y) {
-  let f = inPond(x0, z0, PONDS.hole) || DIGS.some(([a, b, c, d]) => x0 >= a && x0 <= c && z0 >= b && z0 <= d) ? -10 : 0;   // no ground over the dug-out ponds (their banks are surfaces)
+  let dug = inPond(x0, z0, PONDS.hole); if (!dug) for (let i = 0; i < DIGS.length; i++) { const q = DIGS[i]; if (x0 >= q[0] && x0 <= q[2] && z0 >= q[1] && z0 <= q[3]) { dug = true; break; } }   // (no closure: floorAt runs many times a frame)
+  let f = dug ? -10 : 0;   // no ground over the dug-out ponds (their banks are surfaces)
   for (const s of WALK_SURF) {
     let x = x0, z = z0;
     if (s.rot) { const [cx, cz, ph] = s.rot, c = Math.cos(ph), sn = Math.sin(ph), dx = x0 - cx, dz = z0 - cz; x = dx * c - dz * sn; z = dx * sn + dz * c; }   // turned surfaces (pond berms) use local coords
@@ -9632,7 +9643,8 @@ function updateVehTops() {
     if (!s) { s = V.top = { x0: 0, x1: 0, z0: 0, z1: 0, y0: 0, y1: 0 }; WALK_SURF.push(s); }   // created once, moved every frame
     const e = V.g.matrixWorld.elements, b = V.b;
     let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, top = -1e9;
-    for (const X of [b.min.x, b.max.x]) for (const Y of [b.min.y, b.max.y]) for (const Z of [b.min.z, b.max.z]) {
+    for (let i = 0; i < 8; i++) {   // the 8 box corners (no throwaway arrays: this runs for every vehicle every frame)
+      const X = i & 1 ? b.max.x : b.min.x, Y = i & 2 ? b.max.y : b.min.y, Z = i & 4 ? b.max.z : b.min.z;
       const wx = e[0] * X + e[4] * Y + e[8] * Z + e[12], wy = e[1] * X + e[5] * Y + e[9] * Z + e[13], wz = e[2] * X + e[6] * Y + e[10] * Z + e[14];
       if (wx < x0) x0 = wx; if (wx > x1) x1 = wx; if (wz < z0) z0 = wz; if (wz > z1) z1 = wz; if (wy > top) top = wy;
     }
@@ -10695,26 +10707,33 @@ function walkMove(fwd, strafe, dt, run) {
 const VBOX = { truck: [0.5, 10.6, 1.4], car: [0, 8.6, 1.7], loco: [0, 10.6, 1.6] };   // [center offset along length, half length, half width]
 function vehicleHits() {
   if (walk.dead || walk.ride || walk.y < -1) return;   // riding the train: safe on the deck; down in the basement: under everything
-  const bodies = vehicles.map(v => [v.g, VBOX.truck, 'semi']).concat(train.cars.map(c => [c.g, c.loco ? VBOX.loco : VBOX.car, 'train'])).concat(...THRUS.filter(R => R.u >= 0).map(R => R.cars.map(c => [c.g, c.loco ? VBOX.loco : VBOX.car, 'train'])));
-  for (const [g, [off, hl, hw], kind] of bodies) {
+  // (v1.97.92: walks the semis and train cars in place instead of building a fresh list of little arrays every frame)
+  for (let i = 0; i < vehicles.length; i++) if (vehHitOne(vehicles[i].g, VBOX.truck, 'semi')) return;
+  for (let i = 0; i < train.cars.length; i++) { const c = train.cars[i]; if (vehHitOne(c.g, c.loco ? VBOX.loco : VBOX.car, 'train')) return; }
+  for (const R of THRUS) if (R.u >= 0) for (const c of R.cars) if (vehHitOne(c.g, c.loco ? VBOX.loco : VBOX.car, 'train')) return;
+}
+function vehHitOne(g, box, kind) {   // one semi / train car against Squeeg; true = he got hit (stop checking)
+  const off = box[0], hl = box[1], hw = box[2];
+  {
     const a = g.rotation.y, ca = Math.cos(a), sa = Math.sin(a);
     const cx = g.position.x + off * ca, cz = g.position.z - off * sa;
     const prev = g.userData.prevPos || (g.userData.prevPos = g.position.clone());
     const mvx = g.position.x - prev.x, mvz = g.position.z - prev.z, moving = mvx * mvx + mvz * mvz > 1e-5; prev.copy(g.position);
     const dx = walk.x - cx, dz = walk.z - cz, lx = dx * ca - dz * sa, lz = dx * sa + dz * ca;
     const px = hl + BODY_R - Math.abs(lx), pz = hw + BODY_R - Math.abs(lz);
-    if (px <= 0 || pz <= 0) continue;
+    if (px <= 0 || pz <= 0) return false;
     if (moving) {   // thrown clear to the side of the vehicle so the body is visible from above
       const side = Math.sign(lz || 1) * (hw + 1.6);
       walk.x = cx + lx * ca + side * sa; walk.z = cz - lx * sa + side * ca;
       const ml = Math.hypot(mvx, mvz) || 1, vsp = kind === 'semi' ? 11 : 15, sx = Math.sign(lz || 1) * sa, sz = Math.sign(lz || 1) * ca;   // flung ahead of and away from the vehicle
-      walk.dead = kind; layBody(walk.x, walk.z, walk.yaw, mvx / ml * vsp * 0.8 + sx * 3, 4.5, mvz / ml * vsp * 0.8 + sz * 3, 7, true); walk.diedAt = { x: walk.x, z: walk.z }; return;
+      walk.dead = kind; layBody(walk.x, walk.z, walk.yaw, mvx / ml * vsp * 0.8 + sx * 3, 4.5, mvz / ml * vsp * 0.8 + sz * 3, 7, true); walk.diedAt = { x: walk.x, z: walk.z }; return true;
     }
     // parked/stopped: push out along the shallowest side
     let nlx = lx, nlz = lz;
     if (px < pz) nlx = Math.sign(lx || 1) * (hl + BODY_R); else nlz = Math.sign(lz || 1) * (hw + BODY_R);
     walk.x = cx + nlx * ca + nlz * sa; walk.z = cz - nlx * sa + nlz * ca;
   }
+  return false;
 }
 // ---------- Squeeg's body: a super basic stick man (about 1.8 m), shown lying down where Squeeg died ----------
 // ---------- CHARACTER FACES: two dot eyes and a little mouth on a small decal on the front of the head; X eyes when dead
@@ -11402,21 +11421,35 @@ function makeCritter(kind) {
   g.traverse(o => { o.userData.noHit = true; }); g.userData.noHit = true; g.visible = false; scene.add(g);
   return { kind, g, mats, cols: mats.map(x => x.color.getHex()), state: 'gone', t: 3 + Math.random() * 10, speed: kind === 'rat' ? 3.2 : 1.6 };
 }
+function crSolidsNear(all) {   // only meshes whose bounds reach into a critter area (plus 2 m): the probes skip the rest of the plant
+  const out = [], sp = new T.Sphere(), sc = new T.Vector3();
+  for (const m of all) { const g = m.geometry; if (!g) continue; if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingSphere) continue;
+    sp.copy(g.boundingSphere).applyMatrix4(m.matrixWorld);
+    if (CR_AREA.some(a => sp.center.x + sp.radius > a[0] - 2 && sp.center.x - sp.radius < a[2] + 2 && sp.center.z + sp.radius > a[1] - 2 && sp.center.z - sp.radius < a[3] + 2)) out.push(m); }
+  return out;
+}
 function crRay(o, d, far) { ray.set(o, d); ray.far = far; const h = ray.intersectObjects(crSolids, false)[0]; ray.far = Infinity; return h; }
 function crFloor(x, z) { const h = crRay(V3(x, 1.2, z), V3(0, -1, 0), 2); return h && h.point.y < 0.35 ? h.point.y : null; }   // open floor only (no pads or equipment)
+// v1.97.92: one ground probe per frame at most. Spawning used to try up to 20 spots in one frame and picking a run up to 8
+// directions, each a ray against every static mesh in the plant - a 5-11 ms spike on a PC (much more on a handheld) about
+// once a second. Now each frame makes one attempt and the critter simply tries again next frame, and the probes only test
+// meshes that overlap the areas critters live in (crSolidsNear), not the whole plant.
 function crSpawn(c) {
-  for (let k = 0; k < 20; k++) {
+  for (let k = 0; k < 1; k++) {
+    if ((c.spawnTries = (c.spawnTries || 0) + 1) > 20) { c.spawnTries = 0; c.t = 2; return; }   // 20 frames without a spot: rest, then try again
+    c.t = 0;   // try again next frame
     const a = CR_AREA[Math.random() * CR_AREA.length | 0], x = a[0] + Math.random() * (a[2] - a[0]), z = a[1] + Math.random() * (a[3] - a[1]);
     if (walk.on && Math.hypot(x - walk.x, z - walk.z) < 6) continue;   // not right under Squeeg's nose
     const y = crFloor(x, z); if (y == null) continue;
+    c.spawnTries = 0;
     c.g.position.set(x, y, z); c.g.rotation.set(0, Math.random() * 6.3, 0); c.held = false; c.thrown = false; c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i])); if (c.g.userData.sprite) c.g.userData.sprite.material.rotation = 0;
     c.g.visible = true; c.state = 'idle'; c.t = 0.5 + Math.random() * 2; c.life = 60 + Math.random() * 90; return;
   }
-  c.t = 2;   // try again shortly
+  // no spot this frame: c.t is 0, so the next frame tries one more (crSpawn rests 2 s after 20 misses)
 }
-function crLeg(c, away) {   // pick a clear straight run along the floor
+function crLeg(c, away) {   // pick a clear straight run along the floor (one direction per call: the caller retries next frame)
   const p = c.g.position;
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 1; k++) {
     let a = Math.random() * Math.PI * 2;
     if (away) a = Math.atan2(p.x - walk.x, p.z - walk.z) + (Math.random() - 0.5) * 1.6;
     const d = V3(Math.sin(a), 0, Math.cos(a)), len = (c.kind === 'rat' ? 3 : 1.5) + Math.random() * 4;
@@ -11428,7 +11461,7 @@ function crLeg(c, away) {   // pick a clear straight run along the floor
 }
 function updateCritters(dt) {
   if (!critters) critters = [makeCritter('rat'), makeCritter('lizard')];
-  if ((crSolidsT += dt) > 10) { crSolids = collectSolids(true); crSolidsT = 0; }
+  if ((crSolidsT += dt) > 10 || !crSolids.length) { crSolids = crSolidsNear(collectSolids(true)); crSolidsT = 0; }
   for (const c of critters) {
     const p = c.g.position;
     if (c.state === 'gone') { if ((c.t -= dt) <= 0) crSpawn(c); continue; }
@@ -11437,7 +11470,7 @@ function updateCritters(dt) {
     const near = walk.on && !walk.dead && Math.hypot(p.x - walk.x, p.z - walk.z) < 4;
     if (c.state === 'idle') {
       if (c.life <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 8 + Math.random() * 25; continue; }   // wandered off
-      if (near || (c.t -= dt) <= 0) { if (!crLeg(c, near)) c.t = 1; }
+      if (near || (c.t -= dt) <= 0) { if (crLeg(c, near)) c.legTries = 0; else c.t = (c.legTries = (c.legTries || 0) + 1) < 8 ? 0 : (c.legTries = 0, 1); }   // up to 8 frames of one try each, then rest 1 s
     } else if (c.state === 'run') {
       const st = Math.min(c.left, c.speed * (near ? 1.6 : 1) * dt); p.addScaledVector(c.dir, st); c.left -= st;
       const sp = c.g.userData.sprite; if (sp) { sp.material.rotation = 0.08 * Math.sin(clock * 30); const r = V3().setFromMatrixColumn(camera.matrixWorld, 0); sp.scale.x = (c.dir.x * r.x + c.dir.z * r.z >= 0 ? 1 : -1) * 0.3; }   // lizard wiggle, faces the way it runs
@@ -12924,8 +12957,9 @@ function frameBody(now) {
   if (deathT > 0) deathT -= dt;
   try { P3.update(sim, sdt, evs); } catch (e) { if (!window.__sceneErr) { window.__sceneErr = 1; if (window.__showErr) __showErr('3D: ' + (e && e.message)); }
     try { P3.drawHud(); } catch (e2) {} }   // even a broken world update must not take the first-person gun off the screen
-  const panelW = $('panel').classList.contains('open') ? $('panel').offsetWidth : 0;
-  if ($('labels').offsetParent) for (const id in labels) {
+  const labelsOn = !P3.walking && $('labels').offsetParent;   // walking: labels are hidden, so don't make the browser lay the page out just to ask (v1.97.92)
+  const panelW = labelsOn && $('panel').classList.contains('open') ? $('panel').offsetWidth : 0;
+  if (labelsOn) for (const id in labels) {
     const p = P3.project(id), el = labels[id];
     const hide = !p.vis || p.x < 20 || p.y < 56 || p.x > window.innerWidth - panelW - 20 || p.y > window.innerHeight - 10;
     el.style.display = hide ? 'none' : '';
@@ -12934,7 +12968,7 @@ function frameBody(now) {
   uiT += dt;
   if (uiT > 0.2) {
     uiT = 0; updateOuts(); refreshPanel(); setTxt($('birdCount'), '🐦 ' + P3.pigeonHits + (P3.critterHits ? ' · 🐀 ' + P3.critterHits : ''));
-    if ($('labels').offsetParent) for (const id in labels) { const s = Sim.stationStatus(sim, id); setCls(labels[id].querySelector('.dot'), 'dot ' + (s === 'good' ? '' : s)); }
+    if (!P3.walking && $('labels').offsetParent) for (const id in labels) { const s = Sim.stationStatus(sim, id); setCls(labels[id].querySelector('.dot'), 'dot ' + (s === 'good' ? '' : s)); }
   }
   { const a = P3.nh3 || 0, el = $('nh3'); if (el.dataset.a !== a.toFixed(2)) { el.dataset.a = a.toFixed(2); el.style.opacity = Math.min(0.92, a * 1.1); view.style.filter = a > 0.15 ? 'blur(' + ((a - 0.15) * 4).toFixed(1) + 'px)' : ''; } }   // ammonia: eyes burn and water
   { const t = P3.toxic || 0, el = $('toxic'); if (el.dataset.t !== t.toFixed(2)) { el.dataset.t = t.toFixed(2); el.style.opacity = Math.min(0.75, t * t * 0.75 + t * 0.1); } }   // pond poison: screen goes green
@@ -12943,14 +12977,20 @@ function frameBody(now) {
 }
 let fpsN = 0, fpsT = 0;
 const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fps) || 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;   // 0 = uncapped; the tier caps it (60 on a phone, 144 on a desktop)
-let fpsAcc = 0, fpsPrev = 0;
+// Frame pacing (v1.97.92): measure the screen's real refresh interval and draw on every k-th refresh, k = refresh / cap
+// rounded to a whole number. The old time accumulator compared each refresh gap against 1000 / cap, so ordinary timing
+// jitter made it skip a frame it should have drawn (a visible hitch even on a 60 Hz screen) and gave 90 / 120 Hz screens
+// uneven gaps. Now a 60 Hz screen draws every refresh, 120 Hz under a 60 cap draws every 2nd, and the gaps are always even.
+const PACE = { gaps: [], hz: 0, k: 1, n: 0, prev: 0, t: 0 };
+function paceUpdate(now) {   // keeps a rolling median of the refresh gap; re-picks k every couple of seconds (screens can change rate)
+  if (PACE.prev) { const g = now - PACE.prev; if (g > 2 && g < 50) { PACE.gaps.push(g); if (PACE.gaps.length > 90) PACE.gaps.shift(); } }
+  PACE.prev = now;
+  if (now - PACE.t > 2000 && PACE.gaps.length >= 30) { PACE.t = now; const s = PACE.gaps.slice().sort((a, b) => a - b), med = s[s.length >> 1]; PACE.hz = 1000 / med;
+    PACE.k = FPS_CAP > 0 ? Math.max(1, Math.round(PACE.hz / FPS_CAP - 0.15)) : 1; }   // -0.15: a 70 Hz screen under a 60 cap still draws every refresh
+}
 function frame(now) {
-  if (FPS_STEP) {   // deadline accumulator: keeps the remainder, so it settles at the cap instead of halving the rate
-    if (!fpsPrev) fpsPrev = now;
-    fpsAcc += Math.min(50, now - fpsPrev); fpsPrev = now;
-    if (fpsAcc < FPS_STEP - 0.01) { requestAnimationFrame(frame); return; }
-    fpsAcc = Math.min(fpsAcc - FPS_STEP, FPS_STEP);
-  }
+  paceUpdate(now);
+  if (PACE.k > 1 && (++PACE.n % PACE.k) !== 0) { requestAnimationFrame(frame); return; }
   fpsN++; if (!fpsT) fpsT = now; if (now - fpsT >= 1000) {
     const pf = P3.perf || {}, pz = $('modal').classList.contains('open'), vm = P3.viewmodel || {};
     const badGun = P3.walking && !vm.third && vm.held === 'gun' && !vm.gun;   // should be up but is not: tell the player

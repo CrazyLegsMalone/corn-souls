@@ -1,0 +1,81 @@
+// Run from the test/ directory: node validate-frame-stability.cjs
+// v1.97.92 frame-stability audit. Guards the five fixes that keep every frame costing about the same:
+//  1. shadows redrawn every frame on every tier, cheaper on low/medium (smaller box, coarse steps, no tiny casters)
+//  2. critter ground probes: at most one per frame, against nearby meshes only (they were 5-11 ms spikes)
+//  3. frame pacing on whole screen refreshes (the old accumulator skipped frames on timing jitter)
+//  4. no per-frame garbage in the vehicle contacts, roof tops and vehicle hits
+//  5. no forced page layout every frame while walking
+const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
+const html = fs.readFileSync('game.html', 'utf8'), launcher = fs.readFileSync('index.html', 'utf8');
+const fn = (src, name) => { const i = src.indexOf('function ' + name + '('); assert.ok(i >= 0, name + ' exists'); let d = 0, j = src.indexOf('{', i); for (; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) break; } return src.slice(i, j + 1); };
+
+// 1 ---------------------------------------------------------------- shadows
+assert.ok(html.includes('SH = { on: false, R: TIER.shadowR || 85,'), 'the walking shadow box size comes from the tier');
+const follow = fn(html, 'shadowFollow');
+assert.ok(follow.includes("const st = Math.max(1, Math.round((TIER.shadowStep || 0) / tx)) * tx;"), 'the box step is a whole number of texels (no shimmer)');
+assert.ok(follow.includes('/ st) * st') && follow.includes('w = Math.round((cx * z.x + cy * z.y + cz * z.z) / st) * st'), 'all three box axes snap to the coarse step, so walking does not move it every frame');
+assert.ok(html.includes('if (TIER.minCaster > 0) {') && html.includes('< TIER.minCaster) { o.castShadow = false; off++; }'), 'little objects stop casting on low / medium');
+assert.ok(html.indexOf('PERF.smallCasters = off;') < html.indexOf('PERF.casters = n;'), 'and the caster count is taken after the trim');
+
+// 2 ---------------------------------------------------------------- critters
+const spawn = fn(html, 'crSpawn'), leg = fn(html, 'crLeg');
+assert.ok(spawn.includes('for (let k = 0; k < 1; k++)') && !spawn.includes('k < 20'), 'a spawn makes one ground probe per frame, not 20');
+assert.ok(spawn.includes('> 20) { c.spawnTries = 0; c.t = 2; return; }'), 'and rests 2 s after 20 frames without a spot');
+assert.ok(!/\n  c\.t = 2;\s+\/\/ try again shortly\n\}/.test(spawn), 'a miss leaves c.t at 0, so the very next frame tries again');
+assert.ok(leg.includes('for (let k = 0; k < 1; k++)') && !leg.includes('k < 8'), 'picking a run makes one try per frame');
+assert.ok(html.includes('c.t = (c.legTries = (c.legTries || 0) + 1) < 8 ? 0 : (c.legTries = 0, 1);'), 'up to 8 frames of tries, then a 1 s rest');
+assert.ok(html.includes('crSolids = crSolidsNear(collectSolids(true));'), 'the probes only test meshes near the critter areas');
+{ // run crSolidsNear against stub meshes
+  const src = fn(html, 'crSolidsNear');
+  class V { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; } }
+  class Sphere { constructor() { this.center = new V(); this.radius = 0; } copy(s) { this.center = new V(s.center.x, s.center.y, s.center.z); this.radius = s.radius; return this; } applyMatrix4(m) { this.center.x += m.x; this.center.z += m.z; return this; } }
+  const mesh = (x, z, r) => ({ geometry: { boundingSphere: { center: new V(0, 0, 0), radius: r } }, matrixWorld: { x, z } });
+  const ctx = { T: { Sphere, Vector3: V }, CR_AREA: [[0, 0, 10, 10]] }; vm.createContext(ctx);
+  vm.runInContext(src + '\nthis.out = crSolidsNear([' + ['mesh(5,5,1)', 'mesh(50,50,1)', 'mesh(13,5,2)', 'mesh(-40,5,1)'].join(',') + ']).length;', Object.assign(ctx, { mesh }));
+  assert.equal(ctx.out, 2, 'a mesh inside or touching (with 2 m margin) a critter area is kept, far ones are dropped');
+}
+
+// 3 ---------------------------------------------------------------- frame pacing
+{ const src = html.slice(html.indexOf('const PACE = {'), html.indexOf('function frame(now) {'));
+  const k = (hz, cap) => { const ctx = { FPS_CAP: cap }; vm.createContext(ctx); vm.runInContext(src + '\nlet t = 0; for (let i = 0; i < 1200; i++) { t += 1000 / ' + hz + ' + (i % 3 - 1) * 0.15; paceUpdate(t); } this.k = PACE.k; this.hz = PACE.hz;', ctx); return ctx.k; };
+  assert.equal(k(60, 60), 1, '60 Hz screen, 60 cap: every refresh is drawn (no jitter skips)');
+  assert.equal(k(120, 60), 2, '120 Hz screen, 60 cap: every 2nd refresh, even gaps');
+  assert.equal(k(90, 60), 1, '90 Hz screen, 60 cap: every refresh (never uneven 1-2-1-2 gaps)');
+  assert.equal(k(144, 144), 1, '144 Hz desktop, 144 cap: every refresh');
+  assert.equal(k(165, 60), 3, '165 Hz screen, 60 cap: every 3rd refresh');
+  assert.equal(k(240, 90), 3, '240 Hz screen, 90 cap: every 3rd refresh');
+}
+assert.ok(html.includes('function frame(now) {\n  paceUpdate(now);'), 'every refresh feeds the pacing measurement');
+
+// 4 ---------------------------------------------------------------- no per-frame garbage
+const tops = fn(html, 'updateVehTops');
+assert.ok(!tops.includes('of [b.min.x') && tops.includes('i & 1 ? b.max.x : b.min.x'), 'roof tops walk the 8 box corners without throwaway arrays');
+const hits = fn(html, 'vehicleHits');
+assert.ok(!/\.map\(|\.concat\(|\.filter\(/.test(hits) && hits.includes('vehHitOne('), 'vehicle hits walk the semis and train cars in place');
+const one = fn(html, 'vehHitOne');
+assert.ok(!one.includes('continue') && one.includes('return true;') && one.trim().endsWith('return false;\n}'), 'vehHitOne reports a hit with true, otherwise false');
+const floor = fn(html, 'floorAt');
+assert.ok(!floor.includes('DIGS.some(') && floor.includes('for (let i = 0; i < DIGS.length; i++)'), 'floorAt checks the dug-out areas without a closure');
+assert.ok(launcher.includes('const CS_POOL=[],CS={n:0,stamp:-1};') && launcher.includes('if(CS.stamp===clock)return;CS.stamp=clock;CS.n=0;'), 'vehicle contacts are built once per frame into a reused pool');
+assert.ok(launcher.includes('function csVehiclePenetration(x,z,r,ignore){   // returns a shared result object') && launcher.includes('if(o.g===ignore)continue;'), 'and queries skip their own vehicle instead of rebuilding the list');
+{ // run the engine string against stub vehicles: bodies are pooled, queries are correct
+  const start = launcher.indexOf('const vehicleContactEngine=') + 'const vehicleContactEngine='.length, end = launcher.indexOf(';\n  const playerBlockAnchor=', start);
+  const engine = JSON.parse(launcher.slice(start, end));
+  const g = (x, z, a = 0) => ({ position: { x, z }, rotation: { y: a }, visible: true });
+  const truck = g(0, 0), car = g(20, 0), mine = g(40, 0);
+  const ctx = { clock: 1, vehicles: [{ g: truck }], train: { cars: [] }, THRUS: [], O: { cars: [{ g: car, x: 20, z: 0, a: 0 }] }, CAR_ON: null, RANGER_SAVE: null, walk: { drive: true, mow: false }, utv: { g: mine }, NET: {} };
+  vm.createContext(ctx); vm.runInContext(engine + '\nthis.a = csVehiclePenetration(20, 2.5, 1, null); this.ax = this.a && this.a.z; this.n1 = CS.n; this.b = csVehiclePenetration(20, 2.5, 1, O.cars[0].g); this.n2 = CS.n; this.pool = CS_POOL.length; clock = 2; csBuild(); this.pool2 = CS_POOL.length; this.c = csVehiclePenetration(0, 0.5, 1, null);', ctx);
+  assert.ok(ctx.a && ctx.ax > 0, 'a point next to a parked car is pushed away from it');
+  assert.equal(ctx.b, null, 'the same query ignoring that car finds nothing');
+  assert.equal(ctx.n1, 7, 'one truck (5 samples) and one car (2 samples) are in the frame list');
+  assert.equal(ctx.n2, 7, 'a second query in the same frame reuses the list');
+  assert.equal(ctx.pool2, ctx.pool, 'the next frame reuses the pooled objects (no new ones)');
+  assert.ok(ctx.c && ctx.c.kind === 'corn-truck', 'a point inside the truck reports a truck contact');
+}
+
+// 5 ---------------------------------------------------------------- no forced layout while walking
+assert.ok(html.includes("const labelsOn = !P3.walking && $('labels').offsetParent;") && html.includes("const panelW = labelsOn && $('panel').classList.contains('open') ? $('panel').offsetWidth : 0;"),
+  'the side panel is only measured when the station labels are on screen');
+assert.ok(html.includes("if (!P3.walking && $('labels').offsetParent) for (const id in labels) { const s = Sim."), 'the 5 Hz label refresh is skipped while walking too');
+
+console.log('PASS: frame stability - shadows every frame with a cheaper pass, critter probes time-sliced and local, refresh-locked frame pacing, no per-frame garbage in vehicle contacts / roofs / hits / floorAt, no layout reads while walking');

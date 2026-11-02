@@ -31,7 +31,13 @@ assert.equal(desktop.shadowEvery, 1, 'and a shadow refresh every frame');
 assert.equal(desktop.fps, 144, 'and the old 144 cap');
 const tablet = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 1024 } });
 assert.equal(tablet.name, 'medium', 'a big touch device with enough memory is not pushed to the floor');
-assert.equal(tablet.shadowEvery, 2, 'medium redraws the shadow map every second frame');
+assert.equal(tablet.shadowEvery, 1, 'medium redraws the shadow map every frame too (v1.97.92: alternate heavy/light frames were judder)');
+for (const [t, R, st, mc] of [[phone, 50, 4, 0.5], [tablet, 65, 3, 0.35], [desktop, 85, 2, 0]]) {   // the pass is made cheaper instead of rarer
+  assert.equal(t.shadowEvery, 1, t.name + ' redraws its shadows every frame (steady cost)');
+  assert.equal(t.shadowR, R, t.name + ' shadow box half-size ' + R + ' m');
+  assert.equal(t.shadowStep, st, t.name + ' moves the shadow box in ' + st + ' m steps');
+  assert.equal(t.minCaster, mc, t.name + ' smallest shadow caster ' + mc + ' m');
+}
 const smallPhone = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 380 } });
 assert.equal(smallPhone.name, 'low', 'a small screen wins over a generous memory figure');
 const override = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 }, storage: { getItem: k => k === 'cs_perf' ? 'low' : null } });
