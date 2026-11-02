@@ -1,3 +1,14 @@
+## TEST v1.97.82 — X puts a corpse down, B eats it, fire throws it (2026-11-01)
+- Owner: X should drop the corpse you are holding, B should eat, fire should throw.
+- **X** (`critterPick()`) now carries a corpse and, pressed again, **puts it down** - `deadDrop()` detaches it, snaps it to the floor at your feet and lays it belly-up, instead of swallowing it. It still picks up from 2.2 m across critters, fallen pigeons and dead pond frogs.
+- **B** (`critterEat()`) eats: the corpse leaves the world (`state = 'gone'`). B still closes an open panel first, so it doesn't do two things at once, and the PC keyboard now has a **b** key for it (it had no key at all before - B was Escape/Backspace only).
+- **Fire** (`critterThrow()`) throws: the corpse is detached at 0.7 m in front of the camera and given the view direction x 9 m/s plus 3.4 m/s of lift, with a random tumble. `updateThrown()` integrates a real 9.8 m/s2 arc every frame, and when the body reaches the floor it settles belly-up, clears `o.thrown` and gets its 45 s clean-up timer back - so a thrown body is an ordinary corpse again. Fire falls through to the tool whenever your hands are empty, so nothing else about shooting changed.
+- The prompt says all three: *"Picked up the dead rat - X to put it down, B to eat it, fire to throw it."*
+- A body thrown while dead or driving is impossible by construction: `deadDrop()` already puts it down when you die or get into a vehicle.
+- Tests: the machines suite pins the three verbs, the bridge exports, the B key, the fire fall-through and the landing rule, and runs `updateThrown()` itself over a stand-in corpse - it starts up, travels forward, lands at 0.06 m, ends with the timer back at 45 s and the throw list empty.
+- Verified locally and in a clean clone: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.82` / `corn-souls-test-shell-v109`.
+
 ## TEST v1.97.81 — the fermenters do not drain through pipes lying outside them (2026-11-01)
 - Owner, pointing at the pipe run along the concrete in front of the fermenter columns: remove it, that is not how the ferms connect to each other or to the beer well.
 - It was the **beer drain** assembly: two 0.7 m runs down the outside of both columns (`drW` on the west, `drE` on the east), a 0.7 m stub off every single tank, a riser climbing the office wall to `BWH + 3`, a run across at that height and a drop into the beer well, plus the steel support post that carried the riser.

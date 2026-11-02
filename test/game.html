@@ -9174,7 +9174,7 @@ function update(sim, dt, events) {
     puffT = 0;
   }
   updatePuffs(dt); updateWeather(dt);
-  updateBirds(dt); updateCritters(dt); updateVehTops(); if (heldDead && (walk.dead || walk.drive)) deadDrop();   // dying or getting in puts the corpse down updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateCoolingTower(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); vendUpdate(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
+  updateBirds(dt); updateCritters(dt); updateThrown(dt); updateVehTops(); if (heldDead && (walk.dead || walk.drive)) deadDrop();   // dying or getting in puts the corpse down updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateCoolingTower(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); vendUpdate(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
 
   // trucks come when the simulation calls them
   for (const e of events) spawn(e.kind, e.ship);
@@ -11345,24 +11345,53 @@ function deadNear(r) {   // any corpse within reach that somebody is not already
   for (const o of cand) { const p = o.g.position, d = Math.hypot(p.x - walk.x, p.z - walk.z); if (d < bd) { bd = d; best = o; } }
   return best;
 }
-function critterPick() {   // returns a line for the UI, or null when there is nothing to do here
+function critterPick() {   // X: pick a corpse up, or put down the one you are carrying
   if (!walk.on || walk.dead) return null;
-  if (heldDead) {                                    // already holding one: eat it
-    const nm = heldDead.nm;
-    if (heldDead.g.parent) heldDead.g.parent.remove(heldDead.g);
-    heldDead.o.state = 'gone'; heldDead.o.held = false; heldDead = null;
-    return 'You ate the ' + nm + '.';
-  }
+  if (heldDead) { const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }
   const o = deadNear(); if (!o) return null;
   const nm = deadName(o);
   o.held = true; heldDead = { o, g: o.g, nm };
   camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6); o.g.rotation.set(0.2, 0.6, 0.3);
-  return 'Picked up the dead ' + nm + ' - X again to eat it.';
+  return 'Picked up the dead ' + nm + ' - X to put it down, B to eat it, fire to throw it.';
 }
-function deadDrop() {   // dying, or getting into something, puts it down again
-  if (!heldDead) return;
-  const o = heldDead.o; o.held = false; heldDead = null;
-  if (o.g.parent === camera) scene.attach(o.g);
+function critterEat() {   // B: the corpse leaves the world
+  if (!heldDead) return null;
+  const nm = heldDead.nm, o = heldDead.o, g = heldDead.g;
+  if (g.parent) g.parent.remove(g);
+  o.state = 'gone'; o.held = false; o.thrown = false; heldDead = null;
+  return 'You ate the ' + nm + '.';
+}
+function deadDrop() {   // X, dying, or getting into something: the corpse goes down on the floor where you are
+  if (!heldDead) return null;
+  const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; heldDead = null;
+  if (g.parent === camera) scene.attach(g);
+  const f = floorAt(g.position.x, g.position.z, g.position.y + 0.3);
+  g.position.y = Math.max(f, 0) + 0.06; g.rotation.set(0, g.rotation.y, Math.PI);   // belly-up on the ground
+  return nm;
+}
+// ---------- THROWING: fire while holding a corpse lobs it; it flies, tumbles, and comes to rest as a normal corpse
+// (o.thrown is cleared on landing, so the clean-up timer takes it again like any other body)
+const THROWN = [];
+function critterThrow() {   // returns a line for the UI, or null so the fire button falls through to the tool
+  if (!heldDead || !walk.on || walk.dead) return null;
+  const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; o.thrown = true; o.t = 45; heldDead = null;
+  scene.attach(g);
+  const dir = camera.getWorldDirection(V3(0, 0, 0));
+  g.position.copy(camera.getWorldPosition(V3(0, 0, 0))).addScaledVector(dir, 0.7);
+  THROWN.push({ g, o, v: V3(dir.x * 9, dir.y * 9 + 3.4, dir.z * 9), spin: V3(5 + Math.random() * 6, Math.random() * 8, 2 + Math.random() * 5), t: 0 });
+  return 'Threw the ' + nm + '.';
+}
+function updateThrown(dt) {
+  for (let i = THROWN.length - 1; i >= 0; i--) {
+    const b = THROWN[i], g = b.g; b.t += dt; b.v.y -= 9.8 * dt;
+    g.position.addScaledVector(b.v, dt);
+    g.rotation.x += b.spin.x * dt; g.rotation.y += b.spin.y * dt; g.rotation.z += b.spin.z * dt;
+    const f = floorAt(g.position.x, g.position.z, g.position.y + 0.3);
+    if (g.position.y <= Math.max(f, 0) + 0.06 || b.t > 6) {   // landed (or gave up on a roof edge): a corpse on the ground again
+      g.position.y = Math.max(f, 0) + 0.06; g.rotation.set(0, g.rotation.y, Math.PI);
+      b.o.thrown = false; b.o.t = 45; THROWN.splice(i, 1);
+    }
+  }
 }
 function hitCritter(c, col) {
   critterHits++; c.state = 'hit'; c.t = 45; c.held = false; c.thrown = false; if (col != null) c.mats.forEach(m => m.color.setHex(col));
@@ -11777,7 +11806,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), critterPick: () => critterPick(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? renderer.info.render.calls : 0; }, get triCount() { return renderer ? renderer.info.render.triangles : 0; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
+root.Plant3D = { powerSet: on => powerSet(on), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? renderer.info.render.calls : 0; }, get triCount() { return renderer ? renderer.info.render.triangles : 0; }, snapshot: (w) => snapshot(w), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
 })(this);
 </script>
 <script>// =====================================================================
@@ -12599,9 +12628,9 @@ function press(n) {
     if (P3.pivotGenNear()) { pivotGenMenu(); return; }   // center-pivot diesel gen-set
     if (P3.powerResetNear()) { powerResetMenu(); return; }   // main substation breaker
     if (vendX()) return;   // a dropped packet or a vending machine takes the X press first
-    { const m = P3.critterPick(); if (m) { toast(m); return; } }   // a dead critter under the crosshair: pick it up, then eat it
+    { const m = P3.critterPick(); if (m) { toast(m); return; } }   // a corpse: X picks it up, X again puts it down
     const r = P3.kiaToggle() || P3.radioToggle() || P3.takeTool() || P3.takeExtinguisher() || P3.pickChute() || P3.takeKey() || P3.carToggle() || P3.mowerToggle() || P3.coolerHandle() || P3.nh3Valve() || P3.throwSwitch() || P3.rideToggle(); if (r) { toast(r); return; } const id = P3.interactTarget(); if (id === 'BOARD') openBoard(); else if (id === 'BOARD_BUSY') toast('The Board Op is using this board — use the other one'); else if (id) selectUnit(id); else toast('Nothing to interact with here'); return; }
-    if (n === 'B') { if (cur) closePanel(); return; }   // B only backs out of panels/menus; it doesn't leave Squeeg mode
+    if (n === 'B') { if (cur) { closePanel(); return; } const m = P3.critterEat(); if (m) toast(m); return; }   // B backs out of panels, and eats what you are carrying
     if (n === 'A' && !cur) { P3.walkJump(); return; }
     if (n === 'Y') { if (P3.driving) { toast(P3.utvView()); return; } toggleLamp(); return; }   // headlamp (in the UTV: chase / driver's-seat view)
     if (n === 'SELECT' || n[0] === 'K') { debugMenu(n[0] === 'K' ? n.slice(1) : null); return; }
@@ -12642,7 +12671,7 @@ window.padAxis = (lx, ly, rx, ry, hx, hy, lt, rt) => {
     if (!on && pad.held['h' + n]) { pad.held['h' + n] = pad.held[n] = false; }
   }
 };
-const KEYS = { ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', Enter: 'A', ' ': 'A', Escape: 'B', Backspace: 'B', '[': 'L1', ']': 'R1', m: 'START', h: 'SELECT', y: 'Y' };
+const KEYS = { ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT', Enter: 'A', ' ': 'A', Escape: 'B', Backspace: 'B', '[': 'L1', ']': 'R1', m: 'START', h: 'SELECT', y: 'Y', b: 'B' };
 // ---------- PC keyboard + mouse (browser version) ----------
 // Squeeg: WASD walk, Shift sprint, Space jump, E / left click interact, F headlamp, mouse looks once grabbed (click), Esc frees the mouse
 // Savior Mode: WASD pan, Q/E turn, R/F tilt, -/= or the wheel zoom, Shift moves faster; left-drag pans, right-drag turns
@@ -12714,7 +12743,7 @@ function padCam(dt) {
     if (stickMag < 0.15 && Math.hypot(walkIn.f, walkIn.s) < 0.05 && !kf && !ks) { pad.idleT = (pad.idleT || 0) + dt; if (pad.idleT > 0.4) pad.sprint = false; } else pad.idleT = 0;   // sprint turns off when you stop
     P3.walkMove(f, s, dt, pad.sprint || Math.hypot(walkIn.f, walkIn.s) > 0.95);
     P3.setAim(aimIn.mouse || aimIn.tog || pad.lt > 0.5 || !!pad.held.L2); document.body.classList.toggle('ads', P3.aiming);
-    if (fireIn.mouse || fireIn.btn || pad.rt > 0.5 || pad.held.R2) { fireIn.cd -= dt; if (fireIn.cd <= 0) { if (!P3.radioFire()) P3.fire(); fireIn.cd = 0.16; } } else fireIn.cd = 0;   // hold to keep firing
+    if (fireIn.mouse || fireIn.btn || pad.rt > 0.5 || pad.held.R2) { fireIn.cd -= dt; if (fireIn.cd <= 0) { const th = P3.critterThrow(); if (th) toast(th); else if (!P3.radioFire()) P3.fire(); fireIn.cd = 0.16; } } else fireIn.cd = 0;   // hold to keep firing; a held corpse is thrown instead
     if (z(pad.rx) || z(pad.ry)) P3.walkLook(-z(pad.rx) * 2.2 * dt, -z(pad.ry) * 1.6 * dt);
     return;
   }

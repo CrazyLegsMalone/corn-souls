@@ -484,7 +484,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function updateVehTops()'), 'vehicles carry a walk surface that follows them');
   assert.ok(html.includes('s.x0 = x0; s.x1 = x1; s.z0 = z0; s.z1 = z1; s.y0 = s.y1 = top;'), 'the surface is the world AABB at roof height');
   assert.ok(html.includes('if (!s) { s = V.top = { x0: 0, x1: 0, z0: 0, z1: 0, y0: 0, y1: 0 }; WALK_SURF.push(s); }'), 'one surface per vehicle, created once and moved');
-  assert.ok(html.includes('updateBirds(dt); updateCritters(dt); updateVehTops();'), 'updated every frame, before the player moves');
+  assert.ok(html.includes('updateVehTops(); if (heldDead && (walk.dead || walk.drive)) deadDrop();'), 'updated every frame, before the player moves');
   assert.ok(html.includes('if (ly > b.max.y - 0.3 || ly + 1.7 < b.min.y) continue;'), 'and vehPush already ignores a vehicle you are standing on');
   assert.ok(html.includes('regVehBox(g);   // solid to walk into, and a roof you can stand on'), 'the Ranger is registered too');
   assert.ok(html.includes('walk.y < 1.2) for (const off of [-0.9, 0, 0.9])'), 'its old three-circle push-out does not shove you off the roof');
@@ -495,11 +495,48 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("for (const b of birds) if (b.state === 'fall' && !b.held) cand.push(b);"), 'so do fallen birds');
   assert.ok(html.includes("for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);"), 'and dead frogs');
   assert.ok(html.includes('camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6);'), 'a picked-up corpse is carried in front of the camera');
-  assert.ok(html.includes('Picked up the dead ') && html.includes('- X again to eat it.'), 'and you are told how to eat it');
-  assert.ok(html.includes('if (heldDead.g.parent) heldDead.g.parent.remove(heldDead.g);') && html.includes("heldDead.o.state = 'gone'; heldDead.o.held = false; heldDead = null;"), 'X again eats it, taking it out of the world');
+  // X carries and puts down, B eats, fire throws - three verbs, three buttons, as the owner asked
+  assert.ok(html.includes('- X to put it down, B to eat it, fire to throw it.'), 'the prompt names all three buttons');
+  assert.ok(html.includes("if (heldDead) { const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }"), 'X on a held corpse puts it down');
+  assert.ok(html.includes('function critterEat()'), 'B eats');
+  assert.ok(html.includes("o.state = 'gone'; o.held = false; o.thrown = false; heldDead = null;"), 'eating takes it out of the world');
+  assert.ok(html.includes('const m = P3.critterEat(); if (m) toast(m);'), 'the B press is wired to eating, and still closes a panel first');
+  assert.ok(html.includes("m: 'START', h: 'SELECT', y: 'Y', b: 'B' }"), 'the keyboard has a B key');
+  assert.ok(html.includes('function critterThrow()'), 'fire throws');
+  assert.ok(html.includes('const th = P3.critterThrow(); if (th) toast(th); else if (!P3.radioFire()) P3.fire();'), 'the fire button throws a held corpse instead of firing the tool');
+  assert.ok(html.includes('const THROWN = [];') && html.includes('function updateThrown(dt) {'), 'thrown bodies fly');
+  assert.ok(html.includes('b.t += dt; b.v.y -= 9.8 * dt;'), 'on a real arc');
+  assert.ok(html.includes('b.o.thrown = false; b.o.t = 45; THROWN.splice(i, 1);'), 'and come to rest as ordinary corpses, back on the clean-up timer');
+  assert.ok(html.includes('critterEat: () => critterEat(), critterThrow: () => critterThrow(),'), 'both are on the Plant3D bridge');
+  assert.ok(html.includes('updateBirds(dt); updateCritters(dt); updateThrown(dt);'), 'and they are stepped every frame');
   assert.ok(html.includes('if (!c.held && !c.thrown && (c.t -= dt) <= 0)'), 'a held corpse is already exempt from the clean-up timer');
   assert.ok(html.includes('if (heldDead && (walk.dead || walk.drive)) deadDrop();'), 'and it is put down if you die or get in something');
   assert.ok(html.includes('{ const m = P3.critterPick(); if (m) { toast(m); return; } }'), 'the X press is wired to it');
+  // ---------------------------------------------------------------- and a thrown body really falls and settles
+  {   // run the game's own ballistic step over a stand-in corpse on a flat floor
+    const src = html.slice(html.indexOf('const THROWN = [];'), html.indexOf('function hitCritter('));
+    assert.ok(src.includes('function updateThrown(dt)'), 'found the throw step');
+    const lib3d = { window: {}, console };
+    vm.runInNewContext(scripts.find(x => x.includes('window.THREE=eu')), lib3d);
+    const T3 = lib3d.window.THREE;
+    const ctx = { T: T3, Math, console, floorAt: () => 0 };
+    vm.createContext(ctx);
+    vm.runInContext(src, ctx);
+    vm.runInContext('this.THROWN = THROWN; this.step = updateThrown;', ctx);
+    const g = new T3.Object3D(); g.position.set(0, 2, 0);
+    const o = { thrown: true, t: 0 };
+    ctx.THROWN.push({ g, o, v: new T3.Vector3(1.5, 0.5, 0), spin: new T3.Vector3(1, 1, 1), t: 0 });
+    const y0 = g.position.y;
+    ctx.step(1 / 60);
+    assert.ok(g.position.y > y0, 'it starts upward');
+    for (let i = 0; i < 400 && ctx.THROWN.length; i++) ctx.step(1 / 60);
+    assert.equal(ctx.THROWN.length, 0, 'the throw ends');
+    assert.ok(g.position.x > 0.5, 'it travelled forward');
+    assert.ok(Math.abs(g.position.y - 0.06) < 1e-9, 'and it is lying on the floor');
+    assert.equal(o.thrown, false, 'no longer exempt from the clean-up timer');
+    assert.equal(o.t, 45, 'with a full timer again');
+  }
+
   // ---------------------------------------------------------------- the dirt pond loop keeps out of the corn circle
   {   // the tracks are drawn from the same numbers the game builds from, so this cannot drift
     const blk = html.slice(html.indexOf('const DIRT_ROADS = ['), html.indexOf('];', html.indexOf('const DIRT_ROADS = [')));
