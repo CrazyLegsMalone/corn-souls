@@ -1,3 +1,12 @@
+## TEST v1.97.73 — the ground layering is measured in depth steps, not centimetres (2026-11-01)
+- Owner-reported follow-up: concrete now rendered further out but still stopped at a certain distance from the character. That distance is the depth buffer, not the geometry.
+- **The arithmetic**: with `camera.near = 0.2` and `far = 9000` a 24-bit depth buffer resolves about **0.3 cm at 100 m, 2.7 cm at 300 m, 6 cm at 450 m and 10.7 cm at 600 m**. The layers were separated by 4 polygon-offset units and ~5 cm of real height, so past roughly 450 m one depth step was wider than the gap and the grass plane won - the pad vanished at exactly the distance the owner saw.
+- **Offsets are now 32 units each way** (base pushed back +16/+32, every overlay pulled forward -16/-32), and the flat concrete pads went from 5.5 cm to **8 cm** of real height. 32 units is ~3 m of effective separation at 600 m and ~6 m at 800 m, which carries past the fog's far plane at 760 m - beyond that the ground is sky-coloured anyway, so nothing can be seen to fight there.
+- Nothing else changes: no renderer flag, no logarithmic depth, no perceptible cost. At close range 32 units is a fraction of a centimetre, so a kerb or a bollard standing on a pad still draws over it.
+- Tests pin the new offsets on both the ground materials and the pad material, and the pad height.
+- Verified locally: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.73` / `corn-souls-test-shell-v100`.
+
 ## TEST v1.97.72 — every tank, equipment and door label is 25% smaller (2026-11-01)
 - Owner request. All 28 nameplate call sites funnel through `nameplate()`, so the trim is one constant there: **`NAME_K = 0.75`** applied to the plate height (0.53 with a tag line, 0.34 without, times each call site's own `k`), and the plate width follows the same factor. Tanks, dryers, boilers, the cooling tower, the drive-through windows, the exit doors and every room sign shrink together.
 - **Door signs are their own system** (`doorSign()` -> `signFace()`, the painted plates over the process-building doorways such as COOK ALLEY / BREAK ROOM / LAB / SERVER) and had a fixed plane of 1.15 x 0.25 m; those now use `1.15 * NAME_K` by `0.25 * NAME_K` so they match.

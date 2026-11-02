@@ -4708,7 +4708,7 @@ function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are a
   // depth buffer with almost no resolution out there), so the dirt yard and the road surfaces flickered through as
   // green. The base layer is now pushed back as well as the overlays being pulled forward.
   const back = kind === 'grass';
-  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: back ? 4 : -4, polygonOffsetUnits: back ? 8 : -8 });
+  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: back ? 16 : -16, polygonOffsetUnits: back ? 32 : -32 });
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -5497,8 +5497,8 @@ function init(container) {
   // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
   // grass. Without that it lost the depth fight a few hundred metres out and the grass showed through - the concrete
   // appeared to stop a certain distance from the player.
-  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = -4; m.polygonOffsetUnits = -8; return m; };
-  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, 0.055, z, null); p.castShadow = false; };
+  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = -16; m.polygonOffsetUnits = -32; return m; };
+  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, 0.08, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
   { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
   { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
