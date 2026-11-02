@@ -466,6 +466,23 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- the dirt pond loop keeps out of the corn circle
+  {   // the tracks are drawn from the same numbers the game builds from, so this cannot drift
+    const blk = html.slice(html.indexOf('const DIRT_ROADS = ['), html.indexOf('];', html.indexOf('const DIRT_ROADS = [')));
+    const legs = [...blk.matchAll(/pts: \[\[(.*?)\]\]/g)].map(m => [...m[1].matchAll(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g)].map(p => [+p[1], +p[2]]));
+    assert.ok(legs.length >= 3 && legs[0].length > 10, 'the pond loop legs are where they are expected');
+    assert.deepEqual(legs[0][0], [-225, 185], 'the loop starts on the paved south road, not short of it');
+    const PC = [-675, -99], PR = 344;                                    // centre-pivot corn circle
+    const phi = Math.atan(0.756), c = Math.cos(phi), s2 = Math.sin(phi), PONDS = [[-603, 429], [-451, 309]], HALF = 67.4;
+    let circle = 1e9, pond = 1e9;
+    for (const leg of legs) for (let i = 0; i < leg.length - 1; i++) {
+      const [x0, z0] = leg[i], [x1, z1] = leg[i + 1], n = Math.max(2, Math.round(Math.hypot(x1 - x0, z1 - z0) / 2));
+      for (let k = 0; k <= n; k++) { const t = k / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+        circle = Math.min(circle, Math.hypot(x - PC[0], z - PC[1]) - PR);
+        for (const [px, pz] of PONDS) pond = Math.min(pond, Math.max(Math.abs((x - px) * c + (z - pz) * s2) - HALF, Math.abs(-(x - px) * s2 + (z - pz) * c) - HALF)); } }
+    assert.ok(circle > 15, 'the dirt loop keeps clear of the corn circle (' + circle.toFixed(1) + ' m)');
+    assert.ok(pond > 2, 'and of the ponds (' + pond.toFixed(1) + ' m)');
+  }
   // ---------------------------------------------------------------- flat walkable tank tops
   assert.ok(html.includes('function tankDeck(g, opt)'), 'tankDeck() exists');
   assert.ok(html.includes('add(new T.CylinderGeometry(R * 0.99, R * 0.99, 0.3, 32), mat(O.deck || 0xa6abae), x, rim - 0.15, z, null);'), 'a steel deck flush with the rim');

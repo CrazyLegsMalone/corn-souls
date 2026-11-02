@@ -1,3 +1,13 @@
+## TEST v1.97.77 — the pond dirt loop stops cutting through the corn circle and actually meets the pavement (2026-11-01)
+- Owner request: the dirt road round the ponds should not go through the corn circle, it should connect to the pavement on the west side once both sides of the loop meet, and it should connect to the east-west road over the tracks just north of the tank farm.
+- **It ran straight through the pivot circle.** The circle is centred on (-675, -99) with a **344 m radius**, so its southern edge reaches z 245; the old track ran at z 190-200 from x -420 to -700, i.e. up to **32 m inside** the corn. The west leg now dips south around it and around the ponds' north-west corner: it keeps **22 m** off the circle (sampled every 2 m along the whole polyline, not just at the nodes) and 7 m off the pond edges, then rejoins the existing west-side run at (-742, 345).
+- **It stopped 17 m short of the asphalt.** The paved south road - the east-west road just north of the tank farm, the one that runs over the railroad tracks - ends at x -235, and the dirt began at x -252. The first node now sits **on the pavement at (-225, 185)**, so the loop is joined to the road network.
+- The unit-train loop's east side runs at x -240, which is why the join is at -225: the crossing is now a **segment** between nodes (a dirt level crossing, where it belongs) so every node still clears the track by 10 m and the ponds by 8 m, as the existing CI rules require.
+- The comment explaining the route sits **above** the `DIRT_ROADS` array - CI parses that array as JSON, so a comment inside it breaks the build (it caught me once).
+- Tests: the existing node rules (pond 8 m, track 10 m) still pass, and a new check samples **every segment** of all three legs and fails if the loop comes within 15 m of the corn circle or 2 m of a pond edge - so this cannot be routed back through the corn by accident.
+- Verified locally and in a clean clone of the commit: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.77` / `corn-souls-test-shell-v104`.
+
 ## TEST v1.97.76 — a dead plant leaves the mash in the pipes (2026-11-01)
 - Owner-reported: during an outage the mash pipes showed empty when they should still show mash, just not moving.
 - Cause: `updateFlows()` hid the liquid tube whenever the flow rate was near zero (`f.mesh.visible = r > 0.02`). Every flow rate is derived from the simulation, and the simulation zeroes during an outage, so the whole plant's pipes went from a flowing stream to nothing - as if the pipes had been emptied.

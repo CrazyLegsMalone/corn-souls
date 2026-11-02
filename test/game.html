@@ -5306,9 +5306,14 @@ function updateCoolingTower(dt) {
   for (const f of TOWER.fans) f.rotateY(dt * 7.5);
 }
 // Dirt tracks for the Ranger: from the end of the paved south road, across the loop track, then splitting to run
-// round both ponds and meet at the substation forecourt. Every node clears the ponds and the track (checked in CI).
+// round both ponds and meet at the substation forecourt. Every node clears the ponds, the track and the corn circle.
+// The west leg dips south around the centre-pivot corn circle and around the north-west corner of the ponds: the old line
+// ran at z 190-200 straight through the circle (centred on (-675,-99), 344 m radius, so its southern edge reaches z 245).
+// This line keeps 22 m off the circle and 7 m off the pond edges, and it starts at x -235 - the west end of the paved
+// south road (the east-west road just north of the tank farm, the one that runs over the tracks) - so the dirt actually
+// meets asphalt instead of stopping short of it: the first node sits on the tarmac at x -225 and the run crosses the unit-train loop (x -240) between nodes, where a dirt level crossing belongs. Kept above the array: CI parses it as JSON.
 const DIRT_ROADS = [
-  { w: 5.5, pts: [[-252, 185], [-285, 205], [-420, 190], [-560, 190], [-700, 200], [-742, 300], [-748, 420], [-730, 500], [-672, 534], [-610, 540]] },
+  { w: 5.5, pts: [[-225, 185], [-255, 190], [-370, 200], [-440, 200], [-470, 205], [-540, 250], [-600, 285], [-660, 300], [-720, 310], [-742, 345], [-748, 430], [-730, 500], [-672, 534], [-610, 540]] },
   { w: 5.5, pts: [[-285, 205], [-310, 300], [-320, 400], [-360, 470], [-460, 505], [-560, 536], [-610, 540]] },
   { w: 7.0, pts: [[-610, 540], [-610, 553.6]] }
 ];
