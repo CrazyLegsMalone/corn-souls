@@ -1,3 +1,14 @@
+## TEST v1.97.79 — jump onto a vehicle and stand on its roof (2026-11-01)
+- Owner request: the player should be able to jump and stand on the Ranger and the other vehicles.
+- **Half of it already worked.** `vehPush()` skips a vehicle the moment you are above it (`ly > b.max.y - 0.3`), so nothing shoved you off once you were up there - but there was **no floor**: `floorAt()` found the ground under the car, so you fell straight through the roof.
+- **`updateVehTops()`** gives every vehicle in `VBOXES` a **walk surface that follows it**: one `WALK_SURF` entry per vehicle, created once and rewritten every frame with the vehicle's **world AABB** (its local box transformed through the group's matrix) and its roof height. It runs in the per-frame update before the player moves.
+- **The Ranger is now registered** with `regVehBox()` in `buildUTV()`, so it gets the same solid box *and* the same roof. Registering it also replaces the old three-circle approximation the UTV used for being walked into - and that push-out is now skipped above 1.2 m, so it cannot shove you off its own roof.
+- **Rebuilding it is safe**: `buildUTV()` prunes any `VBOXES` entry (and its walk surface) that belonged to the old group, so a respawn or a 2-player swap cannot leave a phantom solid and a floating roof behind at the old spot.
+- The parked cars, the mower and anything else that goes through `regVehBox()` get roofs for free.
+- Tests pin the per-frame follower, the world-AABB maths, the one-surface-per-vehicle rule, the Ranger's registration, the height guard on its old push-out and the rebuild pruning.
+- Verified locally and in a clean clone: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.79` / `corn-souls-test-shell-v106`.
+
 ## TEST v1.97.78 — killing a critter, carrying the corpse and eating it (2026-11-01)
 - Owner request: after killing a critter and picking up the corpse, it can be eaten.
 - **Nothing could pick a corpse up before.** Critters, fallen pigeons and dead pond frogs were killed, flopped, cleaned themselves up after 45 s and that was it - `hitCritter()`/`hitBird()` set the state but no interaction ever looked at them.

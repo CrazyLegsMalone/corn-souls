@@ -466,6 +466,15 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- standing on vehicles
+  assert.ok(html.includes('function updateVehTops()'), 'vehicles carry a walk surface that follows them');
+  assert.ok(html.includes('s.x0 = x0; s.x1 = x1; s.z0 = z0; s.z1 = z1; s.y0 = s.y1 = top;'), 'the surface is the world AABB at roof height');
+  assert.ok(html.includes('if (!s) { s = V.top = { x0: 0, x1: 0, z0: 0, z1: 0, y0: 0, y1: 0 }; WALK_SURF.push(s); }'), 'one surface per vehicle, created once and moved');
+  assert.ok(html.includes('updateBirds(dt); updateCritters(dt); updateVehTops();'), 'updated every frame, before the player moves');
+  assert.ok(html.includes('if (ly > b.max.y - 0.3 || ly + 1.7 < b.min.y) continue;'), 'and vehPush already ignores a vehicle you are standing on');
+  assert.ok(html.includes('regVehBox(g);   // solid to walk into, and a roof you can stand on'), 'the Ranger is registered too');
+  assert.ok(html.includes('walk.y < 1.2) for (const off of [-0.9, 0, 0.9])'), 'its old three-circle push-out does not shove you off the roof');
+  assert.ok(html.includes('for (let i = VBOXES.length - 1; i >= 0; i--) if (VBOXES[i].g === utv.g)'), 'and rebuilding it drops the old solid and roof');
   // ---------------------------------------------------------------- killing a critter, carrying it and eating it
   assert.ok(html.includes('function critterPick()'), 'X can pick a corpse up');
   assert.ok(html.includes("if (critters) for (const c of critters) if (c.state === 'hit' && !c.held) cand.push(c);"), 'dead critters count');

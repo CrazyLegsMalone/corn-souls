@@ -9179,7 +9179,7 @@ function update(sim, dt, events) {
     puffT = 0;
   }
   updatePuffs(dt); updateWeather(dt);
-  updateBirds(dt); updateCritters(dt); if (heldDead && (walk.dead || walk.drive)) deadDrop();   // dying or getting in puts the corpse down updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateCoolingTower(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); vendUpdate(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
+  updateBirds(dt); updateCritters(dt); updateVehTops(); if (heldDead && (walk.dead || walk.drive)) deadDrop();   // dying or getting in puts the corpse down updateDucks(dt); updateWindsock(dt); updatePivot(dt); pivotGenSound(); updatePowerReset(dt); updateCoolingTower(dt); updateDamage(dt); updateExtinguisher(dt); nh3Ram(); updateAcid(dt); updateVulture(dt); vendUpdate(dt); updateKia(dt); updateShopRadio(dt); updateScarecrows(dt); updatePlumes(dt); updateNH3(dt); updateBalls(dt); updateGun(dt); updateRagdolls(dt); netUpdate(dt); updateBillboards(); updateSky(dt); applyPowerOutage();
 
   // trucks come when the simulation calls them
   for (const e of events) spawn(e.kind, e.ship);
@@ -9515,6 +9515,22 @@ function regVehBox(g) {
   g.traverse(o => { if (!o.isMesh || !o.geometry) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox.clone().applyMatrix4(m4.multiplyMatrices(inv, o.matrixWorld))); });
   if (!b.isEmpty()) VBOXES.push({ g, b });
 }
+// STANDING ON VEHICLES: every registered vehicle gets a walk surface that follows it, so you can jump onto a roof and
+// stand there. vehPush() already ignores a vehicle you are above (ly > b.max.y - 0.3), so the only thing that was missing
+// was a floor to land on - without it floorAt() returned the ground under the car and you slid off the side.
+function updateVehTops() {
+  for (const V of VBOXES) {
+    let s = V.top;
+    if (!s) { s = V.top = { x0: 0, x1: 0, z0: 0, z1: 0, y0: 0, y1: 0 }; WALK_SURF.push(s); }   // created once, moved every frame
+    const e = V.g.matrixWorld.elements, b = V.b;
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, top = -1e9;
+    for (const X of [b.min.x, b.max.x]) for (const Y of [b.min.y, b.max.y]) for (const Z of [b.min.z, b.max.z]) {
+      const wx = e[0] * X + e[4] * Y + e[8] * Z + e[12], wy = e[1] * X + e[5] * Y + e[9] * Z + e[13], wz = e[2] * X + e[6] * Y + e[10] * Z + e[14];
+      if (wx < x0) x0 = wx; if (wx > x1) x1 = wx; if (wz < z0) z0 = wz; if (wz > z1) z1 = wz; if (wy > top) top = wy;
+    }
+    s.x0 = x0; s.x1 = x1; s.z0 = z0; s.z1 = z1; s.y0 = s.y1 = top;   // the world AABB of the vehicle, roof height
+  }
+}
 function vehPush() {
   for (const V of VBOXES) {
     const g = V.g; if (walk.drive && (g === utv.g || g.parent === utv.g)) continue;   // the one you're driving
@@ -9552,7 +9568,7 @@ function pushOut() {
   if (NET.rr) for (const off of [-0.9, 0, 0.9]) {   // the other player's Ranger is solid too
     const R = NET.rr, cx = R.x - Math.sin(R.a) * off, cz = R.z - Math.cos(R.a) * off, dx = walk.x - cx, dz = walk.z - cz, d = Math.hypot(dx, dz), m = 0.8 + BODY_R;
     if (d < m && d > 0.001) { walk.x = cx + dx / d * m; walk.z = cz + dz / d * m; } }
-  if (utv.g && !walk.drive) for (const off of [-0.9, 0, 0.9]) {   // the parked UTV is solid
+  if (utv.g && !walk.drive && walk.y < 1.2) for (const off of [-0.9, 0, 0.9]) {   // the parked UTV is solid (but not when you are standing on it)
     const cx = utv.x - Math.sin(utv.a) * off, cz = utv.z - Math.cos(utv.a) * off, dx = walk.x - cx, dz = walk.z - cz, d = Math.hypot(dx, dz), m = 0.8 + BODY_R;
     if (d < m && d > 0.001) { walk.x = cx + dx / d * m; walk.z = cz + dz / d * m; } }
   vehPush();
@@ -10853,7 +10869,13 @@ function makeRangerMesh(o, color) {   // o collects wheels + steering wheel
   }
   return g;
 }
-function buildUTV(color, vest) { if (utv.g) scene.remove(utv.g); const g = makeRangerMesh(utv, color); g.position.set(utv.x, utv.y + 0.13, utv.z); g.rotation.y = utv.a; scene.add(g); utv.g = g; utv.driver = seatDriver(g, vest || VEST_COL[0]); utv.driver.visible = false;
+function buildUTV(color, vest) {
+  if (utv.g) {   // a rebuild must not leave a phantom solid and roof behind at the old spot
+    scene.remove(utv.g);
+    for (let i = VBOXES.length - 1; i >= 0; i--) if (VBOXES[i].g === utv.g) { const k = WALK_SURF.indexOf(VBOXES[i].top); if (k >= 0) WALK_SURF.splice(k, 1); VBOXES.splice(i, 1); } }
+  const g = makeRangerMesh(utv, color);
+  g.position.set(utv.x, utv.y + 0.13, utv.z); g.rotation.y = utv.a; scene.add(g); utv.g = g; utv.driver = seatDriver(g, vest || VEST_COL[0]); utv.driver.visible = false;
+  regVehBox(g);   // solid to walk into, and a roof you can stand on (updateVehTops gives it the floor)
   utv.flame = addFlame(g); }
 let flameMat = null;
 function addFlame(g) {   // NOS exhaust flame (hidden until boosting)
