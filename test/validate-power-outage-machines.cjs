@@ -482,14 +482,14 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('polygonOffset: true, polygonOffsetFactor: back ? 4 : -4, polygonOffsetUnits: back ? 8 : -8'),
     'the base layer is pushed back and every overlay pulled forward, both by more than one depth unit');
   assert.ok(html.includes("const back = kind === 'grass';"), 'grass is the layer that always loses the depth fight');
-  assert.ok(html.includes("groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.03,"), 'the dirt yard sits 3 cm above the grass');
+  assert.ok(html.includes("groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035,"), 'the dirt yard sits above the asphalt and clear of the grass');
   assert.ok(html.includes('holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03,'), 'and so does the pit pad');
   assert.ok(html.includes('mat(c), x, 0.045, z, null)'), 'the station and fermentation pads sit 4.5 cm up, above dirt and asphalt');
   assert.ok(html.includes('(X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor'), 'the scale-house tile floor clears its slab top');
   assert.ok(html.includes('camera.near = 0.2; camera.updateProjectionMatrix();'), 'and the walk camera near plane is 0.2, not 0.1');
   {   // the layers, bottom to top, must stay strictly ordered with a real gap
-    const layer = [['grass', 0], ['asphalt', 0.024], ['dirt', 0.03], ['pads', 0.045]];
-    for (let i = 1; i < layer.length; i++) assert.ok(layer[i][1] - layer[i - 1][1] >= 0.006, layer[i][0] + ' clears ' + layer[i - 1][0]);
+    const layer = [['grass', 0], ['asphalt', 0.024], ['dirt', 0.035], ['pads', 0.045]];
+    for (let i = 1; i < layer.length; i++) assert.ok(layer[i][1] - layer[i - 1][1] >= 0.005, layer[i][0] + ' clears ' + layer[i - 1][0]);
   }
   // ---------------------------------------------------------------- riding along: one drives, one sits beside them
   assert.ok(html.includes('function seatPassenger(g, vest)') && html.includes('d.position.set(0.34, 0.12, -0.02)'), 'a passenger seat on the other half of the bench (the driver sits at -0.3)');

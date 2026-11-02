@@ -5372,7 +5372,7 @@ function init(container) {
   // close to the grass base flickers through it at distance. They now sit above the dirt (0.03) and asphalt (0.024).
   const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat(c), x, 0.045, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
-  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.03, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
+  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
   { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
     // the pit itself: four sloped sides and a flat bottom, one mesh; walkable (ramps), and the ground over it is cut away
     const r = P.run, D = -P.d, O = [[P.x0, P.z0], [P.x1, P.z0], [P.x1, P.z1], [P.x0, P.z1]], I = [[P.x0 + r, P.z0 + r], [P.x1 - r, P.z0 + r], [P.x1 - r, P.z1 - r], [P.x0 + r, P.z1 - r]];
