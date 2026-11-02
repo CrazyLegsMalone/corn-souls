@@ -466,6 +466,18 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- tin-bin tops: walkways and plant-side ladders
+  assert.ok(html.includes('function binWalkway(xa, za, xb, zb, y)'), 'a walkway helper exists');
+  assert.ok(html.includes('function siloLadderAt(x, z, R, H, ang)'), 'and a ladder that can sit on any side');
+  assert.ok(html.includes('binWalkway(w2.x, w2.z, w3s.x, w3s.z, BTOP);') && html.includes('binWalkway(w3n.x, w3n.z, w4.x, w4.z, BTOP);'),
+    'Tin Bin 2 -> 3 and Tin Bin 3 -> 4, both at the roof height');
+  assert.ok(html.includes('rimOf = (cx, cz, R, tx, tz) =>'), 'the walkway ends are measured from the two bin rims, not hard-coded');
+  assert.ok(html.includes('const BTOP = SILOH + 0.15'), 'the deck sits on the roofs (siloClimb lays the roof at H + 0.15)');
+  assert.ok(html.includes('siloLadderAt(SILOX, -SILOZ, SILOR, SILOH, 0)'), 'a plant-side ladder on Tin Bin 2');
+  assert.ok(html.includes('if (i === 1) siloLadderAt(TB34X, z, TB34R, SILOH, 0);'), 'and on Tin Bin 4');
+  assert.ok(html.includes('function siloClimb(x, z, R, H, gaps)') && html.includes('if (open) continue;'),
+    'the eave guardrail opens where a walkway or ladder meets it');
+  assert.ok(html.includes('WALK_SURF.push({ x0: Math.min(xa, xb) - W / 2') && html.includes('wallSegs.push([xa + ox + SX'), 'the deck is walkable and its rails block a fall');
   // ---------------------------------------------------------------- performance audit
   assert.ok(html.includes('const FPS_CAP = 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;'), 'the frame rate is capped at 144');
   assert.ok(html.includes('fpsAcc = Math.min(fpsAcc - FPS_STEP, FPS_STEP);'), 'with a remainder accumulator, so the cap does not halve to half the display rate');

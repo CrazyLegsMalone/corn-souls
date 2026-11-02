@@ -1,3 +1,13 @@
+## TEST v1.97.74 — the tin-bin tops are joined up, with plant-side ladders on bins 2 and 4 (2026-11-01)
+- Owner request: a walkway from the top of Tin Bin 2 to Tin Bin 3 and from Tin Bin 3 to Tin Bin 4, and a ladder up to the tops of Tin Bin 4 and Tin Bin 2.
+- **The roofs were already walkable** - `siloClimb()` lays a roof disc, a yellow eave guardrail and a `WALK_SURF` disc for each bin - but nothing joined them (the source even said "not connected yet"), so each top was an island.
+- **`binWalkway(xa, za, xb, zb, y)`** builds a 1.4 m grating deck at the roof height with handrails, posts, toe boards and a `WALK_SURF`, and pushes `wallSegs` along both rails so you cannot step off. The two bridges are measured from the bins themselves (`rimOf()` intersects the line between two centres with each radius), so they stay correct if a bin is ever moved: **Tin Bin 2 -> 3 is 2.76 m** and **Tin Bin 3 -> 4 is 2.00 m**, both at `SILOH + 0.15` - the same height `siloClimb` lays the roofs at, so the deck is flush.
+- **`siloClimb()` gained a `gaps` list**: the eave guardrail now opens wherever a walkway leaves or a new ladder meets it (it previously only had the one gap for its own west ladder). Without that you would climb or walk straight into a fence.
+- **`siloLadderAt(x, z, R, H, ang)`** puts the same ladder-and-cage on any side of a bin (the built-in one is welded to the west); Tin Bin 2 and Tin Bin 4 each get one on the **plant side** (angle 0, east) and a `LADDERS` entry pointing inward, so all four tops are reachable from the yard, in both directions.
+- Tests pin the helpers, both bridges and their height, the rim-derived ends, the two new ladders, the guardrail gaps and the deck's walk/clip data.
+- Verified locally: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.74` / `corn-souls-test-shell-v101`.
+
 ## TEST v1.97.73 — the ground layering is measured in depth steps, not centimetres (2026-11-01)
 - Owner-reported follow-up: concrete now rendered further out but still stopped at a certain distance from the character. That distance is the depth buffer, not the geometry.
 - **The arithmetic**: with `camera.near = 0.2` and `far = 9000` a 24-bit depth buffer resolves about **0.3 cm at 100 m, 2.7 cm at 300 m, 6 cm at 450 m and 10.7 cm at 600 m**. The layers were separated by 4 polygon-offset units and ~5 cm of real height, so past roughly 450 m one depth step was wider than the gap and the grass plane won - the pad vanished at exactly the distance the owner saw.

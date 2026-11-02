@@ -5635,9 +5635,22 @@ function init(container) {
 
   O.silos = [tank(SILOX, SILOZ, SILOR, SILOH, 0xf4c430, 0xffcf33, 'silo0', { top: 0xd94848, level: 0.6, dome: false, noRail: true }),     // Tin Bin 1 — south
              tank(SILOX, -SILOZ, SILOR, SILOH, 0xf4c430, 0xffcf33, 'silo1', { top: 0xd94848, level: 0.6, dome: false, noRail: true })];
-  siloClimb(SILOX, SILOZ, SILOR, SILOH); siloClimb(SILOX, -SILOZ, SILOR, SILOH);   // Tin Bin 2 — north
-  // Tin Bins 3 & 4, north of Tin Bin 2: big storage bins, not connected yet
-  TB34Z.forEach((z, i) => { tank(TB34X, z, TB34R, SILOH, 0xf4c430, 0xffcf33, 'tb' + (i + 3), { top: 0xd94848, level: 0.5, dome: false, noRail: true }); siloClimb(TB34X, z, TB34R, SILOH); nameplate('TIN BIN #' + (i + 3), TB34X, 2.5, z, TB34R, 1, 0); });
+  // The tin-bin roofs are walkable (siloClimb lays a WALK_SURF disc) and now joined: walkways 2 -> 3 -> 4 at the roof's
+  // own height, plus a second ladder on the plant side of the two end bins (Tin Bin 2 and Tin Bin 4). The eave guardrail is
+  // told to open wherever a walkway or a new ladder meets it, otherwise you would climb up into a fence.
+  const BTOP = SILOH + 0.15, rimOf = (cx, cz, R, tx, tz) => { const a = Math.atan2(tz - cz, tx - cx); return { x: cx + Math.cos(a) * R, z: cz + Math.sin(a) * R, a }; };
+  const w2 = rimOf(SILOX, -SILOZ, SILOR, TB34X, TB34Z[0]), w3s = rimOf(TB34X, TB34Z[0], TB34R, SILOX, -SILOZ),
+    w3n = rimOf(TB34X, TB34Z[0], TB34R, TB34X, TB34Z[1]), w4 = rimOf(TB34X, TB34Z[1], TB34R, TB34X, TB34Z[0]);
+  siloClimb(SILOX, SILOZ, SILOR, SILOH);                                                  // Tin Bin 1 — south
+  siloClimb(SILOX, -SILOZ, SILOR, SILOH, [w2.a, 0]); siloLadderAt(SILOX, -SILOZ, SILOR, SILOH, 0);   // Tin Bin 2 — north
+  TB34Z.forEach((z, i) => {
+    tank(TB34X, z, TB34R, SILOH, 0xf4c430, 0xffcf33, 'tb' + (i + 3), { top: 0xd94848, level: 0.5, dome: false, noRail: true });
+    siloClimb(TB34X, z, TB34R, SILOH, i === 0 ? [w3s.a, w3n.a] : [w4.a, 0]);
+    if (i === 1) siloLadderAt(TB34X, z, TB34R, SILOH, 0);                                 // Tin Bin 4: plant-side ladder
+    nameplate('TIN BIN #' + (i + 3), TB34X, 2.5, z, TB34R, 1, 0);
+  });
+  binWalkway(w2.x, w2.z, w3s.x, w3s.z, BTOP);                                             // Tin Bin 2 -> Tin Bin 3
+  binWalkway(w3n.x, w3n.z, w4.x, w4.z, BTOP);                                             // Tin Bin 3 -> Tin Bin 4
   nameplate('TIN BIN #1', SILOX, 2.5, SILOZ, SILOR, 1, 0); nameplate('TIN BIN #2', SILOX, 2.5, -SILOZ, SILOR, 1, 0);   // on the east side, facing the pits
 
   // ---------- SILOS -> DAY BINS ----------
@@ -9664,7 +9677,7 @@ function chuteFly(dt, f) {
 }
 // ---------- SILO TOPS: a caged ladder up the west side of each tin bin to the eave, a yellow guardrail around the top edge, and the
 // domed roof made walkable (stacked flat steps that follow the dome) so you can walk up to the peak
-function siloClimb(x, z, R, H) {   // x, z: grain-yard coords (the yard's meshes get shifted by GDX/GDZ afterwards; the walk data is shifted here)
+function siloClimb(x, z, R, H, gaps) {   // gaps: extra angles where the eave guardrail must open (walkways)
   const SX = GDX, SZ2 = GDZ, yel = mat(0xf2c200), lrail = mat(0xd8b23a), LX = x - R - 0.3, top = H + 0.15; const d = add(new T.CylinderGeometry(R, R, 0.15, 32), mat(0xd94848), x, H + 0.075, z, null); d.receiveShadow = true;
   for (const sz of [-0.25, 0.25]) box(0.06, top + 1.1, 0.06, lrail, LX, (top + 1.1) / 2, z + sz);
   for (let y = 0.3; y < top; y += 0.3) box(0.035, 0.035, 0.5, lrail, LX, y, z);
@@ -9674,6 +9687,8 @@ function siloClimb(x, z, R, H) {   // x, z: grain-yard coords (the yard's meshes
   const N = 36, rr = R - 0.2, half = 0.85 / rr;
   for (let i = 0; i < N; i++) { const a0 = (i - 0.5) / N * Math.PI * 2, a1 = (i + 0.5) / N * Math.PI * 2, mid = (a0 + a1) / 2;
     if (Math.abs(Math.atan2(Math.sin(mid - Math.PI), Math.cos(mid - Math.PI))) < half) continue;   // ladder is on the west (angle pi)
+    let open = false; for (const gp of (gaps || [])) if (Math.abs(Math.atan2(Math.sin(mid - gp), Math.cos(mid - gp))) < half) { open = true; break; }
+    if (open) continue;                                                                          // a walkway leaves here
     const ax = x + Math.cos(a0) * rr, az = z + Math.sin(a0) * rr, bx = x + Math.cos(a1) * rr, bz = z + Math.sin(a1) * rr, L = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bx - ax, bz - az);
     for (const hh of [1.07, 0.55]) { const r = box(0.05, 0.05, L, yel, (ax + bx) / 2, top + hh, (az + bz) / 2); r.rotation.y = ang; }
     box(0.05, 1.07, 0.05, yel, ax, top + 0.535, az); wallSegs.push([ax + SX, az + SZ2, bx + SX, bz + SZ2, top - 0.4, top + 2.2]); }
@@ -9681,6 +9696,30 @@ function siloClimb(x, z, R, H) {   // x, z: grain-yard coords (the yard's meshes
   WALK_SURF.push({ x0: x + SX - R, x1: x + SX + R, z0: z + SZ2 - R, z1: z + SZ2 + R, y0: top, y1: top });
   // flat walkable roof deck across the entire silo top
   // (all 4 tin bins: Tin Bin 1, Tin Bin 2, Tin Bin 3, Tin Bin 4)
+}
+// ---------- TIN BIN TOPS: a walkway between the bins and a second ladder on the plant side of the two end bins. The roofs
+// were already walkable (siloClimb pushes a WALK_SURF disc) but nothing joined them, so the tops were islands.
+function binWalkway(xa, za, xb, zb, y) {   // grain-yard coords, like siloClimb: the meshes move with the yard, the walk data here
+  const SX = GDX, SZ2 = GDZ, W = 1.4, L = Math.hypot(xb - xa, zb - za), ang = Math.atan2(xb - xa, zb - za);
+  const mx = (xa + xb) / 2, mz = (za + zb) / 2, grate = mat(0x3f444a), yel = mat(0xf2c200);
+  const deck = box(W, 0.08, L, grate, mx, y - 0.04, mz); deck.rotation.y = ang; deck.castShadow = false;   // grating
+  for (const s2 of [-1, 1]) {
+    const ox = Math.cos(ang) * s2 * (W / 2 - 0.05), oz = -Math.sin(ang) * s2 * (W / 2 - 0.05);
+    for (const hh of [1.07, 0.55]) { const r = box(0.05, 0.05, L, yel, mx + ox, y + hh - 0.04, mz + oz); r.rotation.y = ang; }
+    for (let t2 = 0; t2 <= 1.001; t2 += 0.25) { box(0.05, 1.07, 0.05, yel, xa + (xb - xa) * t2 + ox, y + 0.495, za + (zb - za) * t2 + oz); }
+    box(W, 0.12, 0.04, yel, mx + ox, y - 0.02, mz + oz).rotation.y = ang;                                  // toe board
+    wallSegs.push([xa + ox + SX, za + oz + SZ2, xb + ox + SX, zb + oz + SZ2, y - 0.4, y + 2.2]);            // stops you stepping off
+  }
+  WALK_SURF.push({ x0: Math.min(xa, xb) - W / 2, x1: Math.max(xa, xb) + W / 2, z0: Math.min(za, zb) - W / 2, z1: Math.max(za, zb) + W / 2, y0: y, y1: y });
+}
+function siloLadderAt(x, z, R, H, ang) {   // a ladder and cage on any side of a bin (siloClimb's own is on the west)
+  const SX = GDX, SZ2 = GDZ, lrail = mat(0xd8b23a), top = H + 0.15, LX = R + 0.3;
+  const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = -ang; scene.add(g);
+  const P = (w, h, d, m, px, py, pz) => { const q = new T.Mesh(new T.BoxGeometry(w, h, d), lrail); q.position.set(px, py, pz); g.add(q); return q; };
+  for (const sz of [-0.25, 0.25]) P(0.06, top + 1.1, 0.06, lrail, LX, (top + 1.1) / 2, sz);
+  for (let y = 0.3; y < top; y += 0.3) P(0.035, 0.035, 0.5, lrail, LX, y, 0);
+  for (let y = 2.4; y < top + 1; y += 1.2) { const hoop = new T.Mesh(new T.TorusGeometry(0.38, 0.025, 4, 14, Math.PI), lrail); hoop.rotation.set(Math.PI / 2, 0, Math.PI / 2); hoop.position.set(LX, y, 0); g.add(hoop); }
+  LADDERS.push({ x: x + Math.cos(ang) * (LX + 0.1) + SX, z: z + Math.sin(ang) * (LX + 0.1) + SZ2, top, dx: -Math.cos(ang), dz: -Math.sin(ang) });
 }
 // ---------- EVIL SCARECROWS: four flat billboard scarecrows standing in the corn circle, drawn in code (burlap sack head with a stitched
 // grin and glowing red eyes, floppy hat, ragged flannel, straw poking out, crucified on a pole). Get within ~14 m of one and it lets you
