@@ -18,6 +18,8 @@ function build(source, westWing){
  ctx.enclosure=(x0,x1,z0,z1,top)=>({x0,x1,z0,z1,top,wins:[],area:Math.abs((x1-x0)*(z1-z0))});   // outage daylight registry
  ctx.glazing=noop;
  ctx.NAME_K=0.75;   // label scale constant, defined at the top of the engine block
+ ctx.srgbTex=t=>t;   // the canvas-texture sRGB helper lives in the engine block; this slice only needs it to exist
+
  ctx.loadVendMachine=()=>({});ctx.vendSpawn=noop;   // vending props are placed through their own loader
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);

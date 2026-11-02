@@ -4663,7 +4663,7 @@ function nameplate(text, x, y, z, r, dx, dz, k) {
   c.fillStyle = '#111'; c.textAlign = 'center'; c.textBaseline = 'middle';
   if (tag) { c.font = 'bold 46px Arial, sans-serif'; c.fillText(tag, W / 2, 42); c.font = 'bold 64px Arial, sans-serif'; c.fillText(name, W / 2, 104); }
   else { c.font = 'bold 64px Arial, sans-serif'; c.fillText(name, W / 2, H / 2 + 3); }
-  const tex = new T.CanvasTexture(cv); tex.anisotropy = 4;
+  const tex = srgbTex(new T.CanvasTexture(cv)); tex.anisotropy = 4;
   const L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, h = (tag ? 0.53 : 0.34) * (k || 1) * NAME_K;   // 25% smaller than the original plate sizes
   const m = new T.Mesh(new T.PlaneGeometry(h * W / H, h), new T.MeshBasicMaterial({ map: tex }));
   m.position.set(x + ux * (r + 0.05), y, z + uz * (r + 0.05)); m.rotation.y = Math.atan2(ux, uz); m.userData.noHit = true; scene.add(m);
@@ -4714,6 +4714,12 @@ const gridLight = m => { m.userData.gridLight = true; return m; };
 const batteryLight = m => { m.userData.batteryLight = true; return m; };
 // ground textures, drawn in code (no image files): 256 px tiles that repeat every 8 m. Dirt = soil with clods, pebbles and faint ruts;
 // grass = a mottled lawn with blade flecks. Subtle on purpose so they don't look busy; mipmaps keep them clean from far away.
+// ---------- one place that tags an authored canvas texture as sRGB. A colour map painted with the 2D canvas holds
+// sRGB values; if it is left untagged, three reads it as linear and then encodes the frame again on the way out, which
+// is what washed the site out (the ground textures had their tag swallowed by a comment until v1.97.87). Masks and
+// additive glow ramps stay untagged on purpose: they are luminance ramps, not colour, and brightening them is the
+// whole point.
+const srgbTex = t => { if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; };
 const GROUND = {};
 function groundTex(kind) {
   if (GROUND[kind]) return GROUND[kind];
@@ -5474,7 +5480,7 @@ function gooTex(color) {
     const x = Math.random() * 128, y = Math.random() * 32, rx = 4 + Math.random() * 12, ry = 2 + Math.random() * 5, col = Math.random() < 0.4 ? shade(0.25, 0.7) : shade(-0.45, 0.8);   // mostly darker blobs: the flow reads clearer
     for (const dx of [-128, 0, 128]) { c.fillStyle = col; c.beginPath(); c.ellipse(x + dx, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); }   // drawn 3x so the strip tiles seamlessly
   }
-  const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; return (GOO[color] = t);
+  const t = srgbTex(new T.CanvasTexture(cv)); t.wrapS = t.wrapT = T.RepeatWrapping; return (GOO[color] = t);
 }
 function flow(path, geo, color, max, opts) {
   opts = opts || {};
@@ -6172,7 +6178,7 @@ function init(container) {
         const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112; const g = cv.getContext('2d');
         g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, 512, 112); g.strokeStyle = '#2b3a4a'; g.lineWidth = 8; g.strokeRect(4, 4, 504, 104);
         g.fillStyle = '#1d2a3a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '800 ' + (text.length > 11 ? 50 : 62) + 'px system-ui, sans-serif'; g.fillText(text, 256, 58);
-        signTex[text] = new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv) });
+        signTex[text] = new T.MeshBasicMaterial({ map: srgbTex(new T.CanvasTexture(cv)) });
       }
       const geo = new T.PlaneGeometry(1.15 * NAME_K, 0.25 * NAME_K);   // door signs follow the nameplates: 25% smaller
       {
@@ -6278,12 +6284,12 @@ function init(container) {
       c.fillStyle = '#d0201a'; c.font = 'bold 8px Arial'; c.textAlign = 'center'; c.fillText('FIRE', 115, 92);
       c.font = 'bold 6px Arial'; 'EXTINGUISHER'.split('').forEach((ch, i) => c.fillText(ch, 115, 101 + i * 5.5));
       c.beginPath(); c.moveTo(108, 165); c.lineTo(122, 165); c.lineTo(115, 172); c.fill();               // arrow down
-      const tex = new T.CanvasTexture(cv); tex.anisotropy = 4;
+      const tex = srgbTex(new T.CanvasTexture(cv)); tex.anisotropy = 4;
       const m = new T.Mesh(new T.PlaneGeometry(W, H), new T.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.05 }));
       m.position.set(AC - 2.35 - 0.48 - 0.2 - W / 2, H / 2, SZ + 0.17); m.userData.noHit = true; scene.add(m);
       extWall(AC - 3.58, 0.76, SZ + 0.3, 0); }
     // two more signs from the photo: DANGER overhead door (between the man door and the roll-up door) and NOTICE hard hats (on the man door)
-    { const signTex = (draw, w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.textAlign = 'center'; draw(c); const t = new T.CanvasTexture(cv); t.anisotropy = 4; return t; };
+    { const signTex = (draw, w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.textAlign = 'center'; draw(c); const t = srgbTex(new T.CanvasTexture(cv)); t.anisotropy = 4; return t; };
       const danger = signTex(c => { c.fillStyle = '#111'; c.fillRect(4, 4, 152, 34); c.fillStyle = '#d0201a'; c.beginPath(); c.ellipse(80, 21, 58, 13, 0, 0, Math.PI * 2); c.fill();
         c.fillStyle = '#fff'; c.font = 'bold 20px Arial'; c.fillText('DANGER', 80, 28); c.fillStyle = '#111'; c.font = 'bold 15px Arial'; c.fillText('OVERHEAD', 80, 60); c.fillText('DOOR CRUSH', 80, 78); c.fillText('HAZARD', 80, 96);
         c.strokeStyle = '#111'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, 157, 109); }, 160, 112);
@@ -6357,7 +6363,7 @@ function init(container) {
         const cl = new T.Mesh(new T.BoxGeometry(0.34, 0.09, 0.07), mat(0xc9cdd1)); cl.position.set(-0.22, DH0 - 0.32, 0.07); g.add(cl);
         const arm = new T.Mesh(new T.BoxGeometry(0.4, 0.03, 0.03), mat(0x9a9fa4)); arm.position.set(-0.3, DH0 - 0.18, 0.08); g.add(arm);
         const pl = (draw, w, h, x, y) => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = Math.round(128 * h / w); const c = cv.getContext('2d'); draw(c, cv.width, cv.height);
-          const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) })); m.position.set(x, y, 0.036); m.userData.noHit = true; g.add(m); };
+          const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) })); m.position.set(x, y, 0.036); m.userData.noHit = true; g.add(m); };
         pl((c, W, H) => { c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.fillStyle = '#1f56a8'; c.fillRect(4, 4, W - 8, H * 0.3); c.fillStyle = '#fff'; c.font = 'bold ' + Math.round(H * 0.24) + 'px Arial'; c.textAlign = 'center'; c.fillText('NOTICE', W / 2, H * 0.27);
           c.fillStyle = '#111'; c.font = 'bold ' + Math.round(H * 0.11) + 'px Arial'; ['HARD HATS AND', 'EYE PROTECTION', 'REQUIRED', 'IN THIS AREA'].forEach((t, i) => c.fillText(t, W / 2, H * (0.46 + i * 0.15))); }, 0.34, 0.25, -lw / 2 + 0.06, 1.25);
         pl((c, W, H) => { c.fillStyle = '#f7f7f4'; c.fillRect(0, 0, W, H); c.strokeStyle = '#555'; c.lineWidth = 1.5; for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) { c.beginPath(); c.arc(60 + j * 14, 18 + i * 13, 6, 0, 7); c.stroke(); }
@@ -6507,7 +6513,7 @@ function init(container) {
         const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#6b7a45'; c.fillRect(0, 0, 64, 64);
         let r = 7; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
         for (const col of ['#4a5a2e', '#7a6040', '#2a2a22', '#8d9a5a']) { c.fillStyle = col; for (let i = 0; i < 7; i++) { c.beginPath(); c.ellipse(rnd() * 64, rnd() * 64, 4 + rnd() * 9, 3 + rnd() * 5, rnd() * 3, 0, 7); c.fill(); } }
-        const camo = new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) }), white = mat(0xf4f4f2);
+        const camo = new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) }), white = mat(0xf4f4f2);
         op.traverse(o => { if (o.isMesh && o.material === white) o.material = camo; }); }
       wallSegs.push([-34.2, N + D, E - D, N + D], [-34.2, N, -34.2, N + D], [E - D, N + D, E - D, S - D], [-35.6, S - D, E - D, S - D], [-35.6, S - D, -35.6, S]);
       // two control boards in the NE and SE corners: four 42 in monitors in a 2 x 2 wall on a stand, keyboard and mouse, angled to face into the room
@@ -6589,7 +6595,7 @@ function init(container) {
       slab(BEX - FXE, -10 - BNZ, (FXE + BEX) / 2, (BNZ - 10) / 2); slab(MX1 - BEX, -10 - BSZ, (BEX + MX1) / 2, (BSZ - 10) / 2);
       { // east face decals (photos): DANGER HIGH VOLTAGE + NOTICE by the double door, DANGER sign + louver north of the roll-up; AC condensers on the corner wall
         const deco = (draw, w, h, x, y, z) => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = Math.round(128 * h / w); const c = cv.getContext('2d'); draw(c, cv.width, cv.height);
-          const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) })); m.position.set(x, y, z); m.rotation.y = Math.PI / 2; m.userData.noHit = true; scene.add(m); };
+          const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) })); m.position.set(x, y, z); m.rotation.y = Math.PI / 2; m.userData.noHit = true; scene.add(m); };
         const danger = (c, W, H) => { c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.fillStyle = '#c8211c'; c.fillRect(6, 6, W - 12, H * 0.32); c.fillStyle = '#fff'; c.font = 'bold ' + Math.round(H * 0.2) + 'px Arial'; c.textAlign = 'center'; c.fillText('DANGER', W / 2, H * 0.29);
           c.fillStyle = '#111'; c.font = 'bold ' + Math.round(H * 0.15) + 'px Arial'; c.fillText('HIGH', W / 2, H * 0.58); c.fillText('VOLTAGE', W / 2, H * 0.8); };
         const dz = BSZ - 2.4 - 1.0;
@@ -6672,7 +6678,7 @@ function init(container) {
         O.swingDoors.slice(MSD).forEach(d => { d.g.children[0].material = gm; });
         box(1.85, 0.6, 0.06, gm, dx, DH0 + 0.38, BSZ + 0.14); box(1.85, 0.6, 0.06, gm, dx, DH0 + 0.38, BSZ - 0.14);   // transom panel over the doors
         const sg = (draw, w, h, x, y, z, parent) => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = Math.round(128 * h / w); const c = cv.getContext('2d'); draw(c, cv.width, cv.height);
-          const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) })); m.position.set(x, y, z); m.userData.noHit = true; (parent || scene).add(m); return m; };
+          const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) })); m.position.set(x, y, z); m.userData.noHit = true; (parent || scene).add(m); return m; };
         const leaf = O.swingDoors[MSD];   // west leaf: signs ride on it so they swing away with the door
         if (leaf) { const lw = 0.84;
           sg((c, W, H) => { c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.fillStyle = '#c8211c'; c.fillRect(5, 5, W - 10, H * 0.25); c.fillStyle = '#fff'; c.font = 'bold ' + Math.round(H * 0.17) + 'px Arial'; c.textAlign = 'center'; c.fillText('DANGER', W / 2, H * 0.22);
@@ -6729,7 +6735,7 @@ function init(container) {
           // green door with a big window and a NOTICE (hard hats + eye protection) sign, V-shaped FIRE EXTINGUISHER sign + extinguisher to its left, two vent pipes behind the roof
           const px = OX, fz = OZ - SP / 2 - 1.7, D = BSZ - fz, pz = (fz + BSZ) / 2, W = 1.9, H = 2.6;
           const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#e6e6df'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#c4c5bd'; for (let k = 0; k < 4; k++) c.fillRect(k * 16, 0, 2, 64);
-          const sid = new T.CanvasTexture(cv); sid.wrapS = T.RepeatWrapping; sid.repeat.x = 3;
+          const sid = srgbTex(new T.CanvasTexture(cv)); sid.wrapS = T.RepeatWrapping; sid.repeat.x = 3;
           const sm = new T.MeshLambertMaterial({ map: sid }), DX0 = px - 0.08 - 0.47, DX1 = px - 0.08 + 0.47;   // hollow now: walls with a doorway, so the door can open
           for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
           box(DX0 - (px - W / 2), H, 0.08, sm, (px - W / 2 + DX0) / 2, H / 2, fz); box(px + W / 2 - DX1, H, 0.08, sm, (DX1 + px + W / 2) / 2, H / 2, fz); box(DX1 - DX0, H - 2.15, 0.08, sm, px - 0.08, (H + 2.15) / 2, fz);
@@ -6748,7 +6754,7 @@ function init(container) {
           (O.swingDoors = O.swingDoors || []).push({ g: dg, rot: 0, dir: 1, x: px - 0.08, z: fz, open: 0 });
       egressStrobe(px - 0.08, fz, 0, 1);   // pump house door, strobe inside
           const pl = (draw, w, h, x, y, z, ry) => { const cv2 = document.createElement('canvas'); cv2.width = 96; cv2.height = Math.round(96 * h / w); const c2 = cv2.getContext('2d'); draw(c2, cv2.width, cv2.height);
-            const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv2) })); m.position.set(x, y, z); m.rotation.y = ry; m.userData.noHit = true; scene.add(m); };
+            const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv2)) })); m.position.set(x, y, z); m.rotation.y = ry; m.userData.noHit = true; scene.add(m); };
           pl((c2, Wd, Hd) => { c2.fillStyle = '#fff'; c2.fillRect(0, 0, Wd, Hd); c2.fillStyle = '#1f56a8'; c2.fillRect(4, 4, Wd - 8, Hd * 0.33); c2.fillStyle = '#fff'; c2.font = 'bold ' + Math.round(Hd * 0.24) + 'px Arial'; c2.textAlign = 'center'; c2.fillText('NOTICE', Wd / 2, Hd * 0.3);
             c2.fillStyle = '#111'; c2.font = 'bold ' + Math.round(Hd * 0.12) + 'px Arial'; c2.fillText('HARD HATS AND', Wd / 2, Hd * 0.52); c2.fillText('EYE PROTECTION', Wd / 2, Hd * 0.68); c2.fillText('REQUIRED', Wd / 2, Hd * 0.84); }, 0.24, 0.16, px - 0.08, 1.15, fz - 0.07, Math.PI);
           dg.attach(scene.children[scene.children.length - 1]);   // NOTICE rides on the door
@@ -6863,7 +6869,7 @@ function init(container) {
     // on gravel just north of Final Product Tank 1. Ridge east-west: door in the east gable (spill-kit + fire-extinguisher signs either side),
     // double-hung window on the south wall, 6-pane window + vent in the west gable (hydrant + bollard out front), NO SMOKING on the north wall.
     const S = 3.05, H = 1.8, PK = 2.74, x = FPX + 1.5 - 8 * 0.3048, z = FP1Z - 28.7, h = S / 2;   // satellite: under the pipe rack, between the south road and the tank farm fence
-    const tex = (w, hh, draw) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = hh; const c = cv.getContext('2d'); draw(c, w, hh); return new T.CanvasTexture(cv); };
+    const tex = (w, hh, draw) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = hh; const c = cv.getContext('2d'); draw(c, w, hh); return srgbTex(new T.CanvasTexture(cv)); };
     const panels = tex(128, 64, (c, W, Hh) => { c.fillStyle = '#e9ebec'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#b9bec2'; for (let k = 0; k < 8; k++) c.fillRect(k * 16, 0, 2, Hh); });
     const wc = new T.MeshLambertMaterial({ map: panels }), rc = mat(0x8d9399), gl = gridLight(new T.MeshBasicMaterial({ color: 0xf2d27a })), trim = mat(0x8a7a66);
     { const t = 0.08, DW = 0.9;   // hollow: four thin panel walls, a door gap in the east wall, concrete floor inside
@@ -6957,7 +6963,7 @@ function init(container) {
     const lines = text.split('\n'), fs = Math.min(cv.height / (lines.length * 1.5), cv.width / (Math.max(...lines.map(l => l.length)) * 0.62));
     g.font = '800 ' + fs + 'px system-ui, sans-serif';
     lines.forEach((l, i) => g.fillText(l, cv.width / 2, cv.height / 2 + (i - (lines.length - 1) / 2) * fs * 1.2));
-    const tex = new T.CanvasTexture(cv);
+    const tex = srgbTex(new T.CanvasTexture(cv));
     const pl = add(new T.PlaneGeometry(w, d), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }), x, 0.24, z, null, true);
     pl.rotation.x = -Math.PI / 2;
   };
@@ -7100,7 +7106,7 @@ function init(container) {
       const tote = makeTote(c, Z0 + 0.95, 0); tote.position.y += 0.21; tote.visible = false;   // only drawn while its door is open (or about to be)
       return { g, seg, c, i, tote, ow: OW, want: 0, open: 0 };
     });
-    { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 32; const tx = new T.CanvasTexture(cv);   // digital temperature readout beside door 4
+    { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 32; const tx = srgbTex(new T.CanvasTexture(cv));   // digital temperature readout beside door 4
       const scr = new T.Mesh(new T.PlaneGeometry(0.3, 0.15), gridLight(new T.MeshBasicMaterial({ map: tx }))); scr.position.set(cs[3], 2.55, Z0 - 0.17); scr.rotation.y = Math.PI; scene.add(scr);
       box(0.36, 0.22, 0.04, dark, cs[3], 2.55, Z0 - 0.15);
       const bea = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 0.14, 10), gridLight(new T.MeshBasicMaterial({ color: 0x5a1010 }))); bea.position.set(cs[3] + 0.4, 2.55, Z0 - 0.2); scene.add(bea);   // red alarm beacon
@@ -7532,7 +7538,7 @@ function init(container) {
       const panel = new T.Group(); panel.position.y = h / 2; g.add(panel);
       { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'); c.strokeStyle = 'rgba(40,42,44,0.9)'; c.lineWidth = 1.2;
         for (let i = 0; i <= 32; i += 4) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 32); c.moveTo(0, i); c.lineTo(32, i); c.stroke(); }
-        const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set((w - 0.1) / 0.12, h / 0.12);
+        const t = srgbTex(new T.CanvasTexture(cv)); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set((w - 0.1) / 0.12, h / 0.12);
         const mm = new T.MeshLambertMaterial({ map: t, color: 0x9aa0a4, transparent: true, opacity: 0.55, depthWrite: false, side: T.DoubleSide }); t.minFilter = T.LinearFilter;
         const sc = new T.Mesh(new T.PlaneGeometry(w - 0.1, h), mm); sc.rotation.y = Math.PI / 2; panel.add(sc);
         const haze = new T.Mesh(new T.PlaneGeometry(w - 0.1, h), new T.MeshLambertMaterial({ color: 0x3a3e42, transparent: true, opacity: 0.5, depthWrite: false, side: T.DoubleSide })); haze.renderOrder = 3; haze.rotation.y = Math.PI / 2; haze.position.x = 0.01; panel.add(haze); }   // the mesh screen
@@ -7572,7 +7578,7 @@ function init(container) {
     // meet at the sump in the middle of the east side
     { const cv = document.createElement('canvas'); cv.width = 32; cv.height = 32; const c = cv.getContext('2d'); c.fillStyle = '#1a1c1e'; c.fillRect(0, 0, 32, 32);
       c.fillStyle = '#7d848b'; for (let i = 0; i < 32; i += 4) c.fillRect(i, 0, 2, 32); c.fillRect(0, 0, 32, 2); c.fillRect(0, 16, 32, 2);
-      const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping;
+      const tex = srgbTex(new T.CanvasTexture(cv)); tex.wrapS = tex.wrapT = T.RepeatWrapping;
       const grate = (x0, x1, z0, z1) => { const w = x1 - x0, d = z1 - z0, t = tex.clone(); t.needsUpdate = true; t.repeat.set(w > d ? w / 0.5 : 1, w > d ? 1 : d / 0.5); if (w <= d) t.rotation = 0;
         const m = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshLambertMaterial({ map: t })); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.218, (z0 + z1) / 2); m.userData.noHit = true; scene.add(m); };
       const RX = E1 - 7.3, hz = EZ0 + 28.6, W = 0.6;
@@ -7608,7 +7614,7 @@ function init(container) {
       const X0 = E1 - 6.1, Z0 = EZ0 + 19.2, Z1 = Z0 + 24 * 0.3302, RB = 8 * 0.3302;
       const T13 = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#b7a183'; c.fillRect(0, 0, 64, 64);
         for (let i = 0; i < 120; i++) { c.fillStyle = Math.random() < 0.5 ? 'rgba(140,120,95,0.35)' : 'rgba(205,190,165,0.35)'; c.fillRect(Math.random() * 64, Math.random() * 64, 3, 2); }
-        c.fillStyle = '#8a7a64'; c.fillRect(0, 0, 64, 2); c.fillRect(0, 0, 2, 64); const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(6.1 / 0.3302, (Z1 - Z0) / 0.3302); return t; })();
+        c.fillStyle = '#8a7a64'; c.fillRect(0, 0, 64, 2); c.fillRect(0, 0, 2, 64); const t = srgbTex(new T.CanvasTexture(cv)); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(6.1 / 0.3302, (Z1 - Z0) / 0.3302); return t; })();
       const fl = new T.Mesh(new T.PlaneGeometry(6.0, Z1 - Z0 - 0.1), new T.MeshLambertMaterial({ map: T13 })); fl.rotation.x = -Math.PI / 2; fl.position.set(X0 + 3.05, 0.23, (Z0 + Z1) / 2); fl.userData.noHit = true; scene.add(fl);
       { const wb = new T.MeshLambertMaterial({ color: 0xeceae4, transparent: true, opacity: 0.85, depthWrite: false }); wallMats.push(wb);   // white painted block, inside faces
         const W = (w, d, x, z) => add(new T.BoxGeometry(w, 3.0, d), wb, x, 1.72, z, null, true);
@@ -7685,7 +7691,7 @@ function init(container) {
       box(0.9, 0.85, 0.9, mat(0x8f9497), TX1 + 0.6, 0.43, TZ1 - 1.0); extraCols.push([TX1 + 0.6, TZ1 - 1.0, 0.6]);   // AC condenser
       const louver = (w, h, x, y, z, ry, split) => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = Math.round(128 * h / w); const c = cv.getContext('2d'); c.fillStyle = '#d6d8d4'; c.fillRect(0, 0, cv.width, cv.height);
         c.fillStyle = '#8f938f'; for (let y2 = 4; y2 < cv.height; y2 += 6) c.fillRect(2, y2, cv.width - 4, 2.5); if (split) c.fillRect(62, 0, 4, cv.height);
-        const lv = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) })); lv.position.set(x, y, z); lv.rotation.y = ry; lv.userData.noHit = true; scene.add(lv); };
+        const lv = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) })); lv.position.set(x, y, z); lv.rotation.y = ry; lv.userData.noHit = true; scene.add(lv); };
       louver(4.3, 3.4, TX1 + 0.17, 2.1, TZM - 3.95, Math.PI / 2, true);                                       // east double louver
       louver(1.4, 2.85, TX0 - 0.17, 1.85, TZ0 + 1.36, -Math.PI / 2, false);                                    // west louver
       { const z = WRU, g = new T.Group(); g.position.set(TX0, 0, z); scene.add(g);   // west roll-up (opens when Squeeg walks up)
@@ -7756,7 +7762,7 @@ function init(container) {
   cx2.fillStyle = '#f2c200'; cx2.fillRect(0, 0, 256, 192); cx2.fillStyle = '#111'; cx2.fillRect(0, 0, 256, 54);
   cx2.fillStyle = '#f2c200'; cx2.font = 'bold 44px sans-serif'; cx2.textAlign = 'center'; cx2.fillText('DANGER', 128, 44);
   cx2.fillStyle = '#111'; cx2.font = 'bold 30px sans-serif'; cx2.fillText('TOXIC WATER', 128, 104); cx2.fillText('KEEP OUT', 128, 150);
-  const signM = new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) }), postM = mat(0x8a96a3);
+  const signM = new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) }), postM = mat(0x8a96a3);
   for (const [px, pz, col] of PONDS) {
     const phi = PONDS.phi;
     for (const [ex, ez] of [[0, 1], [0, -1]]) for (const t of [0]) {   // 2 signs per pond, on opposite sides, facing out
@@ -7836,7 +7842,7 @@ function init(container) {
     // water: a soft curtain under the whole arm and the end gun's arc. The picture scrolls down; nothing is recalculated per drop.
     const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const c = cv.getContext('2d');
     for (let i = 0; i < 90; i++) { const x = Math.random() * 64, y = Math.random() * 128, l = 6 + Math.random() * 14; c.strokeStyle = 'rgba(225,240,255,' + (0.25 + Math.random() * 0.5).toFixed(2) + ')'; c.lineWidth = 1 + Math.random(); c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + l); c.stroke(); }
-    const wt = new T.CanvasTexture(cv); wt.wrapS = wt.wrapT = T.RepeatWrapping; wt.repeat.set(R / 3, 1);
+    const wt = srgbTex(new T.CanvasTexture(cv)); wt.wrapS = wt.wrapT = T.RepeatWrapping; wt.repeat.set(R / 3, 1);
     const wm = new T.MeshBasicMaterial({ map: wt, transparent: true, opacity: 0.7, depthWrite: false, side: T.DoubleSide, fog: true });
     O.pivot.sheets = [];
     for (const tilt of [0.18, -0.18]) { const w = P(new T.PlaneGeometry(R - 2, PH - 0.4), wm, R / 2 + 1, (PH - 0.4) / 2 + 0.1, 0); w.rotation.x = tilt; w.userData.noHit = true; O.pivot.sheets.push(w); }   // two sheets in a shallow V: reads as spray from any side
@@ -8062,7 +8068,7 @@ function makeDuckMats() {
   c.fillStyle = '#1f7a3a'; c.beginPath(); c.arc(94, 34, 17, 0, Math.PI * 2); c.fill();                     // green head (mallard)
   c.fillStyle = '#f2a900'; c.beginPath(); c.moveTo(108, 32); c.lineTo(126, 38); c.lineTo(108, 42); c.fill(); // orange bill
   c.fillStyle = '#111'; c.beginPath(); c.arc(99, 29, 2.6, 0, Math.PI * 2); c.fill();                       // eye
-  const tex = new T.CanvasTexture(cv);
+  const tex = srgbTex(new T.CanvasTexture(cv));
   return new T.SpriteMaterial({ map: tex, alphaTest: 0.5 });
 }
 let quackT = 3;
@@ -8159,7 +8165,7 @@ function trackPath(pts, closed) {
     c.fillStyle = '#8e8e8a'; c.fillRect(0, 0, 128, 32);
     for (let k = 0; k < 220; k++) { c.fillStyle = Math.random() < 0.5 ? '#7a7a76' : '#a3a39e'; c.fillRect(Math.random() * 128, Math.random() * 32, 2, 2); }   // stones
     c.fillStyle = '#5d4330'; c.fillRect(22, 4, 84, 15);                                               // one tie: 2.6 m of the 4 m strip, 0.23 m of each 0.51 m
-    tieTex = new T.CanvasTexture(cv); tieTex.wrapT = T.RepeatWrapping; tieTex.anisotropy = 4;
+    tieTex = srgbTex(new T.CanvasTexture(cv)); tieTex.wrapT = T.RepeatWrapping; tieTex.anisotropy = 4;
   }
   const P = pts.map(p => new T.Vector3(p.x !== undefined ? p.x : p[0], 0, p.z !== undefined ? p.z : p[1]));
   if (closed) P.push(P[0].clone());
@@ -8222,11 +8228,11 @@ function buildRail() {
   // red/white striped arm carrying three red lamps and a counterweight. When a train is coming the flashers alternate and the bell rings,
   // the gates drop a few seconds later, stay down until the train is past, then rise; the lights and bell stop once the gates are up.
   { const cbTex = (() => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 40; const c = cv.getContext('2d'); c.fillStyle = '#f6f6f2'; c.fillRect(0, 0, 256, 40); c.strokeStyle = '#111'; c.lineWidth = 3; c.strokeRect(2, 2, 252, 36);
-      c.fillStyle = '#111'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('RAILROAD', 128, 21); return new T.CanvasTexture(cv); })();
+      c.fillStyle = '#111'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('RAILROAD', 128, 21); return srgbTex(new T.CanvasTexture(cv)); })();
     const cbTex2 = (() => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 40; const c = cv.getContext('2d'); c.fillStyle = '#f6f6f2'; c.fillRect(0, 0, 256, 40); c.strokeStyle = '#111'; c.lineWidth = 3; c.strokeRect(2, 2, 252, 36);
-      c.fillStyle = '#111'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('CROSSING', 128, 21); return new T.CanvasTexture(cv); })();
+      c.fillStyle = '#111'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('CROSSING', 128, 21); return srgbTex(new T.CanvasTexture(cv)); })();
     const tkTex = (() => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const c = cv.getContext('2d'); c.fillStyle = '#f6f6f2'; c.fillRect(0, 0, 128, 64); c.strokeStyle = '#111'; c.lineWidth = 4; c.strokeRect(3, 3, 122, 58);
-      c.fillStyle = '#111'; c.font = 'bold 34px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('2', 64, 22); c.font = 'bold 16px Arial'; c.fillText('TRACKS', 64, 48); return new T.CanvasTexture(cv); })();
+      c.fillStyle = '#111'; c.font = 'bold 34px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('2', 64, 22); c.font = 'bold 16px Arial'; c.fillText('TRACKS', 64, 48); return srgbTex(new T.CanvasTexture(cv)); })();
     const glowTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'), gr = c.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,90,70,1)'); gr.addColorStop(0.35, 'rgba(255,40,30,.55)'); gr.addColorStop(1, 'rgba(255,0,0,0)'); c.fillStyle = gr; c.fillRect(0, 0, 64, 64); return new T.CanvasTexture(cv); })();
     const white = mat(0xeeeeee), blk = mat(0x111214), gray = mat(0x8a9097);
     RXING.flash = [[], []];   // two flasher groups that alternate (left / right lamps), each entry { lens material, glow sprite }
@@ -8585,7 +8591,7 @@ function buildRailPhone() {
     c.fillStyle = '#16181c'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = 'bold 30px Arial'; c.fillText('RAILROAD', 128, 34);
     c.font = 'bold 19px Arial'; c.fillText('DISPATCHER PHONE', 128, 68);
-    const plate = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv), side: T.DoubleSide }));
+    const plate = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)), side: T.DoubleSide }));
     plate.position.set(0, 2.0, 0.02); plate.userData.noHit = true; g.add(plate); }
   g.rotation.y = Math.PI;   // door, plate and handset face the road/approach
   scene.add(g); extraCols.push([x, z, 0.42]);
@@ -9005,7 +9011,7 @@ function buildSky() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const c = cv.getContext('2d');
   for (let i = 0; i < 26; i++) { const x = 40 + Math.random() * 176, y = 50 + Math.random() * 40 - Math.abs(x - 128) * 0.15, r = 18 + Math.random() * 26, gr = c.createRadialGradient(x, y, 0, x, y, r);
     gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(0.6, 'rgba(250,250,252,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); }
-  const ct = new T.CanvasTexture(cv), parts = [];
+  const ct = srgbTex(new T.CanvasTexture(cv)), parts = [];
   for (let i = 0; i < 26; i++) { const a = Math.random() * Math.PI * 2, r = 2500 + Math.random() * 4000, w = 900 + Math.random() * 1300, q = new T.PlaneGeometry(w, w * 0.45);
     q.lookAt(V3(-Math.cos(a), 0, -Math.sin(a))); q.translate(Math.cos(a) * r, 700 + Math.random() * 900 + r * 0.12, Math.sin(a) * r); parts.push(q); }
   let n = 0; parts.forEach(q => n += q.index.count);
@@ -9337,7 +9343,7 @@ function makeTote(x, z, ry) {
     c.fillStyle = '#e9e6dc'; c.fillRect(0, 0, 96, 80); c.fillStyle = '#d6d2c6'; for (let k = 1; k < 5; k++) c.fillRect(k * 19, 4, 3, 72);
     c.strokeStyle = '#a7adb3'; c.lineWidth = 4; c.strokeRect(3, 3, 90, 74); c.lineWidth = 2; for (let k = 1; k < 6; k++) { c.beginPath(); c.moveTo(k * 16, 3); c.lineTo(k * 16, 77); c.stroke(); }
     c.fillStyle = '#e0453a'; c.beginPath(); c.arc(48, 40, 7, 0, 7); c.fill(); c.strokeStyle = '#2c8f7a'; c.lineWidth = 2; c.beginPath(); c.arc(48, 40, 9, 0, 7); c.stroke();
-    const top = new T.MeshLambertMaterial({ map: new T.CanvasTexture(cv) }), bot = mat(0x1d1f22), L = tx(TOTE_TEX.long), S = tx(TOTE_TEX.short);
+    const top = new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) }), bot = mat(0x1d1f22), L = tx(TOTE_TEX.long), S = tx(TOTE_TEX.short);
     toteMats = [S, S, top, bot, L, L];   // box faces: +x, -x, +y, -y, +z, -z
   }
   const m = new T.Mesh(new T.BoxGeometry(1.22, 1.16, 1.02), toteMats); m.position.set(x, 0.58, z); m.rotation.y = ry || 0; m.castShadow = m.receiveShadow = true; scene.add(m);
@@ -9405,7 +9411,7 @@ function netRemote() {
   it('washer', [[0.04, 0.04, 0.8, 0xf2c200, 0, 0, -0.35], [0.08, 0.14, 0.1, 0x1d1f22, 0, -0.06, 0.02]]);
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 40; const c = cv.getContext('2d');
   c.fillStyle = 'rgba(20,24,30,.75)'; c.fillRect(0, 0, 128, 40); c.fillStyle = '#ffb347'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.fillText(NET.host ? 'PLAYER 2' : 'PLAYER 1', 64, 29);
-  const tag = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), depthTest: false })); tag.scale.set(0.9, 0.28, 1); tag.position.y = 2.15; av.add(tag);
+  const tag = new T.Sprite(new T.SpriteMaterial({ map: srgbTex(new T.CanvasTexture(cv)), depthTest: false })); tag.scale.set(0.9, 0.28, 1); tag.position.y = 2.15; av.add(tag);
   av.visible = false; scene.add(av);
   dressPlayer(av, VEST_COL[other], {});   // the other player wears the tinted operator rig too
   NET.rp = { av, items, sg, aim: 0, aimK: 0, am: 0, sh: MAG, held: null, x: 0, y: 0, z: 0, yaw: 0, tx: 0, ty: 0, tz: 0, tyaw: 0, walk: false, drive: false };
@@ -9799,7 +9805,7 @@ function chuteDeploy() {
   if (!CHUTE.canopy) {   // striped canopy (red / white panels) on a flattened dome, suspension lines down to the harness
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 8; const c = cv.getContext('2d');
     for (let i = 0; i < 16; i++) { c.fillStyle = i % 2 ? '#f4f4f2' : '#d4242a'; c.fillRect(i * 16, 0, 16, 8); }
-    const tex = new T.CanvasTexture(cv); const g = new T.Group();
+    const tex = srgbTex(new T.CanvasTexture(cv)); const g = new T.Group();
     const dome = new T.Mesh(new T.SphereGeometry(3.4, 16, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), new T.MeshLambertMaterial({ map: tex, side: T.DoubleSide })); dome.scale.y = 0.55; dome.position.y = 4.2; g.add(dome);
     const lm = new T.LineBasicMaterial({ color: 0x333333 }), pts = [];
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, r = 3.4 * Math.sin(Math.PI * 0.42); pts.push(new T.Vector3(Math.cos(a) * r, 4.2 + 3.4 * 0.55 * Math.cos(Math.PI * 0.42), Math.sin(a) * r), new T.Vector3(0, 1.4, 0)); }
@@ -10130,7 +10136,7 @@ function brokenGlassMat() {   // a car's windows after a hit: cracked, partly kn
   if (BROKEN_GLASS) return BROKEN_GLASS;
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d'); c.fillStyle = 'rgba(160,185,200,0.45)'; c.fillRect(0, 0, 128, 128);
   c.clearRect(40, 34, 52, 46); crackLines(c, 66, 57, 1);
-  const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping;
+  const t = srgbTex(new T.CanvasTexture(cv)); t.wrapS = t.wrapT = T.RepeatWrapping;
   return (BROKEN_GLASS = new T.MeshLambertMaterial({ map: t, transparent: true, side: T.DoubleSide, depthWrite: false }));
 }
 function crackLines(c, cx, cy, s) {   // spiderweb: rays out from the hit with a few rings across them
@@ -10143,7 +10149,7 @@ function crackDecal() {   // one shared crack picture for every other window: a 
   const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c = cv.getContext('2d');
   const g = c.createRadialGradient(128, 128, 4, 128, 128, 30); g.addColorStop(0, 'rgba(20,24,28,0.85)'); g.addColorStop(1, 'rgba(20,24,28,0)'); c.fillStyle = g; c.beginPath(); c.arc(128, 128, 30, 0, 7); c.fill();   // the hole
   crackLines(c, 128, 128, 2.4);
-  const t = new T.CanvasTexture(cv);
+  const t = srgbTex(new T.CanvasTexture(cv));
   return (CRACK = new T.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, fog: true }));
 }
 const GLASS_COLS = new Set([0x4a6275, 0x1c2630, 0x3a4a5a, 0x8fb0c4, 0xbfd8e6, 0x9fd8ff, 0xf2d27a]);
@@ -11381,7 +11387,7 @@ function makeCritter(kind) {
     c.strokeStyle = '#4f7a2a'; c.lineWidth = 4; for (const x of [46, 72]) { c.beginPath(); c.moveTo(x, 34); c.lineTo(x - 6, 44); c.moveTo(x + 4, 34); c.lineTo(x + 10, 44); c.stroke(); }   // legs
     c.fillStyle = '#9cbf5a'; c.beginPath(); c.ellipse(62, 33, 18, 3, 0, 0, Math.PI * 2); c.fill();          // belly
     c.fillStyle = '#111'; c.beginPath(); c.arc(101, 25, 2, 0, Math.PI * 2); c.fill();                       // eye
-    const sm = new T.SpriteMaterial({ map: new T.CanvasTexture(cv), alphaTest: 0.5 }); mats.push(sm);
+    const sm = new T.SpriteMaterial({ map: srgbTex(new T.CanvasTexture(cv)), alphaTest: 0.5 }); mats.push(sm);
     const sp = new T.Sprite(sm); sp.scale.set(0.3, 0.11, 1); sp.position.y = 0.055; g.add(sp); g.userData.sprite = sp;
   }
   g.traverse(o => { o.userData.noHit = true; }); g.userData.noHit = true; g.visible = false; scene.add(g);

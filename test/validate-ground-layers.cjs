@@ -74,4 +74,26 @@ assert.ok(!html.includes(', 0.032, rz + 2.75)') && !html.includes(', 0.032, z); 
   assert.ok(!swallowed.test(html), 'and it can never be swallowed again');
 }
 
+
+// ---------------------------------------------------------------- every canvas colour texture is tagged sRGB
+// A map painted with the 2D canvas holds sRGB values. Untagged, three reads them as linear and encodes the frame again
+// on the way out, which washes the surface out - that is what happened to the ground until v1.97.87 and to every sign,
+// label and decal until this pass. Additive glow ramps and alpha masks stay linear on purpose (they are luminance, and
+// brightening them is the point), so they are the only allowed exceptions.
+{
+  const lines = html.split(String.fromCharCode(10));
+  const ramps = ['AdditiveBlending', 'glowTex', 'addColorStop', 'sprayTex'];
+  const bad = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes('new T.CanvasTexture(')) continue;
+    const ctx = lines[i] + (lines[i + 1] || '') + (lines[i + 2] || '');
+    if (lines[i].includes('srgbTex(') || ctx.includes('colorSpace')) continue;
+    if (ramps.some(k => lines[i].includes(k))) continue;
+    bad.push(i + 1);
+  }
+  assert.equal(bad.length, 0, 'canvas colour textures left untagged at line(s) ' + bad.join(', '));
+  assert.ok(html.includes('const srgbTex = t => { if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; };'),
+    'and they are tagged through one helper, so the rule is written down once');
+}
+
 console.log('PASS: one ground layer table (grass < dirt < dirtroad < asphalt < paint < pad), height and depth pull in lockstep, every overlay takes both from it - so the cross road between the process building and the energy center is above the dirt yard again');
