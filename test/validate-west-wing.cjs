@@ -15,6 +15,8 @@ function build(source, westWing){
  ctx.egressStrobe=noop;ctx.gridLight=m=>m;ctx.batteryLight=m=>m;   // power-outage hooks: this block only needs them to exist
  ctx.exitSignMat=()=>new T.MeshBasicMaterial({color:0xc8211c});ctx.exitHalo=noop;   // EXIT signage helpers
  ctx.DRINK_SPOTS=[];   // replaced soda machines are registered here, not built as boxes
+ ctx.enclosure=(x0,x1,z0,z1,top)=>({x0,x1,z0,z1,top,wins:[],area:Math.abs((x1-x0)*(z1-z0))});   // outage daylight registry
+ ctx.glazing=noop;
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);
  vm.runInContext(source.slice(source.indexOf('  // ---------- PROCESS BUILDING'),source.indexOf('  // beer well pump inside the alley')),ctx);

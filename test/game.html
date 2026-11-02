@@ -4750,6 +4750,20 @@ function tank(x, z, r, h, accent, liquid, st, opts) {
 
 // solid wall segments for walk mode: [x0, z0, x1, z1]
 const wallSegs = [], wallMats = [];   // wall materials: see-through from above, solid in Squeeg mode
+// ---------- INTERIOR LIGHTING IN AN OUTAGE ----------
+// Nothing in the renderer knows indoors from outdoors: there is no baked light and no occlusion, so the sky light lights
+// an interior exactly like the yard. Every roofed building therefore registers an envelope, and every window in it is a
+// daylight source. On an outage the interior SURFACES themselves are dimmed per mesh - dark in the middle of a room,
+// brighter near a window - and restored exactly when the power comes back. Windows are the only way light gets in; the
+// see-through wall materials of the free camera are a rendering convenience and never count as glazing.
+const ENCL = [];
+function enclosure(x0, x1, z0, z1, top) {          // a roofed volume; returns it so windows can be added right there
+  const e = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), top, wins: [] };
+  e.area = (e.x1 - e.x0) * (e.z1 - e.z0);
+  ENCL.push(e); return e;
+}
+function glazing(e, x, y, z, r) { if (e) e.wins.push([x, y, z, r || 4.5]); }   // a window: light falls off over r
+
 // ---------- gray metal building: see-through walls and roof so the equipment inside stays visible ----------
 function building(x0, x1, z0, z1, h, northOpen, eastOpen, westOpen, southOpen) {   // northOpen / eastOpen: [[center along the wall, width, height], ...] openings
   const nop = (northOpen || []).slice().sort((a, b) => a[0] - b[0]);
@@ -4779,6 +4793,11 @@ function building(x0, x1, z0, z1, h, northOpen, eastOpen, westOpen, southOpen) {
       add(new T.BoxGeometry(0.3, h - oh, ow), wall, x1, (h + oh) / 2, c, null, true); at = c + ow / 2; }
     add(new T.BoxGeometry(0.3, h, z1 - at), wall, x1, h / 2, (at + z1) / 2, null, true); }
   add(new T.BoxGeometry(w + 1, 0.3, d + 1), roof, cx, h + 0.15, cz, null, true);
+  { const E = enclosure(x0, x1, z0, z1, h);        // its openings are the only daylight this shed gets in an outage
+    for (const [c, ow] of nop) glazing(E, c, 1.7, z0, 3.0 + ow * 0.5);
+    for (const [c, ow] of sop) glazing(E, c, 1.7, z1, 3.0 + ow * 0.5);
+    for (const [c, ow] of wop) glazing(E, x0, 1.7, c, 3.0 + ow * 0.5);
+    for (const [c, ow] of eop) glazing(E, x1, 1.7, c, 3.0 + ow * 0.5); }
 }
 // a plain man door that vanishes as Squeeg walks up (like the other doors): center (x, z) on a wall running along x (alongX) or z, leaf color,
 // plus a concrete floor helper for the simple buildings
@@ -5314,6 +5333,8 @@ function init(container) {
       for (const x of [-199, -193, -189, -183, -181, -175]) box(0.3, wallH - 1.6, 0.7, mat(0x2b2f36), x, (wallH - 1.6) / 2, z);
     }
     add(new T.BoxGeometry(bx1 - bx0 + 1.6, 0.3, bz1 - bz0 + 1.6), glass(0xcfe8ff, 0.32), (bx0 + bx1) / 2, wallH + 0.2, 0, 'recv', true);   // see-through roof
+    { const E = enclosure(bx0 + GDX, bx1 + GDX, bz0 + GDZ, bz1 + GDZ, wallH);   // no windows: the truck bays are the only daylight
+      for (const c of [-196, -186, -178]) { glazing(E, c + GDX, 2.2, bz0 + GDZ, 5.0); glazing(E, c + GDX, 2.2, bz1 + GDZ, 5.0); } }
     for (const x of [bx0 - 0.8, bx1 + 0.8]) box(0.4, 0.5, bz1 - bz0 + 1.6, trim, x, wallH + 0.25, 0);
     for (const z of [bz0 - 0.8, bz1 + 0.8]) box(bx1 - bx0 + 1.6, 0.5, 0.4, trim, (bx0 + bx1) / 2, wallH + 0.25, z);
     O.pitGrain = [];
@@ -5951,7 +5972,9 @@ function init(container) {
     // Open ferm aisle to the shop side from z=-23.7 to SZ: no divider meshes, trim, door leaves or collision.
     // roofs: west block and ferm alley (tanks and evaporators poke up through)
     add(new T.BoxGeometry(EW - WW + 0.6, 0.3, WZS - NZ + 0.6), roofM, (WW + EW) / 2, PH + 0.15, (NZ + WZS) / 2, null, true);
+    enclosure(WW, EW, NZ, WZS, PH);
     add(new T.BoxGeometry(FXE - FXW + 0.6, 0.3, SZ - ZN + 0.6), roofM, AC, PH + 0.15, (SZ + ZN) / 2, null, true);
+    enclosure(FXW, FXE, ZN, SZ, PH);
     // concrete floor with a trench drain down the ferm alley and along the evap alley aisle
     const conc = new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 }), grate = mat(0x3f444a); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
     const slab = (w, d, x, z) => { const o = add(new T.BoxGeometry(w, 0.1, d), conc, x, 0.17, z, null, true); o.receiveShadow = true; };
@@ -6075,6 +6098,9 @@ function init(container) {
     }
                                                            // lab ↔ control room
     add(new T.BoxGeometry(L, 0.2, OZS - OZN), ceilM, (WW + EW) / 2, OH + 0.1, (OZN + OZS) / 2, null, true);                                  // office ceiling/roof
+    { const E = enclosure(WW, EW, OZN, OZS, OH);     // the office block is its own envelope inside the shed, and its windows are the daylight
+      glazing(E, EW - 0.135, 1.5, OZN + 1.6, 3.6); glazing(E, EW - 0.135, 1.5, OZN + 4.9, 3.6);
+      glazing(E, -32.8, 1.5, OZN + 0.2, 3.4); glazing(E, -32.0, 1.5, OZS - 0.2, 3.4); }
     // lockers along the hallway's south wall at the west end, exit sign over the door
     for (let i = 0; i < 14; i++) {
       const lx = WW + 0.3 + 0.305 * (i + 0.5);
@@ -6212,6 +6238,7 @@ function init(container) {
       add(new T.BoxGeometry(MX1 - FXE + 0.3, 0.3, SZ + 10 + 0.3), roofM, (FXE + MX1) / 2, PH + 0.15, (SZ - 10) / 2, null, true);
       add(new T.BoxGeometry(BEX - FXE + 0.3, 0.3, -10 - BNZ), roofM, (FXE + BEX) / 2, PH + 0.15, (BNZ - 10) / 2, null, true);
       add(new T.BoxGeometry(MX1 - BEX, 0.3, -10 - BSZ), roofM, (BEX + MX1) / 2, PH + 0.15, (BSZ - 10) / 2, null, true);
+      enclosure(FXE, MX1, SZ, -10, PH); enclosure(FXE, BEX, -10, BNZ, PH); enclosure(BEX, MX1, -10, BSZ, PH);
       slab(BEX - FXE, -10 - BNZ, (FXE + BEX) / 2, (BNZ - 10) / 2); slab(MX1 - BEX, -10 - BSZ, (BEX + MX1) / 2, (BSZ - 10) / 2);
       { // east face decals (photos): DANGER HIGH VOLTAGE + NOTICE by the double door, DANGER sign + louver north of the roll-up; AC condensers on the corner wall
         const deco = (draw, w, h, x, y, z) => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = Math.round(128 * h / w); const c = cv.getContext('2d'); draw(c, cv.width, cv.height);
@@ -6683,6 +6710,9 @@ function init(container) {
       for (let i = SHS; i < WALK_SURF.length; i++) { WALK_SURF[i].x0 += DX; WALK_SURF[i].x1 += DX; }
       for (let i = SHD; i < (O.swingDoors || []).length; i++) O.swingDoors[i].x += DX;
       for (let i = dS; i < DRINK_SPOTS.length; i++) DRINK_SPOTS[i].x += DX; }   // vending machines standing in this building
+    { const E = enclosure(X0 + SH_DX, X1 + SH_DX, ZN, ZS, FY + H);   // the two drive-through windows and the west doors are its daylight
+      glazing(E, WINX + SH_DX, FY + 1.65, ZN, 3.6); glazing(E, WINX + SH_DX, FY + 1.65, ZS, 3.6);
+      glazing(E, X0 + SH_DX + 0.2, FY + 1.2, HZ, 3.0); }
     // two scale techs at the drive-through windows (inbound on the north wall, outbound on the south wall), facing the trucks
     NPCS.push({ id: 'brenda', g: seatedPerson(WINX + SH_DX, ZN + 0.85, 0, 0x8a5a9e, FY, { woman: 0x5a3a22 }) }, { id: 'tammy', g: seatedPerson(WINX + SH_DX, ZS - 0.85, Math.PI, 0x4f8f5a, FY, { woman: 0xc9a25a }) });   // scale techs: women, no hard hats (brunette, blonde)
   }
@@ -8634,6 +8664,56 @@ function updateSky(dt) {
   cm.color.setRGB(1, 1, 1).lerp(hor, grayW ? 0.55 : 0.12).multiplyScalar(lum < 0.35 ? 0.55 : 1);
   SKY.stars.material.opacity = Math.max(0, Math.min(1, (0.42 - lum) * 4)) * (grayW ? 0.15 : 1);
 }
+// ---------- interior darkening for an outage: the innermost roofed envelope wins, and its windows are the only daylight
+const INTERIOR = { saved: [], cache: new Map(), on: false, walls: null };
+function enclAt(x, y, z) {
+  let best = null;
+  for (const e of ENCL) {
+    if (x < e.x0 || x > e.x1 || z < e.z0 || z > e.z1 || y > e.top) continue;
+    if (!best || e.area < best.area) best = e;                  // nested: the smallest room containing the point
+  }
+  return best;
+}
+function interiorLight(e, x, y, z) {                            // 0.10 with no daylight at all, up to 0.80 right at a window
+  if (!e) return 1;
+  let d = 0;
+  for (const w of e.wins) {
+    const dd = Math.hypot(x - w[0], y - w[1], z - w[2]);
+    if (dd < w[3] && 1 - dd / w[3] > d) d = 1 - dd / w[3];
+  }
+  return 0.10 + 0.70 * d;
+}
+function dimmedMaterial(m, k) {                                 // one dimmed clone per (material, level), shared by every mesh that needs it
+  const key = m.uuid + '|' + k;
+  let c = INTERIOR.cache.get(key);
+  if (c) return c;
+  c = m.clone();
+  if (c.color) c.color.multiplyScalar(k);
+  if (c.emissive) c.emissive.multiplyScalar(k);
+  INTERIOR.cache.set(key, c); return c;
+}
+function applyInteriorDark(on) {
+  if (!on) {
+    for (const [o, m] of INTERIOR.saved) o.material = m;
+    INTERIOR.saved.length = 0; INTERIOR.on = false; return;
+  }
+  if (INTERIOR.on || !ENCL.length) return;
+  INTERIOR.on = true;
+  if (!INTERIOR.walls) INTERIOR.walls = new Set(wallMats);       // the shells keep their own look: setWallsSolid() owns their opacity
+  const p = new T.Vector3();
+  scene.traverse(o => {
+    if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
+    const m = o.material;
+    if (!m.color || m.isSpriteMaterial || INTERIOR.walls.has(m)) return;
+    if (m.userData && (m.userData.gridLight || m.userData.batteryLight || m.userData.keepLit)) return;
+    o.getWorldPosition(p);
+    const e = enclAt(p.x, p.y, p.z);
+    if (!e) return;
+    const k = Math.round(interiorLight(e, p.x, p.y, p.z) * 20) / 20;
+    if (k >= 0.95) return;
+    INTERIOR.saved.push([o, m]); o.material = dimmedMaterial(m, k);
+  });
+}
 // ---------- POWER OUTAGE: a real power cut. The world's own lighting is never touched - only the fixtures wired to
 // the plant supply go dark (gridLight). Battery gear (exit signs, radios, vehicle lights, egress strobes) and fires
 // (keepLit) keep working. The roll-up doors are dead while it runs. Triggered from the debug menu for now.
@@ -8662,6 +8742,7 @@ function setPowerOutage(on) {
         }
       }
     });
+    applyInteriorDark(true);
     POWER_OUTAGE.apply();
   } else {                        // power comes back: every captured emitter returns to exactly what it was
     for (const [m, k, kind] of POWER_OUTAGE.saved) {
@@ -8669,6 +8750,7 @@ function setPowerOutage(on) {
       else m.color.setRGB(k.r, k.g, k.b);
     }
     POWER_OUTAGE.saved.length = 0;
+    applyInteriorDark(false);
   }
   return on;
 }

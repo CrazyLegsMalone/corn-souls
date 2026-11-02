@@ -56,7 +56,7 @@ jobs:
           fail=0
           for f in validate-west-wing.cjs validate-windsocks.cjs \
                    validate-mcc-extinguisher.cjs validate-vulture.cjs \
-                   validate-seating.cjs; do
+                   validate-seating.cjs validate-interior-dark.cjs; do
             if node "$f"; then echo "::notice::PASS test/$f"; else echo "::warning::FAIL test/$f"; fail=1; fi
           done
           exit $fail

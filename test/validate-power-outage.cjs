@@ -46,6 +46,7 @@ function makeCtx() {
     scene: { background: col(0.56), fog: { color: col(0.56) }, traverse(fn) { meshes.forEach(m => fn({ material: m })); } },
     hemi: { intensity: 1.15 }, sunL: { intensity: 1.7 },
     EGRESS: { list: [], lens: basic(0x3a0e0e) },
+    applyInteriorDark: () => {},   // interior daylight has its own suite (validate-interior-dark.cjs)
     performance: { now: () => 0 }
   };
   ctx.window = ctx;
