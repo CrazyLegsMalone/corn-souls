@@ -4694,7 +4694,8 @@ function groundTex(kind) {
       c.beginPath(); c.moveTo(x, y); c.lineTo(x + R(-1, 1), y - l); c.stroke(); } c.globalAlpha = 1;   // blade flecks
     blot(['#8a7a4a'], 30, 1, 2.5, 0.35);                                  // a few bare specks
   }
-  const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+  const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping;
+  t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);   // ground is seen at grazing angles for hundreds of metres if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
   return GROUND[kind] = t;
 }
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
@@ -5454,7 +5455,12 @@ function init(container) {
   scene.children[scene.children.length - 1].receiveShadow = true;
   // 4.5 cm up, not 1.5: these pads are plain shared materials with no polygon offset of their own, and a plane that
   // close to the grass base flickers through it at distance. They now sit above the dirt (0.03) and asphalt (0.024).
-  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat(c), x, 0.045, z, null); p.castShadow = false; };
+  // A pad is a thin flat plane lying on the ground, so it needs the same protection the ground textures have: its own
+  // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
+  // grass. Without that it lost the depth fight a few hundred metres out and the grass showed through - the concrete
+  // appeared to stop a certain distance from the player.
+  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = -4; m.polygonOffsetUnits = -8; return m; };
+  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, 0.055, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
   { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
   { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;

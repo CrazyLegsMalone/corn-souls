@@ -1,3 +1,11 @@
+## TEST v1.97.68 — the flat concrete pads stop losing to the grass at distance (2026-11-01)
+- Owner-reported: concrete surfaces only showed up to a certain distance from the player. The concrete pads (the station pads and the pad under the fermentation area) are **thin flat planes lying on the ground** drawn with a shared, offset-free `mat(c)` - the one ground-overlay family that never got the layering treatment in v1.97.65. A few hundred metres out they lose the depth fight with the grass base plane and the grass wins, so the concrete appears to stop.
+- Each pad now gets **its own material** (`padMat(c)` - a clone of the palette colour with `polygonOffset` -4/-8 pulling it forward) so the shared `mat()` palette stays untouched, and the pads moved from 4.5 cm to **5.5 cm** above the grass, clear of the dirt (3.5) and asphalt (2.4).
+- **Ground textures keep their detail further out**: `groundTex()` anisotropy went from a flat 4 to `min(8, maxAnisotropy)`, which matters on ground seen at grazing angles for hundreds of metres - the mip chain was collapsing to flat colour well before the terrain ended.
+- Tests pin the pad material (own clone, offset -4/-8, shared palette untouched, 5.5 cm) and the anisotropy line.
+- Verified locally: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.68` / `corn-souls-test-shell-v95`.
+
 ## TEST v1.97.67 — hotfix: the vending interaction called UI helpers from the engine block (2026-11-01)
 - Owner-reported on v1.97.66: pressing X at a machine (the water can on the floor beside it) threw `TypeError: toast is not a function`.
 - Cause is the same cross-block trap as v1.97.61: `toast()`, `modal()` and `unlockMouse()` live in the **UI script block**, while the vending engine block is in the **engine script block**. The engine can only call `*_NOTIFY` callbacks the UI installs, or expose data and let the UI act. My first cut called all three directly, so collecting a packet (and opening the menu) threw.

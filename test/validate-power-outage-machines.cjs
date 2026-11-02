@@ -517,9 +517,15 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const back = kind === 'grass';"), 'grass is the layer that always loses the depth fight');
   assert.ok(html.includes("groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035,"), 'the dirt yard sits above the asphalt and clear of the grass');
   assert.ok(html.includes('holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03,'), 'and so does the pit pad');
-  assert.ok(html.includes('mat(c), x, 0.045, z, null)'), 'the station and fermentation pads sit 4.5 cm up, above dirt and asphalt');
+  assert.ok(html.includes('padMat(c), x, 0.055, z, null)'), 'the station and fermentation pads sit 5.5 cm up, above dirt and asphalt, with their own offset material');
   assert.ok(html.includes('(X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor'), 'the scale-house tile floor clears its slab top');
   assert.ok(html.includes('camera.near = 0.2; camera.updateProjectionMatrix();'), 'and the walk camera near plane is 0.2, not 0.1');
+  // the flat concrete pads are thin planes lying on the ground, so they need the same protection as the textured layers:
+  // their own offset material (the shared mat(c) must stay untouched) and a real gap above the grass
+  assert.ok(html.includes("const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = -4; m.polygonOffsetUnits = -8; return m; };"), 'pads get their own forward-offset material');
+  assert.ok(html.includes("mat(c).clone(); m.polygonOffset = true"), 'and the shared palette material is not modified');
+  assert.ok(html.includes('padMat(c), x, 0.055, z, null)'), 'pads sit 5.5 cm up, clear of the grass, dirt and asphalt');
+  assert.ok(html.includes('t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);'), 'ground textures keep their detail at grazing angles');
   {   // the layers, bottom to top, must stay strictly ordered with a real gap
     const layer = [['grass', 0], ['asphalt', 0.024], ['dirt', 0.035], ['pads', 0.045]];
     for (let i = 1; i < layer.length; i++) assert.ok(layer[i][1] - layer[i - 1][1] >= 0.005, layer[i][0] + ' clears ' + layer[i - 1][0]);
