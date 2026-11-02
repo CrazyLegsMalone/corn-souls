@@ -455,10 +455,46 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(Math.abs(mn[1]) < 0.1, 'the base already sits at y 0');
   // wiring: two bays, north is Boiler 1
   assert.ok(html.includes("[[19.4, 25.4, 'BOILER 1'], [32.0, 38.6, 'BOILER 2']]"), 'north is Boiler 1, south is Boiler 2');
-  assert.ok(html.includes('BOILER_SPOTS.push({ x: cx, y: 0, z: cz, yaw: -Math.PI / 2'), 'turned so the long axis runs east-west and the burner faces west');
+  assert.ok(html.includes('BOILER_SPOTS.push({ x: cx, y: 0, z: cz, yaw: Math.PI / 2'), 'turned 180: casing east-west, burner and blower on the EAST end, stack on the west');
   assert.ok(html.includes('loadBoilers();') && html.includes('root.clone(true)'), 'one upload shared by both boilers');
-  assert.ok(html.includes('ecBox(cx - 5.0, cx + 5.0, cz - 3.2, cz + 3.2)'), 'each boiler keeps its collision box');
+  assert.ok(html.includes('ecBox(cx - 5.2, cx + 5.2, cz - 3.2, cz + 3.2)'), 'each boiler keeps its collision box, widened for the sleeve');
+  // the casing sleeve: the casing is 3.34 m across, so r 1.67, and it runs 2.03 m back from the casing's west face to the
+  // dryer train's burner-can line at x = E0 + 7.35 (the model's casing ends at local z -3.22, so the sleeve centres on -4.235)
+  assert.ok(html.includes("const sleeve = new T.Mesh(new T.CylinderGeometry(1.67, 1.67, 2.03, 20), casing.material)"), 'the sleeve uses the casing section and material');
+  assert.ok(html.includes('sleeve.rotation.x = Math.PI / 2; sleeve.position.set(0, 2.35, -4.235);'), 'in model space, behind the rear flue box, so it turns with the boiler');
+  assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
+  { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
+    assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // performance: the model is folded to one mesh per material instead of 258 parts, and it is out of the shadow pass
+  assert.ok(html.includes('mergeModel(root, false);') && html.includes('function mergeModel(root, castShadow)'), 'the boiler batch-merged, with shadows off');
+  assert.ok(html.includes('function mergeModel(root, castShadow) {') && html.includes('if (parts.length < 2) continue;'), 'merge keeps single-part materials as they are');
+  assert.ok(html.includes('if (o !== root) o.matrixAutoUpdate = false; })'), 'and stops walking static matrices every frame');
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
+  // the merge itself, run for real: the game's own glTF reader + mergeModel on the boiler file
+  {
+    const reader = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
+    const merger = html.slice(html.indexOf('function mergeModel(root, castShadow) {'), html.indexOf('function rigPivot('));
+    assert.ok(reader.includes('function glbBuild(') && merger.includes('function mergeModel('), 'both helpers are in the game');
+    const lib3 = { window: {}, console };
+    vm.runInNewContext(scripts.find(x => x.includes('window.THREE=eu')), lib3);   // the engine bundle the other suites use
+    const T3 = lib3.window.THREE, mctx = { console, TextDecoder, T: T3 };
+    vm.createContext(mctx);
+    vm.runInContext(reader + '\n' + merger, mctx);
+    const model = mctx.glbBuild(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength));
+    const count = () => { let meshes = 0, tris = 0, casters = 0;
+      model.root.traverse(o => { if (!o.isMesh) return; meshes++; const g3 = o.geometry; tris += (g3.index ? g3.index.count : g3.attributes.position.count) / 3; if (o.castShadow) casters++; });
+      return { meshes, tris, casters }; };
+    model.root.updateMatrixWorld(true);
+    const before = count(), bbBefore = new T3.Box3().setFromObject(model.root);
+    mctx.mergeModel(model.root, false);
+    model.root.updateMatrixWorld(true);
+    const after = count(), bbAfter = new T3.Box3().setFromObject(model.root);
+    assert.ok(before.meshes > 250, 'the raw model is ' + before.meshes + ' separate parts');
+    assert.ok(after.meshes <= 12, 'merged down to ' + after.meshes + ' submissions');
+    assert.ok(Math.abs(after.tris - before.tris) < 1, 'every triangle survives (' + before.tris + ' -> ' + after.tris + ')');
+    assert.ok(bbAfter.min.distanceTo(bbBefore.min) < 1e-3 && bbAfter.max.distanceTo(bbBefore.max) < 1e-3, 'and the bounds do not move');
+    assert.equal(after.casters, 0, 'and nothing goes into the shadow pass');
+  }
 }
 
 console.log('PASS: the outage stops the plant model dead (conveyors, pumps, mills, RTO) and the pivot keeps running on its own diesel until the day tank is dry');

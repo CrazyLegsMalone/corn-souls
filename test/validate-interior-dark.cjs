@@ -32,6 +32,9 @@ const darkRoom = interior(), nearWin = interior(), deepRoom = interior(), nested
 lamp.userData.gridLight = true;
 const mDark = mk(darkRoom, 0, 1, 0), mNear = mk(nearWin, 25, 1, -4.4), mDeep = mk(deepRoom, 1, 1, 4.4),
   mNested = mk(nested, 25, 1, 4.4), mOut = mk(outdoor, 60, 1, 60), mShell = mk(wallMat, 2, 1, 2), mLamp = mk(lamp, 3, 1, 3);
+// the failure this guards against: the ground is ONE 16 km plane whose origin sits inside a building footprint
+const groundMat = interior();
+const mGround = new T.Mesh(new T.PlaneGeometry(4000, 4000), groundMat); mGround.position.set(0, 0.02, 0); scene.add(mGround);
 
 const ctx = { T, scene, camera, wallMats, console, Math, performance };
 vm.createContext(ctx);
@@ -50,6 +53,8 @@ assert.ok(g(mDeep) <= 0.11 && g(mNested) <= 0.11, 'and away from it, dark again 
 assert.equal(mOut.material, outdoor, 'outdoors is untouched');
 assert.equal(mShell.material, wallMat, 'the wall shell is untouched (setWallsSolid owns it)');
 assert.equal(mLamp.material, lamp, 'a gridLight fixture is left to the outage code');
+assert.equal(mGround.material, groundMat, 'a world-scale surface (the ground) is never dimmed, wherever its origin sits');
+assert.ok(g(mDark) <= 0.11, 'but the room it sits in still is');
 assert.ok(g(mNear) > g(mNested), 'the window reaches its own room, not the cupboard inside it');
 
 // the registration work: each roofed building declares its envelope, and only windows are daylight

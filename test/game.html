@@ -4937,6 +4937,43 @@ const TOWER = { x: 50, z: 202, yaw: 0, scale: 2, fans: [], ready: false };
 // upload of the model (clone() shares geometry and materials), and the machine's advert panel is its embedded PNG.
 // ---------- NPC CHARACTER MODELS: same rigid-part rig family as Squeeg (flat export, named parts), so the limbs are
 // reparented onto generated shoulder / elbow / hip / knee pivots - which is also what lets a standing export sit down.
+// ---------- STATIC MODEL MERGE: an imported model is authored as hundreds of tiny parts (the boiler alone is 258), and
+// every part is its own draw submission - twice over, because each one renders into the shadow map too. Folding a model
+// down to one mesh per material changes nothing on screen: the boiler goes from ~1030 submissions to ~22.
+function mergeModel(root, castShadow) {
+  root.updateMatrixWorld(true);
+  const inv = new T.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), gone = [];
+  root.traverse(o => {
+    if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || !o.geometry || !o.geometry.attributes.position) return;
+    const m = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    let g = groups.get(o.material); if (!g) groups.set(o.material, g = []);
+    g.push({ g: o.geometry, m, o });
+  });
+  for (const [mat, parts] of groups) {
+    if (parts.length < 2) continue;
+    if (mat.map && !parts.every(x => x.g.attributes.uv)) continue;      // a textured batch needs UVs on every part
+    let n = 0;
+    const geos = parts.map(x => { const g = x.g.index ? x.g.toNonIndexed() : x.g.clone(); g.applyMatrix4(x.m); n += g.attributes.position.count; return g; });
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    let k = 0; const allUv = geos.every(g => g.attributes.uv);
+    for (const g of geos) { pos.set(g.attributes.position.array, k * 3); if (g.attributes.normal) nor.set(g.attributes.normal.array, k * 3); if (allUv) uv.set(g.attributes.uv.array, k * 2); k += g.attributes.position.count; }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
+    if (allUv) geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    const mesh = new T.Mesh(geo, mat);
+    mesh.castShadow = !!castShadow; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false;
+    root.add(mesh);
+    for (const x of parts) gone.push(x.o);
+    for (const g of geos) g.dispose();
+  }
+  for (const o of gone) if (o.parent) o.parent.remove(o);
+  root.traverse(o => {   // static parts: no per-frame matrix walk, and the caller's shadow choice applies to every part
+    if (o.isMesh) { o.castShadow = !!castShadow; o.receiveShadow = true; }
+    if (o !== root) o.matrixAutoUpdate = false; });
+  root.updateMatrixWorld(true);
+  return root;
+}
 function rigPivot(av, jointName, members) {
   const joint = av.getObjectByName(jointName);
   if (!joint || !joint.parent) return null;
@@ -5009,6 +5046,15 @@ const BOILER = { ready: false };
 const BOILER_SPOTS = [];
 function loadBoilers() {
   loadGlbModel('/corn-souls/assets/models/ethanol_plant_steam_boiler_narrow_long.glb', ({ root }) => {
+    // The casing stops ~2 m short of the dryer train's west end, so a sleeve runs it back to that line: cylinder of the
+    // casing's own section (r 1.67, centreline y 2.35), 2.03 m long, behind the rear flue box - model space, so it turns
+    // with the boiler. It takes the casing's material, so it merges into that batch and costs no extra draw.
+    const casing = root.getObjectByName('Insulated_Boiler_Casing');
+    if (casing && casing.material) {
+      const sleeve = new T.Mesh(new T.CylinderGeometry(1.67, 1.67, 2.03, 20), casing.material);
+      sleeve.rotation.x = Math.PI / 2; sleeve.position.set(0, 2.35, -4.235);
+      root.add(sleeve); }
+    mergeModel(root, false);                             // static and indoors: merged, and out of the shadow pass
     BOILER_SPOTS.forEach((s, i) => {
       const g = i ? root.clone(true) : root;
       g.position.set(s.x, s.y, s.z); g.rotation.y = s.yaw || 0; if (s.scale) g.scale.setScalar(s.scale);
@@ -5023,6 +5069,7 @@ const DRINK = { ready: false };
 const DRINK_SPOTS = [];
 function loadDrinkMachines() {
   loadGlbModel('/corn-souls/assets/models/milorade_machine.glb', ({ root }) => {
+    mergeModel(root, false);                             // 19 parts -> one draw per material, indoors so no shadow pass
     DRINK_SPOTS.forEach((s, i) => {
       const g = i ? root.clone(true) : root;
       g.position.set(s.x, s.y, s.z); g.rotation.y = s.yaw || 0;
@@ -7208,11 +7255,13 @@ function init(container) {
       ecBox(x0 - 1.2, x1 + 1.2, cz - 2.3, cz + 2.3);
       nameplate(nm, (x0 + x1) / 2, cy + R + 0.4, cz, 0.2, 0, -1).position.z = cz - R - 0.06; });
     // package boilers: the owner's ethanol_plant_steam_boiler_narrow_long.glb, one per bay - NORTH IS BOILER 1, SOUTH IS
-    // BOILER 2. Turned -90 degrees so the ~10 m casing runs east-west and its burner faces west, like the old pair did.
+    // BOILER 2. Turned +90 degrees: the casing runs east-west with the burner, blower and ladder on the EAST end and the
+    // stack and rear flue box on the west, and the casing sleeve (see loadBoilers) carries its west face back to x E0+7.35
+    // so it lines up with the west end of the dryer train's burner cans.
     [[19.4, 25.4, 'BOILER 1'], [32.0, 38.6, 'BOILER 2']].forEach(([za, zb, nm]) => {
       const cz = EZ0 + (za + zb) / 2, cx = E0 + 12.6;
-      BOILER_SPOTS.push({ x: cx, y: 0, z: cz, yaw: -Math.PI / 2, name: nm });
-      ecBox(cx - 5.0, cx + 5.0, cz - 3.2, cz + 3.2);
+      BOILER_SPOTS.push({ x: cx, y: 0, z: cz, yaw: Math.PI / 2, name: nm });
+      ecBox(cx - 5.2, cx + 5.2, cz - 3.2, cz + 3.2);
       nameplate(nm, cx, 3.2, cz - 3.3, 3.2, 0, -1); });
     loadBoilers();
     // floor trenches (steel grating over them): one east-west between the boilers and one north-south along the east side; the three runs
@@ -8665,7 +8714,7 @@ function updateSky(dt) {
   SKY.stars.material.opacity = Math.max(0, Math.min(1, (0.42 - lum) * 4)) * (grayW ? 0.15 : 1);
 }
 // ---------- interior darkening for an outage: the innermost roofed envelope wins, and its windows are the only daylight
-const INTERIOR = { saved: [], cache: new Map(), on: false, walls: null };
+const INTERIOR = { saved: [], cache: new Map(), on: false, walls: null, _s: new T.Vector3() };
 function enclAt(x, y, z) {
   let best = null;
   for (const e of ENCL) {
@@ -8709,6 +8758,14 @@ function applyInteriorDark(on) {
     o.getWorldPosition(p);
     const e = enclAt(p.x, p.y, p.z);
     if (!e) return;
+    // Only a mesh that fits inside the room counts as interior. The ground is one 16 km plane whose origin sits at (0,0,0)
+    // - inside the shop envelope - so without this it (and any road crossing a footprint) went dark with the building.
+    const g2 = o.geometry;
+    if (g2) {
+      if (!g2.boundingSphere) g2.computeBoundingSphere();
+      const sc = o.getWorldScale(INTERIOR._s).length() / Math.SQRT2;
+      if (g2.boundingSphere.radius * sc > 0.5 * Math.hypot(e.x1 - e.x0, e.z1 - e.z0)) return;
+    }
     const k = Math.round(interiorLight(e, p.x, p.y, p.z) * 20) / 20;
     if (k >= 0.95) return;
     INTERIOR.saved.push([o, m]); o.material = dimmedMaterial(m, k);
@@ -12343,7 +12400,7 @@ function frameBody(now) {
 }
 let fpsN = 0, fpsT = 0;
 function frame(now) {
-  fpsN++; if (!fpsT) fpsT = now; if (now - fpsT >= 1000) { $('fps').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps'; fpsN = 0; fpsT = now; }
+  fpsN++; if (!fpsT) fpsT = now; if (now - fpsT >= 1000) { const ri = renderer.info.render; $('fps').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps  ' + ri.calls + ' dc  ' + Math.round(ri.triangles / 1000) + 'k tri'; fpsN = 0; fpsT = now; }
   try { frameBody(now); } catch (e) { if (frameErrs++ < 3 && window.__showErr) __showErr('frame: ' + (e && e.message) + '\n' + (e && e.stack || '')); }
   requestAnimationFrame(frame);
 }
