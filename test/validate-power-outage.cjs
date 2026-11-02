@@ -127,7 +127,7 @@ function makeCtx() {
   const start = html.indexOf("['Power outage: start'"), end = html.indexOf("['Power outage: end'");
   assert.ok(start > 0 && end > start, 'debug menu has the power outage rows');
   const rows = html.slice(start, end + 80);
-  assert.equal(rows.split('P3.setPowerOutage(').length - 1, 2, 'two debug rows drive the event (start / end)');
+  assert.equal(rows.split('P3.powerSet(').length - 1, 2, 'two debug rows drive the event (start / end), through powerSet so the other player follows');
   assert.ok(!/[^.\w]setPowerOutage\(/.test(rows), 'menu rows must not call the private function directly');
   assert.ok(!rows.includes('force night'), 'the night preview row is gone');
   assert.ok(html.includes('setPowerOutage, get powerOutage()'), 'the event is exported on Plant3D');
@@ -155,4 +155,12 @@ function makeCtx() {
   assert.ok(!html.includes('DAYLIGHT'), 'the daylight snapshot the dimming needed is gone');
 }
 
+
+  // The outage is WORLD state: both players must change it through powerSet(), which also tells the other PC.
+  assert.ok(html.includes('function powerSet(on) {'), 'one way to change the plant supply');
+  assert.ok(html.includes('const r = setPowerOutage(!!on);') && html.includes("if (NET.conn) netSend({ t: 'po', on: !!on });"), 'it applies locally and tells the other player');
+  assert.ok(html.includes('powerSet(false);'), 'the breaker reset goes through powerSet');
+  assert.ok(html.includes("} else if (m.t === 'po') { setPowerOutage(!!m.on);"), 'and the other side applies what it hears');
+  assert.ok(html.includes('powerSet: on => powerSet(on)'), 'exposed for the debug menu');
+  assert.ok(html.includes('P3.powerSet(true)') && html.includes('P3.powerSet(false)'), 'the debug menu uses it, so a debug outage also reaches the other player');
 console.log('PASS: the power outage kills only mains emitters (and keeps them dead after a rewrite), leaves the sun/sky/fog, battery gear and fires alone, blinks the interior egress strobes, and locks out the roll-up doors');

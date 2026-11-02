@@ -215,6 +215,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     Q_CLOSED: { closed: true }, Q_OPEN: { open: true },
     walk: { on: true, dead: false, x: -608.6, z: 565.3 },
     setPowerOutage: on => { tripped = on; ctx.POWER_OUTAGE.on = !!on; },
+    NET: { conn: null }, netSend: () => {},   // powerSet tells the other player, and this sandbox is offline
     Math
   };
   vm.createContext(ctx);
