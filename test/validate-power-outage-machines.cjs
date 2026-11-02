@@ -508,16 +508,24 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' })"), 'break-room machine placed where the flat box was');
   assert.ok(html.includes("loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' })"), 'scale-house machine placed in shifted coordinates');
   assert.ok(html.includes('for (const s2 of DRINK_SPOTS) VEND.machines.push('), 'the Milo-Rade machines answer X too');
-  assert.ok(html.includes("if (P3.vendDispense(m, 'milo_rade_can.glb', 'Milo-Rade')) toast('WATER: out of order - it never stocked water. Dispensing Milo-Rade anyway.');"), 'the WATER joke is preserved and still drops a Milo-Rade can');
+  assert.ok(html.includes("if (r.water) toast('WATER: out of order - it never stocked water. Dispensing Milo-Rade anyway.');"), 'the WATER button keeps its joke and still drops a Milo-Rade can');
   assert.ok(html.includes("vendSpawn('water_can.glb', 'Water',"), 'the water can is a separate item at each machine');
   assert.ok(html.includes('if (!M || !M.ready || VEND.busy) return false;'), 'repeated presses are ignored while one is dropping');
   assert.ok(!/vendSpawn\([^)]*0\.001/.test(html), 'the embedded preview packet scale is never copied onto a spawned prop');
   assert.ok(html.includes('// deliberately NOT merged: DISPENSED_* and SNACK_DISPENSER_FLAP have to stay addressable as nodes'), 'the machine stays unmerged so its nodes work');
+  // the cabinets' own buttons are what you press - no menu, no dialog
+  assert.ok(html.includes("const n = byName['SELECT_' + s2.key]; if (n) M.buttons.push({ node: n, file: s2.file, name: s2.name });"), 'the Shifty Food buttons are registered by node');
+  assert.ok(html.includes("for (const nm of ['MILO_RADE_SELECT_BUTTON', 'MILO_RADE_SELECT_BUTTON_SECOND'])"), 'so are the Milo-Rade ones');
+  assert.ok(html.includes("const w = byName['WATER_SELECT_BUTTON']; if (w) M.buttons.push({"), 'and the WATER button is its own button');
+  assert.ok(html.includes('ray.intersectObject(M.root, true)') && html.includes('if (!onIt) return null;'), 'pressing raycasts the cabinet, and looking away does nothing');
+  assert.ok(html.includes('const pick = btn || (M.buttons || [])[0];'), 'aim at a button for that item, aim anywhere on the cabinet for the first one');
+  assert.ok(!html.includes('Shifty Food · KEEP YOUR BODY RUNNING'), 'the selection menu is gone');
+  assert.ok(!html.includes("toast('Dispensing "), 'and nothing is announced when it dispenses');
   {   // the vending engine block must not touch UI-only helpers - calling toast() there shipped a TypeError on v1.97.66
     const a = html.indexOf('const VEND = {'), b = html.indexOf('// ---------- MILO RADE vending machines', a);
     const engine = html.slice(a, b > a ? b : a + 12000);
     for (const fn of ['toast(', 'modal(', 'unlockMouse(']) assert.ok(!engine.includes(fn), 'the vending engine block must not call ' + fn);
-    assert.ok(html.includes('vendPickNear: () => vendPickNear()') && html.includes('vendSnacks: SNACKS'), 'it exposes its data and actions to the UI instead');
+    assert.ok(html.includes('vendPress: () => vendPress()'), 'it exposes the press to the UI instead');
     assert.ok(html.includes("const p = P3.vendPickNear();") && html.includes("toast('Collected ' + P3.vendTake(p))"), 'and the UI block does the talking');
   }
   // ---------------------------------------------------------------- ground and floor layering (z-fighting guard)
