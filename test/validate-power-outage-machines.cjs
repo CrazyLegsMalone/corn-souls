@@ -680,6 +680,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('av.traverse(o => { if (o.isMesh) o.userData.body = true; });'), 'box parts are marked, so held items survive the hide');
   assert.ok(html.includes('for (const c of box) if (c.parent) c.parent.remove(c);'), 'and the box body is REMOVED, so nothing can reveal it again');
   assert.ok(html.includes('if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);'), 'a second dress replaces the rig instead of stacking one on top');
+  assert.ok(html.includes('for (const c of av.children.slice()) if (c !== g && !c.userData.item) c.visible = false;'), 'and nothing else on the avatar is left showing, even if a box part escaped the marker');
+  assert.ok(html.includes('for (const o of scene.children.slice()) if (o.userData.selfAv) scene.remove(o);'), 'one self avatar, ever: a stray from a half-finished build is swept out of the scene');
   {
     const reader2 = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
     const rigSrc = html.slice(html.indexOf('function rigPivot('), html.indexOf('function loadCharacter('));
@@ -698,6 +700,13 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
       box.userData.body = true; av.add(box); return av; };
     const a1 = avatar(), a2 = avatar();
     pctx.dressPlayer(a1, 0xff7a1a, {}); pctx.dressPlayer(a2, 0xc6e41f, {});
+    {   // a held item must survive the dressing; anything else on the avatar must not show through the rig
+      const a3 = avatar(), held = new T4.Group(), stray = new T4.Group();
+      held.userData.item = true; a3.add(held); a3.add(stray);
+      pctx.dressPlayer(a3, 0xff7a1a, {});
+      assert.equal(held.visible, true, 'a held item stays visible on a dressed avatar');
+      assert.equal(stray.visible, false, 'and every other child of the avatar is switched off');
+    }
     const rigOf = av => av.children.find(c => c.type === 'Group');   // the box body is removed, so the rig is the only group
     const g1 = rigOf(a1), g2 = rigOf(a2);
     assert.ok(g1 && g2, 'a rig was added to each avatar');

@@ -5129,6 +5129,7 @@ function dressPlayer(av, vest, opts) {
     for (const c of box) if (c.parent) c.parent.remove(c);
     if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);   // never dress twice
     av.userData.rig = g; av.add(g);
+    for (const c of av.children.slice()) if (c !== g && !c.userData.item) c.visible = false;   // belt and braces: no box body shows through the rig
     if (o.onRig) o.onRig(rig, g);
   } catch (e) { console.warn('[player rig] dressing failed, the box avatar stays:', e && e.message); } });
 }
@@ -9299,11 +9300,11 @@ function netRemote() {
   if (NET.rp) return;
   const other = NET.host ? 1 : 0, av = makeCharacter(VEST_COL[other], false); av.scale.setScalar(SQ_K);   // the other player: their vest color
   // what they're holding, in the right hand: paintball gun, squeegee, power washer wand (empty hand = nothing)
-  const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; av.add(g); items[k] = g; };
-  const sg = buildShotgun(true); sg.g.position.set(0.2, 1.0, -0.2); sg.g.visible = false; av.add(sg.g); items.gun = sg.g;   // the same pump shotgun model
+  const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; g.userData.item = true; av.add(g); items[k] = g; };
+  const sg = buildShotgun(true); sg.g.position.set(0.2, 1.0, -0.2); sg.g.visible = false; sg.g.userData.item = true; av.add(sg.g); items.gun = sg.g;   // the same pump shotgun model
   it('squeegee', [[0.03, 0.03, 1.2, 0xc9a227, 0, -0.05, -0.45], [0.5, 0.1, 0.04, 0x1d1f22, 0, -0.08, -1.05]]);
   for (const k in TOOLS) items[k] = toolItem(k, av);
-  { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; av.add(e); items.ext = e; }
+  { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; e.userData.item = true; av.add(e); items.ext = e; }
   it('washer', [[0.04, 0.04, 0.8, 0xf2c200, 0, 0, -0.35], [0.08, 0.14, 0.1, 0x1d1f22, 0, -0.06, 0.02]]);
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 40; const c = cv.getContext('2d');
   c.fillStyle = 'rgba(20,24,30,.75)'; c.fillRect(0, 0, 128, 40); c.fillStyle = '#ffb347'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.fillText(NET.host ? 'PLAYER 2' : 'PLAYER 1', 64, 29);
@@ -10021,7 +10022,7 @@ function makeTool(k) {   // first person: the picture comes up from the bottom-r
   const q = hudPart(g, new T.PlaneGeometry(L, L / 4), toolMat(k, true), 0.12, -0.12, -0.6); q.rotation.set(0, 0.35, 2.25);   // working end up and to the left
   const glove = hudMat(0x7b5a36), sl = hudMat(0xff7a1a);
   hudPart(g, new T.BoxGeometry(0.085, 0.08, 0.08), glove, 0.3, -0.38, -0.55); hudPart(g, new T.CylinderGeometry(0.045, 0.05, 0.22, 8), sl, 0.35, -0.47, -0.5).rotation.x = 1.2;
-  g.visible = false; camera.add(g); return g;
+  g.visible = false; ensureHud().add(g); return g;
 }
 function toolItem(k, av) {   // in a character's hand (other player / third person): the same picture, sticking forward and up
   const L = TOOLS[k].L, g = new T.Group(), m = new T.Mesh(new T.PlaneGeometry(L, L / 4), toolMat(k)); m.rotation.y = Math.PI / 2; m.position.set(0, 0, -L * 0.35); g.add(m);
@@ -10221,7 +10222,7 @@ function takeExtinguisher() {
 }
 function makeExtHud() { const g = new T.Group(); g.userData.noHit = true;
   const q = hudPart(g, new T.PlaneGeometry(0.17, 0.34), new T.MeshBasicMaterial({ map: extTex(), color: 0xdadada, transparent: true, alphaTest: 0.35, depthTest: false, side: T.DoubleSide }), 0.22, -0.19, -0.55); q.rotation.set(-0.1, -0.3, 0.12);
-  g.visible = false; camera.add(g); return g; }
+  g.visible = false; ensureHud().add(g); return g; }
 let SPRAY_TEX = null;
 function sprayTex() { if (SPRAY_TEX) return SPRAY_TEX; const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); return (SPRAY_TEX = new T.CanvasTexture(cv)); }
 function updateExtinguisher(dt) {
@@ -10325,7 +10326,7 @@ function radioToggle(remote) {
   if (SR.g.parent === camera || SR.g.parent === hudScene || (VIEW.av && SR.g.parent === VIEW.av) || (NET.rp && SR.g.parent === NET.rp.av) || d > 1.8 || wp.y > walk.y + 2.2 || wp.y < walk.y - 1) return null;
   if (d > 0.5 && (dx * -Math.sin(walk.yaw) + dz * -Math.cos(walk.yaw)) / d < 0.75) return null;   // look at it to grab it (so the Ranger's X still works when it's in the bed)
   if (NET.rp && SR.carry === 'them') return 'The other player has the radio';
-  SR.carry = 'me'; SR.prevHeld = held; setItem('hand'); srAttach(hudScene || camera, V3(-0.42, -0.13, -0.62), 0.75); SR.g.rotation.z = 0.12; SR.g.rotation.x = -0.05;   // up on your left shoulder like an old-school boom box (drawn with the gun so walls never cut through it)
+  SR.carry = 'me'; SR.prevHeld = held; setItem('hand'); srAttach(ensureHud(), V3(-0.42, -0.13, -0.62), 0.75); SR.g.rotation.z = 0.12; SR.g.rotation.x = -0.05;   // up on your left shoulder like an old-school boom box (drawn with the gun so walls never cut through it)
   netSend({ t: 'srp', m: 'c' });
   return '📻 Got the radio · 🎯 / click / R2: on → next song → off · ✋ / E / X: set it down (at a Ranger: in the back)';
 }
@@ -10345,7 +10346,7 @@ function updateShopRadio(dt) {
   if (SR.carry === 'me' && (!walk.on || walk.dead || walk.drive || walk.mow || walk.ride)) {   // got in something / died while carrying: it goes in the Ranger bed if that's what you got into, else down at your feet
     if (walk.drive && !CAR_ON) { srAttach(myRangerG(), SR_BED, Math.PI); SR.carry = null; netSend({ t: 'srp', m: 'r', who: 'mine' }); } else srPlace('drive');
     if (SR.prevHeld) setItem(SR.prevHeld); SR.prevHeld = null; }
-  if (SR.carry === 'me') { const want = VIEW.third && VIEW.av ? VIEW.av : (hudScene || camera); if (SR.g.parent !== want) {
+  if (SR.carry === 'me') { const want = VIEW.third && VIEW.av ? VIEW.av : ensureHud(); if (SR.g.parent !== want) {
       if (want === VIEW.av) { srAttach(VIEW.av, SR_HANDS, -Math.PI / 2); SR.g.rotation.z = -0.15; } else { srAttach(want, V3(-0.42, -0.13, -0.62), 0.75); SR.g.rotation.z = 0.12; SR.g.rotation.x = -0.05; } } }
   const p = SR.carry === 'me' ? camera.position : SR.g.getWorldPosition(V3()), d = walk.on ? Math.hypot(walk.x - p.x, walk.z - p.z) : Math.hypot(camera.position.x - p.x, camera.position.z - p.z) * 0.5, t = C.currentTime;
   const vol = SR.on ? Math.max(0, 1 - d / 45) ** 1.8 * 0.55 : 0; SR.out.gain.setTargetAtTime(vol, t, 0.1); SR.lp.frequency.setTargetAtTime(900 + 1700 * Math.max(0, 1 - d / 20), t, 0.3);
@@ -11108,16 +11109,17 @@ function buildSelfAv() {
   const me = NET.conn && !NET.host ? 1 : 0, key = 'v' + me;
   if (VIEW.av && VIEW.key === key && (VIEW.av.userData.rig || VIEW.pending)) return;   // dressed, or the model is on its way
   if (VIEW.av) scene.remove(VIEW.av);
-  const av = makeCharacter(VEST_COL[me], false); av.scale.setScalar(SQ_K); VIEW.legs = []; VIEW.arms = [];
+  for (const o of scene.children.slice()) if (o.userData.selfAv) scene.remove(o);   // a stray from an earlier build must not stand there too
+  const av = makeCharacter(VEST_COL[me], false); av.scale.setScalar(SQ_K); av.userData.selfAv = true; VIEW.legs = []; VIEW.arms = [];
   for (const m of av.children.slice()) { const P = m.geometry && m.geometry.parameters; if (!P || m.geometry.type !== 'BoxGeometry') continue;
     const leg = Math.abs(P.height - 0.82) < 0.01, arm = Math.abs(P.height - 0.6) < 0.01 && Math.abs(P.width - 0.11) < 0.01; if (!leg && !arm) continue;
     const top = m.position.y + P.height / 2, pv = new T.Group(); pv.position.set(m.position.x, top, m.position.z); av.add(pv); av.remove(m); m.position.set(0, -P.height / 2, 0); pv.add(m);   // swing from the hip / shoulder
     (leg ? VIEW.legs : VIEW.arms).push(pv); }
-  const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); q.castShadow = true; g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; av.add(g); items[k] = g; };
-  const sg = buildShotgun(true); sg.g.position.set(0.2, 1.0, -0.2); sg.g.visible = false; av.add(sg.g); items.gun = sg.g;
+  const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); q.castShadow = true; g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; g.userData.item = true; av.add(g); items[k] = g; };
+  const sg = buildShotgun(true); sg.g.position.set(0.2, 1.0, -0.2); sg.g.visible = false; sg.g.userData.item = true; av.add(sg.g); items.gun = sg.g;
   it('squeegee', [[0.03, 0.03, 1.2, 0xc9a227, 0, -0.05, -0.45], [0.5, 0.1, 0.04, 0x1d1f22, 0, -0.08, -1.05]]);
   for (const k in TOOLS) items[k] = toolItem(k, av);
-  { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; av.add(e); items.ext = e; }
+  { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; e.userData.item = true; av.add(e); items.ext = e; }
   av.traverse(o => { o.userData.noHit = true; if (o.isMesh) o.castShadow = true; }); av.visible = false; scene.add(av);
   VIEW.av = av; VIEW.key = key; VIEW.items = items;
   VIEW.pending = performance.now();
@@ -11589,10 +11591,19 @@ function buildShotgun(shadows) {
 let hudScene = null, hudCam = null, hudHemi = null, hudSun = null, fpGun = null;
 const HIP = { x: 0.075, y: -0.142, z: -0.46, rx: 0.04, ry: 0.045 };   // low and to the right; you can see the magazine sticking out the side
 const ADS = { x: 0, y: -0.0562, z: -0.3861, rx: 0.0199, ry: 0 };   // rear notch 30 cm in front of the eye; notch and the top of the bead line up on the crosshair
-function makeGun() {
+// EVERY first-person item lives in hudScene, drawn by drawHudGun() with its own near plane of 1 cm. The world camera's
+// near plane is 1 m (that is what keeps the depth buffer usable out to 9 km, and the floors rely on it), so anything
+// parented to the camera that sits half a metre from the eye - the hand, the squeegee's handle, a tool - was simply
+// clipped away and the player looked empty-handed. One scene, one near plane, no clipping.
+function ensureHud() {
+  if (hudScene) return hudScene;
   hudScene = new T.Scene(); hudCam = new T.PerspectiveCamera(42, 1, 0.01, 5);
   hudHemi = new T.HemisphereLight(0xffffff, 0x5a5048, 1); hudScene.add(hudHemi);
   hudSun = new T.DirectionalLight(0xffffff, 1); hudScene.add(hudSun); hudScene.add(hudSun.target);
+  return hudScene;
+}
+function makeGun() {
+  ensureHud();
   fpGun = buildShotgun(false); hudScene.add(fpGun.g);
   fpGun.g.visible = false; return fpGun.g;
 }
@@ -11605,7 +11616,9 @@ function snapshot(w) {   // a small JPEG of the game view right now (for notes /
     c.getContext('2d').drawImage(src, 0, 0, W, H); return c.toDataURL('image/jpeg', 0.6); } catch (e) { return null; }
 }
 function drawHudGun() {
-  if ((!gun || !gun.visible) && SR.carry !== 'me') return;
+  let any = SR.carry === 'me' || (gun && gun.visible);
+  if (!any) for (const k in heldG) if (heldG[k] && heldG[k].visible) { any = true; break; }
+  if (!any) return;
   hudCam.aspect = camera.aspect; hudCam.view = camera.view ? Object.assign({}, camera.view) : null; hudCam.updateProjectionMatrix();
   // light the gun like the world: same sun direction (turned into camera space) and brightness, but never too dark to see
   hudHemi.color.copy(hemi.color); hudHemi.intensity = Math.max(0.8, hemi.intensity);
@@ -11635,7 +11648,7 @@ function makeSqueegee() {
   grip.position.copy(a).lerp(b, 0.06); grip.quaternion.copy(h.quaternion);
   hudPart(g, new T.BoxGeometry(0.55, 0.05, 0.05), hudMat(0xffc531), 0.02, -0.51, -1.72);    // yellow blade holder
   hudPart(g, new T.BoxGeometry(0.57, 0.035, 0.02), hudMat(0x1d2a3a), 0.02, -0.55, -1.73);   // black rubber blade
-  g.visible = false; camera.add(g); return g;
+  g.visible = false; ensureHud().add(g); return g;
 }
 function makeHand() {
   const g = new T.Group(); g.userData.noHit = true;
@@ -11644,7 +11657,7 @@ function makeHand() {
   hudPart(g, new T.BoxGeometry(0.06, 0.03, 0.065), skin, 0.17, -0.135, -0.4);                                                       // palm
   for (let i = 0; i < 4; i++) hudPart(g, new T.BoxGeometry(0.012, 0.018, 0.04), skin, 0.148 + i * 0.015, -0.13, -0.448);           // fingers
   const th = hudPart(g, new T.BoxGeometry(0.014, 0.016, 0.04), skin, 0.135, -0.128, -0.41); th.rotation.y = 0.6;                  // thumb
-  g.scale.setScalar(0.85); g.visible = false; camera.add(g); return g;
+  g.scale.setScalar(0.85); g.visible = false; ensureHud().add(g); return g;
 }
 // power washer: hold fire to spray a stream of water; it washes paint splats off whatever it hits and scatters pigeons and critters
 function makeWasher() {
@@ -11653,7 +11666,7 @@ function makeWasher() {
 
 
 
-  g.visible = false; camera.add(g); return g;
+  g.visible = false; ensureHud().add(g); return g;
 }
 const wash = { t: 0, rayT: 0, drops: null, d: [], snd: null };
 function updateWasher(dt, on) {

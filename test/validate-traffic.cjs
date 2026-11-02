@@ -11,6 +11,24 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  assert.ok(rendered,failure);
  for(const s of scripts(rendered))new vm.Script(s);
  // First-person items must use the post-world pass even when the shotgun is hidden.
+ // The world camera's near plane is 1 m (that is what keeps the depth buffer good out to 9 km), so an item parented
+ // to it and sitting half a metre from the eye is clipped away: the player sees empty air, no hand, no squeegee.
+ // TEST builds them straight into the HUD scene, which has its own 1 cm near plane. LIVE lags until it is promoted,
+ // where its loader patch still moves them across at runtime - so both forms are checked here.
+ {
+  const s0 = rendered.indexOf('function drawHudGun() {');
+  const drawSrc = rendered.slice(s0, rendered.indexOf('\nconst tq =', s0));
+  assert.ok(/heldG/.test(drawSrc), 'the post-world pass is drawn for any held item, not just the shotgun');
+  if (rendered.includes('function ensureHud()')) {
+   assert.equal((rendered.match(/g\.visible = false; ensureHud\(\)\.add\(g\); return g;/g) || []).length, 5,
+    'hand, squeegee, washer, hand tool and extinguisher are all built into the HUD scene');
+   assert.equal((rendered.match(/camera\.add\(g\)/g) || []).length, 0, 'nothing first-person hangs off the world camera');
+   assert.equal((rendered.match(/hudScene \|\| camera/g) || []).length, 0, 'a carried item never falls back to the world camera');
+  } else {
+   assert.equal((rendered.match(/g\.visible = false; camera\.add\(g\); return g;/g) || []).length, 5,
+    'LIVE still builds them in the world camera, and its loader patch moves them into the HUD scene');
+  }
+ }
  const initHeld=rendered.split('\n').find(line=>line.includes('if (!heldG.squeegee)'));
  const makeHeld=()=>({visible:false,parent:'world-camera',position:{x:.1,y:-.2,z:-.6}});
  const hudState={heldG:{},TOOLS:{crowbar:{}},hudScene:{add(item){item.parent=this;}},
