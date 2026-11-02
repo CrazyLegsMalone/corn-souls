@@ -56,4 +56,22 @@ for (const stale of ['(EXR + WXR) / 2, 0.035,', '(MXR + EXR) / 2, 0.024,', 'RDPX
   assert.equal(ctx.b('pad'), -16, 'and the concrete pads are pulled forward the most');
 }
 
+
+// ---------------------------------------------------------------- painted markings are painted, not embedded
+assert.ok(html.includes("strip(n0 + dir * SIN, 0.15, ylw, GY('paint'));"), 'the highway yellow edge line is on the paint layer');
+assert.ok(html.includes("strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, GY('paint'));"), 'and so is the white one');
+assert.ok(html.includes("dummy.position.set(x, GY('paint'), z); dummy.rotation.set(0, phi, 0);"), 'the highway lane dashes too');
+assert.ok(html.includes("dummy.position.set(SX0 + i * 2.7, GY('paint'), rz + 2.75);"), 'and the shop-lot stall lines');
+assert.ok(!html.includes(', 0.032, rz + 2.75)') && !html.includes(', 0.032, z); dummy.rotation.set(0, phi, 0)'),
+  'no painted marking is left buried in the asphalt at 0.032');
+// the ground canvases must be tagged sRGB: the statement once ended up inside a trailing comment, which washed the
+// whole site out (sRGB pixels read as linear, then encoded again on the way out)
+{
+  const NL = String.fromCharCode(10);
+  assert.ok(html.includes('if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;' + NL + '  return GROUND[kind] = t;'),
+    'the ground texture sRGB tag is a real statement, not swallowed by the anisotropy comment');
+  const swallowed = new RegExp('t\.anisotropy = [^' + NL + ']*//[^' + NL + ']*if \(T\.SRGBColorSpace\)');
+  assert.ok(!swallowed.test(html), 'and it can never be swallowed again');
+}
+
 console.log('PASS: one ground layer table (grass < dirt < dirtroad < asphalt < paint < pad), height and depth pull in lockstep, every overlay takes both from it - so the cross road between the process building and the energy center is above the dirt yard again');

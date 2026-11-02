@@ -7240,7 +7240,7 @@ function init(container) {
     const rows = [0.3, 12.8, 18.3, 30.8, 36.3, 48.8].map(r => Z0 + r);   // top edge of each stall row (z): single row by the north curb, then back-to-back pairs, 7 m drive aisles between
     const SX0 = 66 + SH_DX; extStation(SX0 - 1.6, 0.025, rows[0] + 1.0, Math.PI / 2);
     const n = Math.floor((X1 - 0.5 - SX0) / 2.7) + 1, lines = new T.InstancedMesh(new T.BoxGeometry(0.12, 0.02, 5.5), mat(0xffffff), rows.length * n);
-    let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, 0.032, rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
+    let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, GY('paint'), rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
     lines.count = k; lines.userData.noHit = true; scene.add(lines);
     // five employees' vehicles parked in stalls, very simple: body, cabin, windows, wheels (nose in toward the stall's back)
     const car = (kind, col, si, ri) => {
@@ -7808,7 +7808,7 @@ function init(container) {
       strip(n0 + dir * SIN, 0.15, ylw, GY('paint'));                                                           // yellow inside edge line
       strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, GY('paint'));                                              // white outside edge line
       const nd = n0 + dir * (SIN + LANE), cnt = Math.floor(L / 12.2), d = new T.InstancedMesh(new T.BoxGeometry(3.05, 0.02, 0.15), wht, cnt);
-      for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, 0.032, z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
+      for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, GY('paint'), z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
       d.userData.noHit = true; scene.add(d);                                                             // lane divider dashes
     }
   }
