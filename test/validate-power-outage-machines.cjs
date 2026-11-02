@@ -491,17 +491,24 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     for (const f of files.slice(1)) assert.equal((read(f).images || []).length, 1, f + ' carries its own embedded label');
   }
   assert.ok(html.includes("const VEND = { machines: [], picks: [], props: {}, busy: false, eaten: 0 };"), 'one vending state');
-  assert.ok(html.includes("if (P3.vendNear()) return;   // a dropped packet or a vending machine takes the X press first"), 'X checks the vending first');
+  assert.ok(html.includes('if (vendX()) return;   // a dropped packet or a vending machine takes the X press first'), 'X checks the vending first, from the UI block where toast/modal live');
   assert.ok(html.includes('const r = P3.kiaToggle() || P3.radioToggle()'), 'and the launcher-patched line is untouched');
   assert.ok(html.includes('vendUpdate(dt);'), 'the flap is animated from the frame loop');
   assert.ok(html.includes("loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' })"), 'break-room machine placed where the flat box was');
   assert.ok(html.includes("loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' })"), 'scale-house machine placed in shifted coordinates');
   assert.ok(html.includes('for (const s2 of DRINK_SPOTS) VEND.machines.push('), 'the Milo-Rade machines answer X too');
-  assert.ok(html.includes("rows.push(['💧 Water', () => { if (vendDispense(M, 'milo_rade_can.glb', 'Milo-Rade')) toast('WATER: out of order (it never stocked water) - dispensing Milo-Rade anyway'); }]);"), 'the WATER joke is preserved and still drops a Milo-Rade can');
+  assert.ok(html.includes("if (P3.vendDispense(m, 'milo_rade_can.glb', 'Milo-Rade')) toast('WATER: out of order - it never stocked water. Dispensing Milo-Rade anyway.');"), 'the WATER joke is preserved and still drops a Milo-Rade can');
   assert.ok(html.includes("vendSpawn('water_can.glb', 'Water',"), 'the water can is a separate item at each machine');
   assert.ok(html.includes('if (!M || !M.ready || VEND.busy) return false;'), 'repeated presses are ignored while one is dropping');
   assert.ok(!/vendSpawn\([^)]*0\.001/.test(html), 'the embedded preview packet scale is never copied onto a spawned prop');
   assert.ok(html.includes('// deliberately NOT merged: DISPENSED_* and SNACK_DISPENSER_FLAP have to stay addressable as nodes'), 'the machine stays unmerged so its nodes work');
+  {   // the vending engine block must not touch UI-only helpers - calling toast() there shipped a TypeError on v1.97.66
+    const a = html.indexOf('const VEND = {'), b = html.indexOf('// ---------- MILO RADE vending machines', a);
+    const engine = html.slice(a, b > a ? b : a + 12000);
+    for (const fn of ['toast(', 'modal(', 'unlockMouse(']) assert.ok(!engine.includes(fn), 'the vending engine block must not call ' + fn);
+    assert.ok(html.includes('vendPickNear: () => vendPickNear()') && html.includes('vendSnacks: SNACKS'), 'it exposes its data and actions to the UI instead');
+    assert.ok(html.includes("const p = P3.vendPickNear();") && html.includes("toast('Collected ' + P3.vendTake(p))"), 'and the UI block does the talking');
+  }
   // ---------------------------------------------------------------- ground and floor layering (z-fighting guard)
   // grass is the base plane at y 0; dirt, asphalt and the concrete pads lie above it. Anything closer than a couple of
   // centimetres, or relying on a single unit of polygon offset, flickers through as green a few hundred metres out.
