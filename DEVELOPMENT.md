@@ -1,3 +1,12 @@
+## TEST v1.97.76 — a dead plant leaves the mash in the pipes (2026-11-01)
+- Owner-reported: during an outage the mash pipes showed empty when they should still show mash, just not moving.
+- Cause: `updateFlows()` hid the liquid tube whenever the flow rate was near zero (`f.mesh.visible = r > 0.02`). Every flow rate is derived from the simulation, and the simulation zeroes during an outage, so the whole plant's pipes went from a flowing stream to nothing - as if the pipes had been emptied.
+- **A pipe now remembers that mash has been through it** (`f.wet`), stays visible once it has, and simply **stops scrolling** while nothing is flowing. Only a pipe that has never carried anything is hidden, so a fresh plant does not look full of mash before the first truck unloads.
+- This covers everything that runs through the same liquid path - cooked mash, beer, water, the overflow lines - because they all animate through `updateFlows()`. Frozen is also physically right for an overflow line: it keeps what last went through it rather than draining.
+- Tests pin the new rule in `validate-power-outage.cjs` (the pipe remembers, stays visible, only scrolls while flowing) and that the old one-line `visible = r > 0.02` rule is gone.
+- Verified locally **and in a clean clone** of the commit: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.76` / `corn-souls-test-shell-v103`.
+
 ## TEST v1.97.75 — flat, walkable tops on the liq tanks and both final product tanks (2026-11-01)
 - Owner request: the tops of Liq Tank 1 and 2 should be flat and walkable, and the same for both Final Product Tanks.
 - **Nothing up there was standable.** `tank()` puts a **dome** on the shell, and the Final Product Tanks' `flat: true` was only a *squashed* dome (sphere scaled 0.25) - and it never pushed a `WALK_SURF` at all, so the tops were decoration.

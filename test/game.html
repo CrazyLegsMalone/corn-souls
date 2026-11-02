@@ -5442,9 +5442,12 @@ function updateFlows(dt) {
     const n = Math.round(f.max * Math.min(1, r));
     f.off = (f.off + dt * f.speed * (0.35 + 0.65 * Math.min(1.4, r)) / f.len) % 1;
     if (!isFinite(f.off)) f.off = 0;
-    if (f.liquid) {   // slide the goo along the pipe; hide the stream when nothing is flowing
-      f.mesh.visible = r > 0.02;
-      if (f.mesh.visible) { f.tex.offset.x -= dt * f.speed * (0.35 + 0.65 * Math.min(1.4, r)) / 1.2; if (f.tex.offset.x < -1000) f.tex.offset.x += 1000; }
+    if (f.liquid) {   // slide the goo along the pipe
+      // A pipe that has carried mash still has mash in it when the pump stops: the outage freezes the stream instead of
+      // emptying the pipe. Only a pipe that has never run is hidden (nothing has been through it yet).
+      if (r > 0.02) f.wet = true;
+      f.mesh.visible = !!f.wet;
+      if (r > 0.02) { f.tex.offset.x -= dt * f.speed * (0.35 + 0.65 * Math.min(1.4, r)) / 1.2; if (f.tex.offset.x < -1000) f.tex.offset.x += 1000; }   // frozen: no scrolling
       continue;
     }
     for (let i = 0; i < n; i++) {

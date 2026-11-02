@@ -163,4 +163,10 @@ function makeCtx() {
   assert.ok(html.includes("} else if (m.t === 'po') { setPowerOutage(!!m.on);"), 'and the other side applies what it hears');
   assert.ok(html.includes('powerSet: on => powerSet(on)'), 'exposed for the debug menu');
   assert.ok(html.includes('P3.powerSet(true)') && html.includes('P3.powerSet(false)'), 'the debug menu uses it, so a debug outage also reaches the other player');
+
+  // A dead plant leaves the mash where it was: the stream in a pipe freezes, it does not empty the pipe.
+  assert.ok(html.includes('if (r > 0.02) f.wet = true;'), 'a pipe remembers that mash has been through it');
+  assert.ok(html.includes('f.mesh.visible = !!f.wet;'), 'and stays visible when the pump stops');
+  assert.ok(!html.includes('f.mesh.visible = r > 0.02;'), 'the old rule that emptied every pipe on an outage is gone');
+  assert.ok(html.includes('if (r > 0.02) { f.tex.offset.x -= dt * f.speed'), 'the goo only scrolls while it is actually flowing');
 console.log('PASS: the power outage kills only mains emitters (and keeps them dead after a rewrite), leaves the sun/sky/fog, battery gear and fires alone, blinks the interior egress strobes, and locks out the roll-up doors');
