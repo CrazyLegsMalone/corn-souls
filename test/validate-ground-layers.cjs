@@ -31,8 +31,14 @@ assert.ok(html.includes("holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, 
   'and so is the tank farm dirt, so its own gravel loop sits on top of it');
 assert.ok(html.includes("groundMat(kind, false, rw, rd2), (x0 + x1) / 2, GY(kind), (z0 + z1) / 2, null)"),
   'every road in the grid takes its height from its own layer');
-assert.ok(html.includes("groundMat('dirtroad', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('dirtroad'), CZR, null)"),
-  'the cross road between the process building (south wall z 44) and the energy center (z 73-149) is a road layer, above the yard');
+assert.ok(html.includes("groundMat('asphalt', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('asphalt'), CZR, null)"),
+  'the cross road between the process building (south wall z 44) and the energy center (z 73-149) is asphalt, above the yard - it was gravel, which read as brown ground');
+assert.ok(!html.includes("groundMat('dirtroad', false, EXR - MXR"), 'no gravel surface is left in that gap');
+// the two strips of bare dirt either side of the road are concrete aprons, and they stop at its edges
+assert.ok(html.includes('pad(-47.5, (58.8 + (CZR - 3.8)) / 2, 53, (CZR - 3.8) - 58.8, 0xc9ccd1);'),
+  'the apron from the distillation pad down to the road stops at the road edge');
+assert.ok(html.includes('pad(-38, ((CZR + 3.8) + 73.2) / 2, 34, 73.2 - (CZR + 3.8), 0xc9ccd1);'),
+  'and the apron from the road up to the energy center wall stops at the other edge');
 assert.ok(html.includes("GY('paint'),"), 'lane dashes are the paint layer, above the asphalt they mark');
 assert.ok(html.includes("padMat(c), x, GY('pad'), z, null)") && html.includes('m.polygonOffsetUnits = GLAYER.pad[1];'),
   'concrete pads keep the top layer and their own forward-pulled material');

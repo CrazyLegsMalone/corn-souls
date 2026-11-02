@@ -1,4 +1,16 @@
-## TEST v1.97.89 — every canvas colour texture is tagged sRGB, so signs and decals stop being washed out (2026-11-01)
+## TEST v1.97.90 — the yard between the process building and the energy center is pavement now, not gravel on dirt (2026-11-01)
+- Owner: the road between the process building and the energy center still looks like brown ground, not concrete or pavement.
+- **It was never pavement.** The cross road (`z = CZR = 67.8`, x -125…72) was built as `groundMat('dirtroad', …)` - the gravel texture, `#9b7f5d` with ruts, which is the same brown family as the dirt around it. The v1.97.86/88 layer work made sure it is drawn on top of the yard; the surface itself was still gravel. On top of that, 11.4 m of the 29 m gap was bare dirt: measured, the strip ran concrete pad (z 47.3-58.8) → **dirt** (58.8-64.0) → gravel road (64.0-71.6) → **dirt** (71.6-73.0) → energy center wall.
+- **The cross road is asphalt now**, across its whole 197 m run so the surface does not change mid-road. It meets the middle road and the east road at the same height and material, so the junctions stay clean, and its ends are unchanged.
+- **The two dirt strips are concrete aprons** (`pad(…, 0xc9ccd1)` - the concrete layer at `GY('pad')`, with the pads' own forward-pulled material, matching the distillation pad beside them):
+  - x -74…-21, z 58.8 → the road's north edge, tying the distillation pad's south curb down to the pavement;
+  - x -55…-21, z the road's south edge → 73.2, the apron along the energy center's north wall, in front of its roll-up door (x -29.7) and man door (x -32.4).
+  Both stop exactly at `CZR ∓ 3.8` (the road's half width), so the road stays visible between them and nothing is drawn over it. The gap now reads: concrete pad, concrete apron, asphalt road, concrete apron, energy center.
+- Tests: `validate-ground-layers.cjs` now asserts the cross road is asphalt (and that no gravel surface is left in that gap), and pins both aprons *with their bounds computed from `CZR`*, so a future road-width change cannot leave an apron covering the pavement.
+- Verified locally and in a clean clone: 10 repo-root suites + 8 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.90` / `corn-souls-test-shell-v117`.
+
+
 - Follow-up to the v1.97.87 ground-texture fix. Only the ground canvases were tagged; the other **33 canvas colour textures** - tank and door nameplates, door signs, equipment plates, the office tiles and wall sheeting, vehicle camo, the tote label, the pigeon and critter sprites, clouds, the crack and broken-glass decals, the flow/slurry texture, the digit readout, the reserved-space ground labels - were still untagged, so against a corrected ground they read washed out (sRGB pixels used as linear, then encoded again on the way out).
 - One helper writes the rule down: `const srgbTex = t => { if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; };` and every authored colour canvas goes through it. **Additive glow ramps and alpha masks are deliberately left linear** (exit-sign halos, the rail-crossing glow, ammonia puffs, wind dust, the extinguisher spray, the flame sprite, the radial glows): they are luminance, not colour, and brightening them is the point. The `TextureLoader` paths already tagged themselves (glTF embedded images, the tote photos).
 - Expected look: signs, plates and decals get their real colour back, matching the ground. Nothing else changes - alpha, geometry and layout are untouched.

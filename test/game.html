@@ -5648,7 +5648,16 @@ function init(container) {
     rd(-235, SZR, EXR - RC, SZR, SRW);                        // south road, 35 paces (~10.7 m) wide (paced) (west end meets the grain yard roads)
     rd(EXR, NROAD, EXR, SZR - RC);                            // east road
     rd(MXR, NROAD, MXR, SZR);                                 // middle road
-    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('dirtroad', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('dirtroad'), CZR, null); r.castShadow = false; }   // cross road: flat dirt/gravel road, 25 paces wide, just south of the CMT berm
+    // cross road: pavement, not gravel. It was a dirt road ('dirtroad') because the satellite shows loose surface there,
+    // but the stretch between the process building and the energy center is the plant's service yard and it read as one
+    // brown smear; every other road on the site is asphalt, so this one matches them (owner, v1.97.90).
+    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('asphalt', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('asphalt'), CZR, null); r.castShadow = false; }
+    // the two bare-dirt strips left in that yard, paved: the road crosses the gap at CZR +/- 3.8, so these aprons stop
+    // exactly at its edges. North one runs from the distillation pad's south curb (z 58.8, its 0.35 m curb included) to
+    // the road; south one is the apron along the energy center's north wall (z 73, its roll-up door is at x -29.7).
+    // pad() puts them on the concrete layer with its own forward-pulled material, so they never fight the asphalt.
+    pad(-47.5, (58.8 + (CZR - 3.8)) / 2, 53, (CZR - 3.8) - 58.8, 0xc9ccd1);          // distillation pad -> cross road
+    pad(-38, ((CZR + 3.8) + 73.2) / 2, 34, 73.2 - (CZR + 3.8), 0xc9ccd1);            // cross road -> energy center wall
     const corner = (cx, cz, start, W = RW, kind = 'asphalt') => { const d = (RC + W / 2) * 2, r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), groundMat(kind, false, d, d), cx, GY(kind), cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
     corner(EXR - RC, SZR - RC, -Math.PI / 2, SRW);                 // rounded SE corner of the plant loop
     // road around the tank farm: south on the east side, west along the south side, north on the west side back to the south road
