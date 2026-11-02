@@ -17,6 +17,7 @@ function build(source, westWing){
  ctx.DRINK_SPOTS=[];   // replaced soda machines are registered here, not built as boxes
  ctx.enclosure=(x0,x1,z0,z1,top)=>({x0,x1,z0,z1,top,wins:[],area:Math.abs((x1-x0)*(z1-z0))});   // outage daylight registry
  ctx.glazing=noop;
+ ctx.NAME_K=0.75;   // label scale constant, defined at the top of the engine block
  ctx.loadVendMachine=()=>({});ctx.vendSpawn=noop;   // vending props are placed through their own loader
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);
@@ -41,8 +42,11 @@ const replacedByModel=o=>{const p=o.position;return p.x>-62.1&&p.x<-60.8&&p.y<2&
 // The break room's snack machine (the black box and its glass panel) is replaced too: it is now the Shifty Food cabinet
 // (assets/models/shifty_food_machine.glb), so those two boxes no longer exist in the new source.
 const replacedBySnack=o=>{const p=o.position;return p.x>-60.2&&p.x<-59.0&&p.y<2.2&&(p.z+3)>14.3&&(p.z+3)<15.2;};
+// Door-sign plates are deliberately resized (every label in the plant shrank by 25%), so their geometry signature moves
+// while the sign itself stays exactly where it was.
+const resizedSign=o=>o.geometry?.type==='PlaneGeometry'&&Math.abs(o.geometry.parameters.width-1.15)<1e-6&&Math.abs(o.geometry.parameters.height-0.25)<1e-6;
 for(const o of office(old).filter(o=>!(o.geometry?.parameters.depth>7))) {
- if(replacedByModel(o)||replacedBySnack(o))continue;
+ if(replacedByModel(o)||replacedBySnack(o)||resizedSign(o))continue;
  assert.ok(relocated.has(signature(o,3)),'office object preserved at translated position: '+signature(o,3));
 }
 assert.deepEqual(next.NPCS.map(n=>n.id),old.NPCS.map(n=>n.id));

@@ -4653,6 +4653,9 @@ const M = {};
 
 // tank nameplate: white sign with black lettering stuck on the shell, like the plant's (e.g. "TF-2203 SLURRY TANK #1").
 // (x, z) tank center, r its radius, y height of the sign, (dx, dz) the direction it faces
+// Every label in the plant (tank tags, door signs, equipment plates) is drawn here, so its size lives here too:
+// NAME_K trims them all by 25% from the sizes the geometry was originally tuned to.
+const NAME_K = 0.75;
 function nameplate(text, x, y, z, r, dx, dz, k) {
   const [tag, name] = text.includes('|') ? text.split('|') : [null, text];
   const H = tag ? 150 : 96, W = Math.max(256, Math.ceil(Math.max(name.length, tag ? tag.length * 0.75 : 0) * 46 + 48)), cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -4661,7 +4664,7 @@ function nameplate(text, x, y, z, r, dx, dz, k) {
   if (tag) { c.font = 'bold 46px Arial, sans-serif'; c.fillText(tag, W / 2, 42); c.font = 'bold 64px Arial, sans-serif'; c.fillText(name, W / 2, 104); }
   else { c.font = 'bold 64px Arial, sans-serif'; c.fillText(name, W / 2, H / 2 + 3); }
   const tex = new T.CanvasTexture(cv); tex.anisotropy = 4;
-  const L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, h = (tag ? 0.53 : 0.34) * (k || 1);
+  const L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, h = (tag ? 0.53 : 0.34) * (k || 1) * NAME_K;   // 25% smaller than the original plate sizes
   const m = new T.Mesh(new T.PlaneGeometry(h * W / H, h), new T.MeshBasicMaterial({ map: tex }));
   m.position.set(x + ux * (r + 0.05), y, z + uz * (r + 0.05)); m.rotation.y = Math.atan2(ux, uz); m.userData.noHit = true; scene.add(m);
   return m;
@@ -6054,7 +6057,7 @@ function init(container) {
         g.fillStyle = '#1d2a3a'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '800 ' + (text.length > 11 ? 50 : 62) + 'px system-ui, sans-serif'; g.fillText(text, 256, 58);
         signTex[text] = new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv) });
       }
-      const geo = new T.PlaneGeometry(1.15, 0.25);
+      const geo = new T.PlaneGeometry(1.15 * NAME_K, 0.25 * NAME_K);   // door signs follow the nameplates: 25% smaller
       {
         const m = new T.Mesh(geo, signTex[text]);
         m.position.set(cx + (alongX ? 0 : s2 * (th / 2 + 0.03)), DH + 0.32, cz + (alongX ? s2 * (th / 2 + 0.03) : 0));

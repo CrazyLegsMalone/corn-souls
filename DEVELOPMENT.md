@@ -1,3 +1,11 @@
+## TEST v1.97.72 — every tank, equipment and door label is 25% smaller (2026-11-01)
+- Owner request. All 28 nameplate call sites funnel through `nameplate()`, so the trim is one constant there: **`NAME_K = 0.75`** applied to the plate height (0.53 with a tag line, 0.34 without, times each call site's own `k`), and the plate width follows the same factor. Tanks, dryers, boilers, the cooling tower, the drive-through windows, the exit doors and every room sign shrink together.
+- **Door signs are their own system** (`doorSign()` -> `signFace()`, the painted plates over the process-building doorways such as COOK ALLEY / BREAK ROOM / LAB / SERVER) and had a fixed plane of 1.15 x 0.25 m; those now use `1.15 * NAME_K` by `0.25 * NAME_K` so they match.
+- Nothing else moved: the canvas resolutions are untouched (so the text is crisper per pixel, not blurrier), the standoff distance from the wall is unchanged, and every plate stays exactly where it was. To go bigger or smaller later it is one number.
+- Tests: `validate-west-wing.cjs` compares every office object against the previous build, so door-sign plates are now explicitly exempted as *resized* (they are the same sign in the same place, just smaller) and the sandbox gained the `NAME_K` constant.
+- Verified locally: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.72` / `corn-souls-test-shell-v99`.
+
 ## TEST v1.97.71 — the vending buttons just dispense (no menu, no toast) (2026-11-01)
 - Owner request: pressing a button on the machine should dispense what that button sells, instead of opening a menu and announcing it.
 - **The cabinets carry real button nodes**, so those are what you press: `SELECT_POPCORN` / `SELECT_CORN_CHIPS` / `SELECT_ROASTED_CORN` on the Shifty Food machine, `MILO_RADE_SELECT_BUTTON` / `..._SECOND` and `WATER_SELECT_BUTTON` on the Milo-Rade machines. `loadVendMachine()` registers them per machine (`M.buttons`), hides the Milo-Rade preview can as well as the snack ones, and keeps the cabinet as a raycast target (`M.root`).
