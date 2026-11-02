@@ -590,10 +590,11 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.ok(html.includes("const p = P3.vendPickNear();") && html.includes("toast('Collected ' + P3.vendTake(p))"), 'and the UI block does the talking');
   }
   // ---------------------------------------------------------------- ground and floor layering (z-fighting guard)
-  // grass is the base plane at y 0; dirt, asphalt and the concrete pads lie above it. Anything closer than a couple of
-  // centimetres, or relying on a single unit of polygon offset, flickers through as green a few hundred metres out.
-  assert.ok(html.includes('polygonOffset: true, polygonOffsetFactor: back ? 16 : -16, polygonOffsetUnits: back ? 32 : -32'),
-    'the base layer is pushed back and every overlay pulled forward, 32 depth units each way - one unit is ~11 cm by 600 m');
+  // grass is the base plane at y 0; dirt, asphalt and the concrete pads lie above it. The separation must ride on the
+  // resolution-relative offset alone: a slope factor is multiplied by the floor's own depth slope, which is unbounded for
+  // a plane seen along its own plane, and that is what used to walk the concrete out of the clip range in the distance.
+  assert.ok(html.includes('polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8'),
+    'the base layer is pushed back and every overlay pulled forward by resolution steps, with no slope term');
   assert.ok(html.includes("const back = kind === 'grass';"), 'grass is the layer that always loses the depth fight');
   assert.ok(html.includes("groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035,"), 'the dirt yard sits above the asphalt and clear of the grass');
   assert.ok(html.includes('holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03,'), 'and so does the pit pad');
@@ -602,7 +603,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('camera.near = 0.2; camera.updateProjectionMatrix();'), 'and the walk camera near plane is 0.2, not 0.1');
   // the flat concrete pads are thin planes lying on the ground, so they need the same protection as the textured layers:
   // their own offset material (the shared mat(c) must stay untouched) and a real gap above the grass
-  assert.ok(html.includes("const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = -16; m.polygonOffsetUnits = -32; return m; };"), 'pads get their own forward-offset material');
+  assert.ok(html.includes("m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = -12;"), 'pads get their own forward-offset material - resolution steps, never a slope factor');
   assert.ok(html.includes("mat(c).clone(); m.polygonOffset = true"), 'and the shared palette material is not modified');
   assert.ok(html.includes('padMat(c), x, 0.08, z, null)'), 'pads sit 8 cm up, clear of the grass, dirt and asphalt');
   assert.ok(html.includes('t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);'), 'ground textures keep their detail at grazing angles');

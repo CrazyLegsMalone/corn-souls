@@ -83,5 +83,15 @@ const again = ctx.INTERIOR.saved.length;
 ctx.applyInteriorDark(true);
 assert.equal(ctx.INTERIOR.saved.length, again, 'a repeated outage call does not double-dim');
 
+// ------------------------------------------------ the floor layering, inside and out
+// A floor is a flat plane seen along its own plane, so its depth slope is almost infinite: any polygon offset that is
+// multiplied by that slope (polygonOffsetFactor) runs away with distance and pulls the fragments right out of the depth
+// range, where they are clipped. That is the bug where concrete 'stopped' a certain distance from the player. The
+// layering must ride on the resolution-relative term only.
+assert.ok(!/polygonOffsetFactor: back \? 16/.test(html), 'the grass/dirt layering has no slope term');
+assert.ok(html.includes("polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8"), 'it separates the layers by resolution steps only');
+assert.ok(html.includes('m.polygonOffsetFactor = 0; m.polygonOffsetUnits = -12;'), 'and so does a concrete pad');
+assert.ok(html.includes('a factor of -16 pulled the pads so far forward'), 'the reason is written down next to the code');
+
 for (const script of scripts) if (script.trim()) new vm.Script(script);
 console.log('PASS: interiors go dark on an outage, windows are the only daylight, nested rooms stay dark, and power restores them exactly');

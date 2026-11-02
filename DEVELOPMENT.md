@@ -1,3 +1,12 @@
+## TEST v1.97.80 — the floor really does stop rendering at a distance (2026-11-01)
+- Report: the concrete is still wrong, and now it also stops rendering at a distance *inside buildings*.
+- **The floor was being clipped, not z-fighting.** `polygonOffset` adds `factor x slope + units x resolution`. Both the ground layering and the concrete pads used `factor = ±16`, and a floor viewed along its own plane has an almost **infinite depth slope** - the further away it is and the flatter the angle, the bigger the offset. That offset was added to the fragment depth, walked the concrete straight out of the clip range, and those fragments were **discarded**. Hence a hard edge where the floor simply stopped, at a distance that depended on your eye height and pitch - and it happened indoors as well, where long floors are seen at the flattest angles.
+- **The fix: no slope term at all.** `groundMat()` is now `polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8` (grass pushed back 8 resolution steps, dirt/asphalt pulled forward 8) and `padMat()` is `factor 0, units -12`. Resolution-step offsets are bounded by the depth buffer's own precision, so they cannot run away at any angle.
+- The real separation is geometric and was never the problem: 3.5 cm between grass and dirt, 4.5 cm to the pads, 8 cm to a pad above the dirt. Depth precision at 200 m is ~2 mm and at 500 m ~15 mm, so the layers resolve on their own; fog is opaque from 760 m anyway.
+- Tests: `/validate-interior-dark.cjs` now pins that no slope factor survives on either layering, that the offsets are resolution-relative, and that the reason is written next to the code.
+- Verified locally and in a clean clone: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.80` / `corn-souls-test-shell-v107`.
+
 ## TEST v1.97.79 — jump onto a vehicle and stand on its roof (2026-11-01)
 - Owner request: the player should be able to jump and stand on the Ranger and the other vehicles.
 - **Half of it already worked.** `vehPush()` skips a vehicle the moment you are above it (`ly > b.max.y - 0.3`), so nothing shoved you off once you were up there - but there was **no floor**: `floorAt()` found the ground under the car, so you fell straight through the roof.

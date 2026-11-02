@@ -4703,12 +4703,14 @@ function groundTex(kind) {
 }
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
   const t = groundTex(kind).clone(); t.needsUpdate = true; if (worldUV) t.repeat.set(1 / 8, 1 / 8); else t.repeat.set(w / 8, d / 8);
-  // Layering: grass is the base plane at y 0 and everything else lies a couple of centimetres above it. One depth
-  // unit of polygon offset was not enough to separate them at a few hundred metres (near 0.1 / far 9000 leaves the
-  // depth buffer with almost no resolution out there), so the dirt yard and the road surfaces flickered through as
-  // green. The base layer is now pushed back as well as the overlays being pulled forward.
+  // Layering: grass is the base plane at y 0 and everything else lies a couple of centimetres above it. The layers are
+  // separated with polygon offset that is measured in depth-buffer resolution steps, NOT in slope: a factor term is
+  // multiplied by the surface's own depth slope, and a floor seen along its own plane has an almost infinite slope, so
+  // a factor of -16 pulled the pads so far forward that their fragments went outside the depth range and were clipped -
+  // which is why the concrete (and every other overlaid floor) appeared to simply stop a certain distance away. Slope
+  // is now zero and the offset is a fixed handful of resolution steps, which cannot run away at any viewing angle.
   const back = kind === 'grass';
-  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: back ? 16 : -16, polygonOffsetUnits: back ? 32 : -32 });
+  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8 });
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -5532,9 +5534,8 @@ function init(container) {
   // close to the grass base flickers through it at distance. They now sit above the dirt (0.03) and asphalt (0.024).
   // A pad is a thin flat plane lying on the ground, so it needs the same protection the ground textures have: its own
   // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
-  // grass. Without that it lost the depth fight a few hundred metres out and the grass showed through - the concrete
-  // appeared to stop a certain distance from the player.
-  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = -16; m.polygonOffsetUnits = -32; return m; };
+  // grass. The offset is resolution steps only - a slope factor here is what made the pad vanish in the distance.
+  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = -12; return m; };
   const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, 0.08, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
   { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
