@@ -466,9 +466,19 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- performance audit
+  assert.ok(html.includes('const FPS_CAP = 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;'), 'the frame rate is capped at 144');
+  assert.ok(html.includes('fpsAcc = Math.min(fpsAcc - FPS_STEP, FPS_STEP);'), 'with a remainder accumulator, so the cap does not halve to half the display rate');
+  assert.ok(html.includes('if (fpsAcc < FPS_STEP - 0.01) { requestAnimationFrame(frame); return; }'), 'and a skipped frame still schedules the next one');
+  // NPC rigs never animate after their pose: folded to one mesh per material and out of the shadow pass
+  assert.ok(html.includes('mergeModel(root, false);'), 'NPC rigs are merged after posing (the boiler and the vending props do the same)');
+  assert.ok(html.includes('// The pose above is the last thing that ever moves these parts'), 'and the reason is written down');
+  assert.ok(html.includes('root.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });   // indoors, static: out of the shadow pass'), 'vending machines are out of the shadow pass');
+  assert.ok(html.includes('mergeModel(root, true, o => { for (const f of TOWER.fans)'), 'the cooling tower shell is folded while its fan rotors stay');
+  assert.ok(html.includes('function mergeModel(root, castShadow, skip) {'), 'mergeModel can leave named parts alone');
   // performance: the model is folded to one mesh per material instead of 258 parts, and it is out of the shadow pass
-  assert.ok(html.includes('mergeModel(root, false);') && html.includes('function mergeModel(root, castShadow)'), 'the boiler batch-merged, with shadows off');
-  assert.ok(html.includes('function mergeModel(root, castShadow) {') && html.includes('if (parts.length < 2) continue;'), 'merge keeps single-part materials as they are');
+  assert.ok(html.includes('mergeModel(root, false);') && html.includes('function mergeModel(root, castShadow, skip)'), 'the boiler batch-merged, with shadows off');
+  assert.ok(html.includes('function mergeModel(root, castShadow, skip) {') && html.includes('if (parts.length < 2) continue;'), 'merge keeps single-part materials as they are');
   assert.ok(html.includes('if (o !== root) o.matrixAutoUpdate = false; })'), 'and stops walking static matrices every frame');
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
   // ---------------------------------------------------------------- the players wear the operator rig, tinted per player
@@ -594,7 +604,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   // the merge itself, run for real: the game's own glTF reader + mergeModel on the boiler file
   {
     const reader = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
-    const merger = html.slice(html.indexOf('function mergeModel(root, castShadow) {'), html.indexOf('function rigPivot('));
+    const merger = html.slice(html.indexOf('function mergeModel(root, castShadow, skip) {'), html.indexOf('function rigPivot('));
     assert.ok(reader.includes('function glbBuild(') && merger.includes('function mergeModel('), 'both helpers are in the game');
     const lib3 = { window: {}, console };
     vm.runInNewContext(scripts.find(x => x.includes('window.THREE=eu')), lib3);   // the engine bundle the other suites use

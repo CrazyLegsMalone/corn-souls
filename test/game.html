@@ -4946,10 +4946,11 @@ const TOWER = { x: 50, z: 202, yaw: 0, scale: 2, fans: [], ready: false };
 // ---------- STATIC MODEL MERGE: an imported model is authored as hundreds of tiny parts (the boiler alone is 258), and
 // every part is its own draw submission - twice over, because each one renders into the shadow map too. Folding a model
 // down to one mesh per material changes nothing on screen: the boiler goes from ~1030 submissions to ~22.
-function mergeModel(root, castShadow) {
+function mergeModel(root, castShadow, skip) {   // skip(o): true for a mesh that must stay a separate node
   root.updateMatrixWorld(true);
   const inv = new T.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), gone = [];
   root.traverse(o => {
+    if (skip && skip(o)) return;
     if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || !o.geometry || !o.geometry.attributes.position) return;
     const m = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld);
     let g = groups.get(o.material); if (!g) groups.set(o.material, g = []);
@@ -5022,6 +5023,10 @@ function loadCharacter(id, cfg) {
     }
     root.scale.setScalar(cfg.scale || 1);
     root.updateMatrixWorld(true);
+    // The pose above is the last thing that ever moves these parts, so fold them now: one mesh per material and no
+    // shadow casting. An NPC rig was 59-101 parts, each submitted twice - a quarter of the scene's draw calls for four
+    // people standing still.
+    mergeModel(root, false);
     const bb = new T.Box3().setFromObject(root);
     // A seated model is anchored at the PELVIS, not at its origin: seatY is where the HIP JOINTS belong (seatedPerson()'s
     // seat top is 0.47 and the box avatar's hips are 0.49), and the root sits at the model's FEET, 0.62 m below that in
@@ -5158,6 +5163,7 @@ function loadVendMachine(spot) {                 // spot: { x, y, z, yaw, kind }
   VEND.machines.push(M);
   loadGlbModel('/corn-souls/assets/models/' + (spot.kind === 'snack' ? 'shifty_food_machine.glb' : 'milorade_machine.glb'), ({ root, byName }) => {
     // deliberately NOT merged: DISPENSED_* and SNACK_DISPENSER_FLAP have to stay addressable as nodes
+    root.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });   // indoors, static: out of the shadow pass
     const g = new T.Group(); g.position.set(spot.x, spot.y, spot.z); g.rotation.y = spot.yaw || 0; g.add(root); scene.add(g);
     g.updateMatrixWorld(true);
     const bb = new T.Box3().setFromObject(g); g.position.y += spot.y - bb.min.y;   // feet on the floor, whatever the origin is
@@ -5223,6 +5229,9 @@ function loadCoolingTower() {
     const g = new T.Group(); g.position.set(TOWER.x, 0, TOWER.z); g.rotation.y = TOWER.yaw; g.scale.setScalar(TOWER.scale);
     g.add(root); scene.add(g); scene.updateMatrixWorld(true);
     for (let i = 0; i < 4; i++) { const r = byName['Fan_Rotor_' + i]; if (r) TOWER.fans.push(r); }
+    // Fold the static shell (83 parts -> about 9) and leave the four fan rotors as they are, since they turn with the
+    // plant. Shadows are kept: it is a big outdoor structure.
+    mergeModel(root, true, o => { for (const f of TOWER.fans) { let q = o; while (q) { if (q === f) return true; q = q.parent; } } return false; });
     const bb = new T.Box3().setFromObject(g);                                   // the placed footprint, in world space
     const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, cz = (bb.min.z + bb.max.z) / 2;
     add(new T.PlaneGeometry(w + 3, d + 3).rotateX(-Math.PI / 2), groundMat('asphalt', false, w + 3, d + 3), TOWER.x, 0.028, cz);   // hardstand
@@ -12617,7 +12626,15 @@ function frameBody(now) {
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }
 }
 let fpsN = 0, fpsT = 0;
+const FPS_CAP = 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;   // 0 = uncapped
+let fpsAcc = 0, fpsPrev = 0;
 function frame(now) {
+  if (FPS_STEP) {   // deadline accumulator: keeps the remainder, so it settles at the cap instead of halving the rate
+    if (!fpsPrev) fpsPrev = now;
+    fpsAcc += Math.min(50, now - fpsPrev); fpsPrev = now;
+    if (fpsAcc < FPS_STEP - 0.01) { requestAnimationFrame(frame); return; }
+    fpsAcc = Math.min(fpsAcc - FPS_STEP, FPS_STEP);
+  }
   fpsN++; if (!fpsT) fpsT = now; if (now - fpsT >= 1000) { $('fps').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps  ' + P3.drawCalls + ' dc  ' + Math.round(P3.triCount / 1000) + 'k tri'; fpsN = 0; fpsT = now; }
   try { frameBody(now); } catch (e) { if (frameErrs++ < 3 && window.__showErr) __showErr('frame: ' + (e && e.message) + '\n' + (e && e.stack || '')); }
   requestAnimationFrame(frame);

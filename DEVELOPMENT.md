@@ -1,3 +1,22 @@
+## TEST v1.97.70 — performance audit, and the frame rate now caps at 144 (2026-11-01)
+- **Frame cap 144** (`FPS_CAP`). `requestAnimationFrame` runs at the display's rate - 165 Hz on the owner's PC - and the loop rendered every tick. It now uses a **deadline accumulator** (`fpsAcc += frame time; paint when it clears 1000/144; keep the remainder`), so it settles at the cap rather than halving to 82 on a 165 Hz screen; a skipped frame still schedules the next one, and the simulation reads its own clock, so the skipped time simply lands as slightly larger `dt` on the next frame (already clamped to 0.1 s). Set `FPS_CAP = 0` to disable.
+- **Audit of what the imported models actually cost.** Every part of a glTF model is a submission, and `glbBuild` marks each one `castShadow`, so every part is drawn twice. What was still unbatched:
+
+| Model | Parts | Submissions before | After | Saved |
+|---|---|---|---|---|
+| NPC rigs (Vern 101, Rick 62, Brenda 60, Tammy 59) | 282 | **564** | ~60 | **~500** |
+| Cooling tower | 83 | 166 | ~26 | **~140** |
+| Vending machines (2 snack + 2 Milo-Rade) | 48 + 38 | 86 | 43 | **43** |
+| Boiler x2 | 516 | 1032 | 22 | 1030 (v1.97.60) |
+
+- **NPC rigs are folded after posing.** `mergeModel()` runs at the end of `loadCharacter()`: the pose is the last thing that ever moves those parts (`npc.model` is only ever hidden, never animated), so they become one mesh per material and stop casting shadows. Verified against the real Brenda GLB: **60 parts -> 15 meshes, 60 -> 0 shadow casters**, bounding box drift 2.3 cm on the min corner only - that is three vertices the index buffer never referenced, so nothing that was being drawn.
+- **Cooling tower shell folded, fans kept.** `mergeModel()` gained an optional `skip(o)` predicate so a mostly-static model can be batched while its moving parts stay addressable: the shell goes 83 -> ~9 while the four `Fan_Rotor_*` nodes are untouched, and shadows are kept because it is a large outdoor structure.
+- **Vending machines out of the shadow pass** (indoors, static, and they cannot be merged because `DISPENSED_*` / `SNACK_DISPENSER_FLAP` must stay nodes).
+- **Left alone deliberately, with reasons**: the player rigs (up to three avatars x 101 meshes, already shadow-free; limbs animate, so they cannot be merged wholesale - per-pivot merging would take them to ~25 each if the budget ever needs it), the vulture (animated joints), and the pixel-ratio cap of 1.5 (the biggest remaining mobile lever, already written down in `LIGHTING.md`'s Low tier).
+- Tests pin the cap (constant, accumulator, and that a skipped frame reschedules), the NPC merge and its comment, the vending shadow flag, the tower `skip` merge and the `mergeModel` signature.
+- Verified locally: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.70` / `corn-souls-test-shell-v97`.
+
 ## TEST v1.97.69 — the power outage is world state now, so both players see it come back (2026-11-01)
 - Owner-reported in 2 player: the host started an outage from the debug menu, the other player closed the main breaker, a toast said power was restored - but the egress strobes kept blinking and the interiors stayed dark on the other side.
 - Cause: `POWER_OUTAGE.on` was **per-client**. `setPowerOutage()` was called by whoever pressed the button (debug menu, or `powerResetAction()` at the substation) and nothing told the other PC, so each side could sit in a different world. The toast came from the side that acted; the strobes and the interior dimming come from `POWER_OUTAGE.on` on the side that did not.
