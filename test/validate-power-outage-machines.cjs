@@ -579,7 +579,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     'the eave guardrail opens where a walkway or ladder meets it');
   assert.ok(html.includes('WALK_SURF.push({ x0: Math.min(xa, xb) - W / 2') && html.includes('wallSegs.push([xa + ox + SX'), 'the deck is walkable and its rails block a fall');
   // ---------------------------------------------------------------- performance audit
-  assert.ok(html.includes('const FPS_CAP = 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;'), 'the frame rate is capped at 144');
+  assert.ok(html.includes("const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fps) || 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;"),
+    'the frame rate is capped from the quality tier (144 on a desktop, 60 on a phone)');
   assert.ok(html.includes('fpsAcc = Math.min(fpsAcc - FPS_STEP, FPS_STEP);'), 'with a remainder accumulator, so the cap does not halve to half the display rate');
   assert.ok(html.includes('if (fpsAcc < FPS_STEP - 0.01) { requestAnimationFrame(frame); return; }'), 'and a skipped frame still schedules the next one');
   // NPC rigs never animate after their pose: folded to one mesh per material and out of the shadow pass
@@ -724,8 +725,10 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   }
   // cross-script wiring: the frame loop lives in a later script block than the renderer, so the HUD readout has to go
   // through the Plant3D bridge - reading `renderer` directly there threw a ReferenceError once a second (v1.97.60).
-  assert.ok(html.includes('get drawCalls() { return renderer ? renderer.info.render.calls : 0; }'), 'the renderer counters are exposed on Plant3D');
-  assert.ok(html.includes('get triCount() { return renderer ? renderer.info.render.triangles : 0; }'), 'triangles too');
+  assert.ok(html.includes('get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }'), 'the renderer counters are exposed on Plant3D');
+  assert.ok(html.includes('get perf() { return PERF; }, get tier() { return TIER; },'), 'and so are the frame budget and the quality tier');
+  assert.ok(html.includes('P3.perf.frame = performance.now() - now;'), 'the frame-loop bridge feeds the frame time back into the budget (cross-block: PERF lives with the renderer)');
+  assert.ok(html.includes('get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }'), 'triangles too');
   assert.ok(html.includes('+ P3.drawCalls +'), 'and that is what the FPS readout uses');
   { const at = html.indexOf("$('fps').textContent");
     const line = html.slice(at, html.indexOf(';', at));
