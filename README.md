@@ -47,6 +47,11 @@ The LIVE service worker must continue to exclude `/corn-souls/test/`
 requests, and TEST must never register the LIVE worker or use LIVE's
 manifest. Do not advance LIVE until TEST has been approved.
 
+## Design notes
+
+- [Lighting: current state, and the rework design (parked)](LIGHTING.md)
+- [Development log and release notes](DEVELOPMENT.md)
+
 ## Third-party assets and credits
 
 - [Player-visible asset credits](credits.html)
