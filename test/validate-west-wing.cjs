@@ -17,6 +17,7 @@ function build(source, westWing){
  ctx.DRINK_SPOTS=[];   // replaced soda machines are registered here, not built as boxes
  ctx.enclosure=(x0,x1,z0,z1,top)=>({x0,x1,z0,z1,top,wins:[],area:Math.abs((x1-x0)*(z1-z0))});   // outage daylight registry
  ctx.glazing=noop;
+ ctx.loadVendMachine=()=>({});ctx.vendSpawn=noop;   // vending props are placed through their own loader
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);
  vm.runInContext(source.slice(source.indexOf('  // ---------- PROCESS BUILDING'),source.indexOf('  // beer well pump inside the alley')),ctx);
@@ -37,8 +38,11 @@ const relocated=new Set(office(next).map(o=>signature(o)));
 // machine model (assets/models/milorade_machine.glb), so it is not built as a BoxGeometry any more.
 // The break room's soda machine + its glass panel were two boxes in this footprint; both are now the GLB machine.
 const replacedByModel=o=>{const p=o.position;return p.x>-62.1&&p.x<-60.8&&p.y<2&&(p.z+3)>14.3&&(p.z+3)<15.2;};
+// The break room's snack machine (the black box and its glass panel) is replaced too: it is now the Shifty Food cabinet
+// (assets/models/shifty_food_machine.glb), so those two boxes no longer exist in the new source.
+const replacedBySnack=o=>{const p=o.position;return p.x>-60.2&&p.x<-59.0&&p.y<2.2&&(p.z+3)>14.3&&(p.z+3)<15.2;};
 for(const o of office(old).filter(o=>!(o.geometry?.parameters.depth>7))) {
- if(replacedByModel(o))continue;
+ if(replacedByModel(o)||replacedBySnack(o))continue;
  assert.ok(relocated.has(signature(o,3)),'office object preserved at translated position: '+signature(o,3));
 }
 assert.deepEqual(next.NPCS.map(n=>n.id),old.NPCS.map(n=>n.id));

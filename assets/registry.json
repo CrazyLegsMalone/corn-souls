@@ -359,6 +359,132 @@
       "public_repository_redistribution_review": "owner-directed; published with owner approval",
       "required_notice": "None (first-party asset).",
       "notes": "The buzzard that perches on the RTO stack and carries bodies to the far pond, in the TEST channel."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-shifty-food-machine",
+      "title": "Shifty Food vending machine",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/shifty_food_machine.glb",
+      "modifications": "Used at export scale (1.15 x 2.1 x 0.92 m cabinet): placed in the process break room and the scale-house tech room in place of the flat box machines, feet snapped to the floor from its own bounds, no shadow casting. Not merged, because the DISPENSED_* packets and SNACK_DISPENSER_FLAP must stay addressable as nodes.",
+      "files": [
+        "assets/models/shifty_food_machine.glb"
+      ],
+      "evidence": "29 nodes, 24 meshes, 10 materials, one embedded PNG label sheet, three glTF animation clips (Dispense_POPCORN / CORN_CHIPS / ROASTED_CORN) that this game does not mix - the flap is swung procedurally instead. Carries SELECT_*, DISPENSED_* and SNACK_DISPENSER_FLAP interaction nodes.",
+      "notes": "The Shifty Food snack machine in the break room and the scale house (TEST channel)."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-shifty-popcorn",
+      "title": "Shifty Food - Butter Popcorn pack",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/shifty_popcorn.glb",
+      "modifications": "Dispensed at export scale, spawned on the floor in front of the machine and collected with X.",
+      "files": [
+        "assets/models/shifty_popcorn.glb"
+      ],
+      "evidence": "4 meshes, 4 materials, one embedded PNG, fictional nutrition label on the back.",
+      "notes": "Butter Popcorn, one of the three snack packets."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-shifty-corn-chips",
+      "title": "Shifty Food - Corn Chips pack",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/shifty_corn_chips.glb",
+      "modifications": "Dispensed at export scale, spawned on the floor in front of the machine and collected with X.",
+      "files": [
+        "assets/models/shifty_corn_chips.glb"
+      ],
+      "evidence": "4 meshes, one embedded PNG, fictional nutrition label on the back.",
+      "notes": "Corn Chips, one of the three snack packets."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-shifty-roasted-corn",
+      "title": "Shifty Food - Roasted Corn Kernels pack",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/shifty_roasted_corn.glb",
+      "modifications": "Dispensed at export scale, spawned on the floor in front of the machine and collected with X.",
+      "files": [
+        "assets/models/shifty_roasted_corn.glb"
+      ],
+      "evidence": "4 meshes, one embedded PNG, fictional nutrition label on the back.",
+      "notes": "Crunchy Roasted Corn, one of the three snack packets."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-milo-rade-can",
+      "title": "Milo-Rade can (sorghum electrolyte drink)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/milo_rade_can.glb",
+      "modifications": "Dispensed at export scale (0.13 m tall can) from both Milo-Rade machines, spawned on the floor in front and collected with X.",
+      "files": [
+        "assets/models/milo_rade_can.glb"
+      ],
+      "evidence": "7 meshes, 7 materials, one embedded PNG. This is what the Milo-Rade machines now drop, including from their WATER button.",
+      "notes": "The Milo-Rade machine’s dispensed can."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
+      "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-01",
+      "reviewer": "Owner (directed the generation)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-water-can",
+      "title": "Water can",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/water_can.glb",
+      "modifications": "Placed at export scale on the floor beside each snack machine as a separate collectible; the vending WATER button still does not stock it.",
+      "files": [
+        "assets/models/water_can.glb"
+      ],
+      "evidence": "5 meshes, 5 materials, one embedded PNG.",
+      "notes": "The stand-alone water item."
     }
   ]
 }

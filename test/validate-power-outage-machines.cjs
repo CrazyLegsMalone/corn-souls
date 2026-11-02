@@ -476,6 +476,32 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   for (const call of ["dressPlayer(av, VEST_COL[other], {});", "dressPlayer(d, vest, { sit: true });", "dressPlayer(av, VEST_COL[me], { onRig: rig => {"])
 
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
+  // ---------------------------------------------------------------- vending: the Shifty Food machine and the cans
+  { const files = ['shifty_food_machine.glb', 'shifty_popcorn.glb', 'shifty_corn_chips.glb', 'shifty_roasted_corn.glb', 'milo_rade_can.glb', 'water_can.glb'];
+    for (const f of files) assert.ok(fs.existsSync('assets/models/' + f), 'shipped: ' + f);
+    const read = f => { const b = fs.readFileSync('assets/models/' + f); let off = 12, doc = null;
+      while (off < b.length) { const len = b.readUInt32LE(off), type = b.readUInt32LE(off + 4), body = off + 8;
+        if (type === 0x4e4f534a) doc = JSON.parse(b.slice(body, body + len).toString('utf8')); off = body + len + ((4 - (len % 4)) % 4); }
+      return doc; };
+    const m = read('shifty_food_machine.glb'), names = new Set(m.nodes.map(n => n.name));
+    assert.deepEqual(m.animations.map(a => a.name).sort(), ['Dispense_CORN_CHIPS', 'Dispense_POPCORN', 'Dispense_ROASTED_CORN'], 'the three selection clips are in the file');
+    for (const n of ['SELECT_POPCORN', 'SELECT_CORN_CHIPS', 'SELECT_ROASTED_CORN', 'DISPENSED_POPCORN', 'DISPENSED_CORN_CHIPS', 'DISPENSED_ROASTED_CORN', 'SNACK_DISPENSER_FLAP'])
+      assert.ok(names.has(n), 'machine node: ' + n);
+    assert.equal((m.images || []).length, 1, 'the machine labels are one embedded PNG');
+    for (const f of files.slice(1)) assert.equal((read(f).images || []).length, 1, f + ' carries its own embedded label');
+  }
+  assert.ok(html.includes("const VEND = { machines: [], picks: [], props: {}, busy: false, eaten: 0 };"), 'one vending state');
+  assert.ok(html.includes("if (P3.vendNear()) return;   // a dropped packet or a vending machine takes the X press first"), 'X checks the vending first');
+  assert.ok(html.includes('const r = P3.kiaToggle() || P3.radioToggle()'), 'and the launcher-patched line is untouched');
+  assert.ok(html.includes('vendUpdate(dt);'), 'the flap is animated from the frame loop');
+  assert.ok(html.includes("loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' })"), 'break-room machine placed where the flat box was');
+  assert.ok(html.includes("loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' })"), 'scale-house machine placed in shifted coordinates');
+  assert.ok(html.includes('for (const s2 of DRINK_SPOTS) VEND.machines.push('), 'the Milo-Rade machines answer X too');
+  assert.ok(html.includes("rows.push(['💧 Water', () => { if (vendDispense(M, 'milo_rade_can.glb', 'Milo-Rade')) toast('WATER: out of order (it never stocked water) - dispensing Milo-Rade anyway'); }]);"), 'the WATER joke is preserved and still drops a Milo-Rade can');
+  assert.ok(html.includes("vendSpawn('water_can.glb', 'Water',"), 'the water can is a separate item at each machine');
+  assert.ok(html.includes('if (!M || !M.ready || VEND.busy) return false;'), 'repeated presses are ignored while one is dropping');
+  assert.ok(!/vendSpawn\([^)]*0\.001/.test(html), 'the embedded preview packet scale is never copied onto a spawned prop');
+  assert.ok(html.includes('// deliberately NOT merged: DISPENSED_* and SNACK_DISPENSER_FLAP have to stay addressable as nodes'), 'the machine stays unmerged so its nodes work');
   // ---------------------------------------------------------------- ground and floor layering (z-fighting guard)
   // grass is the base plane at y 0; dirt, asphalt and the concrete pads lie above it. Anything closer than a couple of
   // centimetres, or relying on a single unit of polygon offset, flickers through as green a few hundred metres out.
