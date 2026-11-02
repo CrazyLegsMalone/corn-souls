@@ -472,9 +472,24 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
   // ---------------------------------------------------------------- the players wear the operator rig, tinted per player
   assert.ok(html.includes("const PLAYER_RIG = { url: '/corn-souls/assets/models/operator_vern_rig.glb'"), 'both players use the operator rig');
-  assert.equal((html.match(/dressPlayer\(/g) || []).length, 5, 'one definition + four avatars: 2P remote, own 3rd person, Ranger driver, mower rider');
+  assert.equal((html.match(/dressPlayer\(/g) || []).length, 6, 'one definition + five avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat');
   for (const call of ["dressPlayer(av, VEST_COL[other], {});", "dressPlayer(d, vest, { sit: true });", "dressPlayer(av, VEST_COL[me], { onRig: rig => {"])
+
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
+  // ---------------------------------------------------------------- riding along: one drives, one sits beside them
+  assert.ok(html.includes('function seatPassenger(g, vest)') && html.includes('d.position.set(0.34, 0.12, -0.02)'), 'a passenger seat on the other half of the bench (the driver sits at -0.3)');
+  assert.ok(html.includes('y: 0, vy: 0, pass: false }'), 'the walk state carries the ride-along flag');
+  assert.ok(html.includes('else if (walk.pass) passUpdate(dt); else walkPhysics(dt);'), 'riding along replaces walking, so you are carried rather than walking inside the car');
+  assert.ok(html.includes("return (out || V3()).set(0.34, 0.78, -0.02).applyMatrix4(g.matrixWorld);"), 'the seat position comes from the vehicle transform');
+  assert.ok(html.includes('if (!walk.on || walk.dead || !Q || !Q.g || !Q.drive) { passExit(); return; }'), 'if the driver gets out, the passenger steps out too');
+  assert.ok(html.includes("if (walk.pass) { passExit(); return 'Stepped out of the passenger seat'; }"), 'X gets you out');
+  assert.ok(html.includes('NET.rp.drive && !walk.ride && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.4'), 'X beside their moving Ranger gets you in');
+  assert.ok(html.includes("netSend({ t: 'ps', on: true });") && html.includes("netSend({ t: 'ps', on: false });"), 'the other PC is told both ways');
+  assert.ok(html.includes('ps: !!walk.pass,'), 'the 15 Hz player message carries it');
+  assert.ok(html.includes('R.ps = !!m.ps;'), 'and it is read back');
+  assert.ok(html.includes('R.av.visible = R.walk && !R.drive && !R.mow && !R.ps;'), 'their standing body is hidden while they are seated in your car');
+  assert.ok(html.includes('utv.passenger = seatPassenger(P0, VEST_COL[NET.host ? 1 : 0])'), 'and they are drawn in your passenger seat, in their own vest colour');
+  assert.ok(html.includes('const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;'), 'your own third-person body is hidden while you ride');
   assert.ok(html.includes("VIEW.legs = [rig.legL, rig.legR].filter(Boolean);"), 'the walk cycle drives the rig hips');
   assert.ok(html.includes('av.traverse(o => { if (o.isMesh) o.userData.body = true; });'), 'box parts are marked, so held items survive the hide');
   assert.ok(html.includes('av.traverse(c => { if (c.userData.body) c.visible = false; });'), 'and only the box body is hidden');

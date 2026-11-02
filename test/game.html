@@ -9016,7 +9016,7 @@ function update(sim, dt, events) {
     const shut = d.open < 0.55; for (let i = 0; i < 4; i++) d.seg[i] = shut ? d.home[i] : 1e5;
   }
   if (walk.on) {
-    if (walk.drive) utvUpdate(dt); else if (walk.ride) rideUpdate(); else if (walk.mow) mowUpdate(dt); else walkPhysics(dt);
+    if (walk.drive) utvUpdate(dt); else if (walk.ride) rideUpdate(); else if (walk.mow) mowUpdate(dt); else if (walk.pass) passUpdate(dt); else walkPhysics(dt);
     if (O.shedMower) { const m = O.shedMower; m.g.visible = m.out || walk.mow || m.door.open > 0.02 || (walk.x > m.X0 && walk.x < m.X1 && walk.z > m.Z0 && walk.z < m.Z1); }   // mower drawn from inside the shed or while the roll-up is open
     // toxic retention pond: standing in the water slowly poisons Squeeg (the screen turns green over 20 s); get out and it wears off
     const inWater = !walk.dead && !walk.ride && walk.y < PONDS.water && inPond(walk.x, walk.z);
@@ -9126,7 +9126,7 @@ const _lerpA = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k
 function netRecv(m) {
   if (!m || !m.t) return;
   if (m.t === 'p') {
-    netRemote(); const R = NET.rp; R.walk = m.w; R.drive = m.d; R.tx = m.x; R.ty = m.y; R.tz = m.z; R.tyaw = m.yaw; R.aim = m.a || 0; if (m.am !== undefined) { R.am = m.am; R.sh = m.sh; }
+    netRemote(); const R = NET.rp; R.walk = m.w; R.drive = m.d; R.ps = !!m.ps; R.tx = m.x; R.ty = m.y; R.tz = m.z; R.tyaw = m.yaw; R.aim = m.a || 0; if (m.am !== undefined) { R.am = m.am; R.sh = m.sh; }
     const mh = m.h === 'washer' ? 'gun' : m.h;   // water ammo is the same gun
     R.car = m.car || null; if (m.car && O.cars) { const c = O.cars[m.car[0]]; c.tx = m.car[1]; c.tz = m.car[2]; c.ta = m.car[3]; c.ty = m.car[4]; c.remote = true; }
     if (m.mw) { R.mow = m.mw; if (O.shedMower) O.shedMower.out = true; } else if (R.mow) R.mow = null;
@@ -9169,7 +9169,7 @@ function netUpdate(dt) {
   const now = performance.now() / 1000, rdt = Math.min(0.25, now - (NET.lastT || now)); NET.lastT = now;   // real time: keeps sending even while a menu has the game paused
   NET.sendT += rdt; dt = Math.max(dt, rdt);
   if (NET.sendT > 1 / 15) { NET.sendT = 0;
-    const o = { t: 'p', h: held === 'gun' && ammo === 'water' ? 'washer' : held, nb: !!utv.boosting, w: walk.on && !walk.dead, d: !!walk.drive, x: +walk.x.toFixed(2), y: +walk.y.toFixed(2), z: +walk.z.toFixed(2), yaw: +walk.yaw.toFixed(3) };
+    const o = { t: 'p', h: held === 'gun' && ammo === 'water' ? 'washer' : held, nb: !!utv.boosting, w: walk.on && !walk.dead, d: !!walk.drive, ps: !!walk.pass, x: +walk.x.toFixed(2), y: +walk.y.toFixed(2), z: +walk.z.toFixed(2), yaw: +walk.yaw.toFixed(3) };
     o.u = CAR_ON ? [+RANGER_SAVE.x.toFixed(2), +RANGER_SAVE.z.toFixed(2), +RANGER_SAVE.a.toFixed(3), 0, +RANGER_SAVE.y.toFixed(2)] : [+utv.x.toFixed(2), +utv.z.toFixed(2), +utv.a.toFixed(3), +utv.steer.toFixed(2), +utv.y.toFixed(2)];
     if (CAR_ON) o.car = [CAR_ON.i, +utv.x.toFixed(2), +utv.z.toFixed(2), +utv.a.toFixed(3), +utv.y.toFixed(2)];
     o.a = aimK > 0.5 ? 1 : 0; o.am = ammo === 'water' ? 1 : 0; o.sh = mags[ammo];
@@ -9191,7 +9191,10 @@ function netUpdate(dt) {
       if (M[4] && sp > 0.3 && Math.random() < rdt * 12) { const h = g.rotation.y, fx = -Math.cos(h), fz = Math.sin(h); puff(V3(g.position.x + fz * 0.85, g.position.y + 0.25, g.position.z - fx * 0.85), 0.07, 0x6aa84f); }
       if (!walk.mow) { const dd = walk.on ? Math.hypot(walk.x - g.position.x, walk.z - g.position.z) : 60; mowSound(true, Math.min(1, sp / 3.6), Math.max(0, 1 - dd / 45), !!M[4]); }
     } else if (O.shedMower && O.shedMower.rider && O.shedMower.rider.visible) { O.shedMower.rider.visible = false; if (!walk.mow) mowSound(false); }
-    R.av.visible = R.walk && !R.drive && !R.mow;
+    R.av.visible = R.walk && !R.drive && !R.mow && !R.ps;
+    { const P0 = utv.g;   // when they are riding with you, seat them beside you in your own Ranger
+      if (R.ps && P0) { if (!utv.passenger || utv.passG !== P0) { utv.passG = P0; utv.passenger = seatPassenger(P0, VEST_COL[NET.host ? 1 : 0]); } utv.passenger.visible = true; }
+      else if (utv.passenger) utv.passenger.visible = false; }
     if (O.cars) for (const c of O.cars) if (c.remote && c !== CAR_ON) { const k = Math.min(1, rdt * 10); c.x += (c.tx - c.x) * k; c.z += (c.tz - c.z) * k; c.a = _lerpA(c.a, c.ta, k); c.y += ((c.ty || 0) - c.y) * k; c.g.position.set(c.x, c.y + 0.13, c.z); c.g.rotation.set(0, c.a, 0); for (const q of c.cols) { q[0] = 1e5; q[1] = 1e5; } } if (NET.rr) NET.rr.driver.visible = R.walk && R.drive && !R.car; R.av.position.set(R.x, R.y, R.z); R.av.rotation.y = R.yaw;
   }
   const Q = NET.rr; if (Q) {
@@ -9304,7 +9307,7 @@ function mergeStatic() {
   return removed;
 }
 // ---------- WALK MODE: first-person operator view at real scale (Squeeg is 5 ft 6 in: eye height ~1.57 m) ----------
-const walk = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, y: 0, vy: 0 }, EYE = 1.57, BODY_R = 0.28;
+const walk = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, y: 0, vy: 0, pass: false }, EYE = 1.57, BODY_R = 0.28;
 const SQ_K = 1.68 / 1.8;   // Squeeg's body (and the other player's) scaled from the standard 1.8 m character to 5 ft 6 in
 // parked cars and trucks are solid as boxes the shape of the vehicle (the old pair of round colliders left the noses and tailgates walk-through).
 // The box rides along with the vehicle, so a car someone drove somewhere else is still solid where it's parked now.
@@ -10411,6 +10414,31 @@ const RANGER_COL = [0xc0221c, 0x1f63c8];   // Player 1 red, Player 2 blue
 const VEST_COL = [0xff7a1a, 0xc6e41f];     // Player 1 orange vest, Player 2 lime vest
 function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
   dressPlayer(d, vest, { sit: true }); return d; }
+function seatPassenger(g, vest) { const d = makeCharacter(vest, true); d.position.set(0.34, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
+  dressPlayer(d, vest, { sit: true }); return d; }
+// ---------- RIDING ALONG: X beside the other player's moving Ranger and you hop into the passenger seat. Your own controls
+// go quiet, your body is pinned to that seat with the camera riding with it, and the other PC puts you in its own passenger
+// seat (they know from the `ps` flag). X again steps out. Only meaningful in 2 player, where there is somebody to ride with.
+function passSeat(g, out) {
+  if (!g) return null;
+  g.updateMatrixWorld(true);
+  return (out || V3()).set(0.34, 0.78, -0.02).applyMatrix4(g.matrixWorld);
+}
+function passUpdate(dt) {
+  const Q = NET.rr;
+  if (!walk.on || walk.dead || !Q || !Q.g || !Q.drive) { passExit(); return; }            // the driver got out, or the Ranger is gone
+  const s = passSeat(Q.g);
+  walk.x = s.x; walk.y = s.y; walk.z = s.z; walk.yaw = Q.a; walk.vy = 0; walk.peakY = null;
+}
+function passExit() {
+  if (!walk.pass) return;
+  walk.pass = false;
+  const Q = NET.rr;
+  if (Q && Q.g) { walk.x = Q.x + Math.cos(Q.a) * 1.1; walk.z = Q.z - Math.sin(Q.a) * 1.1; walk.y = Q.y; }
+  walk.yaw = Q ? Q.a : walk.yaw; walk.vy = 0;
+  netSend({ t: 'ps', on: false });
+}
+
 // ---------- RAGDOLL (verlet: 11 points joined by fixed-length sticks; cheap, no physics engine). Squeeg goes limp when he dies:
 // flung by whatever hit him, tumbles, flops to a stop on the ground, then freezes (costs nothing) and stays as one of the last 5 bodies.
 // A UTV driven into a body sets it flopping again.
@@ -10518,6 +10546,10 @@ function walkJump() { if (walk.drive) return; if (walk.ride) { rideOff(); return
 function rideCar() { return train.cars.find(c => c.ride); }
 function rideToggle() {
   if (!walk.on || walk.dead) return null;
+  if (walk.pass) { passExit(); return 'Stepped out of the passenger seat'; }
+  if (NET.rr && NET.rp && NET.rp.drive && !walk.ride && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.4) {
+    walk.pass = true; walk.vy = 0; walk.peakY = null; netSend({ t: 'ps', on: true });   // ride shotgun
+    return 'Riding along beside them: X to step out'; }
   if (walk.drive) { const nm = CAR_ON ? CAR_ON.name : 'Ranger'; utvExit(); return 'Got out of the ' + nm; }
   if (NET.rr && !walk.ride && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2 && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < Math.hypot(walk.x - utv.x, walk.z - utv.z)) { swapRangers(); netSend({ t: 'swap' }); }   // the other player's Ranger is closer: take it
   if (utv.g && Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 && !walk.ride) { utvEnter(); return 'The Ranger: RT gas · LT brake/reverse · left stick steer · A handbrake · B NOS (Shift on keyboard) · Y camera · X get out'; }
@@ -10840,7 +10872,7 @@ function buildSelfAv() {
     VIEW.legs = [rig.legL, rig.legR].filter(Boolean); VIEW.arms = [rig.armL, rig.armR].filter(Boolean); } });
 }
 function updateSelfAv() {
-  const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow;
+  const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;
   if (!show) { if (VIEW.av) VIEW.av.visible = false; return; }
   buildSelfAv(); const av = VIEW.av; av.visible = true; av.position.set(walk.x, walk.y, walk.z); av.rotation.y = walk.yaw;
   const sp = Math.hypot(walk.x - VIEW.lx, walk.z - VIEW.lz); VIEW.lx = walk.x; VIEW.lz = walk.z;
