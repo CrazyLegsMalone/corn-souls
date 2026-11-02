@@ -98,5 +98,35 @@ assert.ok(html.includes('P3.perf.frame = performance.now() - now;'), 'the frame 
 assert.ok(html.includes('(window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fps) || 144'), 'the frame cap follows the tier');
 assert.ok(html.includes("+ 'k tri  ' + (pf.frame || 0).toFixed(1) + ' ms'"), 'and the fps readout shows the real numbers');
 
+
+// ---------------------------------------------------------------- one broken update must not freeze the frame
+assert.ok(html.includes('function stepSafe(name, fn) {') && html.includes("console.error('[update:' + name + '] failed '"),
+  'the frame tail runs through a guard that reports the failure instead of dying silently');
+for (const g of ["stepSafe('balls', () => updateBalls(dt));", "stepSafe('gun', () => updateGun(dt));",
+                 "stepSafe('birds', () => updateBirds(dt));", "stepSafe('power', () => applyPowerOutage());"]) {
+  assert.ok(html.includes(g), 'guarded every frame: ' + g);
+}
+assert.ok(html.includes('if (!B || !B.m || !B.v) { balls.splice(i, 1); continue; }'),
+  'a stray entry in the ball list is dropped instead of throwing on every frame');
+assert.ok(html.includes('drawHud: () => drawHudGun(),'), 'the first-person pass is on the Plant3D bridge');
+assert.ok(html.includes('try { P3.drawHud(); } catch (e2) {}'),
+  'and the frame loop draws it even when the world update threw, so the gun cannot vanish with it');
+assert.ok(html.includes('get viewmodel() {') && html.includes("gun: !!(g && g.visible)"),
+  'the viewmodel state is readable, so the fps line can say when the gun should be up but is not');
+assert.ok(html.includes("(badGun ? ' · noGun' : '')"), 'and the fps line does say it');
+assert.ok(html.includes('PAUSED'), 'a modal quietly swallowing the clock is visible on the fps line too');
+{   // the guard really does keep going after a throw, and counts it / names it
+  const NL = String.fromCharCode(10);
+  const i = html.indexOf('function stepSafe(name, fn) {');
+  const src = html.slice(i, html.indexOf(NL + '}', i) + 2);
+  const ctx = { console: { error() {} }, PERF: { errs: 0, err: '', msg: '' }, FAILS: {}, calls: [] };
+  vm.createContext(ctx);
+  vm.runInContext(src + NL + "stepSafe('bad', () => { throw new Error('boom'); }); stepSafe('good', () => this.calls.push(1));", ctx);
+  assert.equal(ctx.calls.length, 1, 'a throwing update does not stop the ones after it');
+  assert.equal(ctx.PERF.errs, 1, 'and the failure is counted');
+  assert.equal(ctx.PERF.err, 'bad', 'and named');
+  assert.equal(ctx.PERF.msg, 'boom', 'and its message kept');
+}
+
 console.log('PASS: quality tier (low/medium/high + manual override), lazy shadow map at the tier rate, one info reset per frame so the fps readout counts the shadow and world passes, warm shader compile, Lambert imports');
 

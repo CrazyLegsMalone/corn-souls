@@ -121,7 +121,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('const CAN = { cap: 20, charge: 20 }'), 'the diesel can holds 20 L');
   assert.ok(html.includes('// ---- diesel gen-set on its own pad beside the pivot point'), 'the gen-set is built');
   assert.ok(html.includes('1 - (d - 25) / 55'), 'the diesel is only audible near the corn circle');
-  assert.ok(html.includes('pivotGenSound();'), 'the engine sound runs every frame');
+  assert.ok(html.includes("stepSafe('pivotGen', () => pivotGenSound());"), 'the engine sound runs every frame (guarded, so one bad frame cannot silence it for good)');
   assert.ok(html.includes('pivotGenNear: () => pivotGenNear()'), 'the tank is reachable from the world');
   assert.ok(html.includes('if (P3.pivotGenNear()) { pivotGenMenu(); return; }'), 'E opens the gen-set menu');
   assert.ok(html.includes("P3.pivotGenAction('dump')"), 'a debug row can empty the tank');
@@ -301,7 +301,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('const TOWER = { x: 50, z: 202, yaw: 0, scale: 2'), 'doubled, and pushed south to clear the road');
   assert.ok(html.includes('g.scale.setScalar(TOWER.scale)'), 'the scale is applied when the model loads');
   assert.ok(html.includes("groundMat('asphalt', false, w + 3, d + 3)"), 'the hardstand is sized from the placed model');
-  assert.ok(html.includes('loadCoolingTower();') && html.includes('updateCoolingTower(dt);'), 'built at load, updated every frame');
+  assert.ok(html.includes('loadCoolingTower();') && html.includes("stepSafe('coolingTower', () => updateCoolingTower(dt));"), 'built at load, updated every frame');
   assert.ok(html.includes('if (!TOWER.fans.length || POWER_OUTAGE.on) return;'), 'the fans stop dead with the plant');
   assert.ok(html.includes('POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'grid-fed stacks (RTO, cooling tower) go cold with the plant');
   assert.ok(html.includes('rate: 7, grid: true });'), 'the RTO stack is flagged grid-fed');
@@ -484,7 +484,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function updateVehTops()'), 'vehicles carry a walk surface that follows them');
   assert.ok(html.includes('s.x0 = x0; s.x1 = x1; s.z0 = z0; s.z1 = z1; s.y0 = s.y1 = top;'), 'the surface is the world AABB at roof height');
   assert.ok(html.includes('if (!s) { s = V.top = { x0: 0, x1: 0, z0: 0, z1: 0, y0: 0, y1: 0 }; WALK_SURF.push(s); }'), 'one surface per vehicle, created once and moved');
-  assert.ok(html.includes('updateVehTops(); if (heldDead && (walk.dead || walk.drive)) deadDrop();'), 'updated every frame, before the player moves');
+  assert.ok(html.includes("stepSafe('vehTops', () => updateVehTops());") &&
+    html.indexOf("stepSafe('vehTops'") < html.indexOf("stepSafe('deadDrop'"), 'updated every frame, before the player moves');
   assert.ok(html.includes('if (ly > b.max.y - 0.3 || ly + 1.7 < b.min.y) continue;'), 'and vehPush already ignores a vehicle you are standing on');
   assert.ok(html.includes('regVehBox(g);   // solid to walk into, and a roof you can stand on'), 'the Ranger is registered too');
   assert.ok(html.includes('walk.y < 1.2) for (const off of [-0.9, 0, 0.9])'), 'its old three-circle push-out does not shove you off the roof');
@@ -508,7 +509,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('b.t += dt; b.v.y -= 9.8 * dt;'), 'on a real arc');
   assert.ok(html.includes('b.o.thrown = false; b.o.t = 45; THROWN.splice(i, 1);'), 'and come to rest as ordinary corpses, back on the clean-up timer');
   assert.ok(html.includes('critterEat: () => critterEat(), critterThrow: () => critterThrow(),'), 'both are on the Plant3D bridge');
-  assert.ok(html.includes('updateBirds(dt); updateCritters(dt); updateThrown(dt);'), 'and they are stepped every frame');
+  assert.ok(html.includes("stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt));"), 'and they are stepped every frame (guarded, so a throw in one cannot stop the others)');
   assert.ok(html.includes('if (!c.held && !c.thrown && (c.t -= dt) <= 0)'), 'a held corpse is already exempt from the clean-up timer');
   assert.ok(html.includes('if (heldDead && (walk.dead || walk.drive)) deadDrop();'), 'and it is put down if you die or get in something');
   assert.ok(html.includes('{ const m = P3.critterPick(); if (m) { toast(m); return; } }'), 'the X press is wired to it');
@@ -617,7 +618,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const VEND = { machines: [], picks: [], props: {}, busy: false, eaten: 0 };"), 'one vending state');
   assert.ok(html.includes('if (vendX()) return;   // a dropped packet or a vending machine takes the X press first'), 'X checks the vending first, from the UI block where toast/modal live');
   assert.ok(html.includes('const r = P3.kiaToggle() || P3.radioToggle()'), 'and the launcher-patched line is untouched');
-  assert.ok(html.includes('vendUpdate(dt);'), 'the flap is animated from the frame loop');
+  assert.ok(html.includes("stepSafe('vending', () => vendUpdate(dt));"), 'the flap is animated from the frame loop');
   assert.ok(html.includes("loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' })"), 'break-room machine placed where the flat box was');
   assert.ok(html.includes("loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' })"), 'scale-house machine placed in shifted coordinates');
   assert.ok(html.includes('for (const s2 of DRINK_SPOTS) VEND.machines.push('), 'the Milo-Rade machines answer X too');
