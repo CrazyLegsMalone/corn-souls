@@ -466,6 +466,17 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- killing a critter, carrying it and eating it
+  assert.ok(html.includes('function critterPick()'), 'X can pick a corpse up');
+  assert.ok(html.includes("if (critters) for (const c of critters) if (c.state === 'hit' && !c.held) cand.push(c);"), 'dead critters count');
+  assert.ok(html.includes("for (const b of birds) if (b.state === 'fall' && !b.held) cand.push(b);"), 'so do fallen birds');
+  assert.ok(html.includes("for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);"), 'and dead frogs');
+  assert.ok(html.includes('camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6);'), 'a picked-up corpse is carried in front of the camera');
+  assert.ok(html.includes('return 'Picked up the dead ' + nm + ' - X again to eat it.';'), 'and you are told how to eat it');
+  assert.ok(html.includes('if (heldDead.g.parent) heldDead.g.parent.remove(heldDead.g);') && html.includes("heldDead.o.state = 'gone'; heldDead.o.held = false; heldDead = null;"), 'X again eats it, taking it out of the world');
+  assert.ok(html.includes('if (!c.held && !c.thrown && (c.t -= dt) <= 0)'), 'a held corpse is already exempt from the clean-up timer');
+  assert.ok(html.includes('if (heldDead && (walk.dead || walk.drive)) deadDrop();'), 'and it is put down if you die or get in something');
+  assert.ok(html.includes('{ const m = P3.critterPick(); if (m) { toast(m); return; } }'), 'the X press is wired to it');
   // ---------------------------------------------------------------- the dirt pond loop keeps out of the corn circle
   {   // the tracks are drawn from the same numbers the game builds from, so this cannot drift
     const blk = html.slice(html.indexOf('const DIRT_ROADS = ['), html.indexOf('];', html.indexOf('const DIRT_ROADS = [')));

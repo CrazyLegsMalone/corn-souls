@@ -1,3 +1,14 @@
+## TEST v1.97.78 — killing a critter, carrying the corpse and eating it (2026-11-01)
+- Owner request: after killing a critter and picking up the corpse, it can be eaten.
+- **Nothing could pick a corpse up before.** Critters, fallen pigeons and dead pond frogs were killed, flopped, cleaned themselves up after 45 s and that was it - `hitCritter()`/`hitBird()` set the state but no interaction ever looked at them.
+- **`critterPick()`** (X, exposed as `Plant3D.critterPick`) finds the nearest corpse within **2.2 m** - a critter in the `hit` state, a pigeon in `fall`, a frog no longer `live` - and takes it into your hands: the group is `camera.attach`ed, so you carry it in front of you at (0.3, -0.3, -0.6), and the prompt says *"Picked up the dead rat - X again to eat it."*
+- **X again eats it**: the corpse is removed from the world, its state goes to `gone` and the flag clears - *"You ate the rat."* No new inventory, no invented hunger or health numbers: eating simply takes the corpse out of the world, which is what was asked for.
+- A carried corpse is already **exempt from the clean-up timer** because those updates skip anything with `held` set - the same flag that stops a thrown body being reclaimed - so it cannot evaporate out of your hands.
+- **It is put down** if you die or get into a vehicle (`deadDrop()`), so a corpse can never be welded to the camera across a death or a drive.
+- Tests pin the corpse search (all three kinds), the carry attachment, both messages, the clean-up exemption and the put-down.
+- Verified locally and in a clean clone: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.78` / `corn-souls-test-shell-v105`.
+
 ## TEST v1.97.77 — the pond dirt loop stops cutting through the corn circle and actually meets the pavement (2026-11-01)
 - Owner request: the dirt road round the ponds should not go through the corn circle, it should connect to the pavement on the west side once both sides of the loop meet, and it should connect to the east-west road over the tracks just north of the tank farm.
 - **It ran straight through the pivot circle.** The circle is centred on (-675, -99) with a **344 m radius**, so its southern edge reaches z 245; the old track ran at z 190-200 from x -420 to -700, i.e. up to **32 m inside** the corn. The west leg now dips south around it and around the ponds' north-west corner: it keeps **22 m** off the circle (sampled every 2 m along the whole polyline, not just at the nodes) and 7 m off the pond edges, then rejoins the existing west-side run at (-742, 345).
