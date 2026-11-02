@@ -492,7 +492,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;'), 'your own third-person body is hidden while you ride');
   assert.ok(html.includes("VIEW.legs = [rig.legL, rig.legR].filter(Boolean);"), 'the walk cycle drives the rig hips');
   assert.ok(html.includes('av.traverse(o => { if (o.isMesh) o.userData.body = true; });'), 'box parts are marked, so held items survive the hide');
-  assert.ok(html.includes('av.traverse(c => { if (c.userData.body) c.visible = false; });'), 'and only the box body is hidden');
+  assert.ok(html.includes('for (const c of box) if (c.parent) c.parent.remove(c);'), 'and the box body is REMOVED, so nothing can reveal it again');
+  assert.ok(html.includes('if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);'), 'a second dress replaces the rig instead of stacking one on top');
   {
     const reader2 = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
     const rigSrc = html.slice(html.indexOf('function rigPivot('), html.indexOf('function loadCharacter('));
@@ -511,10 +512,10 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
       box.userData.body = true; av.add(box); return av; };
     const a1 = avatar(), a2 = avatar();
     pctx.dressPlayer(a1, 0xff7a1a, {}); pctx.dressPlayer(a2, 0xc6e41f, {});
-    const rigOf = av => av.children.find(c => c.type === 'Group' && c !== av.children[0]);
+    const rigOf = av => av.children.find(c => c.type === 'Group');   // the box body is removed, so the rig is the only group
     const g1 = rigOf(a1), g2 = rigOf(a2);
     assert.ok(g1 && g2, 'a rig was added to each avatar');
-    assert.equal(a1.children[0].visible, false, 'the box body is hidden, the rig stands in for it');
+    assert.equal(a1.children.some(c => c.userData.body), false, 'the box body is gone, the rig stands in for it');
     assert.ok(Math.abs(g1.scale.x - 1.8 / 1.64) < 1e-6, 'the rig is scaled to the box body height');
     assert.ok(Math.abs(g1.rotation.y - Math.PI) < 1e-6, 'and turned to face the way the box avatars face');
     const jacket = g => { const n = g.getObjectByName('Torso_Jacket_Male');   // a glTF node is a group holding unnamed meshes

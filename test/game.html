@@ -5058,7 +5058,7 @@ function loadPlayerRig(cb) {
 // caller can animate them (the walk cycle drives VIEW.legs / VIEW.arms, which is exactly these).
 function dressPlayer(av, vest, opts) {
   const o = opts || {};
-  loadPlayerRig(src => {
+  loadPlayerRig(src => { try {
     const g = src.clone(true), rig = characterRig(g, { hands: 'Hand_Glove' });
     // the jacket is the vest: recolour it per player. glTF nodes become GROUPS holding unnamed meshes, so the jacket
     // material is read off the meshes under that node, and the swap is by material identity - a fresh clone each time,
@@ -5076,11 +5076,16 @@ function dressPlayer(av, vest, opts) {
     const bb = new T.Box3().setFromObject(g);
     g.position.y = o.seat === undefined ? -bb.min.y : o.seat - bb.min.y;   // feet on the avatar's floor
     g.rotation.y = Math.PI;                                  // the rigs face +Z, the box avatars face -Z
-    g.traverse(c => { c.userData.noHit = true; });
-    av.traverse(c => { if (c.userData.body) c.visible = false; });   // the box body only: held items stay
-    av.add(g);
+    g.traverse(c => { c.userData.noHit = true; if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; } });
+    // The box body is REMOVED, not just hidden: a stray visible=true anywhere else must never be able to resurrect it,
+    // and a left-over box under the rig is exactly how a player ends up looking like the old Squeeg with somebody
+    // standing inside them. Held items live in their own groups and are untouched.
+    const box = []; av.traverse(c => { if (c.userData.body) box.push(c); });
+    for (const c of box) if (c.parent) c.parent.remove(c);
+    if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);   // never dress twice
+    av.userData.rig = g; av.add(g);
     if (o.onRig) o.onRig(rig, g);
-  });
+  } catch (e) { console.warn('[player rig] dressing failed, the box avatar stays:', e && e.message); } });
 }
 // ---------- PACKAGE BOILERS: the owner's ethanol_plant_steam_boiler_narrow_long.glb - 259 nodes, matrix transforms,
 // and its own stack, burner, blower, steam drum, gauges and ladder. One upload, one clone: both bays share the geometry.
@@ -10855,7 +10860,9 @@ const VIEW = { third: false, av: null, key: '', legs: [], arms: [], items: {}, p
 function setView(third) { VIEW.third = third === undefined ? !VIEW.third : !!third; try { localStorage.setItem('cs_view3', VIEW.third ? '1' : ''); } catch (e) {} return VIEW.third; }
 try { VIEW.third = localStorage.getItem('cs_view3') === '1'; } catch (e) {}
 function buildSelfAv() {
-  const me = NET.conn && !NET.host ? 1 : 0, key = 'v' + me; if (VIEW.av && VIEW.key === key) return; if (VIEW.av) scene.remove(VIEW.av);
+  const me = NET.conn && !NET.host ? 1 : 0, key = 'v' + me;
+  if (VIEW.av && VIEW.key === key && (VIEW.av.userData.rig || VIEW.pending)) return;   // dressed, or the model is on its way
+  if (VIEW.av) scene.remove(VIEW.av);
   const av = makeCharacter(VEST_COL[me], false); av.scale.setScalar(SQ_K); VIEW.legs = []; VIEW.arms = [];
   for (const m of av.children.slice()) { const P = m.geometry && m.geometry.parameters; if (!P || m.geometry.type !== 'BoxGeometry') continue;
     const leg = Math.abs(P.height - 0.82) < 0.01, arm = Math.abs(P.height - 0.6) < 0.01 && Math.abs(P.width - 0.11) < 0.01; if (!leg && !arm) continue;
@@ -10868,12 +10875,15 @@ function buildSelfAv() {
   { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; av.add(e); items.ext = e; }
   av.traverse(o => { o.userData.noHit = true; if (o.isMesh) o.castShadow = true; }); av.visible = false; scene.add(av);
   VIEW.av = av; VIEW.key = key; VIEW.items = items;
+  VIEW.pending = performance.now();
   dressPlayer(av, VEST_COL[me], { onRig: rig => {   // the walk cycle drives the rig once it is on
+    VIEW.pending = 0;
     VIEW.legs = [rig.legL, rig.legR].filter(Boolean); VIEW.arms = [rig.armL, rig.armR].filter(Boolean); } });
 }
 function updateSelfAv() {
   const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;
   if (!show) { if (VIEW.av) VIEW.av.visible = false; return; }
+  if (VIEW.pending && performance.now() - VIEW.pending > 8000) VIEW.pending = 0;   // the model never arrived: try again
   buildSelfAv(); const av = VIEW.av; av.visible = true; av.position.set(walk.x, walk.y, walk.z); av.rotation.y = walk.yaw;
   const sp = Math.hypot(walk.x - VIEW.lx, walk.z - VIEW.lz); VIEW.lx = walk.x; VIEW.lz = walk.z;
   const moving = sp > 0.004 && sp < 1 && walk.y <= (walk.floor || 0) + 0.05; VIEW.ph += moving ? sp * 3.2 : 0;
