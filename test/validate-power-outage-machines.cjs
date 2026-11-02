@@ -475,7 +475,9 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   for (const call of ['tankDeck(O.liq1);', 'tankDeck(O.liq);', 'tankDeck(O.etoh1);', 'tankDeck(O.etoh2);'])
     assert.ok(html.includes(call), 'deck on: ' + call);
   assert.equal((html.match(/dome: false, noRail: true/g) || []).length >= 4, true, 'the four tanks no longer carry a dome or the old torus rail');
-  assert.ok(!html.includes("'etoh', { flat: true,"), 'the squashed dome that was called flat is gone');
+  assert.ok(html.includes("O.etoh1 = tank(FPX, FP1Z, 12, 12.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { dome: false, noRail: true, y: -TPIT.d, level: 0.4 })"), 'Final Product Tank 1 has a flat deck, not a squashed dome');
+  assert.ok(html.includes("O.etoh2 = tank(FPX, FP2Z, 12, 12.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { dome: false, noRail: true, y: -TPIT.d, level: 0.65 })"), 'and Tank 2 the same');
+  assert.ok(html.includes("'liq1', { level: 0.9, dome: false, noRail: true }"), 'Liq Tank 1 the same');
   // ---------------------------------------------------------------- tin-bin tops: walkways and plant-side ladders
   assert.ok(html.includes('function binWalkway(xa, za, xb, zb, y)'), 'a walkway helper exists');
   assert.ok(html.includes('function siloLadderAt(x, z, R, H, ang)'), 'and a ladder that can sit on any side');
