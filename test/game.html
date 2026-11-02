@@ -11694,9 +11694,15 @@ function buildShotgun(shadows) {
   for (let i = 0; i < MAG; i++) balls.push(add(new T.SphereGeometry(0.0057, 10, 8), M.paint[i % PAINT.length], 0.03 + i * 0.022, 0, 0.0118, mag));
   B(0.142, 0.012, 0.001, M.glass, 0.085, 0, 0.0182, mag);                               // clear window over the slit
   const api = { g, pump, mag, stock: stockG, balls, wcol, kind: null, n: -1,
+    // The rounds feed from the GUN end: slot 0 sits at x 0.03, right up against the receiver, and slot 5 at 0.14 out at
+    // the closed end, so 'i >= MAG - n' drops the one nearest the gun on every shot and the empty slot grows where the
+    // magwell is. (Nothing in the model suggests the other way round - there is no spring or follower to see - so a
+    // stack that emptied at the far end just looked like the magazine was eating from the wrong end.)
     setRounds(kind, n) { if (kind === this.kind && n === this.n) return; this.kind = kind; this.n = n;
-      balls.forEach((b, i) => { b.visible = kind === 'paint' && i < n; });
-      wcol.visible = kind === 'water' && n > 0; wcol.scale.x = Math.max(0.001, n * 0.022 - 0.002); wcol.position.x = 0.019 + wcol.scale.x / 2; } };
+      balls.forEach((b, i) => { b.visible = kind === 'paint' && i >= MAG - n; });
+      // the water level recedes from the same end: the column keeps its far-end offset, so it always sits under the balls
+      // that are left (n = 6 fills 0.019..0.149, n = 1 sits at 0.129..0.149 under slot 5)
+      wcol.visible = kind === 'water' && n > 0; wcol.scale.x = Math.max(0.001, n * 0.022 - 0.002); wcol.position.x = 0.019 + (MAG - n) * 0.022 + wcol.scale.x / 2; } };
   return api;
 }
 // first-person gun: its own scene + camera, drawn after the world with a cleared depth buffer
