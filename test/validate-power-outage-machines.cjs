@@ -104,8 +104,9 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('if (s.power) { dead(s); return; }'), 'the plant clock stops with the grid');
   assert.ok(html.includes('sim.power = P3.powerOutage;'), 'the grid drives the plant model');
   assert.ok(html.includes("'No power - nothing is running.'"), 'the unit readouts say there is no power');
-  for (const gate of ['!POWER_OUTAGE.on && train.unloading', '!POWER_OUTAGE.on && pitBusy[i]',
-                      '!POWER_OUTAGE.on && anyDrain', '!POWER_OUTAGE.on && fm.bu > 100']) {
+  // (the beer-drain gate went with the outside drain pipes: there is no drain flow to gate any more - the drain itself is
+  // the plant model's, and it is stopped by dead() like every other unit)
+  for (const gate of ['!POWER_OUTAGE.on && train.unloading', '!POWER_OUTAGE.on && pitBusy[i]', '!POWER_OUTAGE.on && fm.bu > 100']) {
     assert.ok(html.includes(gate), 'gated: ' + gate);
   }
   assert.ok(html.includes("(POWER_OUTAGE.on ? 0 : 1) * (s.k === 'mill'"), 'mill rotors, the blender and the agitators stop');
@@ -466,6 +467,19 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- the fermenter drain pipes
+  // Two pipe runs used to lie on the concrete along the outside of the fermenter columns and climb the office wall into
+  // the beer well. That is not how the fermenters connect to each other or to the beer well, so the whole assembly - the
+  // runs, the stub off every tank, the riser, its support post and the two flow animations riding them - is gone.
+  assert.ok(!html.includes('const drW = [[DXW, 0.7, ZN]'), 'no drain run along the west column');
+  assert.ok(!html.includes('const drE = [[DXE, 0.7, ZN]'), 'no drain run along the east column');
+  assert.ok(!html.includes("[DXE, 0.7, ZN], [DXE, 0.7, -38.0], [DXE, XY, -38.0]"), 'and nothing climbing the office wall');
+  assert.ok(!html.includes('tpost(DXE, -38.0, XY)'), 'its support post is gone too');
+  assert.ok(!html.includes('pipe([[x + d * (FR - 0.2), 0.7, z]'), 'no 0.7 m stub off every fermenter');
+  assert.ok(!html.includes('O.fBeerW') && !html.includes('O.fBeerE'), 'and no flow animation is left driving anything');
+  assert.ok(html.includes('const DXW = FXW - FR - 1.3, DXE = FXE + FR + 1.3;'), 'the pad still knows how wide the fermentation area is');
+  assert.ok(html.includes('pad(AC, (ZN - FR - 3 + -33) / 2, DXE - DXW + 4,'), 'and the pad is still built from it');
+
   // ---------------------------------------------------------------- standing on vehicles
   assert.ok(html.includes('function updateVehTops()'), 'vehicles carry a walk surface that follows them');
   assert.ok(html.includes('s.x0 = x0; s.x1 = x1; s.z0 = z0; s.z1 = z1; s.y0 = s.y1 = top;'), 'the surface is the world AABB at roof height');

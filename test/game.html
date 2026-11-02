@@ -6019,15 +6019,11 @@ function init(container) {
     pipe(rec, id, 0.36);
     O.ferms[i].rec = flow([[tx, 1.6, z + 2.6], [PX, 1.6, PZ], ...rec].map(q => V3(...q)), new T.SphereGeometry(0.28, 6, 5), 0xd9a441, 16, { speed: 5 });
   });
-  // beer drains run outside the alley: west column drains straight into the beer well; east column drains cross the alley entrance overhead
-  const DXW = FXW - FR - 1.3, DXE = FXE + FR + 1.3, XY = BWH + 3;
-  const drW = [[DXW, 0.7, ZN], [DXW, 0.7, BWZ], [FXW - BWR + 0.2, 0.7, BWZ]];
-  const drE = [[DXE, 0.7, ZN], [DXE, 0.7, -38.0], [DXE, XY, -38.0], [-27, XY, -38.0], [-27, XY, -38.5], [-27, BWH + 1, -38.5]];
-  tpost(DXE, -38.0, XY);
-  pipe(drW, 'beer', 0.42); pipe(drE, 'beer', 0.42);
-  fx.forEach(([x, z], i) => { const d = x === FXE ? 1 : -1; pipe([[x + d * (FR - 0.2), 0.7, z], [x === FXE ? DXE : DXW, 0.7, z]], 'f' + i, 0.36); });
-  O.fBeerW = flow(drW.map(q => V3(...q)), blob, 0xd9a441, 40, { speed: 7 });
-  O.fBeerE = flow(drE.map(q => V3(...q)), blob, 0xd9a441, 60, { speed: 7 });
+  // Beer leaves a fermenter through the drain in its own bottom head into the transfer main inside the building. There is
+  // no drain run lying on the concrete along the outside of either column, no stub off every tank, and nothing climbing
+  // the office wall to reach the beer well - that is not how the fermenters connect to each other or to the beer well.
+  // (Owner, on the pipes that used to run along the outside of the tanks.) DXW/DXE still size the fermentation pad.
+  const DXW = FXW - FR - 1.3, DXE = FXE + FR + 1.3;
   pad(AC, (ZN - FR - 3 + -33) / 2, DXE - DXW + 4, (-33) - (ZN - FR - 3), 0xd7dbe0);                // concrete under the fermentation area
   O.beerWell = tank(FXW, BWZ, BWR, BWH, 0x3ddc84, 0xd9a441, 'beer', { level: 0.5, dome: false, noRail: true });
   // ---- TANK-TOP WALKWAY: flat steel decks on the fermenters and the beer well, each with a yellow guardrail all round; a walkway runs
@@ -9102,7 +9098,6 @@ function update(sim, dt, events) {
   const Sim = root.Sim, p = sim.sp, o = sim.out, N = 1800;
   const lv = id => Sim.level(sim, id) / 100;
   const feed = sim.beer.feed;
-  const anyDrain = sim.ferm.some(f => f.state === 'draining') && !sim.drainBlocked;
 
   // product on belts and in pipes
   const recv = sim.silo[0].inflow + sim.silo[1].inflow;
@@ -9123,7 +9118,6 @@ function update(sim, dt, events) {
   O.fToHydro.rate = sim.st2.out / N; O.fCook.rate = sim.cook.out / N; O.fFlash.rate = sim.cook.out / N; O.fLiqOvf.rate = sim.liq1.out / N; O.hx.forEach((f, i) => { f.rate = sim.hxTrain === i ? sim.liq.out / N : 0; }); O.lp.forEach((p, i) => { const on = sim.liqDuty === i; p.f.rate = on ? sim.liq.out / N : 0; p.light.color.setHex(on ? 0x3ddc84 : 0x9aa4ae); }); O.fSteamIn.rate = sim.cook.out > 1 ? Math.max(0.3, (sim.hydro.T - 190) / 40) : 0;
   const fillIdx = sim.ferm.findIndex(f => f.state === 'filling');
   O.fFill.forEach((f, i) => { f.rate = fillIdx === i ? sim.liq.out / N : 0; });
-  const drIdx = sim.ferm.findIndex(f => f.state === 'draining'); O.fBeerE.rate = !POWER_OUTAGE.on && anyDrain && drIdx < 4 ? 1.2 : 0; O.fBeerW.rate = !POWER_OUTAGE.on && anyDrain && drIdx >= 4 ? 1.2 : 0;
   sim.ferm.forEach((fm, i) => { O.ferms[i].rec.rate = !POWER_OUTAGE.on && fm.bu > 100 && fm.state !== 'cleaning' ? 0.6 : 0; });
   O.fFeed.rate = feed / N;
   updateFlows(dt);

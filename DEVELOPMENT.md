@@ -1,3 +1,13 @@
+## TEST v1.97.81 — the fermenters do not drain through pipes lying outside them (2026-11-01)
+- Owner, pointing at the pipe run along the concrete in front of the fermenter columns: remove it, that is not how the ferms connect to each other or to the beer well.
+- It was the **beer drain** assembly: two 0.7 m runs down the outside of both columns (`drW` on the west, `drE` on the east), a 0.7 m stub off every single tank, a riser climbing the office wall to `BWH + 3`, a run across at that height and a drop into the beer well, plus the steel support post that carried the riser.
+- All of it is gone, together with the two flow animations that rode it (`O.fBeerW`, `O.fBeerE`) and the `anyDrain` gate that drove them - leaving those would have had orbs flying along pipes that no longer exist.
+- The **drain itself is untouched**: a fermenter still drains to the beer well in the plant model, on its own clock, stopped by `dead()` on an outage like every other unit. This was scenery, not plumbing in the simulation.
+- `DXW` / `DXE` stay: they are only numbers, and they size the concrete under the fermentation area.
+- Tests: the machines suite now asserts that neither run, the wall riser, the support post, the per-tank stubs or the flow objects come back, that the pad is still sized from `DXW`/`DXE`, and its gated-subsystem list no longer expects the beer-drain gate.
+- Verified locally and in a clean clone: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.81` / `corn-souls-test-shell-v108`.
+
 ## TEST v1.97.80 — the floor really does stop rendering at a distance (2026-11-01)
 - Report: the concrete is still wrong, and now it also stops rendering at a distance *inside buildings*.
 - **The floor was being clipped, not z-fighting.** `polygonOffset` adds `factor x slope + units x resolution`. Both the ground layering and the concrete pads used `factor = ±16`, and a floor viewed along its own plane has an almost **infinite depth slope** - the further away it is and the flatter the angle, the bigger the offset. That offset was added to the fragment depth, walked the concrete straight out of the clip range, and those fragments were **discarded**. Hence a hard edge where the floor simply stopped, at a distance that depended on your eye height and pitch - and it happened indoors as well, where long floors are seen at the flattest angles.
