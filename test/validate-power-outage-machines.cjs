@@ -472,7 +472,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("for (const b of birds) if (b.state === 'fall' && !b.held) cand.push(b);"), 'so do fallen birds');
   assert.ok(html.includes("for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);"), 'and dead frogs');
   assert.ok(html.includes('camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6);'), 'a picked-up corpse is carried in front of the camera');
-  assert.ok(html.includes('return 'Picked up the dead ' + nm + ' - X again to eat it.';'), 'and you are told how to eat it');
+  assert.ok(html.includes('Picked up the dead ') && html.includes('- X again to eat it.'), 'and you are told how to eat it');
   assert.ok(html.includes('if (heldDead.g.parent) heldDead.g.parent.remove(heldDead.g);') && html.includes("heldDead.o.state = 'gone'; heldDead.o.held = false; heldDead = null;"), 'X again eats it, taking it out of the world');
   assert.ok(html.includes('if (!c.held && !c.thrown && (c.t -= dt) <= 0)'), 'a held corpse is already exempt from the clean-up timer');
   assert.ok(html.includes('if (heldDead && (walk.dead || walk.drive)) deadDrop();'), 'and it is put down if you die or get in something');
