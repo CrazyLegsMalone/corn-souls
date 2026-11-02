@@ -4738,16 +4738,27 @@ function groundTex(kind) {
   t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);   // ground is seen at grazing angles for hundreds of metres if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
   return GROUND[kind] = t;
 }
+// ---------- ground layer order, bottom to top. Every flat overlay that lies on the site takes its HEIGHT and its
+// DEPTH PULL from this one table, so the order is a fact of the data instead of a set of magic numbers that disagree.
+// It used to disagree: the dirt yard sat at y 0.035, i.e. 1.1 cm ABOVE the asphalt at 0.024, and every ground
+// material had the same polygon offset (-8). Up to v1.97.80 the slope term in that offset dragged the road surfaces
+// forward and hid the mistake; when the slope term was removed (it was walking floors out of the depth range at
+// distance) height alone decided the depth test, so every road inside the yard - the cross road between the process
+// building and the energy center, the middle road, the loop's inner half, the tank farm's gravel loop, the lane
+// dashes - lost to the dirt and disappeared up close, then fought it at range. The pull now gets stronger with every
+// layer as well, so a higher layer wins even where two planes are nearly coplanar.
+//   [height, polygonOffsetUnits]
+const GLAYER = { grass: [0, 8], dirt: [0.016, -8], dirtroad: [0.030, -10], asphalt: [0.040, -12], paint: [0.047, -14], pad: [0.080, -16] };
+const GY = k => GLAYER[k][0];                 // the y a layer's plane sits at
+const GB = k => GLAYER[k][1];                 // and how far forward (-) or back (+) it is pulled in depth-buffer steps
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
   const t = groundTex(kind).clone(); t.needsUpdate = true; if (worldUV) t.repeat.set(1 / 8, 1 / 8); else t.repeat.set(w / 8, d / 8);
-  // Layering: grass is the base plane at y 0 and everything else lies a couple of centimetres above it. The layers are
-  // separated with polygon offset that is measured in depth-buffer resolution steps, NOT in slope: a factor term is
-  // multiplied by the surface's own depth slope, and a floor seen along its own plane has an almost infinite slope, so
-  // a factor of -16 pulled the pads so far forward that their fragments went outside the depth range and were clipped -
-  // which is why the concrete (and every other overlaid floor) appeared to simply stop a certain distance away. Slope
-  // is now zero and the offset is a fixed handful of resolution steps, which cannot run away at any viewing angle.
-  const back = kind === 'grass';
-  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8 });
+  // Layering: grass is the base plane at y 0 (see GLAYER above for the rest) and the layers are separated with polygon
+  // offset measured in depth-buffer resolution steps, NOT in slope: a factor term is multiplied by the surface's own
+  // depth slope, and a floor seen along its own plane has an almost infinite slope, so a factor of -16 pulled the pads so far forward
+  // that their fragments went outside the depth range and were clipped - which is why the concrete (and every other overlaid
+  // floor) appeared to simply stop a certain distance away. Slope is now always zero.
+  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB(kind) });
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -5339,7 +5350,7 @@ function loadCoolingTower() {
     mergeModel(root, true, o => { for (const f of TOWER.fans) { let q = o; while (q) { if (q === f) return true; q = q.parent; } } return false; });
     const bb = new T.Box3().setFromObject(g);                                   // the placed footprint, in world space
     const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, cz = (bb.min.z + bb.max.z) / 2;
-    add(new T.PlaneGeometry(w + 3, d + 3).rotateX(-Math.PI / 2), groundMat('asphalt', false, w + 3, d + 3), TOWER.x, 0.028, cz);   // hardstand
+    add(new T.PlaneGeometry(w + 3, d + 3).rotateX(-Math.PI / 2), groundMat('asphalt', false, w + 3, d + 3), TOWER.x, GY('asphalt'), cz);   // hardstand
     for (const s2 of [-1, 1]) box(w + 3, 0.18, 0.35, mat(0xb5b0a6), TOWER.x, 0.09, cz + s2 * (d / 2 + 1.5));                        // curbs
     nameplate('COOLING TOWER|CELLS 1-4', TOWER.x, bb.max.y * 0.62, bb.min.z - 0.5, 0.2, 0, -1, 1.6);
     wallSegs.push([bb.min.x, bb.min.z, bb.max.x, bb.min.z], [bb.min.x, bb.max.z, bb.max.x, bb.max.z],
@@ -5585,16 +5596,17 @@ function init(container) {
     add(new T.ShapeGeometry(g), groundMat('grass', true), 0, 0, 0, null, true).rotation.x = -Math.PI / 2;
   }
   scene.children[scene.children.length - 1].receiveShadow = true;
-  // 4.5 cm up, not 1.5: these pads are plain shared materials with no polygon offset of their own, and a plane that
-  // close to the grass base flickers through it at distance. They now sit above the dirt (0.03) and asphalt (0.024).
+  // These pads are plain shared materials with no polygon offset of their own, and a plane that close to the grass
+  // base flickers through it at distance, so they take the top ground layer from the GLAYER table above (height and
+  // depth pull both), which puts them clear of the dirt and of every road surface.
   // A pad is a thin flat plane lying on the ground, so it needs the same protection the ground textures have: its own
   // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
   // grass. The offset is resolution steps only - a slope factor here is what made the pad vanish in the distance.
-  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = -12; return m; };
-  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, 0.08, z, null); p.castShadow = false; };
+  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; return m; };
+  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, GY('pad'), z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
-  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
-  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
+  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'), (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
+  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, GY('dirt'), [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
     // the pit itself: four sloped sides and a flat bottom, one mesh; walkable (ramps), and the ground over it is cut away
     const r = P.run, D = -P.d, O = [[P.x0, P.z0], [P.x1, P.z0], [P.x1, P.z1], [P.x0, P.z1]], I = [[P.x0 + r, P.z0 + r], [P.x1 - r, P.z0 + r], [P.x1 - r, P.z1 - r], [P.x0 + r, P.z1 - r]];
     const v = [], quad = (a, b, c, d) => v.push(...a, ...b, ...c, ...a, ...c, ...d);
@@ -5622,15 +5634,15 @@ function init(container) {
     const asphalt = mat(0x50555c), dash = mat(0xffffff), RW = 8, RC = 12, SRW = 10.7;
     const rd = (x0, z0, x1, z1, W = RW, kind = 'asphalt') => {
       const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-      const rw = alongX ? len : W, rd2 = alongX ? W : len, r = add(new T.PlaneGeometry(rw, rd2).rotateX(-Math.PI / 2), groundMat(kind, false, rw, rd2), (x0 + x1) / 2, 0.024, (z0 + z1) / 2, null); r.castShadow = false;
-      if (kind === 'asphalt') for (let t = 6; t < len - 6; t += 8) add(new T.PlaneGeometry(alongX ? 4 : 0.25, alongX ? 0.25 : 4).rotateX(-Math.PI / 2), dash, alongX ? Math.min(x0, x1) + t : x0, 0.03, alongX ? z0 : Math.min(z0, z1) + t, null, true);
+      const rw = alongX ? len : W, rd2 = alongX ? W : len, r = add(new T.PlaneGeometry(rw, rd2).rotateX(-Math.PI / 2), groundMat(kind, false, rw, rd2), (x0 + x1) / 2, GY(kind), (z0 + z1) / 2, null); r.castShadow = false;
+      if (kind === 'asphalt') for (let t = 6; t < len - 6; t += 8) add(new T.PlaneGeometry(alongX ? 4 : 0.25, alongX ? 0.25 : 4).rotateX(-Math.PI / 2), dash, alongX ? Math.min(x0, x1) + t : x0, GY('paint'), alongX ? z0 : Math.min(z0, z1) + t, null, true);
     };
     rd(-235, NROAD, 245, NROAD);                              // north road, continuing east out the NE entrance (west end meets the grain yard roads)
     rd(-235, SZR, EXR - RC, SZR, SRW);                        // south road, 35 paces (~10.7 m) wide (paced) (west end meets the grain yard roads)
     rd(EXR, NROAD, EXR, SZR - RC);                            // east road
     rd(MXR, NROAD, MXR, SZR);                                 // middle road
-    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('dirtroad', false, EXR - MXR, 7.6), (MXR + EXR) / 2, 0.024, CZR, null); r.castShadow = false; }   // cross road: flat dirt/gravel road, 25 paces wide, just south of the CMT berm
-    const corner = (cx, cz, start, W = RW, kind = 'asphalt') => { const d = (RC + W / 2) * 2, r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), groundMat(kind, false, d, d), cx, 0.024, cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
+    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('dirtroad', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('dirtroad'), CZR, null); r.castShadow = false; }   // cross road: flat dirt/gravel road, 25 paces wide, just south of the CMT berm
+    const corner = (cx, cz, start, W = RW, kind = 'asphalt') => { const d = (RC + W / 2) * 2, r = add(new T.RingGeometry(RC - W / 2, RC + W / 2, 16, 1, start, Math.PI / 2), groundMat(kind, false, d, d), cx, GY(kind), cz, null); r.rotation.x = -Math.PI / 2; r.castShadow = false; };
     corner(EXR - RC, SZR - RC, -Math.PI / 2, SRW);                 // rounded SE corner of the plant loop
     // road around the tank farm: south on the east side, west along the south side, north on the west side back to the south road
     const tfE = TFX + TFW / 2 + 6, tfW = TFX - TFW / 2 - 6, tfS = TFZ + TFD / 2 + 6;
@@ -5700,13 +5712,13 @@ function init(container) {
       G(SX0, SZ0, SX1, SZ0, -20, -0.6);                                                                       // stairwell north end, below the floor
     }
     // lane markings through the building
-    for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) add(new T.PlaneGeometry(0.3, 2.4).rotateX(-Math.PI / 2), mat(0xffffff), x, 0.03, z, null, true);
+    for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) add(new T.PlaneGeometry(0.3, 2.4).rotateX(-Math.PI / 2), mat(0xffffff), x, GY('paint'), z, null, true);
   }
   // access roads: full trucks arrive from the east on the north road, empties leave south onto the main road
-  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.PlaneGeometry(18, z1 - z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 18, z1 - z0), -182, 0.024, (z0 + z1) / 2, null); r.castShadow = false; }
+  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.PlaneGeometry(18, z1 - z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 18, z1 - z0), -182, GY('asphalt'), (z0 + z1) / 2, null); r.castShadow = false; }
   // north-south bypass road between the receiving elevators and the silos, so traffic can go around Pit 1 and Pit 2
-  { const r = add(new T.PlaneGeometry(8, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('asphalt', false, 8, SZR - NROAD), WXR - GDX, 0.024, (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
-  for (let z = NROAD + 6; z < SZR - 6; z += 6) add(new T.PlaneGeometry(0.3, 3).rotateX(-Math.PI / 2), mat(0xffd84d), WXR - GDX, 0.03, z - GDZ, null, true);
+  { const r = add(new T.PlaneGeometry(8, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('asphalt', false, 8, SZR - NROAD), WXR - GDX, GY('asphalt'), (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
+  for (let z = NROAD + 6; z < SZR - 6; z += 6) add(new T.PlaneGeometry(0.3, 3).rotateX(-Math.PI / 2), mat(0xffd84d), WXR - GDX, GY('paint'), z - GDZ, null, true);
 
   // bucket elevators: pit -> boot (in-floor drag conveyor) -> up the leg -> shared distributor head -> spout to Silo 1 or Silo 2
   const EH = SILOH + SILOR * 0.45 + 6, EX = -169;
@@ -6955,8 +6967,8 @@ function init(container) {
   // unisex restroom, safety office, computer-training room. West end: open area with snack + soda machines and the glass entrance
   // doors facing west, with steps and a wheelchair ramp.
   {
-    const ew = 245 - (EXR - 4), er = add(new T.PlaneGeometry(ew, 8).rotateX(-Math.PI / 2), groundMat('asphalt', false, ew, 8), (245 + EXR - 4) / 2, 0.024, SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
-    for (let x = EXR + 8; x < 240; x += 10) add(new T.PlaneGeometry(3, 0.25).rotateX(-Math.PI / 2), mat(0xffffff), x, 0.03, SCZ_OUT, null, true);                       // dashes
+    const ew = 245 - (EXR - 4), er = add(new T.PlaneGeometry(ew, 8).rotateX(-Math.PI / 2), groundMat('asphalt', false, ew, 8), (245 + EXR - 4) / 2, GY('asphalt'), SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
+    for (let x = EXR + 8; x < 240; x += 10) add(new T.PlaneGeometry(3, 0.25).rotateX(-Math.PI / 2), mat(0xffffff), x, GY('paint'), SCZ_OUT, null, true);                       // dashes
     for (const [x, z] of [[SCXI, SCZ_IN], [SCXO, SCZ_OUT_L]]) {   // each scale in the lane right beside the scale house, so the driver's window lines up with the drive-through window
       box(21.3, 0.08, 3.6, mat(0x7d838a), x, 0.04, z);                                                                 // 70 ft truck scale deck
       for (const dz of [-1.85, 1.85]) box(21.3, 0.1, 0.12, mat(0xf2c200), x, 0.05, z + dz);                          // yellow edges
@@ -7215,10 +7227,10 @@ function init(container) {
   // and from the east road (west side); curb all around, rows of painted stalls with drive aisles between them.
   {
     const X0 = 54 + SH_DX, X1 = 114 + SH_DX, Z0 = SCZ_OUT + 5, Z1 = -48, asph = mat(0x50555c), curb = mat(0xb5b0a6);
-    const lot = add(new T.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X1 - X0, Z1 - Z0), (X0 + X1) / 2, 0.024, (Z0 + Z1) / 2, null); lot.castShadow = false;
+    const lot = add(new T.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X1 - X0, Z1 - Z0), (X0 + X1) / 2, GY('asphalt'), (Z0 + Z1) / 2, null); lot.castShadow = false;
     const AX0 = 56 + SH_DX, AX1 = 63 + SH_DX, BZ0 = -66.3, BZ1 = -59.7;                                                      // driveway openings
-    const drA = add(new T.PlaneGeometry(AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2).rotateX(-Math.PI / 2), groundMat('asphalt', false, AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2), (AX0 + AX1) / 2, 0.024, (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
-    const drB = add(new T.PlaneGeometry(X0 - (EXR + 4) + 0.2, BZ1 - BZ0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X0 - (EXR + 4) + 0.2, BZ1 - BZ0), (X0 + EXR + 4) / 2, 0.024, (BZ0 + BZ1) / 2, null); drB.castShadow = false;
+    const drA = add(new T.PlaneGeometry(AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2).rotateX(-Math.PI / 2), groundMat('asphalt', false, AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2), (AX0 + AX1) / 2, GY('asphalt'), (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
+    const drB = add(new T.PlaneGeometry(X0 - (EXR + 4) + 0.2, BZ1 - BZ0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X0 - (EXR + 4) + 0.2, BZ1 - BZ0), (X0 + EXR + 4) / 2, GY('asphalt'), (BZ0 + BZ1) / 2, null); drB.castShadow = false;
     const cb = (x0, z0, x1, z1) => { if (Math.abs(x1 - x0) > 0.01 || Math.abs(z1 - z0) > 0.01) box(Math.max(0.3, Math.abs(x1 - x0)), 0.1, Math.max(0.3, Math.abs(z1 - z0)), curb, (x0 + x1) / 2, 0.05, (z0 + z1) / 2); };
     cb(X0, Z0, AX0, Z0); cb(AX1, Z0, X1, Z0);                // north curb, gap for driveway A
     cb(X0, Z0, X0, BZ0); cb(X0, BZ1, X0, Z1);                // west curb, gap for driveway B
@@ -7781,17 +7793,17 @@ function init(container) {
   {
     const asph = mat(0x50555c), wht = mat(0xffffff), ylw = mat(0xffd84d);
     // Road P: a plain two-lane county road, two 12 ft lanes (7.3 m), no center line
-    const rp = add(new T.PlaneGeometry(7.3, RDP_Z1 - RDP_Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 7.3, RDP_Z1 - RDP_Z0), RDPX, 0.024, (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
+    const rp = add(new T.PlaneGeometry(7.3, RDP_Z1 - RDP_Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 7.3, RDP_Z1 - RDP_Z0), RDPX, GY('asphalt'), (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
     buildRail(); buildUTV();
     // divided highway built to real dimensions: per direction two 12 ft (3.66 m) lanes, a 4 ft inside shoulder and a 10 ft outside
     // shoulder; yellow edge line on the inside, white edge line outside, white 10 ft dashes every 40 ft between the lanes; grass median
     const [x0, x1] = [-1500, 1700], L = (x1 - x0) / HWY.c, phi = Math.atan(HWY.k), MED = 15, LANE = 3.66, SIN = 1.2, SOUT = 3.0;
     const midX = (x0 + x1) / 2, at = (n, u) => [midX + n * HWY.s + u * HWY.c, HWY.z(midX) + n * HWY.c - u * HWY.s];   // n: across (+ = SE), u: along
-    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.PlaneGeometry(L, w).rotateX(-Math.PI / 2), y === 0.024 ? groundMat('asphalt', false, L, w) : m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.024; return r; };
+    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.PlaneGeometry(L, w).rotateX(-Math.PI / 2), y === GY('asphalt') ? groundMat('asphalt', false, L, w) : m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.024; return r; };
     for (const side of [-1, 1]) {
       const n0 = side * MED / 2, dir = side;                        // inner edge of the paved surface, then outward
       const w = SIN + 2 * LANE + SOUT, nc = n0 + dir * w / 2;
-      strip(nc, w, asph, 0.024);                                                                          // pavement: shoulders + 2 lanes
+      strip(nc, w, asph, GY('asphalt'));                                                                          // pavement: shoulders + 2 lanes
       strip(n0 + dir * SIN, 0.15, ylw, 0.032);                                                           // yellow inside edge line
       strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, 0.032);                                              // white outside edge line
       const nd = n0 + dir * (SIN + LANE), cnt = Math.floor(L / 12.2), d = new T.InstancedMesh(new T.BoxGeometry(3.05, 0.02, 0.15), wht, cnt);
@@ -7861,7 +7873,7 @@ function init(container) {
   // turned to face north, reached by the Ranger's dirt tracks. Its MAIN BREAKER is the master reset for a power outage.
   {
     for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w);
-    add(new T.PlaneGeometry(22, 16).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, 0.031, 545);   // forecourt / turnaround
+    add(new T.PlaneGeometry(22, 16).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, GY('dirtroad'), 545);   // forecourt / turnaround
     loadSubstation();
   }
 
@@ -8181,7 +8193,7 @@ function dirtRoad(pts, w) {
   for (let i = 0; i < P.length; i++) {
     const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], t = b.clone().sub(a).normalize(), n = V3(-t.z, 0, t.x);
     if (i) dist += P[i].distanceTo(P[i - 1]);
-    pos.push(P[i].x + n.x * w / 2, 0.028, P[i].z + n.z * w / 2, P[i].x - n.x * w / 2, 0.028, P[i].z - n.z * w / 2);
+    pos.push(P[i].x + n.x * w / 2, GY('dirtroad'), P[i].z + n.z * w / 2, P[i].x - n.x * w / 2, GY('dirtroad'), P[i].z - n.z * w / 2);
     uv.push(dist, 0, dist, w);
     if (i) { const k = 2 * i; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
   }

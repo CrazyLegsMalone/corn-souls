@@ -646,23 +646,28 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   // grass is the base plane at y 0; dirt, asphalt and the concrete pads lie above it. The separation must ride on the
   // resolution-relative offset alone: a slope factor is multiplied by the floor's own depth slope, which is unbounded for
   // a plane seen along its own plane, and that is what used to walk the concrete out of the clip range in the distance.
-  assert.ok(html.includes('polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8'),
+  assert.ok(html.includes('polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB(kind)'),
     'the base layer is pushed back and every overlay pulled forward by resolution steps, with no slope term');
-  assert.ok(html.includes("const back = kind === 'grass';"), 'grass is the layer that always loses the depth fight');
-  assert.ok(html.includes("groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.035,"), 'the dirt yard sits above the asphalt and clear of the grass');
-  assert.ok(html.includes('holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03,'), 'and so does the pit pad');
-  assert.ok(html.includes('padMat(c), x, 0.08, z, null)'), 'the station and fermentation pads sit 8 cm up, above dirt and asphalt, with their own offset material');
+  assert.ok(html.includes("const GLAYER = { grass: [0, 8], dirt: [0.016, -8],"), 'grass is the layer that always loses the depth fight: it is the bottom entry of the layer table');
+  assert.ok(html.includes("groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'),"), 'the dirt yard takes the dirt layer - BELOW the roads that cross it');
+  assert.ok(html.includes("holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, GY('dirt'),"), 'and so does the pit pad');
+  assert.ok(html.includes("padMat(c), x, GY('pad'), z, null)"), 'the station and fermentation pads sit on the pad layer, above dirt and asphalt, with their own offset material');
   assert.ok(html.includes('(X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor'), 'the scale-house tile floor clears its slab top');
   assert.ok(html.includes('camera.near = 0.2; camera.updateProjectionMatrix();'), 'and the walk camera near plane is 0.2, not 0.1');
   // the flat concrete pads are thin planes lying on the ground, so they need the same protection as the textured layers:
   // their own offset material (the shared mat(c) must stay untouched) and a real gap above the grass
-  assert.ok(html.includes("m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = -12;"), 'pads get their own forward-offset material - resolution steps, never a slope factor');
+  assert.ok(html.includes('m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1];'), 'pads get their own forward-offset material - resolution steps, never a slope factor');
   assert.ok(html.includes("mat(c).clone(); m.polygonOffset = true"), 'and the shared palette material is not modified');
-  assert.ok(html.includes('padMat(c), x, 0.08, z, null)'), 'pads sit 8 cm up, clear of the grass, dirt and asphalt');
+  assert.ok(html.includes("padMat(c), x, GY('pad'), z, null)"), 'pads sit on the top layer, clear of the grass, dirt and asphalt');
   assert.ok(html.includes('t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);'), 'ground textures keep their detail at grazing angles');
-  {   // the layers, bottom to top, must stay strictly ordered with a real gap
-    const layer = [['grass', 0], ['asphalt', 0.024], ['dirt', 0.035], ['pads', 0.08]];
-    for (let i = 1; i < layer.length; i++) assert.ok(layer[i][1] - layer[i - 1][1] >= 0.005, layer[i][0] + ' clears ' + layer[i - 1][0]);
+  {   // the layers, bottom to top, come out of GLAYER and must stay strictly ordered with a real gap
+    const tbl = html.slice(html.indexOf('const GLAYER = {'), html.indexOf('const GY = k =>'));
+    const rows = [...tbl.matchAll(/(\w+): \[([\d.]+), (-?\d+)\]/g)].map(m => [m[1], +m[2], +m[3]]);
+    assert.ok(rows.length === 6, 'six ground layers: ' + rows.map(r => r[0]).join(', '));
+    for (let i = 1; i < rows.length; i++) {
+      assert.ok(rows[i][1] - rows[i - 1][1] >= 0.005, rows[i][0] + ' clears ' + rows[i - 1][0]);
+      assert.ok(rows[i][2] < rows[i - 1][2], rows[i][0] + ' is pulled further forward than ' + rows[i - 1][0]);
+    }
   }
   // ---------------------------------------------------------------- riding along: one drives, one sits beside them
   assert.ok(html.includes('function seatPassenger(g, vest)') && html.includes('d.position.set(0.34, 0.12, -0.02)'), 'a passenger seat on the other half of the bench (the driver sits at -0.3)');

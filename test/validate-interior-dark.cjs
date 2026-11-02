@@ -89,8 +89,8 @@ assert.equal(ctx.INTERIOR.saved.length, again, 'a repeated outage call does not 
 // range, where they are clipped. That is the bug where concrete 'stopped' a certain distance from the player. The
 // layering must ride on the resolution-relative term only.
 assert.ok(!/polygonOffsetFactor: back \? 16/.test(html), 'the grass/dirt layering has no slope term');
-assert.ok(html.includes("polygonOffsetFactor: 0, polygonOffsetUnits: back ? 8 : -8"), 'it separates the layers by resolution steps only');
-assert.ok(html.includes('m.polygonOffsetFactor = 0; m.polygonOffsetUnits = -12;'), 'and so does a concrete pad');
+assert.ok(html.includes('polygonOffsetFactor: 0, polygonOffsetUnits: GB(kind)'), 'it separates the layers by resolution steps only, one table for all of them');
+assert.ok(html.includes('m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1];'), 'and so does a concrete pad');
 assert.ok(html.includes('a factor of -16 pulled the pads so far forward'), 'the reason is written down next to the code');
 
 for (const script of scripts) if (script.trim()) new vm.Script(script);
