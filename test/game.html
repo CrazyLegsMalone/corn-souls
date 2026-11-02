@@ -4699,7 +4699,12 @@ function groundTex(kind) {
 }
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
   const t = groundTex(kind).clone(); t.needsUpdate = true; if (worldUV) t.repeat.set(1 / 8, 1 / 8); else t.repeat.set(w / 8, d / 8);
-  return new T.MeshLambertMaterial({ map: t, polygonOffset: kind !== 'grass', polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  // Layering: grass is the base plane at y 0 and everything else lies a couple of centimetres above it. One depth
+  // unit of polygon offset was not enough to separate them at a few hundred metres (near 0.1 / far 9000 leaves the
+  // depth buffer with almost no resolution out there), so the dirt yard and the road surfaces flickered through as
+  // green. The base layer is now pushed back as well as the overlays being pulled forward.
+  const back = kind === 'grass';
+  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: back ? 4 : -4, polygonOffsetUnits: back ? 8 : -8 });
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -5363,10 +5368,12 @@ function init(container) {
     add(new T.ShapeGeometry(g), groundMat('grass', true), 0, 0, 0, null, true).rotation.x = -Math.PI / 2;
   }
   scene.children[scene.children.length - 1].receiveShadow = true;
-  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat(c), x, 0.015, z, null); p.castShadow = false; };
+  // 4.5 cm up, not 1.5: these pads are plain shared materials with no polygon offset of their own, and a plane that
+  // close to the grass base flickers through it at distance. They now sit above the dirt (0.03) and asphalt (0.024).
+  const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat(c), x, 0.045, z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
-  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.01, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
-  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.01, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
+  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, 0.03, (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
+  { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, 0.03, [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
     // the pit itself: four sloped sides and a flat bottom, one mesh; walkable (ramps), and the ground over it is cut away
     const r = P.run, D = -P.d, O = [[P.x0, P.z0], [P.x1, P.z0], [P.x1, P.z1], [P.x0, P.z1]], I = [[P.x0 + r, P.z0 + r], [P.x1 - r, P.z0 + r], [P.x1 - r, P.z1 - r], [P.x0 + r, P.z1 - r]];
     const v = [], quad = (a, b, c, d) => v.push(...a, ...b, ...c, ...a, ...c, ...d);
@@ -6757,7 +6764,7 @@ function init(container) {
     for (const x of [74, 68, 62]) wall(false, x, HS, ZS, [], iw, 0.15);                                // manager | HR | reception | open area
     // floor slab, roof
     add(new T.BoxGeometry(X1 - X0, FY, ZS - ZN), mat(0xb5b0a6), (X0 + X1) / 2, FY / 2, HZ, null);
-    add(new T.BoxGeometry(X1 - X0 - 0.2, 0.02, ZS - ZN - 0.2), mat(0x8a7f6c), (X0 + X1) / 2, FY + 0.01, HZ, null, true);   // darker tile floor (so the walls stand out)
+    add(new T.BoxGeometry(X1 - X0 - 0.2, 0.02, ZS - ZN - 0.2), mat(0x8a7f6c), (X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor, 5 mm clear of the slab top so it cannot z-fight
     const rm = new T.MeshLambertMaterial({ color: 0x3d6b4a, transparent: true, opacity: 0.5, depthWrite: false }); wallMats.push(rm);
     add(new T.BoxGeometry(X1 - X0 + 0.8, 0.25, ZS - ZN + 0.8), rm, (X0 + X1) / 2, FY + H + 0.12, HZ, null, true);
     WALK_SURF.push({ x0: X0, x1: X1, z0: ZN, z1: ZS, y0: FY, y1: FY });
@@ -9377,7 +9384,9 @@ function walkStart() {
   if (!colliders) buildColliders();
   walk.on = true; walk.x = cam.tx; walk.z = cam.tz; walk.yaw = cam.yaw; walk.pitch = -0.08; cam.goal = null;
   pushOut();
-  camera.near = 0.1; camera.updateProjectionMatrix();
+  camera.near = 0.2; camera.updateProjectionMatrix();   // 0.2 not 0.1: halves the depth range, which is what the ground
+  // layering (grass under dirt under asphalt) needs at distance. The first-person weapon lives in hudScene with its own
+  // 0.01 near, so nothing held can be clipped by this.
 }
 function setHeadlamp(on) { if (headlamp) headlamp.intensity = on ? 28 : 0; walk.lamp = !!on; }
 function walkStop() {
