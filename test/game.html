@@ -5040,6 +5040,48 @@ function loadCharacter(id, cfg) {
   }, 'npc:' + id);
 }
 function loadNpcModels() { for (const id in NPC_MODELS) loadCharacter(id, NPC_MODELS[id]); }
+// ---------- PLAYER MODELS: both players wear the operator rig (the same rigid-part family as Vern), tinted to their
+// own vest colour so Player 1 is orange and Player 2 lime. One upload, cloned per avatar; the box body stays as the
+// fallback and keeps driving the walk cycle until the rig arrives, then the rig's own hip and shoulder pivots do.
+const PLAYER_RIG = { url: '/corn-souls/assets/models/operator_vern_rig.glb', root: null, loading: false, wait: [] };
+function loadPlayerRig(cb) {
+  if (PLAYER_RIG.root) return cb(PLAYER_RIG.root);
+  PLAYER_RIG.wait.push(cb);
+  if (PLAYER_RIG.loading) return;
+  PLAYER_RIG.loading = true;
+  loadGlbModel(PLAYER_RIG.url, ({ root }) => {
+    PLAYER_RIG.root = root; PLAYER_RIG.loading = false;
+    for (const f of PLAYER_RIG.wait.splice(0)) f(root);
+  }, 'players');
+}
+// vest: the player's VEST_COL. opts.sit folds the legs for a vehicle seat; opts.onRig hands back the joint pivots so the
+// caller can animate them (the walk cycle drives VIEW.legs / VIEW.arms, which is exactly these).
+function dressPlayer(av, vest, opts) {
+  const o = opts || {};
+  loadPlayerRig(src => {
+    const g = src.clone(true), rig = characterRig(g, { hands: 'Hand_Glove' });
+    // the jacket is the vest: recolour it per player. glTF nodes become GROUPS holding unnamed meshes, so the jacket
+    // material is read off the meshes under that node, and the swap is by material identity - a fresh clone each time,
+    // so Player 1 and Player 2 never share (and never recolour) one material.
+    const jk = g.getObjectByName('Torso_Jacket_Male'), jmat = jk && (jk.isMesh ? jk.material : (jk.children.find(c => c.isMesh) || {}).material);
+    if (jmat) {
+      const tint = jmat.clone(); tint.color.lerp(new T.Color(vest), 0.72);
+      g.traverse(c => { if (c.isMesh && c.material === jmat) c.material = tint; });
+    }
+    if (o.sit) for (const s of ['L', 'R']) {
+      if (rig['leg' + s]) rig['leg' + s].rotation.x = -1.15;
+      if (rig['knee' + s]) rig['knee' + s].rotation.x = 1.15; }
+    g.scale.setScalar(1.8 / 1.64);                           // the box body is 1.8 m at local scale 1; this rig is 1.64 m
+    g.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(g);
+    g.position.y = o.seat === undefined ? -bb.min.y : o.seat - bb.min.y;   // feet on the avatar's floor
+    g.rotation.y = Math.PI;                                  // the rigs face +Z, the box avatars face -Z
+    g.traverse(c => { c.userData.noHit = true; });
+    av.traverse(c => { if (c.userData.body) c.visible = false; });   // the box body only: held items stay
+    av.add(g);
+    if (o.onRig) o.onRig(rig, g);
+  });
+}
 // ---------- PACKAGE BOILERS: the owner's ethanol_plant_steam_boiler_narrow_long.glb - 259 nodes, matrix transforms,
 // and its own stack, burner, blower, steam drum, gauges and ladder. One upload, one clone: both bays share the geometry.
 const BOILER = { ready: false };
@@ -9075,6 +9117,7 @@ function netRemote() {
   c.fillStyle = 'rgba(20,24,30,.75)'; c.fillRect(0, 0, 128, 40); c.fillStyle = '#ffb347'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.fillText(NET.host ? 'PLAYER 2' : 'PLAYER 1', 64, 29);
   const tag = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(cv), depthTest: false })); tag.scale.set(0.9, 0.28, 1); tag.position.y = 2.15; av.add(tag);
   av.visible = false; scene.add(av);
+  dressPlayer(av, VEST_COL[other], {});   // the other player wears the tinted operator rig too
   NET.rp = { av, items, sg, aim: 0, aimK: 0, am: 0, sh: MAG, held: null, x: 0, y: 0, z: 0, yaw: 0, tx: 0, ty: 0, tz: 0, tyaw: 0, walk: false, drive: false };
   const rr = { x: NET.host ? 58.6 : 55, z: 22, a: 0, y: 0, steer: 0, tx: 0, tz: 0, ta: 0, spin: 0 }; rr.tx = rr.x; rr.tz = rr.z;
   rr.g = makeRangerMesh(rr, RANGER_COL[other]); rr.driver = seatDriver(rr.g, VEST_COL[other]); rr.driver.visible = false; rr.flame = addFlame(rr.g); rr.g.traverse(o => { o.userData.noHit = true; }); rr.g.position.set(rr.x, 0.13, rr.z); scene.add(rr.g); NET.rr = rr;
@@ -9142,7 +9185,8 @@ function netUpdate(dt) {
     const k = Math.min(1, 12 * dt); R.x += (R.tx - R.x) * k; R.y += (R.ty - R.y) * k; R.z += (R.tz - R.z) * k; R.yaw = _lerpA(R.yaw, R.tyaw, k);
     if (R.mow && O.shedMower) { const g = O.shedMower.g, M = R.mow, k = Math.min(1, rdt * 10), ox = g.position.x, oz = g.position.z;
       g.position.x += (M[0] - g.position.x) * k; g.position.y += (M[1] - g.position.y) * k; g.position.z += (M[2] - g.position.z) * k; g.rotation.y = _lerpA(g.rotation.y, M[3], k); g.visible = true;
-      if (!O.shedMower.rider) { const d = makeCharacter(VEST_COL[NET.host ? 1 : 0], true); d.scale.setScalar(SQ_K); d.rotation.y = Math.PI / 2; d.position.set(0.22, 0.05, 0); g.add(d); O.shedMower.rider = d; }
+      if (!O.shedMower.rider) { const d = makeCharacter(VEST_COL[NET.host ? 1 : 0], true); d.scale.setScalar(SQ_K); d.rotation.y = Math.PI / 2; d.position.set(0.22, 0.05, 0); g.add(d); O.shedMower.rider = d;
+        dressPlayer(d, VEST_COL[NET.host ? 1 : 0], { sit: true }); }
       O.shedMower.rider.visible = true; const sp = Math.hypot(g.position.x - ox, g.position.z - oz) / Math.max(rdt, 1e-3);
       if (M[4] && sp > 0.3 && Math.random() < rdt * 12) { const h = g.rotation.y, fx = -Math.cos(h), fz = Math.sin(h); puff(V3(g.position.x + fz * 0.85, g.position.y + 0.25, g.position.z - fx * 0.85), 0.07, 0x6aa84f); }
       if (!walk.mow) { const dd = walk.on ? Math.hypot(walk.x - g.position.x, walk.z - g.position.z) : 60; mowSound(true, Math.min(1, sp / 3.6), Math.max(0, 1 - dd / 45), !!M[4]); }
@@ -10342,6 +10386,7 @@ function makeCharacter(vest, seated, opt) {
     P(new T.BoxGeometry(0.3, 0.025, 0.36), 0xf4f4f2, 0, 1.72, -0.04);
   }
   const f = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), faceMat(false)); f.position.set(0, 1.64, -0.138); f.rotation.y = Math.PI; f.userData.noHit = true; av.add(f);   // faces -z (forward)
+  av.traverse(o => { if (o.isMesh) o.userData.body = true; });   // the box body: hidden once a rig is on the avatar
   return av;
 }
 // a person sitting in an office chair (board operator, scale techs): yaw = which way they face, shirt color, floor height
@@ -10364,7 +10409,8 @@ function npcAt() {
 }
 const RANGER_COL = [0xc0221c, 0x1f63c8];   // Player 1 red, Player 2 blue
 const VEST_COL = [0xff7a1a, 0xc6e41f];     // Player 1 orange vest, Player 2 lime vest
-function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d); return d; }
+function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
+  dressPlayer(d, vest, { sit: true }); return d; }
 // ---------- RAGDOLL (verlet: 11 points joined by fixed-length sticks; cheap, no physics engine). Squeeg goes limp when he dies:
 // flung by whatever hit him, tumbles, flops to a stop on the ground, then freezes (costs nothing) and stays as one of the last 5 bodies.
 // A UTV driven into a body sets it flopping again.
@@ -10790,6 +10836,8 @@ function buildSelfAv() {
   { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; av.add(e); items.ext = e; }
   av.traverse(o => { o.userData.noHit = true; if (o.isMesh) o.castShadow = true; }); av.visible = false; scene.add(av);
   VIEW.av = av; VIEW.key = key; VIEW.items = items;
+  dressPlayer(av, VEST_COL[me], { onRig: rig => {   // the walk cycle drives the rig once it is on
+    VIEW.legs = [rig.legL, rig.legR].filter(Boolean); VIEW.arms = [rig.armL, rig.armR].filter(Boolean); } });
 }
 function updateSelfAv() {
   const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow;

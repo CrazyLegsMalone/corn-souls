@@ -470,6 +470,47 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function mergeModel(root, castShadow) {') && html.includes('if (parts.length < 2) continue;'), 'merge keeps single-part materials as they are');
   assert.ok(html.includes('if (o !== root) o.matrixAutoUpdate = false; })'), 'and stops walking static matrices every frame');
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
+  // ---------------------------------------------------------------- the players wear the operator rig, tinted per player
+  assert.ok(html.includes("const PLAYER_RIG = { url: '/corn-souls/assets/models/operator_vern_rig.glb'"), 'both players use the operator rig');
+  assert.equal((html.match(/dressPlayer\(/g) || []).length, 5, 'one definition + four avatars: 2P remote, own 3rd person, Ranger driver, mower rider');
+  for (const call of ["dressPlayer(av, VEST_COL[other], {});", "dressPlayer(d, vest, { sit: true });", "dressPlayer(av, VEST_COL[me], { onRig: rig => {"])
+    assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
+  assert.ok(html.includes("VIEW.legs = [rig.legL, rig.legR].filter(Boolean);"), 'the walk cycle drives the rig hips');
+  assert.ok(html.includes('av.traverse(o => { if (o.isMesh) o.userData.body = true; });'), 'box parts are marked, so held items survive the hide');
+  assert.ok(html.includes('av.traverse(c => { if (c.userData.body) c.visible = false; });'), 'and only the box body is hidden');
+  {
+    const reader2 = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
+    const rigSrc = html.slice(html.indexOf('function rigPivot('), html.indexOf('function loadCharacter('));
+    const playerSrc = html.slice(html.indexOf('const PLAYER_RIG = {'), html.indexOf('// ---------- PACKAGE BOILERS'));
+    assert.ok(rigSrc.includes('function characterRig(') && playerSrc.includes('function dressPlayer('), 'the player-model helpers are in the game');
+    const lib4 = { window: {}, console };
+    vm.runInNewContext(scripts.find(x => x.includes('window.THREE=eu')), lib4);
+    const T4 = lib4.window.THREE;
+    const buf4 = fs.readFileSync('assets/models/operator_vern_rig.glb');
+    const pctx = { T: T4, console, TextDecoder, VEST_COL: [0xff7a1a, 0xc6e41f] };
+    vm.createContext(pctx);
+    Object.assign(pctx, { glbBuf: buf4.buffer.slice(buf4.byteOffset, buf4.byteOffset + buf4.byteLength) });
+    pctx.loadGlbModel = (url, cb) => cb(pctx.glbBuild(pctx.glbBuf));
+    vm.runInContext(reader2 + '\n' + rigSrc + '\n' + playerSrc, pctx);
+    const avatar = () => { const av = new T4.Group(); const box = new T4.Mesh(new T4.BoxGeometry(0.4, 0.6, 0.3), new T4.MeshLambertMaterial({ color: 0xffffff }));
+      box.userData.body = true; av.add(box); return av; };
+    const a1 = avatar(), a2 = avatar();
+    pctx.dressPlayer(a1, 0xff7a1a, {}); pctx.dressPlayer(a2, 0xc6e41f, {});
+    const rigOf = av => av.children.find(c => c.type === 'Group' && c !== av.children[0]);
+    const g1 = rigOf(a1), g2 = rigOf(a2);
+    assert.ok(g1 && g2, 'a rig was added to each avatar');
+    assert.equal(a1.children[0].visible, false, 'the box body is hidden, the rig stands in for it');
+    assert.ok(Math.abs(g1.scale.x - 1.8 / 1.64) < 1e-6, 'the rig is scaled to the box body height');
+    assert.ok(Math.abs(g1.rotation.y - Math.PI) < 1e-6, 'and turned to face the way the box avatars face');
+    const jacket = g => { const n = g.getObjectByName('Torso_Jacket_Male');   // a glTF node is a group holding unnamed meshes
+      return n && (n.isMesh ? n.material : (n.children.find(c => c.isMesh) || {}).material); };
+    const j1 = jacket(g1), j2 = jacket(g2);
+    assert.ok(j1 && j2, "the rig carries the jacket that becomes the player's vest");
+    assert.notEqual(j1, j2, 'each player gets its own jacket material (a shared one would recolour both)');
+    assert.ok(j1.color.getHex() !== j2.color.getHex(), 'and the two players are different colours');
+    assert.ok(j1.color.r > j1.color.g * 2, 'Player 1 reads orange (' + j1.color.getHexString() + ')');
+    assert.ok(j2.color.b < 0.05 && j2.color.r > 0.4 && j2.color.g > 0.4, 'Player 2 reads lime (' + j2.color.getHexString() + ')');
+  }
   // cross-script wiring: the frame loop lives in a later script block than the renderer, so the HUD readout has to go
   // through the Plant3D bridge - reading `renderer` directly there threw a ReferenceError once a second (v1.97.60).
   assert.ok(html.includes('get drawCalls() { return renderer ? renderer.info.render.calls : 0; }'), 'the renderer counters are exposed on Plant3D');
