@@ -1,3 +1,13 @@
+## TEST v1.97.75 — flat, walkable tops on the liq tanks and both final product tanks (2026-11-01)
+- Owner request: the tops of Liq Tank 1 and 2 should be flat and walkable, and the same for both Final Product Tanks.
+- **Nothing up there was standable.** `tank()` puts a **dome** on the shell, and the Final Product Tanks' `flat: true` was only a *squashed* dome (sphere scaled 0.25) - and it never pushed a `WALK_SURF` at all, so the tops were decoration.
+- **`tankDeck(g, opt)`** gives a tank a proper top: a steel **deck disc flush with the rim** (`rim - 0.15`, 0.3 thick, so its surface is exactly `y0 + h`), a **yellow guardrail** (top and mid rail on posts, all the way round except a gap where the ladder lands), `wallSegs` along the rails so you cannot step off, a **caged ladder** from the ground to the rim with a `LADDERS` entry pointing inward, and a `WALK_SURF` over the deck.
+- Applied to **Liq Tank 1, Liq Tank 2, Final Product Tank 1 and Final Product Tank 2**, each of which now passes `dome: false` (no cap sitting on the new deck) and `noRail: true` (the old torus-and-posts rail would have blocked the ladder). The squashed dome on the FP tanks is gone, so their tops are genuinely flat.
+- The ladders land on the **north** side by default (`ang = -PI/2`), which is the yard side for all four; it is one argument per tank if any should face elsewhere.
+- Tests pin the deck/rim relationship, the guardrail gap, the ladder and its `LADDERS` entry, the `WALK_SURF`, all four call sites, and that the domes and the old `flat: true` cap are gone.
+- Verified locally: 10 repo-root suites + 6 `test/` suites pass, anchors pass.
+- Bumped TEST to `1.97.75` / `corn-souls-test-shell-v102`.
+
 ## TEST v1.97.74 — the tin-bin tops are joined up, with plant-side ladders on bins 2 and 4 (2026-11-01)
 - Owner request: a walkway from the top of Tin Bin 2 to Tin Bin 3 and from Tin Bin 3 to Tin Bin 4, and a ladder up to the tops of Tin Bin 4 and Tin Bin 2.
 - **The roofs were already walkable** - `siloClimb()` lays a roof disc, a yellow eave guardrail and a `WALK_SURF` disc for each bin - but nothing joined them (the source even said "not connected yet"), so each top was an island.

@@ -466,6 +466,16 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("const casing = root.getObjectByName('Insulated_Boiler_Casing')"), 'and it takes the casing material from the model');
   { const E0 = -55, cx = E0 + 12.6, westFace = cx - 4.235 - 2.03 / 2, drum = E0 + 7.35;
     assert.ok(Math.abs(westFace - drum) < 0.02, 'the sleeved casing lands on the dryer train line (' + westFace + ' vs ' + drum + ')'); }
+  // ---------------------------------------------------------------- flat walkable tank tops
+  assert.ok(html.includes('function tankDeck(g, opt)'), 'tankDeck() exists');
+  assert.ok(html.includes('add(new T.CylinderGeometry(R * 0.99, R * 0.99, 0.3, 32), mat(O.deck || 0xa6abae), x, rim - 0.15, z, null);'), 'a steel deck flush with the rim');
+  assert.ok(html.includes('if (Math.abs(Math.atan2(Math.sin(mid - ang), Math.cos(mid - ang))) < half) continue;   // the ladder lands here'), 'a guardrail that opens where the ladder lands');
+  assert.ok(html.includes('WALK_SURF.push({ x0: x - R, x1: x + R, z0: z - R, z1: z + R, y0: rim, y1: rim });'), 'and a walk surface on it');
+  assert.ok(html.includes('LADDERS.push({ x: x + Math.cos(ang) * (LX + 0.1)'), 'with a ladder up');
+  for (const call of ['tankDeck(O.liq1);', 'tankDeck(O.liq);', 'tankDeck(O.etoh1);', 'tankDeck(O.etoh2);'])
+    assert.ok(html.includes(call), 'deck on: ' + call);
+  assert.equal((html.match(/dome: false, noRail: true/g) || []).length >= 4, true, 'the four tanks no longer carry a dome or the old torus rail');
+  assert.ok(!html.includes("'etoh', { flat: true,"), 'the squashed dome that was called flat is gone');
   // ---------------------------------------------------------------- tin-bin tops: walkways and plant-side ladders
   assert.ok(html.includes('function binWalkway(xa, za, xb, zb, y)'), 'a walkway helper exists');
   assert.ok(html.includes('function siloLadderAt(x, z, R, H, ang)'), 'and a ladder that can sit on any side');

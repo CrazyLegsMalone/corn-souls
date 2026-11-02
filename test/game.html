@@ -4721,6 +4721,35 @@ const box = (w, h, d, m, x, y, z, st) => add(new T.BoxGeometry(w, h, d), m, x, y
 const cyl = (r, h, m, x, y, z, st, seg) => add(new T.CylinderGeometry(r, r, h, seg || 24), m, x, y + h / 2, z, st);
 
 // ---------- see-through tank with a colored liquid level ----------
+// A FLAT WALKABLE TOP on a tank: a steel deck flush with the rim, a yellow guardrail with a gap where the ladder lands,
+// a caged ladder from the ground, and the walk data. `tank()` only ever puts a dome (or a squashed dome it calls flat) on
+// the shell, so nothing up there could be stood on.
+function tankDeck(g, opt) {
+  const O = opt || {}, x = g.x, z = g.z, R = g.r, h = g.h, y0 = g.y0 || 0, rim = y0 + h;
+  const yel = mat(0xf2c200), lrail = mat(0xd8b23a), ang = O.ang === undefined ? -Math.PI / 2 : O.ang;
+  add(new T.CylinderGeometry(R * 0.99, R * 0.99, 0.3, 32), mat(O.deck || 0xa6abae), x, rim - 0.15, z, null);   // deck, top flush with the rim
+  const N = Math.max(24, Math.round(R * 4)), rr = R * 0.97, half = 0.9 / rr;                                   // guardrail, open at the ladder
+  for (let i = 0; i < N; i++) {
+    const a0 = (i - 0.5) / N * Math.PI * 2, a1 = (i + 0.5) / N * Math.PI * 2, mid = (a0 + a1) / 2;
+    const ax = x + Math.cos(a0) * rr, az = z + Math.sin(a0) * rr, bx = x + Math.cos(a1) * rr, bz = z + Math.sin(a1) * rr;
+    if (Math.abs(Math.atan2(Math.sin(mid - ang), Math.cos(mid - ang))) < half) continue;   // the ladder lands here
+    const L = Math.hypot(bx - ax, bz - az), rot = Math.atan2(bx - ax, bz - az);
+    for (const hh of [1.07, 0.55]) { const r = box(0.05, 0.05, L, yel, (ax + bx) / 2, rim + hh, (az + bz) / 2); r.rotation.y = rot; }
+    box(0.05, 1.07, 0.05, yel, ax, rim + 0.535, az);
+    wallSegs.push([ax, az, bx, bz, rim - 0.4, rim + 2.2]);
+  }
+  {   // the ladder, on the side the guardrail opens, rungs facing out
+    const LX = R + 0.3, top = rim;
+    const lg = new T.Group(); lg.position.set(x, 0, z); lg.rotation.y = -ang; scene.add(lg);
+    const P = (w, hh, d, px, py, pz) => { const q = new T.Mesh(new T.BoxGeometry(w, hh, d), lrail); q.position.set(px, py, pz); lg.add(q); return q; };
+    for (const sz of [-0.25, 0.25]) P(0.06, top + 1.1, 0.06, LX, (top + 1.1) / 2, sz);
+    for (let y = 0.3; y < top; y += 0.3) P(0.035, 0.035, 0.5, LX, y, 0);
+    for (let y = 2.4; y < top + 1; y += 1.2) { const hoop = new T.Mesh(new T.TorusGeometry(0.38, 0.025, 4, 14, Math.PI), lrail); hoop.rotation.set(Math.PI / 2, 0, Math.PI / 2); hoop.position.set(LX, y, 0); lg.add(hoop); }
+    LADDERS.push({ x: x + Math.cos(ang) * (LX + 0.1), z: z + Math.sin(ang) * (LX + 0.1), top, dx: -Math.cos(ang), dz: -Math.sin(ang) });
+  }
+  WALK_SURF.push({ x0: x - R, x1: x + R, z0: z - R, z1: z + R, y0: rim, y1: rim });
+  return rim;
+}
 function tank(x, z, r, h, accent, liquid, st, opts) {
   opts = opts || {};
   const y0 = opts.y || 0;
@@ -5874,7 +5903,8 @@ function init(container) {
   const cblob = new T.SphereGeometry(0.42, 8, 6);
   O.fCook = flow([...toCt1, [CTX, 1.8, CZ1], ...ovf, [CTX, 1.8, CZ2], ...out2].map(q => V3(...q)), cblob, 0xf08a3a, 80, { speed: 6, glow: true });
   O.fFlash = flow(flashOut.map(q => V3(...q)), blob, 0xf0a84a, 20, { speed: 6 });
-  O.liq1 = tank(LQ1[0], LQ1[1], LQR, LQH, 0xff5a5f, 0xf0a84a, 'liq1', { level: 0.9 });
+  O.liq1 = tank(LQ1[0], LQ1[1], LQR, LQH, 0xff5a5f, 0xf0a84a, 'liq1', { level: 0.9, dome: false, noRail: true });
+  tankDeck(O.liq1);   // flat, walked on, with a caged ladder on the north side
   nameplate('LIQUEFACTION TANK #1', LQ1[0], 2.2, LQ1[1], LQR, 0, -1);
   cyl(LQR * 1.03, 2.2, mat(0x45494d), LQ1[0], 0, LQ1[1], null, 24);
   // Liq Tank 1 overflows out its top into the top of Liq Tank 2
@@ -5922,7 +5952,8 @@ function init(container) {
       return flow(path.map(q => V3(...q)), blob, 0xf0a84a, 30, { speed: 6 });
     });
   }
-  O.liq = tank(LQ2[0], LQ2[1], LQR, LQH, 0xff5a5f, 0xf0a84a, 'liq', { level: 0.7 });
+  O.liq = tank(LQ2[0], LQ2[1], LQR, LQH, 0xff5a5f, 0xf0a84a, 'liq', { level: 0.7, dome: false, noRail: true });
+  tankDeck(O.liq);    // same flat top
   nameplate('LIQUEFACTION TANK #2', LQ2[0], 2.2, LQ2[1], LQR, 0, -1);
   cyl(LQR * 1.03, 2.2, mat(0x45494d), LQ2[0], 0, LQ2[1], null, 24);
   O.cookSteam = V3(FVX, FVY + FVH + 3.6, FVZ);
@@ -6746,8 +6777,10 @@ function init(container) {
   // layout from the satellite: west column = Final Product Tanks 1 (north) and 2 (south); east column = 190 proof tank (north,
   // feeds distillation) and 200 proof tank (just south of it; distillation fills it, and it's emptied into a final product tank at 3 AM and 3 PM)
   const FPX = TFX - 14, PRX = TFX + 12, FP1Z = 222, FP2Z = 252, P190Z = 218, P200Z = 232;
-  O.etoh1 = tank(FPX, FP1Z, 12, 12.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { flat: true, y: -TPIT.d, level: 0.4 });     // Final Product Tank 1
-  O.etoh2 = tank(FPX, FP2Z, 12, 12.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { flat: true, y: -TPIT.d, level: 0.65 });    // Final Product Tank 2
+  O.etoh1 = tank(FPX, FP1Z, 12, 12.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { dome: false, noRail: true, y: -TPIT.d, level: 0.4 });     // Final Product Tank 1
+  tankDeck(O.etoh1);   // flat and walkable, not a squashed dome
+  O.etoh2 = tank(FPX, FP2Z, 12, 12.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { dome: false, noRail: true, y: -TPIT.d, level: 0.65 });    // Final Product Tank 2
+  tankDeck(O.etoh2);
   O.p190 = tank(PRX, P190Z, 5, 9.1, 0x7fd3ff, 0x9fe0ff, 'etoh', { flat: true, y: -TPIT.d, level: 0.6 });       // 190 proof tank (188,000 gal)
   O.p200 = tank(PRX, P200Z, 5, 9.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { flat: true, y: -TPIT.d, level: 0.3 });       // 200 proof tank (188,000 gal)
   extraCols.push([FPX, FP1Z, 12.2], [FPX, FP2Z, 12.2], [PRX, P190Z, 5.2], [PRX, P200Z, 5.2]);   // each tank its own collider (room to walk between them)
