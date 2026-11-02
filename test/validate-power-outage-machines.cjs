@@ -470,6 +470,15 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function mergeModel(root, castShadow) {') && html.includes('if (parts.length < 2) continue;'), 'merge keeps single-part materials as they are');
   assert.ok(html.includes('if (o !== root) o.matrixAutoUpdate = false; })'), 'and stops walking static matrices every frame');
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
+  // cross-script wiring: the frame loop lives in a later script block than the renderer, so the HUD readout has to go
+  // through the Plant3D bridge - reading `renderer` directly there threw a ReferenceError once a second (v1.97.60).
+  assert.ok(html.includes('get drawCalls() { return renderer ? renderer.info.render.calls : 0; }'), 'the renderer counters are exposed on Plant3D');
+  assert.ok(html.includes('get triCount() { return renderer ? renderer.info.render.triangles : 0; }'), 'triangles too');
+  assert.ok(html.includes('+ P3.drawCalls +'), 'and that is what the FPS readout uses');
+  { const at = html.indexOf("$('fps').textContent");
+    const line = html.slice(at, html.indexOf(';', at));
+    assert.ok(!line.includes('renderer'), 'the readout never touches renderer itself: ' + line.slice(0, 60)); }
+
   // the merge itself, run for real: the game's own glTF reader + mergeModel on the boiler file
   {
     const reader = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
