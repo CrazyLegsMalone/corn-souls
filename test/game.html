@@ -4735,7 +4735,8 @@ function groundTex(kind) {
     blot(['#8a7a4a'], 30, 1, 2.5, 0.35);                                  // a few bare specks
   }
   const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping;
-  t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);   // ground is seen at grazing angles for hundreds of metres if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+  t.anisotropy = Math.min(8, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 4);   // ground is seen at grazing angles for hundreds of metres
+  if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
   return GROUND[kind] = t;
 }
 // ---------- ground layer order, bottom to top. Every flat overlay that lies on the site takes its HEIGHT and its
@@ -7799,13 +7800,13 @@ function init(container) {
     // shoulder; yellow edge line on the inside, white edge line outside, white 10 ft dashes every 40 ft between the lanes; grass median
     const [x0, x1] = [-1500, 1700], L = (x1 - x0) / HWY.c, phi = Math.atan(HWY.k), MED = 15, LANE = 3.66, SIN = 1.2, SOUT = 3.0;
     const midX = (x0 + x1) / 2, at = (n, u) => [midX + n * HWY.s + u * HWY.c, HWY.z(midX) + n * HWY.c - u * HWY.s];   // n: across (+ = SE), u: along
-    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.PlaneGeometry(L, w).rotateX(-Math.PI / 2), y === GY('asphalt') ? groundMat('asphalt', false, L, w) : m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== 0.024; return r; };
+    const strip = (n, w, m, y) => { const [x, z] = at(n, 0); const r = add(new T.PlaneGeometry(L, w).rotateX(-Math.PI / 2), y === GY('asphalt') ? groundMat('asphalt', false, L, w) : m, x, y, z, null); r.rotation.y = phi; r.castShadow = false; r.userData.noHit = y !== GY('asphalt'); return r; };
     for (const side of [-1, 1]) {
       const n0 = side * MED / 2, dir = side;                        // inner edge of the paved surface, then outward
       const w = SIN + 2 * LANE + SOUT, nc = n0 + dir * w / 2;
       strip(nc, w, asph, GY('asphalt'));                                                                          // pavement: shoulders + 2 lanes
-      strip(n0 + dir * SIN, 0.15, ylw, 0.032);                                                           // yellow inside edge line
-      strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, 0.032);                                              // white outside edge line
+      strip(n0 + dir * SIN, 0.15, ylw, GY('paint'));                                                           // yellow inside edge line
+      strip(n0 + dir * (SIN + 2 * LANE), 0.15, wht, GY('paint'));                                              // white outside edge line
       const nd = n0 + dir * (SIN + LANE), cnt = Math.floor(L / 12.2), d = new T.InstancedMesh(new T.BoxGeometry(3.05, 0.02, 0.15), wht, cnt);
       for (let i = 0; i < cnt; i++) { const [x, z] = at(nd, -L / 2 + 6 + i * 12.2); dummy.position.set(x, 0.032, z); dummy.rotation.set(0, phi, 0); dummy.updateMatrix(); d.setMatrixAt(i, dummy.matrix); }
       d.userData.noHit = true; scene.add(d);                                                             // lane divider dashes
