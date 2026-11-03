@@ -11316,7 +11316,7 @@ function utvUpdate(dt) {
   const n = Math.max(1, Math.ceil(Math.hypot(u.vx, u.vz) * dt / 0.3));   // move in small steps; bounce off things
   for (let i = 0; i < n; i++) {
     const nx = u.x + u.vx * dt / n, nz = u.z + u.vz * dt / n;
-    { const fN = floorAt(nx, nz, u.y + 0.6); if (fN < u.y - 0.8 && fN < -0.5) { utvBump(Math.hypot(u.vx, u.vz)); u.vx *= -0.3; u.vz *= -0.3; break; } }   // won't drive off into a pit or the ponds (a drop to the ground is a jump now)
+    { const fN = floorAt(nx, nz, u.y + 0.6); if (fN < u.y - 0.8 && fN <= -5) { utvBump(Math.hypot(u.vx, u.vz)); u.vx *= -0.3; u.vz *= -0.3; break; } }   // only where there's no ground at all (floorAt's -10 over a hole); the pond banks and bottom are ground, so you can drive in
     u.x = nx; u.z = nz;
     const p = utvBlocked(u.x, u.z, u.a);
     if (p) { const L = Math.hypot(p[0], p[1]) || 1, ex = p[0] / L, ez = p[1] / L, vn = u.vx * ex + u.vz * ez;

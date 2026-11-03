@@ -173,7 +173,7 @@ assert.ok(airSrc.includes('function vehVertical(u, dt)') && hillSrc.includes('fu
 assert.ok(html.includes('buildBillboards(); buildDirtHills(); mergeStatic();'), 'the hills are built with the world (and merged like the rest of the static scenery)');
 assert.ok(html.includes('vehVertical(u, dt);   // ride the ground, or fly') && !html.includes('u.y += (fl - u.y) * Math.min(1, 8 * dt);'), 'the driven vehicle uses the air physics');
 assert.ok(html.includes('const ga = u.air ? 0.12 : 1;') && html.includes('* thr * dt * ga;') && html.includes('ls *= Math.exp(-(u.air ? 0.3'), 'in the air: little gas, brake, steering or grip');
-assert.ok(html.includes('if (fN < u.y - 0.8 && fN < -0.5)'), 'ponds and dug-out pits are still refused; an ordinary drop is a jump');
+assert.ok(html.includes('if (fN < u.y - 0.8 && fN <= -5)') && !html.includes('fN < -0.5)'), 'only a drop into no ground at all (a dug hole) is refused: the pond banks and bottom are ground, so you can drive into the ponds again (v1.97.95)');
 assert.ok(html.includes('utv.vy = 0; utv.air = false;') && html.includes('bailing out mid-jump'), 'getting in resets the jump state; bailing out mid-air drops the vehicle to the ground');
 assert.ok(html.includes('if (o.air) { tP = o.sP - 0.02;') && html.includes('if (o.land) {'), 'the springs let the wheels hang in the air and take the landing');
 assert.ok(html.includes('if (Q.air && !air) Q.land = 4; Q.air = air;'), "the other player's jumps show their wheels hanging and the landing too");
