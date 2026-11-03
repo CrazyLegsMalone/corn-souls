@@ -102,4 +102,14 @@ assert.ok(!html.includes(', 0.032, rz + 2.75)') && !html.includes(', 0.032, z); 
     'and they are tagged through one helper, so the rule is written down once');
 }
 
+// ---------------------------------------------------------------- v1.97.96: the grain-yard slab and the markings' depth pull
+{ const at = html.indexOf("if (st === 'receiving') {"), blk = html.slice(at, html.indexOf('continue; }', at));
+  assert.ok(at > 0 && blk.includes("polygonOffsetUnits: GB('dirtroad')") && blk.includes("GY('dirtroad'), [...RPITS, RSTAIR]"),
+    'the receiving (grain yard) slab sits on the gravel layer with its depth pull: it used to be 1 mm over the dirt with none, and flickered with it');
+  assert.ok(!blk.includes('0.012') && !blk.includes('mat(c.getHex())'), 'no literal slab height and no shared un-pulled mat() left on it'); }
+assert.ok(html.includes("const markMat = c => MARK_MATS[c] || (MARK_MATS[c] = new T.MeshLambertMaterial({ color: c, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB('paint') }));"),
+  'road markings get the paint layer pull from one helper');
+for (const l of html.split('\n').filter(l => l.includes("GY('paint')") && !l.includes('const GLAYER'))) {
+  assert.ok(!/\bmat\(0x/.test(l), 'no marking on the paint layer uses a plain mat() (no depth pull, so the asphalt beat it at range): ' + l.trim().slice(0, 90)); }
+assert.ok(html.includes('dash = markMat(0xffffff)') && html.includes('wht = markMat(0xffffff), ylw = markMat(0xffd84d)'), 'plant road dashes and highway lines use it');
 console.log('PASS: one ground layer table (grass < dirt < dirtroad < asphalt < paint < pad), height and depth pull in lockstep, every overlay takes both from it - so the cross road between the process building and the energy center is above the dirt yard again');

@@ -1,3 +1,25 @@
+## TEST v1.97.96 — grain-yard ground flicker fixed, road markings hold at range, pond ripples and splashes (2026-11-02)
+- Owner: *"Ground still flickers between grains area and process building. Also could we add a basic splash or water thing like a basic texture that shows ripples when you disturb the water a cheap effect."*
+- **Finding the flicker:** a headless scan collected every flat, up-facing, ground-level triangle in the scene on a 2 m grid and listed overlapping pairs whose heights and depth pulls are too close to separate. In the reported area there was one real hit: the **receiving (grain yard) slab**. It sat at `0.012 + 0.005 = 0.017 m` with a plain shared `mat()` and **no polygon offset**, while the plant's dirt plane (`GY('dirt')` 0.016 m, pulled 8 depth steps forward) runs under the slab's east 20 m (x -206.5…-187). The dirt beat the slab's 1 mm lead, so the two traded pixels. The slab now uses the gravel layer: height `GY('dirtroad')` (0.030) and its own material pulled `GB('dirtroad')` (-10). That puts it above the dirt by 14 mm and 2 steps, and still under the asphalt yard roads that cross its edge. The stairs and pit holes are unchanged.
+- **Same scan, second cause: the road markings.** Every marking on the paint layer (plant road centre dashes, the grain-yard lines, the exit road dashes, the shop-lot stall lines, the highway edge lines and lane dashes) had the paint *height* but a plain `mat()`, so no depth pull. The asphalt under them is pulled 12 steps forward, so past a few tens of metres it beat the 7 mm and the dashes flickered or dropped out. New `markMat(color)` helper (next to `GLAYER`): one Lambert per colour with `polygonOffsetUnits: GB('paint')`, now used by all of them. (Named `markMat` because `paintMat` is already the paintball splat material.)
+- Not changed: road-on-road overlaps at junctions. Same layer, same texture tint, so there was no visible fight. Also not changed: some building floors at y 0 under the dirt, which the dirt always covers consistently (no flicker).
+- **Water ripples and splashes** (`WFX`, `wfxRing`, `wfxSplash`, `wfxUpdate`, run every frame next to the pond poison):
+  - **Rings:** one 64 px canvas ring on a flat quad laid 12 mm above the pond surface. Each ring grows (ease-out) and fades over about a second. There is a pool of 20, each with its own material for its own opacity, and they are reused oldest-first.
+  - **Splashes:** a pool of 32 droplet sprites sharing one material, thrown up and pulled down by gravity, hidden once they fall back below the water.
+  - Nothing is allocated after the first ring, and the effect costs nothing until you touch a pond.
+  - What makes them:
+    - wading: a ring every ~0.3 s while moving, plus a little spray when running, and a slow ring every 1.4 s standing still;
+    - jumping in: a splash;
+    - the other player wading;
+    - a vehicle in the water (yours or the other player's Ranger): rings off the rear wheels, more often the faster you go, and spray off the front wheels above 6 m/s;
+    - dropping in off the bank: a big splash and ring;
+    - a paintball hitting the pond surface: a plop ring and a few droplets, instead of a paint splat floating on the water.
+- Verified in headless Chromium: wading across the east pond leaves a trail of rings; driving in leaves a wake of rings with spray off the wheels. A re-scan shows the receiving slab and the markings gone from the conflict list.
+- Tests:
+  - New `test/validate-water.cjs` (12th `test/` suite, wired into CI) runs the real water-fx code on stubs: fixed pools (nothing else added to the scene), rings sit on the surface, grow, fade and hide, droplets fall back in, wading, standing, on the berm (none), jumping in, driving through, dropping in off the bank, leaving the pond, the per-frame hook and the paintball plop.
+  - `validate-ground-layers.cjs` pins the receiving slab's layer and pull, `markMat`, and that no `GY('paint')` line uses a plain `mat()`.
+- Bumped TEST to `1.97.96` / `corn-souls-test-shell-v123`.
+
 ## TEST v1.97.95 — you can drive into the ponds again (2026-11-02)
 - Owner: *"We used to be able to drive through the ponds."* Broken by v1.97.94. The Ranger has always refused a drop of more than 0.8 m in one movement step (meant for holes with no ground), but before v1.97.94 its height eased down the bank slope, so the floor was never that far below it. With air physics, driving off the pond crest at speed makes the Ranger airborne. The floor under it falls away down the inner bank toward the pond bottom (-1.57 m), the gap passes 0.8 m, and since the bottom is below -0.5 the v1.97.94 condition (`fN < -0.5`) bounced it back out.
 - Now only a drop into **no ground at all** is refused (`fN <= -5`: `floorAt` returns -10 over a dug hole with no surface). The pond banks and bottom are real walk surfaces, so you drive over the berm (with a little air off the crest), down into the water, across the bottom and up the far side, like before.
