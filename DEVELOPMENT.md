@@ -1,3 +1,9 @@
+## TEST v1.97.98 — CI fix for v1.97.97 (2026-11-02)
+- I pushed v1.97.97 before I saw that `validate-power-outage-machines.cjs` failed in the clean clone. That suite lifts `function updatePivot(...)` up to `// ---------- HAND TOOLS` and runs it against a stub `O.pivot` that has no `wheels` / `cols` and no `pivotCols()`. The game itself was fine; only the suite broke.
+- `pivotCols()` now sits *after* `updatePivot` (inside the slice that suite runs), and both loops read `P.wheels || []` / `P.cols || []`, so a pivot without towers (the stub) still runs. `validate-pivot.cjs` slices `pivotCols` from its new spot.
+- Full set re-run in a clean clone before this push: 10 repo-root + 13 `test/` suites, anchors.
+- Bumped TEST to `1.97.98` / `corn-souls-test-shell-v125`.
+
 ## TEST v1.97.97 — center pivot: tower tires roll the right way, and the towers are solid (2026-11-02)
 - Owner: *"The wheels on the rotary sprinkler aren't oriented the right way and they have no collision."*
 - **Orientation:** each tower's two tires sit fore and aft on the gearbox beam (local z ±1.7), but their cylinders were turned `rotateX`, so the axles pointed along the beam and the tires faced the direction of travel, as if rolling sideways along the arm. They're now `rotateZ`: axles along the arm (local x), so they roll round the circle the way the tower travels. They also turn now (`rotation.x += turn × tower radius / 0.75 m`, in `updatePivot`), so they only move while the engine runs.

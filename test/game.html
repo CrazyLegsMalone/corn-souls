@@ -10127,10 +10127,6 @@ function updateKia(dt) {
 }
 
 // center pivot: one full turn about every 8 minutes (a real one takes a day or so, but then you'd never see it move); the water keeps falling
-function pivotCols() {   // keep each tower's footprints under it as the arm turns
-  const P = O.pivot; if (!P || !P.g) return; const a = P.g.rotation.y, c = Math.cos(a), s = Math.sin(a);
-  for (const q of P.cols) { q[0] = P.cx + q.lx * c + q.lz * s; q[1] = P.cz - q.lx * s + q.lz * c; }
-}
 function updatePivot(dt) {   // the pivot runs on its own diesel gen-set, so the plant's outage does not stop it
   const P = O.pivot; if (!P || !P.g) return;
   const G = PIVOT_GEN;
@@ -10139,11 +10135,15 @@ function updatePivot(dt) {   // the pivot runs on its own diesel gen-set, so the
   if (!G.running) return;                     // engine off: the arm stays where it stopped and the water is off
   const da = dt * Math.PI * 2 / 480;
   P.g.rotation.y -= da;
-  for (const w of P.wheels) w.m.rotation.x += da * w.r / 0.75;   // rolling: tower speed (radius x turn rate) / tire radius
+  for (const w of P.wheels || []) w.m.rotation.x += da * w.r / 0.75;   // rolling: tower speed (radius x turn rate) / tire radius
   pivotCols();
   for (const t of P.water) t.offset.y = (t.offset.y + dt * 1.6) % 1;
   G.fuel = Math.max(0, G.fuel - dt / 3600 * G.burn);
   if (G.fuel <= 0) { G.running = false; if (PIVOT_NOTIFY) PIVOT_NOTIFY('⛽ The pivot engine ran out of diesel - the pivot has stopped.'); }
+}
+function pivotCols() {   // keep each tower's footprints under it as the arm turns
+  const P = O.pivot; if (!P || !P.g) return; const a = P.g.rotation.y, c = Math.cos(a), s = Math.sin(a);
+  for (const q of P.cols || []) { q[0] = P.cx + q.lx * c + q.lz * s; q[1] = P.cz - q.lx * s + q.lz * c; }
 }
 // The diesel can is the transfer vessel: fill it at the bulk tank on the pad, pour it into the engine's day tank.
 function pivotGenNear() {
