@@ -1,3 +1,10 @@
+## TEST v1.97.100 — headlamp no longer lights far walls white; DDG building goes dark (2026-11-03)
+- Owner (photo, process building, daytime, outage on): *"here's a spot that should be dark right now and isn't"*, and *"Ddg building also did not go dark during power outage and it should"*.
+- **Process building:** the culprit was the headlamp. Its reach window `(1 - q²)²` was not clamped, so past the reach it grew again: a wall 84 m down the ferm alley got a huge boost and rendered white, and everything across a big hall was lit. The window is now clamped to zero past the reach.
+- **Headlamp falloff:** now inverse square (`/(d² + 2)`, source ×2.2 to keep it strong close up) with a 40 m reach (was 1/d over 60 m). Bright at arm's length, a dim shape at 8–15 m, almost nothing across a big hall, which is what a torch in a dark plant should do.
+- **DDG building:** was never registered as a roofed room (`enclosure`), so the lighting pass treated it as outdoors. Now registered; its roll-up and man doors become daylight openings automatically, and it gets generated high-bays like the other rooms. An audit of every large overhead surface found no other roofed building missing (the wet cake pad is an open-sided canopy and stays daylit on purpose).
+- Tests: `validate-interior-dark.cjs` checks the clamped, inverse-square headlamp (nothing past the reach) and the DDG envelope.
+
 ## TEST v1.97.99 — new lighting: dark interiors, lamp pools, outages that only kill the lamps, scare controls (2026-11-02)
 - Owner: *"It doesn't get very dark inside building during the day and it feel like the power outage also darkens the outside a bit"*, then *"give me a good lighting system that performs well on mobile. I want enough dark to make scary moments."*
 - **Why interiors were bright:** one sun + one hemisphere light lit the whole world, and walls/roofs block neither, so a room was as bright as the yard. The only indoor darkening (`applyInteriorDark`) ran in an outage, by swapping each mesh to a dimmed material clone, and it skipped walls, anything large, and every merged mesh.

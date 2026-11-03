@@ -7232,6 +7232,7 @@ function init(container) {
     wallX(Z0, [[NX, 1.0, 2.13]]);                                  // north wall: man door at the NE corner
     for (const x of [X0, X1]) { add(new T.BoxGeometry(0.3, H, Z1 - Z0), wm, x, H / 2, (Z0 + Z1) / 2, null, true); wallSegs.push([x, Z0, x, Z1]); }
     add(new T.BoxGeometry(X1 - X0 + 1, 0.3, Z1 - Z0 + 1), rm, (X0 + X1) / 2, H + 0.15, (Z0 + Z1) / 2, null, true);   // roof
+    enclosure(X0, X1, Z0, Z1, H);   // roofed: dark inside except its doorways (the lighting pass adds the doors and high-bays)
     add(new T.BoxGeometry(X1 - X0, 0.12, Z1 - Z0), mat(0x8f949a), (X0 + X1) / 2, 0.06, (Z0 + Z1) / 2, null, true);   // concrete floor
     // roll-up door (opens when Squeeg walks up, like the plant's) and the two man doors (vanish when Squeeg is near)
     const panel = new T.Mesh(new T.BoxGeometry(GW - 0.1, GH, 0.12), mat(0x9aa1a8)); panel.position.set(GX, GH / 2, Z1); scene.add(panel);
@@ -9190,7 +9191,7 @@ const CSU = {
   csWin: { value: csV4(CS_N.W) },    // daylight openings, grouped by room: x, y, z, 1 / reach (a shut door shrinks its reach)
   csLampP: { value: csV4(CS_N.L) },  // lamps, outdoor ones first, then grouped by room: x, y, z, 1 / radius^2
   csLampC: { value: csV4(CS_N.L) },  //        colour x intensity, lowest y it lights
-  csFl0: { value: new T.Vector4(0, 0.15, 0, 60) },                                   // headlamp, camera space: position, reach
+  csFl0: { value: new T.Vector4(0, 0.15, 0, 40) },                                   // headlamp, camera space: position, reach
   csFl1: { value: new T.Vector4(0, -0.04, -1, 0).normalize().setW(Math.cos(0.45)) }, //   aim, outer cone
   csFl2: { value: new T.Vector4(0, 0, 0, Math.cos(0.45 * 0.4)) },                     //   colour x intensity, inner cone
   csG: { value: new T.Vector4(0, 0, 0, 0) },        // rooms in use, outdoor lamps in use, -, 1 = bypass (the first-person HUD pass)
@@ -9255,8 +9256,10 @@ float csLight(vec3 pV, vec3 nV, out vec3 irr) {
     vec3 L = csFl0.xyz - pV; float d = length(L); vec3 l = L / max(d, 1e-3);
     float s = smoothstep(csFl1.w, csFl2.w, dot(-l, csFl1.xyz));
     if (s > 0.0) {
-      float q = d / csFl0.w; q *= q;
-      irr += csFl2.rgb * (s * (1.0 - q * q) * (1.0 - q * q) / max(d, 0.01) * (hasN ? clamp(dot(nV, l), 0.0, 1.0) : 1.0));
+      // inverse square like a real torch: bright at arm's length, a dim shape at 15 m, next to nothing across a big hall
+      // (the reach window is clamped: unclamped, (1 - q^2)^2 grows again past the reach and lit far walls up white)
+      float q = d / csFl0.w; q = max(1.0 - q * q * q * q, 0.0);
+      irr += csFl2.rgb * (s * q * q / (d * d + 2.0) * (hasN ? clamp(dot(nV, l), 0.0, 1.0) : 1.0));
     }
   }
   return k;
@@ -9487,7 +9490,8 @@ function lightUpdate(dt) {
   // headlamp: battery, so outages do not touch it, but a flicker event close by makes it stutter too
   const fl = headlamp ? headlamp.intensity : 0;
   LIGHT.flK = evNear(LIGHT.flick, rx, rz) || evNear(LIGHT.kill, rx, rz) ? (flickWave(t * 0.8, 3) > 0.5 ? 1 : 0.15) : 1;
-  if (fl > 0) U.csFl2.value.set(headlamp.color.r * fl * LIGHT.flK, headlamp.color.g * fl * LIGHT.flK, headlamp.color.b * fl * LIGHT.flK, U.csFl2.value.w);
+  const fk = fl * LIGHT.flK * 2.2;   // 28 -> ~62: the inverse-square falloff needs more at the source
+  if (fl > 0) U.csFl2.value.set(headlamp.color.r * fk, headlamp.color.g * fk, headlamp.color.b * fk, U.csFl2.value.w);
   else U.csFl2.value.set(0, 0, 0, U.csFl2.value.w);
   U.csG.value.set(R.length, nOut, 0, 0);
   const dk = (1 - 0.9 * dark) * (1 - 0.9 * dark);   // squared: light is linear, the eye is not

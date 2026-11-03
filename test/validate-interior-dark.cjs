@@ -43,6 +43,18 @@ assert.equal((html.match(/lampLight\(gridLight\(/g) || []).length, 7, 'seven aut
 assert.ok(html.includes("['💡 Lights: flicker'") && html.includes("['💡 Lights: blackout nearby (15 s)'") && html.includes("['🌑 Darkness everywhere (20 s)'"), 'the scare controls are on the debug menu');
 assert.ok(html.includes("['🔆 Brightness: ' + P3.lights.brightName"), 'the brightness floor is on the pause menu');
 assert.ok(html.includes('lights: { flicker: (s, r) => lightsFlicker(s, r), blackout: (s, r) => lightsBlackout(s, r), dark: (a, f, h) => lightsDark(a, f, h)'), 'and exported for scripted events');
+// v1.97.100: the headlamp's reach window is clamped (unclamped, (1 - q^2)^2 rose again past the reach and lit a wall 84 m
+// down the ferm alley white), and it falls off with the square of the distance like a real torch.
+{ const fl = lightSrc.slice(lightSrc.indexOf('if (csFl2.r + csFl2.g > 0.0) {'), lightSrc.indexOf('return k;', lightSrc.indexOf('if (csFl2.r + csFl2.g > 0.0) {')));
+  assert.ok(fl.includes('float q = d / csFl0.w; q = max(1.0 - q * q * q * q, 0.0);') && fl.includes('s * q * q / (d * d + 2.0)'), 'headlamp: clamped reach, inverse square');
+  const reach = +(lightSrc.match(/csFl0: \{ value: new T\.Vector4\(0, 0\.15, 0, (\d+)\) \}/) || [])[1];
+  assert.ok(reach >= 25 && reach <= 60, 'headlamp reach is set (' + reach + ' m)');
+  const f = d => { let q = d / reach; q = Math.max(1 - q ** 4, 0); return q * q / (d * d + 2); };
+  assert.ok(f(84) === 0 && f(reach + 1) === 0 && f(200) === 0, 'nothing past the reach');
+  assert.ok(f(2) > 10 * f(8) && f(8) > 10 * f(30), 'bright close up, a dim shape at 8 m, almost nothing across a big hall'); }
+// the DDG barn is roofed, so it is a room (it was missed and stayed daylit in an outage)
+{ const s = html.slice(html.indexOf('// ---------- DDG BUILDING'), html.indexOf('// a big pile of DDG inside'));
+  assert.ok(s.includes('enclosure(X0, X1, Z0, Z1, H);'), 'the DDG building registers its envelope'); }
 
 // ---------------------------------------------------------------- the shader patch, on three.js's own programs
 const store = {};
