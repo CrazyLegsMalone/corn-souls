@@ -135,7 +135,7 @@ function makeCtx() {
 
   // every emitter is classified where it is built, so nothing is dimmed by accident
   assert.equal((html.match(/gridLight\(/g) || []).length, 23, '23 mains emitters are flagged gridLight');
-  assert.equal((html.match(/batteryLight\(/g) || []).length, 9, 'self-powered gear: vehicles, radio, egress lens, EXIT signs, pivot run lamp');
+  assert.equal((html.match(/batteryLight\(/g) || []).length, 10, 'self-powered gear: vehicles (incl. the model Ranger lights), radio, egress lens, EXIT signs, pivot run lamp');
   assert.equal((html.match(/exitSignMat\(\)/g) || []).length, 5, 'four lettered EXIT signs + the shared builder');
   assert.equal((html.match(/exitHalo\(/g) || []).length, 5, 'a halo per sign + the builder');
   assert.ok(html.includes("c.fillText('EXIT', 64, 44)"), 'the signs are lettered, not flat red boxes');

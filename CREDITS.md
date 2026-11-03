@@ -29,6 +29,8 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 
 - **"Turkey Vulture rig"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The buzzard that perches on the RTO stack (`assets/models/vulture_rig.glb`). Registered in [assets/registry.json](assets/registry.json).
 
+- **"PS1 UTV Ranger"** - made by the project owner, the model generated with Gemini and exported as a GLB; not obtained from a third-party marketplace. The drivable Ranger (both players' Rangers, tinted per player) (`assets/models/ps1_utv_ranger.glb`). Registered in [assets/registry.json](assets/registry.json).
+
 - **"Shifty Food vending machine", "Butter Popcorn", "Corn Chips", "Roasted Corn Kernels", "Milo-Rade can", "Water can"** - made by the project owner, the models generated with ChatGPT and exported as GLBs (`assets/models/shifty_food_machine.glb`, `shifty_popcorn.glb`, `shifty_corn_chips.glb`, `shifty_roasted_corn.glb`, `milo_rade_can.glb`, `water_can.glb`). Registered in [assets/registry.json](assets/registry.json).
 
 ## Attribution template

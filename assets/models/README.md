@@ -13,6 +13,7 @@ Shipped 3D GLB models in `assets/models/`:
 - `tammy_scalehouse_rig.glb` — "Scale House Tech - Tammy" — first-party (project owner, AI-generated with ChatGPT), NPC character in the TEST channel.
 - `ethanol_plant_steam_boiler_narrow_long.glb` - "Ethanol Plant Steam Boiler (narrow, long)" - first-party (project owner, AI-generated with ChatGPT), the two energy-centre boilers in the TEST channel.
 - `vulture_rig.glb` - "Turkey Vulture rig" - first-party (project owner, AI-generated with ChatGPT), the buzzard on the RTO stack in the TEST channel (0.8 scale, posed by joint rotation).
+- `ps1_utv_ranger.glb` - "PS1 UTV Ranger" - first-party (project owner, AI-generated with Gemini), the drivable Ranger in the TEST channel (732 triangles, Body material tinted per player at runtime).
 - `shifty_food_machine.glb`, `shifty_popcorn.glb`, `shifty_corn_chips.glb`, `shifty_roasted_corn.glb`, `milo_rade_can.glb`, `water_can.glb` - Shifty Food vending machine, its three snack packets, the Milo-Rade can and the water can - first-party (project owner, AI-generated with ChatGPT, from the shifty_food_cline_package).
 - `milorade_machine.glb` — "Milo Rade Vending Machine" — first-party (project owner, AI-generated with ChatGPT), break room + scale house vending machines in the TEST channel.
 - `1x4_cooling_tower_raised_sill.glb` — "1x4 Cooling Tower (Raised Sill)" — first-party (project owner, AI-generated with ChatGPT), cooling tower in the TEST channel.

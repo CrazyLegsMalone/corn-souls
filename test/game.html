@@ -4982,6 +4982,7 @@ function glbBuild(buf) {
         roughness: pr.roughnessFactor === undefined ? 1 : pr.roughnessFactor, side: T.DoubleSide })
       : new T.MeshLambertMaterial({ color: c, side: T.DoubleSide });
     if (tmap) mat.map = tmap;   // the advert / label panels
+    mat.name = m.name || '';   // lets a caller find a material by its glTF name (the Ranger tints 'Body')
     return mat;
   });
   const prims = (d.meshes || []).map(m => m.primitives.map(pr => {
@@ -9517,7 +9518,7 @@ function netUpdate(dt) {
   const Q = NET.rr; if (Q) {
     const k = Math.min(1, 10 * dt), ox = Q.x, oz = Q.z; Q.x += (Q.tx - Q.x) * k; Q.z += (Q.tz - Q.z) * k; Q.a = _lerpA(Q.a, Q.ta, k); Q.y += ((Q.ty || 0) - Q.y) * k;
     const fwd = (Q.x - ox) * -Math.sin(Q.a) + (Q.z - oz) * -Math.cos(Q.a); Q.spin += fwd / 0.33;
-    Q.g.position.set(Q.x, Q.y + 0.13, Q.z); Q.g.rotation.set(0, Q.a, 0);
+    suspStep(Q, dt, 0, 0); Q.g.position.set(Q.x, Q.y + 0.13 + Q.sY, Q.z); Q.g.rotation.set(Q.sP, Q.a, Q.sR, 'YXZ');   // its springs run here too
     for (const w of Q.wheels) { w.w.rotation.x = -Q.spin; w.pv.rotation.y = w.front ? -Q.steer : 0; } if (Q.sw) Q.sw.rotation.z = -Q.steer * 3;
   }
 }
@@ -10258,7 +10259,7 @@ function dmgNet(m) { const d = dmgOf(m.k); d.h = m.h; d.sent = Math.round(d.h) +
 function dmgOut(k, mine) { const d = dmgOf(k); d.fire = false; if (d.fx) { for (const s of d.fx) { s.parent && s.parent.remove(s); s.material.map.dispose(); s.material.dispose(); } d.fx = null; } if (mine) dmgSend(k); }
 function dmgChar(k) {   // burnt out: everything but the glass goes black
   const d = dmgOf(k), g = dmgG(k); d.burnt = true; if (!g) return;
-  g.traverse(o => { if (!o.isMesh || !o.material || o.userData.wheel || isGlass(o.material) || o.material.map) return; if (!o.userData.m0) o.userData.m0 = o.material; o.material = mat(0x2a2624); });
+  g.traverse(o => { if (!o.isMesh || !o.material || o.userData.wheel || isGlass(o.material) || (o.material.map && !o.userData.charOK)) return; if (!o.userData.m0) o.userData.m0 = o.material; o.material = mat(0x2a2624); });
 }
 function dmgRestore(k) {   // fully repaired: paint and windows back
   const d = dmgOf(k), g = dmgG(k); d.burnt = false; if (!g) return;
@@ -10994,7 +10995,118 @@ function makeRangerMesh(o, color) {   // o collects wheels + steering wheel
     const w = new T.Mesh(wg, wm); w.castShadow = true; pv.add(w); const h = new T.Mesh(new T.BoxGeometry(0.3, 0.12, 0.12), hm); w.add(h);   // hub bar shows the spin
     o.wheels.push({ pv, w, front });
   }
+  for (const c of g.children) c.userData.rangerPart = true;   // the box body: swapped out for the model below once it loads
+  rangerSkinQueue(g, o, color);
   return g;
+}
+// ---------- RANGER MODEL: the owner's ps1_utv_ranger.glb (made with Gemini: 732 triangles, PS1-style 256 + 128 px textures,
+// Body / Trim / Tires / Lights materials, named wheel_FL/FR/RL/RR, steering_wheel, dump_bed, head/taillights, shock_* and
+// seat_driver / seat_passenger markers). Same footprint as the box Ranger - wheels at x +-0.78, z +-1.0, r 0.33, seat top ~1.0 m -
+// so driving, collisions, the seated driver, the passenger seat and the radio-in-the-bed spot all carry over. One fetch, cloned
+// per Ranger. Until it arrives (or if it never does) the box Ranger above stays, so a failed load never costs you the vehicle.
+const RANGER_GLB = { url: '/corn-souls/assets/models/ps1_utv_ranger.glb', root: null, loading: false, wait: [] };
+const RANGER_WHEELS = [['FL', 1], ['FR', 1], ['RL', 0], ['RR', 0]];
+function rangerSkinQueue(g, o, color) {
+  g.userData.rangerCol = color; g.userData.rangerWheels = o.wheels;
+  if (RANGER_GLB.root) { rangerSkinSafe(g); return; }
+  RANGER_GLB.wait.push(g);
+  if (RANGER_GLB.loading) return;
+  RANGER_GLB.loading = true;
+  loadGlbModel(RANGER_GLB.url, ({ root }) => {
+    // once, on the template: flat normals if the export left them out (the reader would draw it black), crisp PS1 texels up
+    // close (mipmaps kept for distance, so it doesn't sparkle), and flat shading to match
+    root.traverse(c => { if (!c.isMesh) return; if (!c.geometry.attributes.normal) c.geometry.computeVertexNormals();
+      const m = c.material; if (m.map) { m.map.magFilter = T.NearestFilter; m.map.needsUpdate = true; } m.flatShading = true; m.needsUpdate = true; });
+    RANGER_GLB.root = root; RANGER_GLB.loading = false;
+    for (const q of RANGER_GLB.wait.splice(0)) rangerSkinSafe(q);
+  }, 'ranger');
+}
+function rangerSkinSafe(g) { try { rangerSkin(g); } catch (e) { console.warn('[ranger] model swap failed, the box Ranger stays:', e && e.message); } }
+function rangerSkin(g) {
+  if (g.userData.skinned || !RANGER_GLB.root) return;
+  const src = RANGER_GLB.root.getObjectByName('utv_vehicle') || RANGER_GLB.root, m = src.clone(true), by = {};
+  m.traverse(c => { if (c.name && !by[c.name]) by[c.name] = c; });
+  for (const [n] of RANGER_WHEELS) if (!by['wheel_' + n]) throw new Error('no wheel_' + n);
+  if (!by.body) throw new Error('no body');
+  const noHit = g.children.some(c => c.userData.noHit);   // the other player's Ranger is not a shot target
+  // materials: Body is cloned per Ranger and tinted to the player colour (its texture is drawn in light greys for exactly
+  // this); Lights become an unlit battery light so the head/taillights read at night and through an outage; Trim and
+  // Tires stay shared with the template.
+  const swap = new Map();
+  const remat = mt => {
+    if (swap.has(mt)) return swap.get(mt);
+    let r = mt;
+    if (mt.name === 'Body') { r = mt.clone(); r.color.setHex(g.userData.rangerCol || RANGER_COL[0]); }
+    else if (mt.name === 'Lights') r = batteryLight(new T.MeshBasicMaterial({ map: mt.map }));
+    swap.set(mt, r); return r;
+  };
+  m.traverse(c => { if (!c.isMesh) return; c.material = remat(c.material); c.castShadow = true; c.receiveShadow = false;
+    c.userData.charOK = true; if (noHit) c.userData.noHit = true; });
+  // wheels: each glTF wheel node spins on its own X; a pivot group at the hub steers it (Y) and rides the suspension (Y position)
+  const W = g.userData.rangerWheels; W.length = 0;
+  for (const [n, front] of RANGER_WHEELS) {
+    const w = by['wheel_' + n], pv = new T.Group();
+    pv.position.copy(w.position); w.parent.add(pv); w.position.set(0, 0, 0); pv.add(w);
+    w.traverse(c => { if (c.isMesh) c.userData.wheel = true; });   // a burnt-out Ranger keeps its tyres
+    const sh = by['shock_' + n] || null;
+    W.push({ pv, w, front: !!front, shock: sh, L0: 0.3138, x0: pv.position.x, y0: pv.position.y, z0: pv.position.z });
+  }
+  for (const c of g.children.slice()) if (c.userData.rangerPart) g.remove(c);   // the box body goes; driver, passenger, flame, fire and radio stay
+  m.userData.rangerPart = true; g.add(m);
+  const sw = by.steering_wheel || null;
+  for (const O2 of [utv, NET.rr, RANGER_SAVE]) if (O2 && O2.g === g) O2.sw = sw;
+  g.userData.skinned = true;
+  SR_BED.y = 0.79;   // the model's bed floor (the box Ranger's was 1.02); a radio already riding back there drops onto it
+  if (SR.g && SR.g.parent === g) SR.g.position.y = SR_BED.y;
+  // walk-into / stand-on box: re-measure it from the new body
+  const V = VBOXES.find(v => v.g === g);
+  if (V) { g.updateMatrixWorld(true); const inv = g.matrixWorld.clone().invert(), b = new T.Box3(), m4 = new T.Matrix4();
+    g.traverse(o => { if (!o.isMesh || !o.geometry || !o.userData.rangerPart && !isRangerPart(o, m)) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox.clone().applyMatrix4(m4.multiplyMatrices(inv, o.matrixWorld))); });
+    if (!b.isEmpty()) V.b.copy(b); }
+  for (const k of ['r', 'rr']) if (dmgG(k) === g && dmgOf(k).burnt) dmgChar(k);   // it burnt out before the model arrived
+}
+function isRangerPart(o, m) { for (let q = o; q; q = q.parent) if (q === m) return true; return false; }
+// ---------- SUSPENSION (visual only - the handling is untouched): every wheel reads the ground under its own hub, and three
+// damped springs (heave, pitch, roll) carry the body toward the plane those four points make, so it noses up a ramp, rocks
+// over the rail crossing, drops a corner off a slab edge and settles with a little bounce. Each wheel then takes up whatever
+// gap is left, within +-9 cm of travel, and its shock stretches or squashes to match. A hop up or down (a curb, a slab) kicks
+// the heave spring so the body lags and bounces; a faint ripple in the dirt keeps it alive on flat ground. Parked, nothing is
+// re-sampled. Works for any vehicle driven through utvUpdate (the Ranger and the three cars) and for the other player's Ranger.
+const SUSP = { K: 110, C: 13, TRAVEL: 0.09, PTS: [[-0.78, -1.0], [0.78, -1.0], [-0.78, 1.0], [0.78, 1.0]] };
+const suspRipple = (x, z) => 0.010 * Math.sin(x * 1.9 + z * 0.7) * Math.sin(z * 1.3 - x * 0.4) + 0.006 * Math.sin(x * 0.55 - z * 0.83 + 1.3);
+function suspStep(o, dt, leanP, leanR) {
+  const W = o.wheels && o.wheels.length >= 4 ? o.wheels : null, n = W ? W.length : 4;
+  if (o.sG !== o.g) { o.sG = o.g; o.sY = o.sVy = o.sP = o.sVp = o.sR = o.sVr = 0; o.sLy = o.y; o.sH = []; o.sX = NaN; }
+  if (W) for (const w of W) if (w.x0 === undefined) { w.x0 = w.pv.position.x; w.y0 = w.pv.position.y; w.z0 = w.pv.position.z; }
+  const ca = Math.cos(o.a), sa = Math.sin(o.a), H = o.sH;
+  if (!(Math.abs(o.x - o.sX) + Math.abs(o.z - o.sZ) < 0.02 && Math.abs(o.a - o.sA) < 0.01 && Math.abs(o.y - o.sYw) < 0.01)) {
+    for (let i = 0; i < n; i++) {
+      const lx = W ? W[i].x0 : SUSP.PTS[i][0], lz = W ? W[i].z0 : SUSP.PTS[i][1], wx = o.x + lx * ca + lz * sa, wz = o.z - lx * sa + lz * ca;
+      const f = floorAt(wx, wz, o.y + 0.6);
+      H[i] = Math.max(-0.3, Math.min(0.4, f - o.y)) + suspRipple(wx, wz);   // over a pit edge the wheel just hangs at full droop
+    }
+    o.sX = o.x; o.sZ = o.z; o.sA = o.a; o.sYw = o.y;
+  }
+  let fH = 0, fZ = 0, fN = 0, rH = 0, rZ = 0, rN = 0, lH = 0, lX = 0, lN = 0, gH = 0, gX = 0, gN = 0, sum = 0;
+  for (let i = 0; i < n; i++) {
+    const lx = W ? W[i].x0 : SUSP.PTS[i][0], lz = W ? W[i].z0 : SUSP.PTS[i][1], h = H[i]; sum += h;
+    if (lz < 0) { fH += h; fZ += lz; fN++; } else { rH += h; rZ += lz; rN++; }
+    if (lx < 0) { lH += h; lX += lx; lN++; } else { gH += h; gX += lx; gN++; }
+  }
+  const tP = fN && rN ? Math.atan2(fH / fN - rH / rN, rZ / rN - fZ / fN) : 0, tR = lN && gN ? Math.atan2(gH / gN - lH / lN, gX / gN - lX / lN) : 0;
+  const tY = sum / n, k = Math.min(dt, 0.05), K = SUSP.K, C = SUSP.C;
+  const dy = Math.max(-0.4, Math.min(0.4, o.y - o.sLy)); o.sLy = o.y; o.sY -= dy * 0.5;   // the chassis lags a step up or down, then springs back
+  o.sVy += (K * (tY - o.sY) - C * o.sVy) * k; o.sY = Math.max(-0.14, Math.min(0.14, o.sY + o.sVy * k));
+  o.sVp += (K * (Math.max(-0.35, Math.min(0.35, tP)) - o.sP) - C * o.sVp) * k; o.sP = Math.max(-0.4, Math.min(0.4, o.sP + o.sVp * k));
+  o.sVr += (K * (Math.max(-0.35, Math.min(0.35, tR)) - o.sR) - C * o.sVr) * k; o.sR = Math.max(-0.4, Math.min(0.4, o.sR + o.sVr * k));
+  if (W) {
+    const tp = Math.tan(o.sP + (leanP || 0)), tr = Math.tan(o.sR + (leanR || 0));
+    for (let i = 0; i < n; i++) {
+      const w = W[i], d = Math.max(-SUSP.TRAVEL, Math.min(SUSP.TRAVEL, H[i] - (o.sY - w.z0 * tp + w.x0 * tr)));
+      w.pv.position.y = w.y0 + d;
+      if (w.shock) w.shock.scale.y = Math.max(0.55, Math.min(1.4, 1 - d * 1.03 / w.L0));   // wheel up = shock squashed
+    }
+  }
 }
 function buildUTV(color, vest) {
   if (utv.g) {   // a rebuild must not leave a phantom solid and roof behind at the old spot
@@ -11141,11 +11253,12 @@ function utvUpdate(dt) {
   const sp = Math.hypot(u.vx, u.vz), latA = fs * fs * Math.tan(u.steer) / 2.0;
   u.roll += (Math.max(-0.12, Math.min(0.12, latA * 0.006 + ls * 0.02)) - u.roll) * Math.min(1, 6 * dt);
   u.pitch += ((I.b > 0.05 && fs > 0.5 ? -0.03 : 0) + (I.t > 0.05 ? 0.015 : 0) - u.pitch) * Math.min(1, 3 * dt);
-  const bounce = 0.13;   // smooth ride: no bob; sits a little high so the tires ride on top of the road and concrete slabs
-  u.g.position.set(u.x, u.y + bounce, u.z); u.g.rotation.set(u.pitch, u.a, u.roll, 'YXZ');
+  const bounce = 0.13;   // sits a little high so the tires ride on top of the road and concrete slabs
+  suspStep(u, dt, u.pitch, u.roll);   // terrain pitch / roll / heave on top of the lean above
+  u.g.position.set(u.x, u.y + bounce + u.sY, u.z); u.g.rotation.set(u.pitch + u.sP, u.a, u.roll + u.sR, 'YXZ');
   if (u.driver) u.driver.visible = !u.view;   // you can see yourself driving in the chase view
   u.spin += fs * dt / 0.33; for (const w of u.wheels) { w.w.rotation.x = w.rev ? u.spin : -u.spin; w.pv.rotation.y = w.front ? -u.steer : 0; } if (u.sw) u.sw.rotation.z = -u.steer * 3;
-  walk.x = u.x; walk.z = u.z; walk.y = u.y + 0.2; walk.floor = walk.y; walk.vy = 0;
+  walk.x = u.x; walk.z = u.z; walk.y = u.y + 0.2 + u.sY * 0.8; walk.floor = walk.y; walk.vy = 0;   // the seat rides the springs
   utvSound(fs, boosting ? 1.4 : I.t);
   if (u.flame) { u.flame.visible = boosting; if (boosting) { const k = 0.8 + Math.random() * 0.4; u.flame.scale.set(0.9 * k, 0.9 * k, 1); } }
   if (u.lookT > 0) u.lookT -= dt; else { u.look *= Math.exp(-3 * dt); u.lookP *= Math.exp(-3 * dt); }   // the view drifts back behind the UTV

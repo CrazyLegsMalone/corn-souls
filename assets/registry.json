@@ -361,6 +361,27 @@
       "notes": "The buzzard that perches on the RTO stack and carries bodies to the far pond, in the TEST channel."
     },
     {
+      "id": "first-party-ps1-utv-ranger",
+      "title": "PS1 UTV Ranger",
+      "creator": "CrazyLegsMalone (project owner) - model generated with Gemini",
+      "source_platform": "Owner-directed, AI-generated with Gemini, exported as GLB",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/ps1_utv_ranger.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "No geometry or names changed. At runtime: the Body material is cloned per Ranger and tinted to the player colour, the Lights material is drawn unlit (battery light), texture magnification is set to nearest, flat shading; each wheel node is re-parented under a hub pivot for steering and suspension travel, and the shock_* nodes are scaled along Y with the suspension.",
+      "files": [
+        "assets/models/ps1_utv_ranger.glb"
+      ],
+      "checked_on": "2026-11-02",
+      "reviewer": "Owner (directed the generation)",
+      "evidence": "Generated with an AI assistant (Gemini) at the project owner's direction ('PS1 UTV Model Generator' page, three.js GLTFExporter). 18 nodes, 8 meshes, 732 triangles, 4 materials (Body, Trim, Tires, Lights), two embedded PNG textures (256x256 atlas, 128x128 tyre), no skins, no animations, no logos or brand names. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The drivable Ranger (both players' Rangers) in the TEST channel; the box-built Ranger remains as the fallback if the model fails to load."
+    },
+    {
       "creator": "CrazyLegsMalone (project owner) - model generated with ChatGPT",
       "source_platform": "Owner-directed, AI-generated with ChatGPT, exported as GLB (shifty_food_cline_package)",
       "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
