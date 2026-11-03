@@ -1,7 +1,11 @@
-// Interiors during a power outage: there is no baked light in this world, so the sky light lights a room exactly like the
-// yard. Rather than tint the whole screen, each roofed building registers an envelope and its windows, and on an outage
-// the interior SURFACES are dimmed per mesh - dark in the middle, brighter near a window - then restored exactly. This
-// suite runs the game's own engine over a small scene to prove the numbers, the nesting and the restore.
+// Run from the test/ directory: node validate-interior-dark.cjs
+// v1.97.99 LIGHTING: indoors is dark, lamps make pools, the headlamp cuts through. There is no baked light and no
+// occlusion in this world, so on its own the sky lights a room exactly like the yard. Every lit material now carries one
+// shared shader patch: a pixel inside a roofed envelope gets only a trickle of sun and sky (more near a window or an open
+// door), plus its room's fixture fill and the pools of the nearest lamps. The yard outside never changes, and the power
+// outage only takes the lamps away. This suite runs the game's own lighting code over a small scene: the room/window/lamp
+// packing, the CPU copy of the shader sum (lightSample), the outage, flicker, blackout, darkness and brightness controls,
+// and that the shader patch lands in three.js's real Lambert / Basic programs.
 const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
 const html = fs.readFileSync('game.html', 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
@@ -11,53 +15,161 @@ const T = lib.window.THREE;
 
 // ---------------------------------------------------------------- the source
 const dataSrc = html.slice(html.indexOf('const ENCL = [];'), html.indexOf('// ---------- gray metal building'));
-const dimSrc = html.slice(html.indexOf('const INTERIOR = {'), html.indexOf('// ---------- POWER OUTAGE: a real power cut.'));
+const a = html.indexOf('// ---------- LIGHTING (v1.97.99)'), b = html.indexOf('// ---------- POWER OUTAGE: a real power cut.');
+assert.ok(a > 0 && b > a, 'the lighting section sits right before the power outage');
+const lightSrc = html.slice(a, b);
 assert.ok(dataSrc.includes('function enclosure(') && dataSrc.includes('function glazing('), 'the envelope model is in the game');
-assert.ok(dimSrc.includes('function enclAt(') && dimSrc.includes('function interiorLight(') && dimSrc.includes('function applyInteriorDark('),
-  'the dimming engine is in the game');
-assert.ok(html.includes('applyInteriorDark(true);') && html.includes('applyInteriorDark(false);'), 'the outage switch drives it both ways');
-assert.ok(html.includes("if (m.userData && (m.userData.gridLight || m.userData.batteryLight || m.userData.keepLit)) return;"),
-  'fixtures and battery gear are left to the existing outage code');
-assert.ok(html.includes('INTERIOR.walls = new Set(wallMats)') && html.includes('INTERIOR.walls.has(m)'),
-  'the wall shells are skipped: setWallsSolid() owns their opacity');
-assert.ok(html.includes('return 0.10 + 0.70 * d;'), 'no daylight = a tenth of the light, a window = 80%');
+for (const f of ['function lightInstall(', 'function lightBuild(', 'function lightUpdate(', 'function lightSample(', 'function lightPower(',
+  'function lightsFlicker(', 'function lightsBlackout(', 'function lightsDark(', 'function lightBrightness(', 'function enclAt('])
+  assert.ok(lightSrc.includes(f), f + ' is in the lighting section');
+assert.ok(!html.includes('function applyInteriorDark(') && !html.includes('dimmedMaterial('), 'the old per-mesh dimming (material clones) is gone');
 
-// ---------------------------------------------------------------- the scene: a windowless room, a windowed room, a nested room, outdoors
-const scene = new T.Scene(), camera = new T.PerspectiveCamera();
-const wallMats = [];
-const wallMat = new T.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }); wallMats.push(wallMat);
-const mk = (mat, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(1, 1, 1), mat); o.position.set(x, y, z); scene.add(o); return o; };
-const interior = () => new T.MeshLambertMaterial({ color: 0xffffff });
-const darkRoom = interior(), nearWin = interior(), deepRoom = interior(), nested = interior(), outdoor = interior(), lamp = interior();
-lamp.userData.gridLight = true;
-const mDark = mk(darkRoom, 0, 1, 0), mNear = mk(nearWin, 25, 1, -4.4), mDeep = mk(deepRoom, 1, 1, 4.4),
-  mNested = mk(nested, 25, 1, 4.4), mOut = mk(outdoor, 60, 1, 60), mShell = mk(wallMat, 2, 1, 2), mLamp = mk(lamp, 3, 1, 3);
-// the failure this guards against: the ground is ONE 16 km plane whose origin sits inside a building footprint
-const groundMat = interior();
-const mGround = new T.Mesh(new T.PlaneGeometry(4000, 4000), groundMat); mGround.position.set(0, 0.02, 0); scene.add(mGround);
+// ---------------------------------------------------------------- wiring
+assert.ok(html.includes('scene = new T.Scene(); lightInstall();'), 'the shader patch is installed before anything compiles');
+assert.ok(!/new T\.SpotLight\(/.test(html.slice(html.indexOf('function init('), html.indexOf('function init(') + 8000)) && html.includes("headlamp = { intensity: 0, color: new T.Color(0xfff1d6) };"),
+  'the headlamp is no longer a three.js SpotLight (that put a light loop on every pixel in the game)');
+assert.ok(html.includes('buildBillboards(); buildDirtHills(); lightBuild(); mergeStatic();'), 'lamps are collected before the static merge folds their meshes away');
+{ const i = html.indexOf("stepSafe('lighting', () => lightUpdate(dt));"), j = html.indexOf('renderer.render(scene, camera);', i);
+  assert.ok(i > 0 && j > i && j - i < 300, 'the lighting is updated every frame, after the camera and right before the render'); }
+assert.ok(html.includes('CSU.csG.value.w = 1; renderer.render(hudScene, hudCam); CSU.csG.value.w = 0;'), 'the first-person HUD pass bypasses the world lighting');
+assert.ok(html.includes('hudHemi.intensity = Math.max(floor, Math.max(0.8, hemi.intensity) * hk + LIGHT.hud.irr * 0.6 + lamp);'), 'and is lit by where you stand instead');
+{ const s = html.slice(html.indexOf('function setPowerOutage(on) {'), html.indexOf('POWER_OUTAGE.apply = function'));
+  assert.ok(s.indexOf('lightPower(true);') > 0 && s.indexOf('lightPower(true);') < s.indexOf('scene.traverse('), 'lamps are back at their true colour before the outage captures them');
+  assert.ok(s.includes('lightPower(false);'), 'and strike up again when the power returns'); }
+assert.ok(html.includes("(LIGHT.bg0 || (LIGHT.bg0 = new T.Color())).copy(scene.background);"), 'daylight() hands the undimmed sky to the darkness control');
+for (const m of ['const wm = selfLit(', 'const roofM = selfLit(', 'const ceilM = selfLit(', 'const conc = selfLit('])
+  assert.ok(html.includes(m), m + ': the fake indoor glow fades with the room light');
+assert.equal((html.match(/lampLight\(gridLight\(/g) || []).length, 7, 'seven authored fixtures throw light: receiving ceiling lights, hallway lights, wall packs, the yard pole');
+assert.ok(html.includes("['💡 Lights: flicker'") && html.includes("['💡 Lights: blackout nearby (15 s)'") && html.includes("['🌑 Darkness everywhere (20 s)'"), 'the scare controls are on the debug menu');
+assert.ok(html.includes("['🔆 Brightness: ' + P3.lights.brightName"), 'the brightness floor is on the pause menu');
+assert.ok(html.includes('lights: { flicker: (s, r) => lightsFlicker(s, r), blackout: (s, r) => lightsBlackout(s, r), dark: (a, f, h) => lightsDark(a, f, h)'), 'and exported for scripted events');
 
-const ctx = { T, scene, camera, wallMats, console, Math, performance };
+// ---------------------------------------------------------------- the shader patch, on three.js's own programs
+const store = {};
+const ctx = { T, Math, console, performance: { now: () => 0 }, localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } },
+  TIER: { name: 'medium' }, scene: new T.Scene(), walk: { on: true, x: 0, y: 0, z: 0 }, cam: { tx: 0, ty: 0, tz: 0 }, clock: 0, EYE: 1.57,
+  hemi: { intensity: 1.18 }, POWER_OUTAGE: { on: false }, headlamp: { intensity: 0, color: new T.Color(1, 1, 1) }, O: { rollDoors: [] },
+  EXIT_SIGN: { mat: null }, EGRESS: { lens: null }, SKY: { clouds: null }, gridLight: m => { m.userData.gridLight = true; return m; } };
+ctx.lampLight = (m, r, k) => { m.userData.lamp = { r, k }; return m; };
 vm.createContext(ctx);
-vm.runInContext(dataSrc + '\n' + dimSrc + '\nthis.ENCL = ENCL; this.INTERIOR = INTERIOR;', ctx);
-ctx.enclosure(-5, 5, -5, 5, 4);                                   // windowless room
-const lit = ctx.enclosure(20, 30, -5, 5, 4);                      // a room with one window on its north wall
-ctx.glazing(lit, 25, 1.5, -5, 4);
-const inner = ctx.enclosure(23, 27, 3, 5, 2.5);                   // a cupboard inside it, with no window of its own
-assert.equal(ctx.ENCL.length, 3, 'three envelopes registered');
+vm.runInContext(dataSrc + '\n' + lightSrc + '\nthis.ENCL = ENCL; this.LIGHT = LIGHT; this.CSU = CSU; this.CS_N = CS_N; this.CS_BRIGHT = CS_BRIGHT;', ctx);
+ctx.lightInstall();
+{ // Lambert: the patch lands right after the light loops, with every uniform bound to the ONE shared object
+  const m = new T.MeshLambertMaterial({ color: 0xffffff }), sh = { fragmentShader: T.ShaderLib.lambert.fragmentShader, vertexShader: T.ShaderLib.lambert.vertexShader, uniforms: {} };
+  m.onBeforeCompile(sh);
+  assert.ok(sh.fragmentShader.includes('float csLight(vec3 pV, vec3 nV, out vec3 irr)'), 'Lambert carries the lighting function');
+  assert.ok(sh.fragmentShader.indexOf('csLight(geometryPosition, geometryNormal, csIrr)') > sh.fragmentShader.indexOf('#include <lights_fragment_end>'), 'and calls it after three.js has summed the sun and sky');
+  assert.ok(!sh.fragmentShader.includes('#define CS_GLOW'), 'a plain material keeps its glow alone');
+  for (const k of Object.keys(ctx.CSU)) assert.equal(sh.uniforms[k], ctx.CSU[k], k + ' is shared, so one write per frame reaches every material');
+  const g = new T.MeshLambertMaterial({ emissive: 0x333333 }); g.userData.csGlow = true;
+  const sg = { fragmentShader: T.ShaderLib.lambert.fragmentShader, uniforms: {} }; g.onBeforeCompile(sg);
+  assert.ok(sg.fragmentShader.startsWith('#define CS_GLOW'), 'a selfLit surface fades its glow with the light');
+  assert.notEqual(m.customProgramCacheKey(), g.customProgramCacheKey(), 'and gets its own program');
+  const ph = new T.MeshPhongMaterial(), sp = { fragmentShader: T.ShaderLib.phong.fragmentShader, uniforms: {} }; ph.onBeforeCompile(sp);
+  assert.ok(sp.fragmentShader.includes('csLight(geometryPosition'), 'Phong too');
+}
+{ // Basic: printed surfaces take the darkness, lights / halos / HUD parts never do
+  const plate = new T.MeshBasicMaterial({ color: 0xffffff }), lamp = ctx.gridLight(new T.MeshBasicMaterial()), halo = new T.MeshBasicMaterial({ blending: T.AdditiveBlending }),
+    hud = new T.MeshBasicMaterial({ depthTest: false }), sky = new T.MeshBasicMaterial({ fog: false }), exit = new T.MeshBasicMaterial(); exit.userData.batteryLight = true;
+  const sh = () => ({ fragmentShader: T.ShaderLib.basic.fragmentShader, vertexShader: T.ShaderLib.basic.vertexShader, uniforms: {} });
+  const s1 = sh(); plate.onBeforeCompile(s1);
+  assert.ok(s1.fragmentShader.includes('csLight(csVP, vec3(0.0), csIrr)') && s1.vertexShader.includes('csVP = mvPosition.xyz;'), 'a name plate is darkened indoors');
+  for (const [m, n] of [[lamp, 'a fixture'], [halo, 'an additive halo'], [hud, 'a HUD part'], [sky, 'the clouds'], [exit, 'an EXIT sign']]) {
+    const s = sh(); m.onBeforeCompile(s); assert.ok(!s.fragmentShader.includes('csLight'), n + ' is left alone'); assert.equal(m.customProgramCacheKey(), 'cs0');
+  }
+  assert.equal(plate.customProgramCacheKey(), 'cs1', 'patched and unpatched unlit materials never share a program');
+}
 
-ctx.applyInteriorDark(true);
-const g = o => +o.material.color.g.toFixed(2);
-assert.ok(g(mDark) <= 0.11, 'a windowless room goes dark (' + g(mDark) + ')');
-assert.ok(g(mNear) > 0.6, 'right at the window it stays bright (' + g(mNear) + ')');
-assert.ok(g(mDeep) <= 0.11 && g(mNested) <= 0.11, 'and away from it, dark again (' + g(mNested) + ')');
-assert.equal(mOut.material, outdoor, 'outdoors is untouched');
-assert.equal(mShell.material, wallMat, 'the wall shell is untouched (setWallsSolid owns it)');
-assert.equal(mLamp.material, lamp, 'a gridLight fixture is left to the outage code');
-assert.equal(mGround.material, groundMat, 'a world-scale surface (the ground) is never dimmed, wherever its origin sits');
-assert.ok(g(mDark) <= 0.11, 'but the room it sits in still is');
-assert.ok(g(mNear) > g(mNested), 'the window reaches its own room, not the cupboard inside it');
+// ---------------------------------------------------------------- a small world: two rooms (one with a cupboard inside), a yard
+const S = ctx.scene;
+const shed = ctx.enclosure(-10, 10, -10, 10, 6);                    // windowless shed, roof at 6 m: it gets generated high-bays
+const office = ctx.enclosure(20, 30, -5, 5, 3);                     // an office with one window on its north wall
+ctx.glazing(office, 25, 1.5, -5, 4);
+const cup = ctx.enclosure(26, 30, 2, 5, 2.5);                       // a cupboard inside the office, no window of its own
+const mk = (m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(0.3, 0.1, 0.3), m); o.position.set(x, y, z); S.add(o); return o; };
+mk(ctx.lampLight(ctx.gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 5, 2.5), 24, 2.9, 0);   // the office's own ceiling light
+mk(ctx.lampLight(ctx.gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 9, 3), 0, 3, 10.4);     // a wall pack on the shed's outside
+ctx.EXIT_SIGN.mat = new T.MeshBasicMaterial({ color: 0xc8211c }); ctx.EXIT_SIGN.mat.userData.batteryLight = true;
+mk(ctx.EXIT_SIGN.mat, -9.5, 2.5, 0);                                 // an EXIT sign inside the shed
+const door = { x: 0, z: -10, h: 4, open: 0 }; ctx.O.rollDoors.push(door);   // a roll-up door in the shed's north wall
+const n = ctx.lightBuild();
+const L = ctx.LIGHT;
+const gen = L.lamps.filter(l => l.inst >= 0);
+assert.equal(gen.filter(l => l.room === shed).length, 4, 'the windowless 20 m shed gets a 2 x 2 grid of ceiling high-bays');
+assert.equal(gen.filter(l => l.room === cup).length, 1, 'the cupboard has no light of its own, so it gets one too');
+assert.equal(gen.filter(l => l.room === office).length, 0, 'the office keeps its own ceiling light');
+assert.ok(gen.filter(l => l.room === shed).every(l => Math.abs(l.y - (6 - 0.35)) < 1e-9), 'hung just under the roof');
+assert.equal(L.inst.count, gen.length, 'drawn as ONE instanced mesh');
+assert.equal(n, gen.length + 3, 'plus the office light, the wall pack and the EXIT sign');
+const pack = L.lamps.find(l => l.z === 10.4), exitL = L.lamps.find(l => l.grid === false);
+assert.equal(pack.room, null, 'the wall pack is outdoors'); assert.equal(exitL.room, shed, 'the EXIT sign is in the shed');
+assert.ok(shed.wins.some(w => w.door === door), 'the roll-up door is a daylight opening of the shed');
+assert.ok(ctx.enclAt(28, 1, 3) === cup && ctx.enclAt(22, 1, 0) === office && ctx.enclAt(50, 1, 50) === null, 'the smallest room wins, outdoors is null');
 
-// the registration work: each roofed building declares its envelope, and only windows are daylight
+const frame = (dt = 0.1) => { ctx.clock += dt; ctx.lightUpdate(dt); };
+const at = (x, y, z) => ctx.lightSample(x, y, z);
+const day = () => { ctx.hemi.intensity = 1.18; }, night = () => { ctx.hemi.intensity = 0.66; };
+ctx.walk.x = 5; ctx.walk.z = 0; day(); frame(); frame();
+assert.ok(ctx.CSU.csG.value.x === 3 && ctx.CS_N.B >= 3, 'all three rooms are uploaded');
+{ const A = ctx.CSU.csBoxA.value; assert.ok(A[0].x === 26 && A[2].x === -10, 'smallest first, so the cupboard wins over the office'); }
+const cShed = at(0, 1.5, 0), cYard = at(50, 1.5, 50), cWin = at(25, 1.5, -4.5), cDeep = at(28, 1.5, 3.5);
+assert.ok(cShed.k <= 0.06, 'midday, middle of the shed: the sun and sky are down to a trickle (k ' + cShed.k + ')');
+assert.ok(cShed.irr > 0.5, 'and its own fixtures light it instead (irr ' + cShed.irr.toFixed(2) + ')');
+assert.equal(cYard.k, 1, 'the yard gets the full sun'); assert.equal(cYard.irr, 0, 'and no lamp light in the day');
+assert.ok(cWin.k > 0.6, 'right at the office window it is bright (k ' + cWin.k.toFixed(2) + ')');
+assert.ok(cDeep.k < 0.1 && cDeep.room !== cWin.room, 'and the cupboard behind it is dark');
+// the roll-up door: shut it lets a sliver in, open it floods the doorway
+const nearDoor = () => at(0, 1.5, -9).k;
+door.open = 0; frame(); const shut = nearDoor(); door.open = 1; frame(); const open = nearDoor();
+assert.ok(open > shut + 0.3, 'opening the roll-up door lets the daylight in (' + shut.toFixed(2) + ' -> ' + open.toFixed(2) + ')');
+door.open = 0; frame();
+
+// ---------------------------------------------------------------- the power outage: the yard is untouched, rooms go black
+ctx.POWER_OUTAGE.on = true; ctx.lightPower(true); frame();
+const oShed = at(0, 1.5, 0), oYard = at(50, 1.5, 50);
+assert.equal(oYard.k, cYard.k, 'an outage never touches the yard (the bug the owner saw)'); assert.equal(oYard.irr, cYard.irr);
+assert.ok(oShed.k === cShed.k && oShed.irr < 0.05, 'the shed loses its fill and its high-bays (irr ' + oShed.irr.toFixed(3) + ')');
+assert.ok(at(-8.5, 1.5, 0).irr > 0.05, 'the battery EXIT sign still throws a faint red pool');
+ctx.POWER_OUTAGE.on = false; ctx.lightPower(false); frame(0.05);
+assert.ok(at(0, 1.5, 0).irr < cShed.irr * 0.8, 'power back: the high-bays have to strike up first');
+for (let i = 0; i < 50; i++) frame(0.1);
+assert.ok(Math.abs(at(0, 1.5, 0).irr - cShed.irr) < 1e-6, 'and five seconds later the shed is exactly as lit as before');
+
+// ---------------------------------------------------------------- night: the outdoor lamps come on
+night(); frame();
+assert.ok(at(0, 0.5, 13).irr > 0.3, 'at night the wall pack throws a pool on the yard');
+assert.equal(at(0, 0.5, 9).irr > cShed.irr, false, 'that pool stays outside the wall (outdoor lamps light outdoor pixels only)');
+day(); frame(); assert.equal(at(0, 0.5, 13).irr, 0, 'and it is off in the day');
+
+// ---------------------------------------------------------------- scare controls
+{ const before = at(0, 1.5, 0).irr; ctx.lightsFlicker(3, 30); let lo = 1e9, hi = 0;
+  for (let i = 0; i < 25; i++) { frame(0.1); const v = at(0, 1.5, 0).irr; lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  assert.ok(lo < before * 0.6 && hi > lo * 2, 'a flicker makes the lights stutter (' + lo.toFixed(2) + '..' + hi.toFixed(2) + ')');
+  for (let i = 0; i < 10; i++) frame(0.1);
+  assert.equal(L.flick, null, 'it ends on its own'); assert.ok(Math.abs(at(0, 1.5, 0).irr - before) < 1e-6, 'and the lights are back exactly'); }
+{ const before = at(0, 1.5, 0).irr; ctx.lightsBlackout(6, 45); for (let i = 0; i < 20; i++) frame(0.1);
+  assert.ok(at(0, 1.5, 0).irr < 0.05, 'a local blackout kills the fixtures nearby');
+  assert.ok(at(-8.5, 1.5, 0).irr > 0.05, 'but not the battery EXIT sign');
+  assert.ok(L.lamps.filter(l => l.inst >= 0).every(l => l.shown <= 0.07), 'and the fixtures themselves go dark with their pools');
+  for (let i = 0; i < 45; i++) frame(0.1);
+  assert.equal(L.kill, null); assert.ok(Math.abs(at(0, 1.5, 0).irr - before) < 1e-6, 'then they come back');
+  assert.ok(L.lamps.filter(l => l.inst >= 0).every(l => l.shown === 1), 'fixtures too'); }
+{ ctx.lightsDark(1, 0.05, 2); for (let i = 0; i < 5; i++) frame(0.1);
+  const y = at(50, 1.5, 50).k;
+  assert.ok(y <= ctx.LIGHT.minK + 0.02, 'darkness takes even the yard down to the brightness floor (k ' + y.toFixed(3) + ')');
+  ctx.lightBrightness(3); frame(); assert.ok(Math.abs(at(50, 1.5, 50).k - 0.15) < 0.02, 'the Brightest setting keeps a 15% floor for screens that crush blacks');
+  assert.equal(store.cs_bright, '3', 'and is remembered'); ctx.lightBrightness(1);
+  for (let i = 0; i < 40; i++) frame(0.1);
+  assert.equal(at(50, 1.5, 50).k, 1, 'the darkness lifts by itself when its time is up'); }
+
+// ---------------------------------------------------------------- packing: each pixel only walks its own lamps and openings
+{ night(); frame(); const U = ctx.CSU, G = U.csG.value;
+  const runs = []; for (let i = 0; i < G.x; i++) { const z = U.csBoxB.value[i].z, e = Math.floor(z / 64); runs.push([z - e * 64, e]); }
+  const nOut = G.y; for (const [s0, s1] of runs) assert.ok(s0 >= nOut || s1 === 0, 'room lamp runs come after the outdoor run');
+  for (let i = 0; i < runs.length; i++) for (let j = i + 1; j < runs.length; j++) assert.ok(runs[i][1] <= runs[j][0] || runs[j][1] <= runs[i][0] || runs[i][1] === runs[i][0] || runs[j][1] === runs[j][0], 'runs never overlap');
+  assert.ok(nOut >= 1, 'the wall pack is in the outdoor run at night'); day(); frame(); }
+
+// ---------------------------------------------------------------- the registration work: each roofed building declares its envelope
 assert.ok(/enclosure\(x0, x1, z0, z1, h\);/.test(html), 'the generic building() registers its own envelope');
 assert.ok(/for \(const \[c, ow\] of nop\) glazing\(/.test(html), 'and its door openings as daylight');
 assert.ok(html.includes('enclosure(WW, EW, NZ, WZS, PH)'), 'the process building west block');
@@ -68,20 +180,6 @@ assert.ok(/enclosure\(bx0 \+ GDX, bx1 \+ GDX, bz0 \+ GDZ, bz1 \+ GDZ, wallH\)/.t
 assert.ok(/enclosure\(X0 \+ SH_DX, X1 \+ SH_DX, ZN, ZS, FY \+ H\)/.test(html), 'the scale house, in its shifted coordinates');
 assert.ok(/glazing\(E, WINX \+ SH_DX, FY \+ 1\.65, ZN, 3\.6\)/.test(html), 'its two drive-through windows are daylight');
 assert.ok(/glazing\(E, EW - 0\.135, 1\.5, OZN \+ 1\.6, 3\.6\)/.test(html), "and the office block's own windows");
-assert.ok(!/glazing\([^)]*open/.test(html), 'door leaves are not treated as glazing');
-
-// ---------------------------------------------------------------- power comes back and everything is exactly as it was
-ctx.applyInteriorDark(false);
-assert.equal(mDark.material, darkRoom, 'the dark room is restored');
-assert.equal(mNear.material, nearWin, 'the windowed room is restored');
-assert.equal(mNested.material, nested, 'the cupboard is restored');
-assert.equal(ctx.INTERIOR.saved.length, 0, 'nothing is left holding a dimmed clone');
-assert.equal(ctx.INTERIOR.on, false, 'the engine is off again');
-
-ctx.applyInteriorDark(true);                                       // and it is idempotent: a second call changes nothing
-const again = ctx.INTERIOR.saved.length;
-ctx.applyInteriorDark(true);
-assert.equal(ctx.INTERIOR.saved.length, again, 'a repeated outage call does not double-dim');
 
 // ------------------------------------------------ the floor layering, inside and out
 // A floor is a flat plane seen along its own plane, so its depth slope is almost infinite: any polygon offset that is
@@ -94,4 +192,4 @@ assert.ok(html.includes('m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYE
 assert.ok(html.includes('a factor of -16 pulled the pads so far forward'), 'the reason is written down next to the code');
 
 for (const script of scripts) if (script.trim()) new vm.Script(script);
-console.log('PASS: interiors go dark on an outage, windows are the only daylight, nested rooms stay dark, and power restores them exactly');
+console.log('PASS: rooms are dark by day and black in an outage while the yard never changes; windows, doors, fixtures, high-bays, EXIT pools, night pools, flicker, blackout, darkness and brightness all check out');

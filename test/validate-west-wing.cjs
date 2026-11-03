@@ -12,7 +12,7 @@ function build(source, westWing){
  ctx.cyl=(r,h,m,x,y,z)=>ctx.add(new T.CylinderGeometry(r,r,h,12),m,x,y+h/2,z);
  ctx.tank=(x,z,r,h,c)=>ctx.add(new T.CylinderGeometry(r,r,h,12),ctx.mat(c),x,h/2,z);
  ctx.regVehBox=noop;ctx.buildShopRadio=noop;ctx.buildToolWall=noop;ctx.pumpSet=noop;ctx.pipe=noop;ctx.nameplate=noop;
- ctx.egressStrobe=noop;ctx.gridLight=m=>m;ctx.batteryLight=m=>m;   // power-outage hooks: this block only needs them to exist
+ ctx.egressStrobe=noop;ctx.gridLight=m=>m;ctx.batteryLight=m=>m;ctx.lampLight=m=>m;ctx.selfLit=m=>m;   // power-outage hooks: this block only needs them to exist
  ctx.exitSignMat=()=>new T.MeshBasicMaterial({color:0xc8211c});ctx.exitHalo=noop;   // EXIT signage helpers
  ctx.DRINK_SPOTS=[];   // replaced soda machines are registered here, not built as boxes
  ctx.enclosure=(x0,x1,z0,z1,top)=>({x0,x1,z0,z1,top,wins:[],area:Math.abs((x1-x0)*(z1-z0))});   // outage daylight registry

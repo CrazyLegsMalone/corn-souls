@@ -39,7 +39,7 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
  const calls=[],chain={copy(){return this;},sub(){return this;},normalize(){return this;},applyQuaternion(){return this;},invert(){return this;}};
  const light=()=>({color:{copy(){}},intensity:1,position:{copy(){}},target:{position:{set(){}}}});
  const hudRender={gun:{visible:false},heldG:hudState.heldG,SR:{carry:null},hudScene:hudState.hudScene,
-  hudCam:{updateProjectionMatrix(){}},camera:{aspect:1,view:null,quaternion:{}},hudHemi:light(),hudSun:light(),hemi:light(),sunL:light(),tv:chain,tq:chain,
+  hudCam:{updateProjectionMatrix(){}},camera:{aspect:1,view:null,quaternion:{}},hudHemi:light(),hudSun:light(),hemi:light(),sunL:light(),tv:chain,tq:chain,LIGHT:{hud:{k:1,irr:0},minK:0.03,flK:1},headlamp:{intensity:0},CSU:{csG:{value:{w:0}}},
   renderer:{autoClear:true,clearDepth(){calls.push('clearDepth');},render(scene){calls.push(scene===hudState.hudScene?'hud':'world');}}};
  const drawStart=rendered.indexOf('function drawHudGun() {'),drawEnd=rendered.indexOf('\nconst tq =',drawStart);
  vm.runInNewContext(rendered.slice(drawStart,drawEnd)+'\nthis.draw=drawHudGun;',hudRender);

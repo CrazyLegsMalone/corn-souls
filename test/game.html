@@ -4716,6 +4716,11 @@ const MODEL_PBR = TIER.pbr;   // imported models: false = Lambert. Cheaper per p
 // gridLight = wired to the plant supply (dies with the outage) | batteryLight = self-powered (exit signs, vehicles, egress strobes).
 const gridLight = m => { m.userData.gridLight = true; return m; };
 const batteryLight = m => { m.userData.batteryLight = true; return m; };
+// lampLight = this emitter also throws light: a pool of radius r (metres) at strength k, picked up by lightBuild()
+const lampLight = (m, r, k) => { m.userData.lamp = { r: r || 7, k: k || 3 }; return m; };
+// selfLit = a surface given a little emissive so it reads indoors (wall sheeting, roof deck, drop ceiling, concrete):
+// the LIGHTING pass scales that glow with the room's light, so it is gone in a blacked-out room instead of glowing gray
+const selfLit = m => { m.userData.csGlow = true; return m; };
 // ground textures, drawn in code (no image files): 256 px tiles that repeat every 8 m. Dirt = soil with clods, pebbles and faint ruts;
 // grass = a mottled lawn with blade flecks. Subtle on purpose so they don't look busy; mipmaps keep them clean from far away.
 // ---------- one place that tags an authored canvas texture as sRGB. A colour map painted with the 2D canvas holds
@@ -4854,12 +4859,12 @@ function tank(x, z, r, h, accent, liquid, st, opts) {
 
 // solid wall segments for walk mode: [x0, z0, x1, z1]
 const wallSegs = [], wallMats = [];   // wall materials: see-through from above, solid in Squeeg mode
-// ---------- INTERIOR LIGHTING IN AN OUTAGE ----------
+// ---------- ROOMS FOR THE LIGHTING PASS ----------
 // Nothing in the renderer knows indoors from outdoors: there is no baked light and no occlusion, so the sky light lights
-// an interior exactly like the yard. Every roofed building therefore registers an envelope, and every window in it is a
-// daylight source. On an outage the interior SURFACES themselves are dimmed per mesh - dark in the middle of a room,
-// brighter near a window - and restored exactly when the power comes back. Windows are the only way light gets in; the
-// see-through wall materials of the free camera are a rendering convenience and never count as glazing.
+// an interior exactly like the yard. Every roofed building therefore registers an envelope, and every window or doorway
+// in it is a daylight source. The LIGHTING pass (see lightUpdate) darkens every pixel inside an envelope, day or night,
+// except near those openings, and lights it with its own fixtures instead. Windows and doorways are the only way light
+// gets in; the see-through wall materials of the free camera are a rendering convenience and never count as glazing.
 const ENCL = [];
 function enclosure(x0, x1, z0, z1, top) {          // a roofed volume; returns it so windows can be added right there
   const e = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), top, wins: [] };
@@ -5502,12 +5507,12 @@ function flow(path, geo, color, max, opts) {
     // costs no per-frame work except moving the texture (the old moving pills recalculated every slug every frame)
     const tex = gooTex(color).clone(); tex.needsUpdate = true; tex.repeat.set(Math.max(1, plen / 1.2), 1);
     const mesh = new T.Mesh(new T.TubeGeometry(path, Math.max(8, Math.round(plen / 0.7)), 0.15, 6, false),
-      new T.MeshLambertMaterial({ map: tex, emissive: color, emissiveIntensity: opts.glow ? 0.45 : 0.22 }));
+      selfLit(new T.MeshLambertMaterial({ map: tex, emissive: color, emissiveIntensity: opts.glow ? 0.45 : 0.22 })));
     mesh.userData.noHit = true; mesh.visible = false; scene.add(mesh);
     const f = { path, mesh, tex, len: plen, rate: 0, speed: opts.speed || 8, liquid: true };
     flows.push(f); return f;
   }
-  const m = new T.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: opts.glow ? 0.4 : liquid ? 0.28 : 0 });
+  const m = selfLit(new T.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: opts.glow ? 0.4 : liquid ? 0.28 : 0 }));
   if (!opts.glow && !liquid) m.emissiveIntensity = 0;
   const mesh = new T.InstancedMesh(geo, m, liquid ? max * 2 : max);   // a pill is two halves so it can bend at a corner mesh.castShadow = !!opts.shadow; mesh.count = 0;
   mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -5589,15 +5594,14 @@ function init(container) {
   renderer.info.autoReset = false;
   renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); if (window.__showErr) __showErr('3D graphics context was lost (GPU reset). Reopen the app.'); });
   container.appendChild(renderer.domElement);
-  scene = new T.Scene();
+  scene = new T.Scene(); lightInstall();
   scene.background = new T.Color(0x8fd0ff); buildSky();
   scene.fog = new T.Fog(0x8fd0ff, 380, 760);
   camera = new T.PerspectiveCamera(42, 1, 1, 9000);
   hemi = new T.HemisphereLight(0xffffff, 0x6b8f4a, 1.15); scene.add(hemi);
   const sun = new T.DirectionalLight(0xfff4e0, 1.7); sunL = sun;
-  headlamp = new T.SpotLight(0xfff1d6, 0, 60, 0.45, 0.6, 1); headlamp.castShadow = false;
-  headlamp.position.set(0, 0.15, 0); headlamp.target.position.set(0, -0.04, -1);
-  camera.add(headlamp); camera.add(headlamp.target); scene.add(camera);
+  headlamp = { intensity: 0, color: new T.Color(0xfff1d6) };   // drawn by the LIGHTING pass (csFl*), not a three.js light
+  scene.add(camera);
   sun.position.set(-60, 140, 90); sun.castShadow = true; sun.shadow.mapSize.set(TIER.shadow, TIER.shadow);
   Object.assign(sun.shadow.camera, { left: -260, right: 170, top: 120, bottom: -100, near: 20, far: 480 });
   sun.shadow.bias = -0.0005;
@@ -5728,7 +5732,7 @@ function init(container) {
       const yel = mat(0xf2c200);                                                                              // guardrail around the opening on the receiving floor (open at the top of the stairs)
       for (const x of [SX0 - 0.05, SX1 + 0.05]) { box(0.06, 0.06, sd, yel, x, 1.05, sz); box(0.06, 0.06, sd, yel, x, 0.55, sz); for (const z of [SZ0 + 0.1, sz, SZ1]) box(0.07, 1.05, 0.07, yel, x, 0.53, z); }
       box(sw + 0.1, 0.06, 0.06, yel, sx, 1.05, SZ1); box(sw + 0.1, 0.06, 0.06, yel, sx, 0.55, SZ1);
-      for (const x of [-188, -178.5, -172]) box(1.2, 0.08, 0.3, gridLight(new T.MeshBasicMaterial({ color: 0xfff6d8 })), x, -0.45, 0);   // ceiling lights
+      for (const x of [-188, -178.5, -172]) box(1.2, 0.08, 0.3, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xfff6d8 })), 7, 3.5), x, -0.45, 0);   // ceiling lights
       // walk data (world coords: the grain yard is shifted by GDX/GDZ)
       const W = (x0, z0, x1, z1, y0, y1, ax) => WALK_SURF.push({ x0: x0 + GDX, x1: x1 + GDX, z0: z0 + GDZ, z1: z1 + GDZ, y0, y1, ax });
       DIGS.push([B.x0 + GDX, B.z0 + GDZ, B.x1 + GDX, B.z1 + GDZ], [SX0 + GDX, SZ0 + GDZ, SX1 + GDX, B.z0 + GDZ]);
@@ -6178,15 +6182,15 @@ function init(container) {
     const ribTex = (() => { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 4; const g = cv.getContext('2d');
       g.fillStyle = '#f3f4f3'; g.fillRect(0, 0, 64, 4); g.fillStyle = '#cfd3d7'; g.fillRect(0, 0, 3, 4); g.fillStyle = '#e4e7e9'; g.fillRect(3, 0, 3, 4); g.fillRect(30, 0, 2, 4);
       const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; })();
-    const wm = new T.MeshLambertMaterial({ color: 0xffffff, map: ribTex, emissive: 0x7a7d80, emissiveMap: ribTex, transparent: true, opacity: 0.5, depthWrite: false });
+    const wm = selfLit(new T.MeshLambertMaterial({ color: 0xffffff, map: ribTex, emissive: 0x7a7d80, emissiveMap: ribTex, transparent: true, opacity: 0.5, depthWrite: false }));
     wm.userData.ribbed = 0.3048;
     // roof deck seen from inside: light-medium gray metal with gray lines running east–west every 2 ft
     const roofTex = (() => { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 64; const g = cv.getContext('2d');
       g.fillStyle = '#c4c8cc'; g.fillRect(0, 0, 4, 64); g.fillStyle = '#979ca2'; g.fillRect(0, 0, 4, 4); g.fillStyle = '#b3b7bc'; g.fillRect(0, 4, 4, 3);
       const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; })();
-    const roofM = new T.MeshLambertMaterial({ color: 0xffffff, map: roofTex, emissive: 0x606366, emissiveMap: roofTex, transparent: true, opacity: 0.35, depthWrite: false });
+    const roofM = selfLit(new T.MeshLambertMaterial({ color: 0xffffff, map: roofTex, emissive: 0x606366, emissiveMap: roofTex, transparent: true, opacity: 0.35, depthWrite: false }));
     const blockM = new T.MeshLambertMaterial({ color: 0xf1efe8, transparent: true, opacity: 0.55, depthWrite: false });   // office: white concrete block
-    const ceilM = new T.MeshLambertMaterial({ color: 0xe9e9e4, emissive: 0x8a8a86, transparent: true, opacity: 0.3, depthWrite: false });   // lit drop ceiling
+    const ceilM = selfLit(new T.MeshLambertMaterial({ color: 0xe9e9e4, emissive: 0x8a8a86, transparent: true, opacity: 0.3, depthWrite: false }));   // lit drop ceiling
     wallMats.push(wm, roofM, blockM, ceilM);
     const trimM = mat(0x8a96a3), leafM = mat(0x3a4a5c), stripeM = mat(0x2f5d3f), frameM = mat(0x56606b);
     // a straight wall with door openings: doors = [[position along the wall, width], ...]; lintel above each opening
@@ -6351,7 +6355,7 @@ function init(container) {
     add(new T.BoxGeometry(FXE - FXW + 0.6, 0.3, SZ - ZN + 0.6), roofM, AC, PH + 0.15, (SZ + ZN) / 2, null, true);
     enclosure(FXW, FXE, ZN, SZ, PH);
     // concrete floor with a trench drain down the ferm alley and along the evap alley aisle
-    const conc = new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 }), grate = mat(0x3f444a); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
+    const conc = selfLit(new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 })), grate = mat(0x3f444a); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
     const slab = (w, d, x, z) => { const o = add(new T.BoxGeometry(w, 0.1, d), conc, x, 0.17, z, null, true); o.receiveShadow = true; };
     slab(EW - WW, WZS - NZ, (WW + EW) / 2, (NZ + WZS) / 2);
     slab(FXE - FXW, SZ - ZN, AC, (SZ + ZN) / 2);
@@ -6711,7 +6715,7 @@ function init(container) {
         sg((c, W, H) => { c.fillStyle = '#fff'; c.fillRect(0, 0, W, H); c.strokeStyle = '#c8211c'; c.lineWidth = 6; c.strokeRect(3, 3, W - 6, H - 6); c.fillStyle = '#c8211c'; c.font = 'bold 22px Arial'; c.textAlign = 'center';
           'FIRE EXT.'.split('').forEach((ch, i) => c.fillText(ch, W / 2, 34 + i * 34)); }, 0.12, 0.42, dx + 1.6, 1.75, BSZ + 0.135);
         add(new T.CylinderGeometry(0.09, 0.09, 0.5, 10), mat(0xc8211c), dx + 1.6, 1.0, BSZ + 0.25); box(0.1, 0.06, 0.1, mat(0x222222), dx + 1.6, 1.28, BSZ + 0.25);
-        box(0.4, 0.25, 0.12, gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), dx + 4.8, 3.2, BSZ + 0.2);   // wall pack light
+        box(0.4, 0.25, 0.12, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 9, 3), dx + 4.8, 3.2, BSZ + 0.2);   // wall pack light
       }
       { // mezzanine on the MCC roof: steel grating deck, yellow handrails along the open (north and south) edges, stairs up along the south face
         const DY = 4.7, yel = mat(0xf2c200), st = mat(0x4a4f55), x0 = FXE + 0.15, x1 = BEX - 0.15, SB = x1 - 0.3, ST = SB - 5.1, SZ0 = BSZ + 0.15, SZ1 = BSZ + 1.2, LX = ST - 1.1;
@@ -6762,7 +6766,7 @@ function init(container) {
           const sm = new T.MeshLambertMaterial({ map: sid }), DX0 = px - 0.08 - 0.47, DX1 = px - 0.08 + 0.47;   // hollow now: walls with a doorway, so the door can open
           for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
           box(DX0 - (px - W / 2), H, 0.08, sm, (px - W / 2 + DX0) / 2, H / 2, fz); box(px + W / 2 - DX1, H, 0.08, sm, (DX1 + px + W / 2) / 2, H / 2, fz); box(DX1 - DX0, H - 2.15, 0.08, sm, px - 0.08, (H + 2.15) / 2, fz);
-          box(W - 0.06, 0.14, D, mat(0x8d9196), px, 0.1, pz); for (const lz of [fz + 3.5, fz + 9.0]) box(0.35, 0.06, 1.1, gridLight(new T.MeshBasicMaterial({ color: 0xfff5d6 })), px, H - 0.05, lz);   // concrete floor + hallway ceiling lights
+          box(W - 0.06, 0.14, D, mat(0x8d9196), px, 0.1, pz); for (const lz of [fz + 3.5, fz + 9.0]) box(0.35, 0.06, 1.1, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xfff5d6 })), 5, 2.5), px, H - 0.05, lz);   // concrete floor + hallway ceiling lights
           const grn = mat(0x23584a), wht = mat(0xf0f0ea);
           for (const sx of [-1, 1]) box(0.1, H, 0.1, grn, px + sx * (W / 2 + 0.01), H / 2, fz + 0.04);                       // green corner trim
           const sh = new T.Shape([new T.Vector2(-W / 2, 0), new T.Vector2(W / 2, 0), new T.Vector2(0, 0.6)]);
@@ -6959,7 +6963,7 @@ function init(container) {
     add(new T.CylinderGeometry(0.2, 0.2, 6.5, 10), mat(0xe9ebec), -159.6, 3.25, ZS + 0.9);                      // tall white riser
     // light pole at the west end
     add(new T.CylinderGeometry(0.1, 0.13, 9, 8), mat(0x9aa0a6), -161.2, 4.5, ZB + 0.2); box(1.6, 0.08, 0.08, mat(0x9aa0a6), -160.5, 8.9, ZB + 0.2);
-    box(0.5, 0.15, 0.3, gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), -159.8, 8.85, ZB + 0.2);
+    box(0.5, 0.15, 0.3, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 17, 5), -159.8, 8.85, ZB + 0.2);
     wallSegs.push([-160.5, ZS - 0.9, -142.5, ZS - 0.9]);   // the bollard line keeps Squeeg out of the skids except around the ends
     nameplate('LOADOUT', -151.6, 2.2, ZS - 0.4, 0.2, 0, -1);
   }
@@ -7516,7 +7520,7 @@ function init(container) {
       egressStrobe(MDX, z, 0, 1);   // north-wall green man door, strobe inside
       box(1.05, 0.1, 0.4, mat(0x56606b), MDX, 2.16, z);
       extWall(MDX - 0.85, 0.75, z - 0.3, Math.PI);                                              // extinguisher
-      box(0.35, 0.2, 0.15, gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), MDX - 0.3, 5.2, z - 0.2);                    // wall pack light
+      box(0.35, 0.2, 0.15, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 10, 3), MDX - 0.3, 5.2, z - 0.2);                    // wall pack light
       box(0.28, 0.2, 0.02, mat(0xf4f4f0), RUX - RW / 2 - 0.35, 1.75, z - 0.16); box(0.24, 0.05, 0.025, mat(0xc8211c), RUX - RW / 2 - 0.35, 1.81, z - 0.16);   // DANGER sign
       for (const [w, h, d, c, y] of [[0.2, 0.15, 0.02, 0xf4f4f0, 1.4], [0.18, 0.04, 0.025, 0x1f56a8, 1.45], [0.18, 0.2, 0.02, 0xb9c6d2, 1.7]]) { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(0.45, y, -0.04); g.add(m); }   // NOTICE + posted sheet on the door
       box(1.4, 1.4, 0.12, mat(0x6f7378), E1 - 1.6, 8.3, z - 0.2);                                                     // exhaust fan louver
@@ -7547,7 +7551,7 @@ function init(container) {
       egressStrobe(E1, dz, -1, 0);   // N Energy MCC green double door, strobe inside
       box(0.12, 0.9, 1.85, grn, E1 + 0.1, 2.6, dz); box(0.16, 3.2, 0.1, grn, E1 + 0.1, 1.55, dz - 0.95); box(0.16, 3.2, 0.1, grn, E1 + 0.1, 1.55, dz + 0.95);   // transom panel + frame
       for (const y of [2.35, 2.85]) for (const sd of [-1, 1]) box(0.1, 0.05, 0.14, mat(0x6f7378), E1 + 0.18, y, dz + sd * 0.7);   // transom hinges
-      box(0.3, 0.22, 0.2, gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), E1 + 0.2, 3.35, dz);                                  // wall pack light
+      box(0.3, 0.22, 0.2, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 9, 3), E1 + 0.2, 3.35, dz);                                  // wall pack light
       extWall(E1 + 0.3, 1.0, dz - 1.45, Math.PI / 2); box(0.02, 0.5, 0.1, mat(0xf4f4f0), E1 + 0.17, 1.55, dz - 1.45); box(0.025, 0.3, 0.04, mat(0xc8211c), E1 + 0.18, 1.55, dz - 1.45);   // extinguisher + arrow sign (north)
       box(0.1, 0.16, 0.12, mat(0x8a8f94), E1 + 0.2, 1.3, dz + 1.3); box(0.04, 0.9, 0.04, mat(0x8a8f94), E1 + 0.18, 0.75, dz + 1.3); }   // switch box + conduit (south)
     const ecRoll = (x, z, w, h, col) => { const g = new T.Group(); g.position.set(x, 0, z); scene.add(g);   // roll-up in a wall running north-south (opens when Squeeg walks up)
@@ -7573,7 +7577,7 @@ function init(container) {
       const seg = [E1, z - w / 2, E1, z + w / 2]; wallSegs.push(seg); (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: E1, z, h, open: 0 });
       for (const dz of [-w / 2 - 0.5, w / 2 + 0.5]) { cyl(0.15, 1.2, mat(0xf2c200), E1 + 0.55, 0, z + dz, null, 10); extraCols.push([E1 + 0.55, z + dz, 0.2]); }
       box(0.02, 0.22, 0.3, mat(0xf4f4f0), E1 + 0.17, 1.95, z - w / 2 - 0.4); box(0.025, 0.06, 0.26, mat(0xc8211c), E1 + 0.18, 2.03, z - w / 2 - 0.4);   // DANGER sign
-      box(0.3, 0.22, 0.2, gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), E1 + 0.2, 4.6, z - w / 2 - 1.2); }                      // wall light
+      box(0.3, 0.22, 0.2, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 9, 3), E1 + 0.2, 4.6, z - w / 2 - 1.2); }                      // wall light
     const ecBox = (x0, x1, z0, z1) => wallSegs.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);   // solid footprint for walking
     const steelC = mat(0x6f7a85), ins = mat(0xc9cdd1);
     // rotary drum dryers (DDGS): long drum east-west on riding rings and rollers, burner/firebox box on the west end, discharge breeching + duct on the east
@@ -7953,7 +7957,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); buildDirtHills(); mergeStatic();
+  buildBillboards(); buildDirtHills(); lightBuild(); mergeStatic();
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
@@ -9117,6 +9121,7 @@ function daylight(hours) {
   const W = { sunny: [0, 1, 1], cloudy: [0.65, 0.35, 0.82], rain: [0.7, 0.25, 0.8], snow: [0.6, 0.35, 0.95] }[weather.kind] || [0, 1, 1];
   if (W[0]) { scene.background.lerp(WGRAY[weather.kind] || WGRAY.cloudy, W[0]); scene.fog.color.copy(scene.background); }
   sunL.intensity *= W[1]; hemi.intensity *= W[2];
+  (LIGHT.bg0 || (LIGHT.bg0 = new T.Color())).copy(scene.background); LIGHT.bgDim = true;   // the undimmed sky, for scripted darkness
 }
 // ---------- SKY: a big dome with a vertical gradient (horizon matches the fog, deeper color overhead), a sun glow, soft drifting clouds
 // (one merged mesh of flat cloud cards, one draw call) and stars at night. Cheap: two draw calls, a tiny shader.
@@ -9160,66 +9165,399 @@ function updateSky(dt) {
   cm.color.setRGB(1, 1, 1).lerp(hor, grayW ? 0.55 : 0.12).multiplyScalar(lum < 0.35 ? 0.55 : 1);
   SKY.stars.material.opacity = Math.max(0, Math.min(1, (0.42 - lum) * 4)) * (grayW ? 0.15 : 1);
 }
-// ---------- interior darkening for an outage: the innermost roofed envelope wins, and its windows are the only daylight
-const INTERIOR = { saved: [], cache: new Map(), on: false, walls: null, _s: new T.Vector3() };
-function enclAt(x, y, z) {
+// ---------- LIGHTING (v1.97.99): indoors is dark, lamps make pools, the headlamp cuts through.
+// The world is lit by one sun and one sky light, and nothing in three.js knows a wall from a window, so on its own a room
+// is exactly as bright as the yard. Every lit material gets the same few lines added to its shader (one shared patch, so
+// still one program per material kind): each pixel checks whether it sits inside one of the nearby roofed envelopes
+// (ENCL). Inside, the sun and sky are cut to a trickle except near a window or an open door, the room's fixtures add a
+// warm fill, and the nearest lamps add pools that fall off with distance. A shed is dim in the middle of the day and
+// pitch dark in an outage, and the yard outside never changes. The headlamp is worked out in the same pass instead of
+// being a three.js SpotLight, which also takes a light loop off every pixel in the game.
+// Cost per pixel: a few compares outdoors (the room loop finds nothing), the window loop only for pixels inside a room,
+// and at most CS_N.L lamps, picked on the CPU every frame, nearest first, and only the ones that are actually lit.
+// Nothing here allocates per frame and nothing recompiles a shader at run time: the counts are uniforms.
+const CS_N = TIER.name === 'low' ? { B: 5, W: 8, L: 5 } : { B: 8, W: 12, L: 8 };
+const LIGHT = { ready: false, lamps: [], faulty: [], rooms: [], cand: [], inst: null, instDirty: false,
+  dark: 0, darkTo: 0, darkRate: 2, darkHold: 0, minK: 0.03, bright: 1, fill: 0.35, indoor: 0.05, lampK: 1,
+  flick: null, kill: null, warmT: 99, flK: 1, bg0: null, night: 0, hud: { k: 1, irr: 0 }, ref: [0, 0, 0] };
+const CS_BRIGHT = [['Dark', 0], ['Normal', 0.03], ['Bright', 0.08], ['Brightest', 0.15]];   // the floor no pixel drops below
+{ let b = 1; try { const s = localStorage.getItem('cs_bright'); if (s !== null && CS_BRIGHT[+s]) b = +s; } catch (e) {} LIGHT.bright = b; LIGHT.minK = CS_BRIGHT[b][1]; }
+const csV4 = n => Array.from({ length: n }, () => new T.Vector4());
+const CSU = {
+  csU: { value: new T.Vector4(1, 1, -1, -1) },  // the rectangle round every room below: a pixel outside it skips the room loop
+  csBoxA: { value: csV4(CS_N.B) },   // rooms: x0, z0, x1, z1 (smallest first, so a nested room wins)
+  csBoxB: { value: csV4(CS_N.B) },   //        top, fixture fill, its lamps (first + 64 * end), its openings (first + 64 * end)
+  csWin: { value: csV4(CS_N.W) },    // daylight openings, grouped by room: x, y, z, 1 / reach (a shut door shrinks its reach)
+  csLampP: { value: csV4(CS_N.L) },  // lamps, outdoor ones first, then grouped by room: x, y, z, 1 / radius^2
+  csLampC: { value: csV4(CS_N.L) },  //        colour x intensity, lowest y it lights
+  csFl0: { value: new T.Vector4(0, 0.15, 0, 60) },                                   // headlamp, camera space: position, reach
+  csFl1: { value: new T.Vector4(0, -0.04, -1, 0).normalize().setW(Math.cos(0.45)) }, //   aim, outer cone
+  csFl2: { value: new T.Vector4(0, 0, 0, Math.cos(0.45 * 0.4)) },                     //   colour x intensity, inner cone
+  csG: { value: new T.Vector4(0, 0, 0, 0) },        // rooms in use, outdoor lamps in use, -, 1 = bypass (the first-person HUD pass)
+  csG2: { value: new T.Vector4(0.05, 0, 1, 0.03) }, // indoor daylight trickle, free-camera lift, global darkness, brightness floor
+  csFillC: { value: new T.Color(1, 0.93, 0.82) }
+};
+const CS_PARS = `
+#define CS_NB ${CS_N.B}
+#define CS_NW ${CS_N.W}
+#define CS_NL ${CS_N.L}
+uniform vec4 csU; uniform vec4 csBoxA[CS_NB]; uniform vec4 csBoxB[CS_NB]; uniform vec4 csWin[CS_NW];
+uniform vec4 csLampP[CS_NL]; uniform vec4 csLampC[CS_NL];
+uniform vec4 csFl0; uniform vec4 csFl1; uniform vec4 csFl2; uniform vec4 csG; uniform vec4 csG2; uniform vec3 csFillC;
+float csLight(vec3 pV, vec3 nV, out vec3 irr) {
+  irr = vec3(0.0);
+  if (csG.w > 0.5) return 1.0;
+  mat3 R = mat3(viewMatrix);
+  vec3 p = (pV - viewMatrix[3].xyz) * R;
+  bool hasN = dot(nV, nV) > 0.01;
+  vec3 n = hasN ? nV * R : vec3(0.0, 1.0, 0.0);
+  float k = 1.0, fill = 0.0;
+  int l0 = 0, l1 = int(csG.y + 0.5), w0 = 0, w1 = 0;   // lamps to look at: the outdoor run unless the pixel is in a room
+  bool inRoom = false;
+  // The test point is nudged 0.4 m along the surface normal: a wall face looking into the room and a ceiling looking down
+  // land inside the envelope, the same wall's outside face and the roof's top land outside it. One box test per room.
+  vec3 q = p + n * 0.4;
+  if (q.x > csU.x && q.x < csU.z && q.z > csU.y && q.z < csU.w) {
+    for (int i = 0; i < CS_NB; i++) {
+      if (float(i) >= csG.x) break;
+      vec4 a = csBoxA[i]; vec4 b = csBoxB[i];
+      vec4 e4 = vec4(q.xz - a.xy, a.zw - q.xz);
+      if (min(min(e4.x, e4.y), min(e4.z, e4.w)) > 0.0 && q.y < b.x) {
+        inRoom = true; fill = b.y;
+        float e = floor(b.z / 64.0); l0 = int(b.z - e * 64.0 + 0.5); l1 = int(e + 0.5);
+        e = floor(b.w / 64.0); w0 = int(b.w - e * 64.0 + 0.5); w1 = int(e + 0.5);
+        break;
+      }
+    }
+  }
+  if (inRoom) {
+    float d = 0.0;
+    for (int j = 0; j < CS_NW; j++) {
+      int i = w0 + j; if (i >= w1) break;
+      vec4 w = csWin[i]; d = max(d, 1.0 - distance(p, w.xyz) * w.w);
+    }
+    k = mix(csG2.x + 0.8 * d, 1.0, csG2.y);
+    irr += csFillC * fill * (0.8 + 0.2 * n.y);
+  }
+  k = max(k * csG2.z, csG2.w);
+  for (int j = 0; j < CS_NL; j++) {
+    int i = l0 + j; if (i >= l1) break;
+    vec4 lc = csLampC[i];
+    if (p.y < lc.w) continue;
+    vec4 lp = csLampP[i]; vec3 L = lp.xyz - p; float d2 = dot(L, L);
+    float a = 1.0 - d2 * lp.w;
+    if (a > 0.0) {
+      float nl = hasN ? max(dot(n, L) * inversesqrt(d2 + 1e-4), 0.0) : 1.0;
+      irr += lc.rgb * (a * a * (0.3 + 0.7 * nl) * smoothstep(-1.2, 0.1, L.y));
+    }
+  }
+  if (csFl2.r + csFl2.g > 0.0) {
+    vec3 L = csFl0.xyz - pV; float d = length(L); vec3 l = L / max(d, 1e-3);
+    float s = smoothstep(csFl1.w, csFl2.w, dot(-l, csFl1.xyz));
+    if (s > 0.0) {
+      float q = d / csFl0.w; q *= q;
+      irr += csFl2.rgb * (s * (1.0 - q * q) * (1.0 - q * q) / max(d, 0.01) * (hasN ? clamp(dot(nV, l), 0.0, 1.0) : 1.0));
+    }
+  }
+  return k;
+}
+`;
+// lit materials (Lambert, Phong, Standard): the sun and sky are scaled by k, the lamps and the headlamp are added on top.
+// Emissive glow is added later by three.js and is untouched, so fixtures and screens still shine in the dark.
+const CS_LIT = `
+{ vec3 csIrr; float csK = csLight(geometryPosition, geometryNormal, csIrr);
+  reflectedLight.directDiffuse *= csK; reflectedLight.indirectDiffuse *= csK;
+  reflectedLight.directSpecular *= csK; reflectedLight.indirectSpecular *= csK;
+  reflectedLight.directDiffuse += csIrr * BRDF_Lambert(material.diffuseColor);
+  #ifdef CS_GLOW
+  totalEmissiveRadiance *= min(1.0, csK + dot(csIrr, vec3(0.3, 0.59, 0.11)) * 0.35);   // a fake 'lit' glow dies with the light
+  #endif
+}
+`;
+// unlit surfaces (printed name plates, painted signs, faces): they ignore the sun, so they only ever get darker indoors
+const CS_BASIC = `
+{ vec3 csIrr; float csK = csLight(csVP, vec3(0.0), csIrr);
+  outgoingLight *= min(1.0, csK + dot(csIrr, vec3(0.3, 0.59, 0.11)) * 0.35); }
+`;
+function csUniforms(shader) { for (const k in CSU) shader.uniforms[k] = CSU[k]; }
+function csPatchLit(shader) {
+  if (shader.fragmentShader.indexOf('#include <lights_fragment_end>') < 0) return;
+  csUniforms(shader);
+  shader.fragmentShader = (this.userData && this.userData.csGlow ? '#define CS_GLOW\n' : '') + shader.fragmentShader.replace('#include <common>', '#include <common>\n' + CS_PARS)
+    .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + CS_LIT);
+}
+// An unlit material is a light (fixture, screen, exit sign, halo, fire) or a HUD part unless it says otherwise; only the
+// plain printed surfaces take the darkness.
+function csBasicOK(m) {
+  const u = m.userData || {};
+  return !(u.gridLight || u.batteryLight || u.keepLit || u.noDim) && m.blending !== T.AdditiveBlending && m.depthTest !== false && m.fog !== false;
+}
+function csPatchBasic(shader) {
+  if (!csBasicOK(this) || shader.fragmentShader.indexOf('vec3 outgoingLight = reflectedLight.indirectDiffuse;') < 0) return;
+  csUniforms(shader);
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 csVP;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\ncsVP = mvPosition.xyz;');
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 csVP;\n' + CS_PARS)
+    .replace('vec3 outgoingLight = reflectedLight.indirectDiffuse;', 'vec3 outgoingLight = reflectedLight.indirectDiffuse;\n' + CS_BASIC);
+}
+function lightInstall() {   // once, before the first frame: every lit material compiled from here on carries the patch
+  for (const C of [T.MeshLambertMaterial, T.MeshPhongMaterial, T.MeshStandardMaterial]) {
+    C.prototype.onBeforeCompile = csPatchLit;
+    C.prototype.customProgramCacheKey = function () { return this.userData && this.userData.csGlow ? 'csL1' : 'csL0'; };
+  }
+  T.MeshBasicMaterial.prototype.onBeforeCompile = csPatchBasic;
+  T.MeshBasicMaterial.prototype.customProgramCacheKey = function () { return csBasicOK(this) ? 'cs1' : 'cs0'; };
+}
+function enclAt(x, y, z) {   // the smallest roofed envelope holding a point (nested rooms win), or null outdoors
   let best = null;
   for (const e of ENCL) {
     if (x < e.x0 || x > e.x1 || z < e.z0 || z > e.z1 || y > e.top) continue;
-    if (!best || e.area < best.area) best = e;                  // nested: the smallest room containing the point
+    if (!best || e.area < best.area) best = e;
   }
   return best;
 }
-function interiorLight(e, x, y, z) {                            // 0.10 with no daylight at all, up to 0.80 right at a window
-  if (!e) return 1;
-  let d = 0;
-  for (const w of e.wins) {
-    const dd = Math.hypot(x - w[0], y - w[1], z - w[2]);
-    if (dd < w[3] && 1 - dd / w[3] > d) d = 1 - dd / w[3];
-  }
-  return 0.10 + 0.70 * d;
-}
-function dimmedMaterial(m, k) {                                 // one dimmed clone per (material, level), shared by every mesh that needs it
-  const key = m.uuid + '|' + k;
-  let c = INTERIOR.cache.get(key);
-  if (c) return c;
-  c = m.clone();
-  if (c.color) c.color.multiplyScalar(k);
-  if (c.emissive) c.emissive.multiplyScalar(k);
-  INTERIOR.cache.set(key, c); return c;
-}
-function applyInteriorDark(on) {
-  if (!on) {
-    for (const [o, m] of INTERIOR.saved) o.material = m;
-    INTERIOR.saved.length = 0; INTERIOR.on = false; return;
-  }
-  if (INTERIOR.on || !ENCL.length) return;
-  INTERIOR.on = true;
-  if (!INTERIOR.walls) INTERIOR.walls = new Set(wallMats);       // the shells keep their own look: setWallsSolid() owns their opacity
+const boxDist = (e, x, z) => Math.hypot(Math.max(e.x0 - x, 0, x - e.x1), Math.max(e.z0 - z, 0, z - e.z1));
+// Collect every lamp once the plant is built (before mergeStatic, which would fold their meshes away):
+//  - fixtures tagged with lampLight() where they are built (ceiling lights, wall packs, the yard pole)
+//  - EXIT signs (battery: a faint red pool, always on) and the egress strobes (battery: red flashes in an outage)
+//  - high-bay fixtures generated for every room that has no ceiling light of its own, drawn as ONE instanced mesh
+function lightBuild() {
+  LIGHT.lamps.length = 0; LIGHT.faulty.length = 0;
+  scene.updateMatrixWorld(true);
   const p = new T.Vector3();
   scene.traverse(o => {
-    if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
-    const m = o.material;
-    if (!m.color || m.isSpriteMaterial || INTERIOR.walls.has(m)) return;
-    if (m.userData && (m.userData.gridLight || m.userData.batteryLight || m.userData.keepLit)) return;
+    if (!o.isMesh || o.isInstancedMesh) return;
+    const m = o.material; if (!m || Array.isArray(m) || !m.userData || !m.color) return;
+    const u = m.userData; let L = null;
+    if (u.lamp) L = { r: u.lamp.r, k: u.lamp.k, col: m.color.clone(), grid: !u.batteryLight, ylo: -6 };
+    else if (m === EXIT_SIGN.mat) L = { r: 3.4, k: 1.1, col: new T.Color(1, 0.13, 0.08), grid: false, ylo: -4 };
+    else if (m === EGRESS.lens) L = { r: 6.5, k: 3.2, col: new T.Color(1, 0.1, 0.06), grid: false, ylo: -5, strobe: true };
+    if (!L) return;
     o.getWorldPosition(p);
-    const e = enclAt(p.x, p.y, p.z);
-    if (!e) return;
-    // Only a mesh that fits inside the room counts as interior. The ground is one 16 km plane whose origin sits at (0,0,0)
-    // - inside the shop envelope - so without this it (and any road crossing a footprint) went dark with the building.
-    const g2 = o.geometry;
-    if (g2) {
-      if (!g2.boundingSphere) g2.computeBoundingSphere();
-      const sc = o.getWorldScale(INTERIOR._s).length() / Math.SQRT2;
-      if (g2.boundingSphere.radius * sc > 0.5 * Math.hypot(e.x1 - e.x0, e.z1 - e.z0)) return;
-    }
-    const k = Math.round(interiorLight(e, p.x, p.y, p.z) * 20) / 20;
-    if (k >= 0.95) return;
-    INTERIOR.saved.push([o, m]); o.material = dimmedMaterial(m, k);
+    L.x = p.x; L.y = p.y; L.z = p.z; L.ylo = p.y - Math.max(-L.ylo, p.y + 1); L.room = enclAt(p.x, p.y, p.z);   // a tall pole still reaches the ground
+    L.mat = L.grid ? m : null; L.base = m.color.clone(); L.inst = -1;
+    LIGHT.lamps.push(L);
   });
+  const lit = new Set();
+  for (const L of LIGHT.lamps) if (L.grid && L.room && L.y > L.room.top - 3) lit.add(L.room);
+  const pts = [];
+  for (const e of ENCL) {
+    if (lit.has(e) || e.top < 2.4) continue;
+    const w = e.x1 - e.x0, d = e.z1 - e.z0, nx = Math.max(1, Math.round(w / 9)), nz = Math.max(1, Math.round(d / 9)), y = e.top - 0.35;
+    const mine = [];
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const x = e.x0 + (i + 0.5) * w / nx, z = e.z0 + (j + 0.5) * d / nz;
+      if (enclAt(x, y - 0.5, z) === e) mine.push([x, y, z, e]);   // a smaller room inside this one lights itself
+    }
+    pts.push(...mine);
+  }
+  if (pts.length) {
+    const im = new T.InstancedMesh(new T.BoxGeometry(0.75, 0.1, 0.75), gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), pts.length);
+    const M4 = new T.Matrix4(), c = new T.Color(0xfff0d2), perRoom = new Map();
+    pts.forEach(([x, y, z, e], i) => {
+      M4.makeTranslation(x, y, z); im.setMatrixAt(i, M4); im.setColorAt(i, c);
+      const L = { x, y, z, r: Math.max(9, (y + 0.6) * 1.6), k: 1.5, col: c.clone(), base: c.clone(), grid: true, ylo: -1, room: e, mat: null, inst: i };
+      LIGHT.lamps.push(L); if (!perRoom.has(e)) perRoom.set(e, []); perRoom.get(e).push(L);
+    });
+    im.userData.noHit = true; im.castShadow = im.receiveShadow = false; scene.add(im); LIGHT.inst = im;
+    for (const list of perRoom.values()) if (list.length >= 4) { const L = list[(list.length * 7 + 3) % list.length]; L.faulty = true; LIGHT.faulty.push(L); }   // one tired ballast per big room
+  }
+  for (const L of LIGHT.lamps) { L.lvl = 1; L.warm = 1; L.shown = 1; L.seed = Math.random() * 100; L.delay = 0; }
+  // doorways are daylight too, but only while open: a shut roll-up lets a little in round its edges, a shut man door none.
+  // An opening already declared with glazing() next to a door is tied to that door instead of adding a second one.
+  for (const e of ENCL) { e.lvl = 1; e.seed = Math.random() * 100; for (const w of e.wins) { w.door = null; w.shut = 1; } }
+  const doors = [...(O.rollDoors || []).map(d => [d, 6.5, 0.15, (d.h || 4) * 0.45]), ...(O.swingDoors || []).map(d => [d, 3.8, 0, 1.2])];
+  for (const [d, reach, shut, y] of doors) for (const e of ENCL) {
+    if (d.x < e.x0 - 1 || d.x > e.x1 + 1 || d.z < e.z0 - 1 || d.z > e.z1 + 1) continue;
+    if (Math.min(Math.abs(d.x - e.x0), Math.abs(d.x - e.x1), Math.abs(d.z - e.z0), Math.abs(d.z - e.z1)) > 1) continue;   // not in this room's wall
+    const near = e.wins.filter(w => Math.hypot(w[0] - d.x, w[2] - d.z) < 4);
+    if (near.length) for (const w of near) { w.door = d; w.shut = shut; }
+    else { const w = [d.x, y, d.z, reach]; w.door = d; w.shut = shut; e.wins.push(w); }
+  }
+  LIGHT.ready = true;
+  return LIGHT.lamps.length;
 }
-// ---------- POWER OUTAGE: a real power cut. The world's own lighting is never touched - only the fixtures wired to
-// the plant supply go dark (gridLight). Battery gear (exit signs, radios, vehicle lights, egress strobes) and fires
+// one switching pattern for flickers: mostly on, with stutters and the odd full drop-out, never in step between lamps
+function flickWave(t, seed) {
+  const s = Math.sin(t * 23 + seed) + Math.sin(t * 61 + seed * 1.7) + Math.sin(t * 7.3 + seed * 0.3);
+  return s > 0.5 ? 1 : s > -0.6 ? 0.3 : 0.02;
+}
+function lightEvent(ev, dt) {   // advance a timed flicker / blackout; null once it has run out
+  if (!ev) return null;
+  ev.t -= dt; return ev.t > 0 ? ev : null;
+}
+function evNear(ev, x, z) { return ev && Math.hypot(x - ev.x, z - ev.z) < ev.r; }
+function evLevel(L, x, z, t) {   // what the timed events and a tired ballast do to one lamp (or room) right now
+  let lv = 1;
+  const F = LIGHT.flick, K = LIGHT.kill;
+  if (evNear(F, x, z)) lv *= F.t < 0.4 ? 1 : flickWave(t, L.seed);
+  if (evNear(K, x, z)) {
+    const a = K.T - K.t;                                              // seconds since it started
+    lv *= a < 0.7 ? flickWave(t * 1.6, L.seed) * (a < 0.6 ? 1 : 0) : K.t < 1.2 ? (K.t < 0.15 ? 1 : flickWave(t * 1.3, L.seed + 9)) : 0;
+  }
+  return lv;
+}
+function lightUpdate(dt) {
+  if (!LIGHT.ready) return;
+  const U = CSU, out = POWER_OUTAGE.on, t = clock;
+  let rx, ry, rz;
+  if (walk.on) { rx = walk.x; ry = walk.y + 1; rz = walk.z; } else { rx = cam.tx; ry = cam.ty; rz = cam.tz; }
+  LIGHT.ref[0] = rx; LIGHT.ref[1] = ry; LIGHT.ref[2] = rz;
+  // timers: scripted darkness, flicker, blackout, and the staggered strike-up after the power comes back
+  if (LIGHT.darkHold > 0 && (LIGHT.darkHold -= dt) <= 0) { LIGHT.darkHold = 0; LIGHT.darkTo = 0; }
+  LIGHT.dark += (LIGHT.darkTo - LIGHT.dark) * Math.min(1, dt * LIGHT.darkRate);
+  if (Math.abs(LIGHT.dark - LIGHT.darkTo) < 0.002) LIGHT.dark = LIGHT.darkTo;
+  LIGHT.flick = lightEvent(LIGHT.flick, dt); LIGHT.kill = lightEvent(LIGHT.kill, dt);
+  LIGHT.warmT += dt;
+  const dark = LIGHT.dark;
+  LIGHT.night = Math.max(Math.min(1, Math.max(0, (1.06 - hemi.intensity) / 0.4)), dark);
+  // rooms: the nearest few, smallest first
+  const R = LIGHT.rooms; R.length = 0;
+  for (const e of ENCL) { e._d = boxDist(e, rx, rz); R.push(e); }
+  R.sort((a, b) => a._d - b._d); if (R.length > CS_N.B) R.length = CS_N.B;
+  R.sort((a, b) => a.area - b.area);
+  const warmRoom = Math.max(0, Math.min(1, (LIGHT.warmT - 0.5) / 2.5));
+  let ux0 = 1e9, uz0 = 1e9, ux1 = -1e9, uz1 = -1e9;
+  for (let i = 0; i < R.length; i++) {
+    const e = R[i]; e._slot = i; e._fill = 0;
+    e.lvl = evLevel(e, Math.max(e.x0, Math.min(e.x1, rx)), Math.max(e.z0, Math.min(e.z1, rz)), t);   // the room's nearest point decides
+    e._fill = out ? 0 : LIGHT.fill * e.lvl * warmRoom;
+    ux0 = Math.min(ux0, e.x0); uz0 = Math.min(uz0, e.z0); ux1 = Math.max(ux1, e.x1); uz1 = Math.max(uz1, e.z1);
+  }
+  for (const e of ENCL) if (R.indexOf(e) < 0) e._slot = -1;
+  U.csU.value.set(ux0, uz0, ux1, uz1);
+  // daylight openings of those rooms, nearest first, then each room's run kept together; a roll-up door lets light in
+  // only as far as it is open
+  const C = LIGHT.cand; C.length = 0;
+  for (const e of R) for (const w of e.wins) {
+    const reach = w[3] * (w.door ? w.shut + (1 - w.shut) * w.door.open : 1);
+    if (reach > 0.05) { w._r = reach; w._s = e._slot; w._d = Math.hypot(w[0] - rx, w[1] - ry, w[2] - rz) - reach; C.push(w); }
+  }
+  C.sort((a, b) => a._d - b._d); if (C.length > CS_N.W) C.length = CS_N.W;
+  C.sort((a, b) => a._s - b._s);
+  const WR = LIGHT.wr || (LIGHT.wr = new Int16Array(CS_N.B * 2)), LR = LIGHT.lr || (LIGHT.lr = new Int16Array(CS_N.B * 2));
+  WR.fill(0); LR.fill(0);
+  for (let i = 0; i < C.length; i++) { const w = C[i]; U.csWin.value[i].set(w[0], w[1], w[2], 1 / w._r); if (!WR[w._s * 2 + 1]) WR[w._s * 2] = i; WR[w._s * 2 + 1] = i + 1; }
+  // lamps: power, warm-up, events, tired ballasts; outdoor lamps only matter in the dark. Nearest first, then the
+  // outdoor run first and each room's run together, so a pixel only ever walks its own lamps.
+  const strobe = out && (performance.now() % 1100) < 620;
+  C.length = 0;
+  for (const L of LIGHT.lamps) {
+    let lv = 1;
+    if (L.grid) {
+      lv = out ? 0 : Math.max(0, Math.min(1, (LIGHT.warmT - L.delay) / 1.2));
+      if (lv > 0 && lv < 1 && ((t * 13 + L.seed) % 1) < 0.35) lv *= 0.2;   // a lamp striking up stutters
+      if (lv > 0) lv *= evLevel(L, L.x, L.z, t);
+      if (lv > 0 && L.faulty) { const s = Math.sin(t * 0.37 + L.seed) + Math.sin(t * 0.91 + L.seed * 2); if (s > 1.55) lv *= flickWave(t * 1.4, L.seed); }
+    } else if (L.strobe) lv = strobe ? 1 : 0;
+    L.lvl = lv;
+    const I = L.k * lv * LIGHT.lampK * (L.room ? 1 : LIGHT.night);
+    if (I < 0.01) continue;
+    const slot = L.room ? L.room._slot : -1;
+    if (L.room && slot < 0) continue;
+    L._I = I; L._s = slot; L._d = Math.hypot(L.x - rx, L.y - ry, L.z - rz) - L.r;
+    if (L._d > 60) continue;
+    C.push(L);
+  }
+  C.sort((a, b) => a._d - b._d); if (C.length > CS_N.L) C.length = CS_N.L;
+  C.sort((a, b) => a._s - b._s);
+  let nOut = 0;
+  for (let i = 0; i < C.length; i++) {
+    const L = C[i];
+    U.csLampP.value[i].set(L.x, L.y, L.z, 1 / (L.r * L.r));
+    U.csLampC.value[i].set(L.col.r * L._I, L.col.g * L._I, L.col.b * L._I, L.ylo);
+    if (L._s < 0) nOut = i + 1; else { if (!LR[L._s * 2 + 1]) LR[L._s * 2] = i; LR[L._s * 2 + 1] = i + 1; }
+  }
+  for (let i = 0; i < R.length; i++) {
+    const e = R[i];
+    U.csBoxA.value[i].set(e.x0, e.z0, e.x1, e.z1);
+    U.csBoxB.value[i].set(e.top, e._fill, LR[i * 2] + 64 * LR[i * 2 + 1], WR[i * 2] + 64 * WR[i * 2 + 1]);
+  }
+  LIGHT.nL = C.length;
+  // the fixtures' own glow follows their lamp (the outage code owns them while the plant is dead)
+  if (!out) for (const L of LIGHT.lamps) {
+    if (!L.grid) continue;
+    const show = Math.max(0.06, L.lvl);
+    if (Math.abs(show - L.shown) < 0.02) continue;
+    L.shown = show;
+    if (L.inst >= 0) { LIGHT.inst.setColorAt(L.inst, _lc.copy(L.base).multiplyScalar(show)); LIGHT.instDirty = true; }
+    else if (L.mat) L.mat.color.copy(L.base).multiplyScalar(show);
+  }
+  if (LIGHT.instDirty && LIGHT.inst) { LIGHT.inst.instanceColor.needsUpdate = true; LIGHT.instDirty = false; }
+  // headlamp: battery, so outages do not touch it, but a flicker event close by makes it stutter too
+  const fl = headlamp ? headlamp.intensity : 0;
+  LIGHT.flK = evNear(LIGHT.flick, rx, rz) || evNear(LIGHT.kill, rx, rz) ? (flickWave(t * 0.8, 3) > 0.5 ? 1 : 0.15) : 1;
+  if (fl > 0) U.csFl2.value.set(headlamp.color.r * fl * LIGHT.flK, headlamp.color.g * fl * LIGHT.flK, headlamp.color.b * fl * LIGHT.flK, U.csFl2.value.w);
+  else U.csFl2.value.set(0, 0, 0, U.csFl2.value.w);
+  U.csG.value.set(R.length, nOut, 0, 0);
+  const dk = (1 - 0.9 * dark) * (1 - 0.9 * dark);   // squared: light is linear, the eye is not
+  U.csG2.value.set(LIGHT.indoor, walk.on ? 0 : out ? 0.25 : 0.6, dk, LIGHT.minK);
+  // scripted darkness also takes the sky down (sky dome, fog and clouds follow scene.background)
+  if (LIGHT.bg0) {
+    const f = dk;
+    if (f < 0.999 || LIGHT.bgDim) { scene.background.copy(LIGHT.bg0).multiplyScalar(f); scene.fog.color.copy(scene.background); LIGHT.bgDim = f < 0.999; }
+    if (f < 0.999 && SKY.clouds) SKY.clouds.material.color.multiplyScalar(f);
+  }
+  const s = lightSample(rx, walk.on ? walk.y + EYE - 0.3 : ry, rz); LIGHT.hud.k = s.k; LIGHT.hud.irr = s.irr;
+}
+const _lc = new T.Color();
+// The shader's sum for one point facing up, on the CPU: the first-person HUD is lit by it and the tests check it.
+function lightSample(x, y, z) {
+  const U = CSU, G = U.csG.value, G2 = U.csG2.value, u = U.csU.value;
+  let room = -1, fill = 0, k = 1, irr = 0, l0 = 0, l1 = Math.round(G.y), w0 = 0, w1 = 0;
+  if (x > u.x && x < u.z && z > u.y && z < u.w) for (let i = 0; i < G.x; i++) {
+    const a = U.csBoxA.value[i], b = U.csBoxB.value[i];
+    if (x > a.x && x < a.z && z > a.y && z < a.w && y < b.x) {
+      room = i; fill = b.y;
+      l1 = Math.floor(b.z / 64); l0 = Math.round(b.z - l1 * 64); w1 = Math.floor(b.w / 64); w0 = Math.round(b.w - w1 * 64);
+      break;
+    }
+  }
+  if (room >= 0) {
+    let d = 0;
+    for (let i = w0; i < w1; i++) { const w = U.csWin.value[i]; d = Math.max(d, 1 - Math.hypot(x - w.x, y - w.y, z - w.z) * w.w); }
+    k = G2.x + 0.8 * d; k += (1 - k) * G2.y;
+    const fc = U.csFillC.value; irr += fill * (fc.r * 0.3 + fc.g * 0.59 + fc.b * 0.11);
+  }
+  k = Math.max(k * G2.z, G2.w);
+  for (let i = l0; i < l1; i++) {
+    const c = U.csLampC.value[i];
+    if (y < c.w) continue;
+    const l = U.csLampP.value[i], dx = l.x - x, dy = l.y - y, dz = l.z - z, d2 = dx * dx + dy * dy + dz * dz, a = 1 - d2 * l.w;
+    if (a <= 0) continue;
+    const nl = Math.max(0, dy / Math.sqrt(d2 + 1e-4)), sm = Math.max(0, Math.min(1, (dy + 1.2) / 1.3));
+    irr += (c.x * 0.3 + c.y * 0.59 + c.z * 0.11) * a * a * (0.3 + 0.7 * nl) * sm * sm * (3 - 2 * sm);
+  }
+  return { k, irr, room };
+}
+// ---- scare controls (debug menu now; scripted horror events later). All local to this player for now.
+function lightsFlicker(sec, r) { const T0 = Math.max(0.5, sec || 3); LIGHT.flick = { t: T0, T: T0, r: r || 30, x: LIGHT.ref[0], z: LIGHT.ref[2] }; return T0; }
+function lightsBlackout(sec, r) { const T0 = Math.max(2, sec || 15); LIGHT.kill = { t: T0, T: T0, r: r || 45, x: LIGHT.ref[0], z: LIGHT.ref[2] }; return T0; }
+function lightsDark(amount, fade, hold) {   // 0 = normal, 1 = almost black everywhere, outdoors too; hold = seconds before it lifts
+  LIGHT.darkTo = Math.max(0, Math.min(1, +amount || 0)); LIGHT.darkRate = 3 / Math.max(0.05, fade === undefined ? 1.5 : fade);
+  LIGHT.darkHold = hold > 0 ? hold : 0; return LIGHT.darkTo;
+}
+function lightBrightness(i) {   // the darkness floor, for screens that crush blacks; remembered per device
+  if (i === undefined) i = (LIGHT.bright + 1) % CS_BRIGHT.length;
+  i = Math.max(0, Math.min(CS_BRIGHT.length - 1, i | 0));
+  LIGHT.bright = i; LIGHT.minK = CS_BRIGHT[i][1]; try { localStorage.setItem('cs_bright', String(i)); } catch (e) {}
+  return CS_BRIGHT[i][0];
+}
+// The outage switch calls this: before it captures the fixtures (put every lamp back to its true colour so that is what
+// gets saved), and after it restores them (the lamps strike up one by one over a couple of seconds, like real high-bays).
+function lightPower(outage) {
+  for (const L of LIGHT.lamps) {
+    if (!L.grid) continue;
+    if (L.mat) L.mat.color.copy(L.base);
+    if (L.inst >= 0 && LIGHT.inst) { LIGHT.inst.setColorAt(L.inst, L.base); LIGHT.instDirty = true; }
+    L.shown = 1;
+    if (!outage) { L.delay = 0.2 + Math.random() * 1.8; L.shown = -1; }
+  }
+  if (LIGHT.instDirty && LIGHT.inst) { LIGHT.inst.instanceColor.needsUpdate = true; LIGHT.instDirty = false; }
+  if (!outage) LIGHT.warmT = 0;
+}
+// ---------- POWER OUTAGE: a real power cut. The sun and sky are never touched - only the fixtures wired to the plant
+// supply go dark (gridLight), and with them the lamps' pools and the rooms' fill in the LIGHTING pass above. Battery gear (exit signs, radios, vehicle lights, egress strobes) and fires
 // (keepLit) keep working. The roll-up doors are dead while it runs. Triggered from the debug menu for now.
 const POWER_OUTAGE = { on: false, saved: [] };
 function setPowerOutage(on) {
@@ -9227,6 +9565,7 @@ function setPowerOutage(on) {
   if (on === POWER_OUTAGE.on) return on;
   POWER_OUTAGE.on = on;
   if (on) {                       // capture every mains-powered emitter once: fixtures, signs, screens, lamps, flashers
+    lightPower(true);             // every lamp back at its true colour first, so that is what gets saved
     POWER_OUTAGE.saved.length = 0;
     const seen = new Set();
     scene.traverse(o => {
@@ -9246,7 +9585,6 @@ function setPowerOutage(on) {
         }
       }
     });
-    applyInteriorDark(true);
     POWER_OUTAGE.apply();
   } else {                        // power comes back: every captured emitter returns to exactly what it was
     for (const [m, k, kind] of POWER_OUTAGE.saved) {
@@ -9254,7 +9592,7 @@ function setPowerOutage(on) {
       else m.color.setRGB(k.r, k.g, k.b);
     }
     POWER_OUTAGE.saved.length = 0;
-    applyInteriorDark(false);
+    lightPower(false);            // and the lamps strike up one by one
   }
   return on;
 }
@@ -9449,6 +9787,7 @@ function update(sim, dt, events) {
     camera.position.set(cam.tx + Math.sin(cam.yaw) * cp * cam.dist, cam.ty + Math.sin(cam.pitch) * cam.dist, cam.tz + Math.cos(cam.yaw) * cp * cam.dist);
     camera.lookAt(cam.tx, cam.ty, cam.tz);
   }
+  stepSafe('lighting', () => lightUpdate(dt));
   shadowFollow(); shadowRefresh(); renderer.info.reset();
   const _rt = performance.now();
   renderer.render(scene, camera);
@@ -12070,10 +12409,14 @@ function drawHudGun() {
   if (!any) return;
   hudCam.aspect = camera.aspect; hudCam.view = camera.view ? Object.assign({}, camera.view) : null; hudCam.updateProjectionMatrix();
   // light the gun like the world: same sun direction (turned into camera space) and brightness, but never too dark to see
-  hudHemi.color.copy(hemi.color); hudHemi.intensity = Math.max(0.8, hemi.intensity);
+  // v1.97.99: and as dark as where you stand - a pitch-black room takes the gun down with it, the headlamp brings it back
+  const hk = LIGHT.hud.k, lamp = headlamp && headlamp.intensity > 0 ? 0.45 * LIGHT.flK : 0, floor = 0.1 + LIGHT.minK * 2;
+  hudHemi.color.copy(hemi.color); hudHemi.intensity = Math.max(floor, Math.max(0.8, hemi.intensity) * hk + LIGHT.hud.irr * 0.6 + lamp);
   const d = tv.copy(sunL.position).sub(sunL.target.position).normalize().applyQuaternion(tq.copy(camera.quaternion).invert());
-  hudSun.position.copy(d); hudSun.target.position.set(0, 0, 0); hudSun.intensity = Math.max(0.55, sunL.intensity); hudSun.color.copy(sunL.color);
-  const ac = renderer.autoClear; renderer.autoClear = false; renderer.clearDepth(); renderer.render(hudScene, hudCam); renderer.autoClear = ac;
+  hudSun.position.copy(d); hudSun.target.position.set(0, 0, 0); hudSun.intensity = Math.max(0.55, sunL.intensity) * hk; hudSun.color.copy(sunL.color);
+  const ac = renderer.autoClear; renderer.autoClear = false; renderer.clearDepth();
+  CSU.csG.value.w = 1; renderer.render(hudScene, hudCam); CSU.csG.value.w = 0;   // the HUD scene is camera space: skip the world pass
+  renderer.autoClear = ac;
 }
 const tq = new T.Quaternion();
 function startReload(to, fill) { if (reloadT > 0) return false; reloadT = 0.0001; reloadTo = to || ammo; reloadFill = fill !== false; idleT = 0; gunClick(520, 0.04, 0.05); return true; }
@@ -12271,7 +12614,8 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
+root.Plant3D = { powerSet: on => powerSet(on), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+  lights: { flicker: (s, r) => lightsFlicker(s, r), blackout: (s, r) => lightsBlackout(s, r), dark: (a, f, h) => lightsDark(a, f, h), brightness: i => lightBrightness(i), get brightName() { return CS_BRIGHT[LIGHT.bright][0]; } }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
 })(this);
 </script>
 <script>// =====================================================================
@@ -12574,7 +12918,7 @@ function debugMenu(code) {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }   // what the screen looked like when the menu was opened (for a bug note)
   const set = k => { wxForced = k; P3.setWeather(k || wxLive); if (!k) fetchWeather(); toast('Weather: ' + (k || 'live')); };   // back to live: real weather right away, then refresh
   modal('<h1>Debug</h1><p>Weather now: <b>' + P3.weather + '</b> (' + (wxForced ? 'forced' : 'live') + ')' + (code ? '<br>Button code: ' + code : '') + '</p>',
-    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.powerSet(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.powerSet(false); toast('Power restored'); }], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
+    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.powerSet(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.powerSet(false); toast('Power restored'); }], ['💡 Lights: flicker', () => { P3.lights.flicker(4); }], ['💡 Lights: blackout nearby (15 s)', () => { P3.lights.blackout(15); }], ['🌑 Darkness everywhere (20 s)', () => { P3.lights.dark(0.88, 2.5, 20); }], ['🌑 Darkness: lift now', () => { P3.lights.dark(0, 1); }], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
 }
 // every control in the game, grouped by what you're doing: keyboard + mouse · controller · phone
 function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for depends on what the line is doing
@@ -12953,7 +13297,7 @@ function openBoard() {
 P3.netNotify = m => { toast('👥 ' + m); if (m.startsWith('Hosting')) twoPlayer(); };
 function menu() {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }
-  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['Reset all setpoints', resetAll]];
+  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['Reset all setpoints', resetAll]];
   if (window.Android) b.push(['Quit', () => { try { Android.quit(); } catch (e) {} }]);
   modal('<h1>Corn Souls</h1>', b);
 }
