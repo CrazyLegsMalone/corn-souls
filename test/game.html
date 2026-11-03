@@ -7938,7 +7938,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); mergeStatic();
+  buildBillboards(); buildDirtHills(); mergeStatic();
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
@@ -9518,6 +9518,7 @@ function netUpdate(dt) {
   const Q = NET.rr; if (Q) {
     const k = Math.min(1, 10 * dt), ox = Q.x, oz = Q.z; Q.x += (Q.tx - Q.x) * k; Q.z += (Q.tz - Q.z) * k; Q.a = _lerpA(Q.a, Q.ta, k); Q.y += ((Q.ty || 0) - Q.y) * k;
     const fwd = (Q.x - ox) * -Math.sin(Q.a) + (Q.z - oz) * -Math.cos(Q.a); Q.spin += fwd / 0.33;
+    { const air = Q.y > floorAt(Q.x, Q.z, Q.y + 0.6) + 0.25; if (Q.air && !air) Q.land = 4; Q.air = air; }   // their jumps arrive as height: airborne if well above the ground
     suspStep(Q, dt, 0, 0); Q.g.position.set(Q.x, Q.y + 0.13 + Q.sY, Q.z); Q.g.rotation.set(Q.sP, Q.a, Q.sR, 'YXZ');   // its springs run here too
     for (const w of Q.wheels) { w.w.rotation.x = -Q.spin; w.pv.rotation.y = w.front ? -Q.steer : 0; } if (Q.sw) Q.sw.rotation.z = -Q.steer * 3;
   }
@@ -11093,9 +11094,13 @@ function suspStep(o, dt, leanP, leanR) {
     if (lz < 0) { fH += h; fZ += lz; fN++; } else { rH += h; rZ += lz; rN++; }
     if (lx < 0) { lH += h; lX += lx; lN++; } else { gH += h; gX += lx; gN++; }
   }
-  const tP = fN && rN ? Math.atan2(fH / fN - rH / rN, rZ / rN - fZ / fN) : 0, tR = lN && gN ? Math.atan2(gH / gN - lH / lN, gX / gN - lX / lN) : 0;
-  const tY = sum / n, k = Math.min(dt, 0.05), K = SUSP.K, C = SUSP.C;
-  const dy = Math.max(-0.4, Math.min(0.4, o.y - o.sLy)); o.sLy = o.y; o.sY -= dy * 0.5;   // the chassis lags a step up or down, then springs back
+  let tP = fN && rN ? Math.atan2(fH / fN - rH / rN, rZ / rN - fZ / fN) : 0, tR = lN && gN ? Math.atan2(gH / gN - lH / lN, gX / gN - lX / lN) : 0;
+  let tY = sum / n; const k = Math.min(dt, 0.05), K = SUSP.K, C = SUSP.C;
+  if (o.air) { tP = o.sP - 0.02; tR = o.sR * 0.98; tY = 0; for (let i = 0; i < n; i++) H[i] = -1; o.sX = NaN; }   // flying: hold the tilt (nose drops a little), wheels hang
+  if (o.land) { o.sVy -= Math.min(4, o.land * 0.45); o.sVp -= Math.min(1.5, o.land * 0.08); o.land = 0; }        // touchdown: the springs take the hit
+  const vNow = (o.y - o.sLy) / Math.max(k, 1e-3); o.sLy = o.y;   // how fast the ground is carrying the chassis up or down
+  if (!o.air && !o.sWasAir) o.sVy -= Math.max(-3, Math.min(3, vNow - (o.sLv || 0)));   // a change in that (ramp foot, crest, curb) jolts the springs; a steady slope doesn't
+  o.sLv = o.air ? 0 : vNow; o.sWasAir = !!o.air;
   o.sVy += (K * (tY - o.sY) - C * o.sVy) * k; o.sY = Math.max(-0.14, Math.min(0.14, o.sY + o.sVy * k));
   o.sVp += (K * (Math.max(-0.35, Math.min(0.35, tP)) - o.sP) - C * o.sVp) * k; o.sP = Math.max(-0.4, Math.min(0.4, o.sP + o.sVp * k));
   o.sVr += (K * (Math.max(-0.35, Math.min(0.35, tR)) - o.sR) - C * o.sVr) * k; o.sR = Math.max(-0.4, Math.min(0.4, o.sR + o.sVr * k));
@@ -11107,6 +11112,74 @@ function suspStep(o, dt, leanP, leanR) {
       if (w.shock) w.shock.scale.y = Math.max(0.55, Math.min(1.4, 1 - d * 1.03 / w.L0));   // wheel up = shock squashed
     }
   }
+}
+// ---------- DIRT HILLS (owner, v1.97.94: "some hills in a grassy or dirt area to test the new physics"): four dirt mounds in
+// the open grass east of the plant, between the plant's east road and Road P (x 118-184, z 2-50, ~60 m east of the Ranger's
+// spot), all running north-south so you line up on them driving north from the Ranger:
+//  kicker (x 118-128)    - a 12 m ramp up to 1.6 m that ends in a sheer face: launch off the lip
+//  tabletop (x 136-148)  - up to 2.0 m, an 8 m flat top, back down: clear the top or case it
+//  whoops (x 154-164)    - three 0.7 m rollers 8 m apart: the suspension's workout
+//  big hill (x 170-184)  - a rounded 3.6 m hill, 44 m long: crest it fast and the Ranger leaves the ground
+// Each hill is a profile of [z, height] points: a slope between two points is a WALK_SURF ramp (so walking, the Ranger and
+// the cars all ride it), two points at the same z are a sheer face. The sides and faces taller than 0.6 m are wallSegs that
+// only block you below the top, so you can't drive through a hill from the side but can drive off its edge.
+const DIRT_HILLS = [
+  { x0: 118, x1: 128, p: [[44, 0], [32, 1.6], [32, 0]] },
+  { x0: 136, x1: 148, p: [[50, 0], [38, 2.0], [30, 2.0], [18, 0]] },
+  { x0: 154, x1: 164, p: [[50, 0], [46, 0.7], [42, 0], [38, 0.7], [34, 0], [30, 0.7], [26, 0]] },
+  { x0: 170, x1: 184, p: [[46, 0], [40, 0.9], [34, 2.4], [28, 3.4], [24, 3.6], [20, 3.4], [14, 2.4], [8, 0.9], [2, 0]] }
+];
+function buildDirtHills() {
+  const t = groundTex('dirt').clone(); t.needsUpdate = true; t.repeat.set(1 / 6, 1 / 6); t.wrapS = t.wrapT = T.RepeatWrapping;
+  const m = new T.MeshLambertMaterial({ map: t, color: 0xd8c4a8 });   // a touch lighter than the flat dirt so the slopes read
+  for (const H of DIRT_HILLS) {
+    const pos = [], uv = [], q = (a, b, c, d, ua, ub, uc, ud) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); uv.push(...ua, ...ub, ...uc, ...ua, ...uc, ...ud); };
+    const { x0, x1, p } = H;
+    for (let i = 0; i < p.length - 1; i++) {
+      const [za, ya] = p[i], [zb, yb] = p[i + 1];
+      if (za === zb) {   // sheer face, facing the way you drive off it (-z)
+        const y = Math.max(ya, yb); q([x0, 0, za], [x1, 0, za], [x1, y, za], [x0, y, za], [x0, 0], [x1, 0], [x1, y], [x0, y]);
+        if (y > 0.6) wallSegs.push([x0, za, x1, za, -0.5, y]);
+        continue;
+      }
+      WALK_SURF.push({ x0, x1, z0: Math.min(za, zb), z1: Math.max(za, zb), y0: za < zb ? ya : yb, y1: za < zb ? yb : ya });
+      q([x0, ya, za], [x1, ya, za], [x1, yb, zb], [x0, yb, zb], [x0, za], [x1, za], [x1, zb], [x0, zb]);                          // top
+      q([x0, 0, za], [x0, ya, za], [x0, yb, zb], [x0, 0, zb], [za, 0], [za, ya], [zb, yb], [zb, 0]);                              // west side
+      q([x1, 0, zb], [x1, yb, zb], [x1, ya, za], [x1, 0, za], [zb, 0], [zb, yb], [za, ya], [za, 0]);                              // east side
+      const lo = Math.min(ya, yb); if (lo > 0.6) for (const x of [x0, x1]) wallSegs.push([x, za, x, zb, -0.5, lo]);
+    }
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+    g.computeVertexNormals();   // unindexed, so every face keeps its own flat normal
+    const o = new T.Mesh(g, m); o.castShadow = true; o.receiveShadow = true; o.material.side = T.DoubleSide; o.name = 'dirtHill'; scene.add(o);
+  }
+}
+// ---------- AIR (owner, v1.97.94: "we can get air on hills?"): the driven vehicle carries vertical speed. On the ground it
+// rides the floor and remembers how fast the floor was carrying it up or down (a slope, not a step: a curb or slab edge
+// never counts as a launch); when the ground falls away faster than gravity can follow - over a crest, off the kicker lip,
+// off a ledge - it leaves the ground and flies on that speed under gravity. In the air the gas, brakes and steering have
+// almost no bite and the tyres stop gripping sideways; the springs let the wheels hang and hold the body's tilt. Landing
+// slams the suspension (scaled by how hard you came down) with a thump; only a really big drop (> 9 m/s, a ~4 m fall)
+// hurts the vehicle. Dropping into a pond or a dug-out pit is still refused, like before.
+const AIR = { G: 9.8, SLOPE: 0.45, GAP: 0.03, HURT: 9 };
+function vehVertical(u, dt) {
+  const fl = floorAt(u.x, u.z, u.y + 0.6), k = Math.min(dt, 0.05), sp = Math.hypot(u.vx, u.vz);
+  if (u.air) {
+    u.vy -= AIR.G * k; u.y += u.vy * k;
+    if (u.y <= fl) {
+      const ga2 = (floorAt(u.x + u.vx * k, u.z + u.vz * k, fl + 0.6) - fl) / k, lim = AIR.SLOPE * sp;   // the slope it came down on
+      const gv = Math.max(-lim, Math.min(lim, ga2)), hit = Math.max(0, gv - u.vy);   // the hit is what the slope doesn't absorb
+      u.y = fl; u.air = false; u.vy = gv; u.land = hit;
+      if (hit > 2) utvBump(Math.min(4, 2.5 + hit * 0.15));   // the thump (capped below the bump code's damage line)
+      if (hit > AIR.HURT && walk.drive) dmgHit(dmgDrivingKey(), (hit - AIR.HURT) * 6, true);
+    }
+    return;
+  }
+  const vy = u.vy || 0, yb = u.y + vy * k - 0.5 * AIR.G * k * k;   // where it would be next if the ground let go
+  if (fl < yb - AIR.GAP && fl > u.y - 50) { u.air = true; u.y = yb; u.vy = vy - AIR.G * k; return; }
+  const d = fl - u.y;
+  u.vy = Math.abs(d) > AIR.SLOPE * sp * k + 0.02 ? vy * 0.5 : Math.max(-12, Math.min(12, d / k));   // a step is not a slope: no launch off a curb
+  u.y = fl;
 }
 function buildUTV(color, vest) {
   if (utv.g) {   // a rebuild must not leave a phantom solid and roof behind at the old spot
@@ -11130,7 +11203,7 @@ function swapRangers() {
   A.vx = A.vz = 0; B.tx = B.x; B.tz = B.z; B.ta = B.a; B.ty = B.y; A.steer = 0;
   if (A.driver) A.g.add(A.driver); if (B.driver) B.g.add(B.driver);
 }
-function utvEnter() { utvIgnition(); walk.drive = true; walk.vy = 0; utv.vx = utv.vz = 0; utv.camYaw = utv.a; utv.look = utv.lookP = 0; }
+function utvEnter() { utvIgnition(); walk.drive = true; walk.vy = 0; utv.vx = utv.vz = 0; utv.vy = 0; utv.air = false; utv.camYaw = utv.a; utv.look = utv.lookP = 0; }
 // ---------- DRIVABLE CARS (the three parked in the dirt behind the plant): same arcade handling as the Ranger, no NOS. Each one is locked
 // until you have its keys, which hang on hooks: the black Silverado's (holy cross keychain) in the production manager's office, the
 // yellow crossover's (mustard bottle keychain) and the silver F-150's (lab beaker keychain) in the lab office. X / E at a key takes it.
@@ -11196,6 +11269,7 @@ function carRestore() {
   CAR_ON = null; RANGER_SAVE = null;
 }
 function utvExit() {
+  if (utv.air) { utv.y = floorAt(utv.x, utv.z, utv.y + 0.6); utv.air = false; utv.vy = 0; if (utv.g) utv.g.position.y = utv.y + 0.13; }   // bailing out mid-jump: it lands where it is
   walk.drive = false; utv.boosting = false; if (utv.flame) utv.flame.visible = false; camera.fov = 42; camera.updateProjectionMatrix(); if (utv.driver) utv.driver.visible = false; utv.vx = utv.vz = 0; utvSound(0, 0); const ca = Math.cos(utv.a), sa = Math.sin(utv.a);
   walk.x = utv.x - ca * (CAR_ON ? 1.9 : 1.5); walk.z = utv.z + sa * (CAR_ON ? 1.9 : 1.5); walk.y = utv.y; walk.vy = 0; walk.yaw = utv.a; walk.pitch = -0.08;
   if (CAR_ON) carRestore(); pushOut();   // step out on the driver's (left) side
@@ -11228,27 +11302,28 @@ function utvUpdate(dt) {
   const MAXF = boosting ? 38 : 26.4, MAXR = 6.6, ACC = boosting ? 30 : 14.3, BRK = 18;   // ~59 mph top speed (~85 on NOS), ~15 mph in reverse
   const dk = DMG[dmgDrivingKey()], dead = dk && (dk.fire || dk.burnt || dk.h <= 0), weak = dk && dk.h < 30;
   const thr = dead ? 0 : (boosting ? Math.max(I.t, 1) : I.t) * (weak ? 0.55 : 1);   // a wrecked engine barely pulls; a dead one doesn't
-  if (thr > 0.05) fs += (fs < -0.3 ? BRK : ACC * (1 - Math.max(0, fs) / MAXF * 0.85)) * thr * dt;      // gas (also brakes while rolling backward)
-  if (I.b > 0.05) { if (fs > 0.3) fs -= BRK * I.b * dt; else fs = Math.max(-MAXR, fs - 4 * I.b * dt); }   // brake, then reverse
-  if (I.hb) fs -= Math.sign(fs) * Math.min(Math.abs(fs), 4 * dt);
-  fs -= fs * 0.25 * dt + Math.sign(fs) * Math.min(Math.abs(fs), (I.t < 0.05 && I.b < 0.05 ? 1.6 : 0.3) * dt);   // air drag + rolling (coasts to a stop)
+  const ga = u.air ? 0.12 : 1;   // airborne: the wheels have (almost) nothing to push on
+  if (thr > 0.05) fs += (fs < -0.3 ? BRK : ACC * (1 - Math.max(0, fs) / MAXF * 0.85)) * thr * dt * ga;      // gas (also brakes while rolling backward)
+  if (I.b > 0.05) { if (fs > 0.3) fs -= BRK * I.b * dt * ga; else fs = Math.max(-MAXR, fs - 4 * I.b * dt * ga); }   // brake, then reverse
+  if (I.hb) fs -= Math.sign(fs) * Math.min(Math.abs(fs), 4 * dt * ga);
+  fs -= fs * 0.25 * dt + Math.sign(fs) * Math.min(Math.abs(fs), (I.t < 0.05 && I.b < 0.05 ? 1.6 : 0.3) * dt * ga);   // air drag + rolling (coasts to a stop)
   fs = Math.max(-MAXR, Math.min(boosting ? MAXF : Math.max(26.4, fs - 6 * dt), fs));   // after a boost it eases back down to normal top speed
   const target = I.s * 0.62 / (1 + Math.abs(fs) * 0.06); u.steer += (target - u.steer) * Math.min(1, 9 * dt);   // less lock at speed
-  ls *= Math.exp(-(I.hb ? 1.4 : 7.5) * dt);                               // tires grab sideways; the handbrake lets the back end slide
-  u.a -= fs * Math.tan(u.steer) / 2.0 * dt * (I.hb ? 1.4 : 1);
+  ls *= Math.exp(-(u.air ? 0.3 : I.hb ? 1.4 : 7.5) * dt);                               // tires grab sideways; the handbrake lets the back end slide
+  u.a -= fs * Math.tan(u.steer) / 2.0 * dt * (I.hb ? 1.4 : 1) * ga;
   const nfx = -Math.sin(u.a), nfz = -Math.cos(u.a), nrx = Math.cos(u.a), nrz = -Math.sin(u.a);
   u.vx = nfx * fs + nrx * ls; u.vz = nfz * fs + nrz * ls;
   const n = Math.max(1, Math.ceil(Math.hypot(u.vx, u.vz) * dt / 0.3));   // move in small steps; bounce off things
   for (let i = 0; i < n; i++) {
     const nx = u.x + u.vx * dt / n, nz = u.z + u.vz * dt / n;
-    if (floorAt(nx, nz, u.y + 0.6) < u.y - 0.8) { utvBump(Math.hypot(u.vx, u.vz)); u.vx *= -0.3; u.vz *= -0.3; break; }   // won't drive off into a pit or the ponds
+    { const fN = floorAt(nx, nz, u.y + 0.6); if (fN < u.y - 0.8 && fN < -0.5) { utvBump(Math.hypot(u.vx, u.vz)); u.vx *= -0.3; u.vz *= -0.3; break; } }   // won't drive off into a pit or the ponds (a drop to the ground is a jump now)
     u.x = nx; u.z = nz;
     const p = utvBlocked(u.x, u.z, u.a);
     if (p) { const L = Math.hypot(p[0], p[1]) || 1, ex = p[0] / L, ez = p[1] / L, vn = u.vx * ex + u.vz * ez;
       u.x += p[0]; u.z += p[1]; if (vn < 0) { utvBump(-vn); u.vx -= 1.4 * vn * ex; u.vz -= 1.4 * vn * ez; u.vx *= 0.7; u.vz *= 0.7; } }
   }
   u.x = Math.max(-1300, Math.min(1500, u.x)); u.z = Math.max(-800, Math.min(1300, u.z));
-  const fl = floorAt(u.x, u.z, u.y + 0.6); u.y += (fl - u.y) * Math.min(1, 8 * dt);
+  vehVertical(u, dt);   // ride the ground, or fly
   // body lean: roll with the turn and slide, nose dips on the brakes and lifts on the gas, a little bounce with speed
   const sp = Math.hypot(u.vx, u.vz), latA = fs * fs * Math.tan(u.steer) / 2.0;
   u.roll += (Math.max(-0.12, Math.min(0.12, latA * 0.006 + ls * 0.02)) - u.roll) * Math.min(1, 6 * dt);

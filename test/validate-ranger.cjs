@@ -1,11 +1,12 @@
 // Run from the test/ directory: node validate-ranger.cjs
-// v1.97.93: the Ranger is the owner's ps1_utv_ranger.glb (made with Gemini), with visual per-wheel suspension.
+// v1.97.93 / v1.97.94: the Ranger is the owner's ps1_utv_ranger.glb (made with Gemini), with visual per-wheel suspension.
 //  1. the file itself: low-poly, every named part the game drives, registered as a first-party asset
 //  2. the model swap, run for real on the game's own glTF reader: box parts out, driver/passenger/radio kept, wheels on hub
 //     pivots, Body tinted per player (never shared), Lights unlit, a missing part leaves the box Ranger in place
 //  3. the suspension, run for real against stub ground: flat, ramp, side slope, a curb under one wheel, a step (bounce),
 //     parked (no re-sampling), a vehicle without wheels
 //  4. the wiring: the driven vehicle, the other player's Ranger, burnt-out paint, ride-along seat still there
+//  5. air (v1.97.94): take off at a lip, fly, land with a thump, no launch off a curb, damage only on a big drop; the dirt hills
 const fs = require('fs'), path = require('path'), vm = require('vm'), assert = require('assert/strict');
 const html = fs.readFileSync('game.html', 'utf8');
 const ROOT = path.join(__dirname, '..'), GLB = path.join(ROOT, 'assets/models/ps1_utv_ranger.glb');
@@ -110,7 +111,7 @@ const run = (o, n, lp = 0, lr = 0) => { for (let i = 0; i < n; i++) sctx.suspSte
   assert.ok(Math.abs(rr.pv.position.y - 0.33) <= sctx.SUSP.TRAVEL + 1e-9, 'every wheel stays within +-' + sctx.SUSP.TRAVEL + ' m'); }
 { sctx.floorAt = () => 0; const o = veh(); run(o, 60);   // driving up a step: the body lags, bounces once, settles
   o.y = 0.15; sctx.floorAt = () => 0.15; const tr = []; for (let i = 0; i < 180; i++) { sctx.suspStep(o, 1 / 60, 0, 0); tr.push(o.sY); }
-  assert.ok(Math.min(...tr) < -0.04, 'a step kicks the chassis down: ' + Math.min(...tr).toFixed(3));
+  assert.ok(Math.min(...tr) < -0.03, 'a step kicks the chassis down: ' + Math.min(...tr).toFixed(3));
   assert.ok(Math.max(...tr.slice(10)) > 0.002, 'it springs back past level (a bounce, not a slow drift): ' + Math.max(...tr.slice(10)).toFixed(4));
   assert.ok(Math.abs(tr[tr.length - 1]) < 0.005, 'and settles'); }
 { let calls = 0; sctx.floorAt = () => { calls++; return 0; }; const o = veh(); run(o, 1); const c1 = calls; run(o, 30);
@@ -126,4 +127,54 @@ assert.ok(html.includes("walk.y = u.y + 0.2 + u.sY * 0.8;"), 'the seat (and firs
 assert.ok(html.includes("suspStep(Q, dt, 0, 0); Q.g.position.set(Q.x, Q.y + 0.13 + Q.sY, Q.z); Q.g.rotation.set(Q.sP, Q.a, Q.sR, 'YXZ');"), "the other player's Ranger bounces on this screen too");
 assert.ok(html.includes('(o.material.map && !o.userData.charOK)'), 'a burnt-out Ranger chars even though its paint is a texture');
 assert.ok(html.includes('function seatPassenger(g, vest)') && html.includes('function passSeat(g, out)') && html.includes("netSend({ t: 'ps', on: true });"), 'ride-along in the passenger seat is still wired');
-console.log('validate-ranger: OK (' + tris + ' triangles)');
+
+// 5 ---------------------------------------------------------------- air + dirt hills (v1.97.94)
+const airSrc = html.slice(html.indexOf('const AIR = {'), html.indexOf('function buildUTV(color, vest) {'));
+const hillSrc = html.slice(html.indexOf('const DIRT_HILLS = ['), html.indexOf('// ---------- AIR'));
+assert.ok(airSrc.includes('function vehVertical(u, dt)') && hillSrc.includes('function buildDirtHills()'), 'air physics and the dirt hills are in the game');
+{ const actx = { Math, walk: { drive: true }, bumps: [], hurt: [], floorAt: () => 0 };
+  actx.utvBump = v => actx.bumps.push(v); actx.dmgDrivingKey = () => 'r'; actx.dmgHit = (k, a) => actx.hurt.push(a);
+  vm.createContext(actx); vm.runInContext(airSrc + '\nthis.vehVertical = vehVertical; this.AIR = AIR;', actx);
+  const drive = (u, n, dt = 1 / 60) => { const out = []; for (let i = 0; i < n; i++) { u.x += u.vx * dt; u.z += u.vz * dt; actx.vehVertical(u, dt); out.push({ z: u.z, y: u.y, air: !!u.air }); } return out; };
+  // a 12 m ramp up to 1.6 m (rising toward -z, the way you drive), then a sheer drop: the kicker
+  actx.floorAt = (x, z) => (z <= 44 && z > 32 ? (44 - z) / 12 * 1.6 : 0);
+  let u = { x: 0, z: 60, y: 0, vx: 0, vz: -18, vy: 0 }, tr = drive(u, 200);
+  const up = tr.filter(t => t.z < 44 && t.z > 33); assert.ok(up.every(t => !t.air), 'climbing the ramp stays on the ground');
+  const off = tr.findIndex(t => t.air); assert.ok(off > 0 && Math.abs(tr[off].z - 32) < 0.8, 'it takes off at the lip (z ' + (off > 0 ? tr[off].z.toFixed(1) : '-') + ')');
+  const peak = Math.max(...tr.map(t => t.y)); assert.ok(peak > 1.7, 'carrying the ramp speed up past the lip: peak ' + peak.toFixed(2) + ' m');
+  const land = tr.findIndex((t, i) => i > off && !t.air); assert.ok(land > off && 32 - tr[land].z > 8, 'and lands well past it: ' + (32 - tr[land].z).toFixed(1) + ' m of air');
+  assert.ok(actx.bumps.length === 1 && actx.bumps[0] <= 4, 'one thump on landing, below the bump code damage line'); assert.equal(actx.hurt.length, 0, 'a normal jump does no damage');
+  // slow over the same ramp: barely leaves the ground at the lip, no flight
+  u = { x: 0, z: 60, y: 0, vx: 0, vz: -3, vy: 0 }; tr = drive(u, 600); const slowAir = tr.filter(t => t.air).length;
+  assert.ok(slowAir < 40, 'crawling off the lip just drops off it (' + slowAir + ' airborne frames)');
+  // a curb: a 0.15 m step up never launches you
+  actx.floorAt = (x, z) => (z < 50 ? 0.15 : 0); u = { x: 0, z: 60, y: 0, vx: 0, vz: -15, vy: 0 }; tr = drive(u, 120);
+  assert.ok(Math.max(...tr.map(t => t.y)) < 0.16, 'a curb is a step, not a ramp: no launch');
+  // going down a long slope stays planted
+  actx.floorAt = (x, z) => Math.max(0, Math.min(3, (z - 20) * 0.2)); u = { x: 0, z: 40, y: 3, vx: 0, vz: -15, vy: 0 }; tr = drive(u, 70);
+  assert.ok(tr.filter(t => t.z > 21 && t.z < 25).every(t => !t.air), 'off a crest at 15 m/s it flies, then lands and stays planted down the slope (the landing takes the slope speed)');
+  // a big drop hurts
+  actx.hurt.length = 0; actx.floorAt = () => 0; u = { x: 0, z: 0, y: 6, vx: 0, vz: 0, vy: 0, air: true }; drive(u, 120);
+  assert.ok(actx.hurt.length === 1 && actx.hurt[0] > 0, 'a ~6 m fall damages the vehicle');
+  actx.hurt.length = 0; u = { x: 0, z: 0, y: 2.5, vx: 0, vz: 0, vy: 0, air: true }; drive(u, 120); assert.equal(actx.hurt.length, 0, 'a 2.5 m drop (the tabletop) does not'); }
+{ const WALK_SURF = [], wallSegs = [], meshes = [];
+  const hctx = { T: T0, WALK_SURF, wallSegs, groundTex: () => new T0.Texture(), scene: { add: o => meshes.push(o) } };
+  vm.createContext(hctx); vm.runInContext(hillSrc + '\nthis.buildDirtHills = buildDirtHills; this.DIRT_HILLS = DIRT_HILLS;', hctx);
+  hctx.buildDirtHills();
+  const H = hctx.DIRT_HILLS; assert.equal(meshes.length, H.length, 'one mesh per hill');
+  for (const h of H) for (let i = 0; i < h.p.length - 1; i++) { const [za, ya] = h.p[i], [zb, yb] = h.p[i + 1];
+    assert.ok(za >= zb, 'profiles run north (z falling)'); if (za !== zb) assert.ok(Math.abs(ya - yb) / (za - zb) <= 0.45, 'every slope is a ramp the ground code treats as a slope (<= 0.45)'); }
+  const at = (x, z) => { let f = 0; for (const s of WALK_SURF) if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) f = Math.max(f, s.y0 + (s.y1 - s.y0) * (z - s.z0) / (s.z1 - s.z0)); return f; };
+  assert.ok(Math.abs(at(123, 32.01) - 1.6) < 0.01 && Math.abs(at(123, 38) - 0.8) < 0.01, 'the kicker is a 1.6 m ramp');
+  assert.ok(Math.abs(at(142, 34) - 2.0) < 1e-9, 'the tabletop is flat on top at 2.0 m'); assert.ok(Math.abs(at(177, 24) - 3.6) < 1e-9, 'the big hill crests at 3.6 m');
+  assert.ok(wallSegs.some(w => w[1] === 32 && w[3] === 32 && w[5] >= 1.6), "the kicker's sheer face blocks you from the far side");
+  assert.ok(wallSegs.filter(w => w[0] === w[2]).length > 0 && wallSegs.every(w => w[4] < 0 && w[5] > 0.6), "tall sides block you below the top only (so you can still drive off an edge)");
+  for (const h of H) { assert.ok(h.x0 >= 110 && h.x1 <= 190 && Math.min(...h.p.map(q => q[0])) >= 0 && Math.max(...h.p.map(q => q[0])) <= 52, 'the hills stay in the open grass east of the plant'); } }
+assert.ok(html.includes('buildBillboards(); buildDirtHills(); mergeStatic();'), 'the hills are built with the world (and merged like the rest of the static scenery)');
+assert.ok(html.includes('vehVertical(u, dt);   // ride the ground, or fly') && !html.includes('u.y += (fl - u.y) * Math.min(1, 8 * dt);'), 'the driven vehicle uses the air physics');
+assert.ok(html.includes('const ga = u.air ? 0.12 : 1;') && html.includes('* thr * dt * ga;') && html.includes('ls *= Math.exp(-(u.air ? 0.3'), 'in the air: little gas, brake, steering or grip');
+assert.ok(html.includes('if (fN < u.y - 0.8 && fN < -0.5)'), 'ponds and dug-out pits are still refused; an ordinary drop is a jump');
+assert.ok(html.includes('utv.vy = 0; utv.air = false;') && html.includes('bailing out mid-jump'), 'getting in resets the jump state; bailing out mid-air drops the vehicle to the ground');
+assert.ok(html.includes('if (o.air) { tP = o.sP - 0.02;') && html.includes('if (o.land) {'), 'the springs let the wheels hang in the air and take the landing');
+assert.ok(html.includes('if (Q.air && !air) Q.land = 4; Q.air = air;'), "the other player's jumps show their wheels hanging and the landing too");
+console.log('validate-ranger: OK (' + tris + ' triangles, air + ' + 4 + ' dirt hills)');
