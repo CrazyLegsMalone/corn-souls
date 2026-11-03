@@ -7845,7 +7845,7 @@ function init(container) {
   {
     const cx = -675, cz = -99, R = 344;   // satellite: big pivot circle in the north part of the loop
     const f = add(new T.CylinderGeometry(R, R, 0.12, 64), mat(0x557d2f), cx, 0.07, cz, null); f.castShadow = false;   // green: it's planted (corn added below, with the corn field)
-    O.pivot = { cx, cz, R };
+    O.pivot = { cx, cz, R, wheels: [], cols: [] };
     // the irrigation machine: galvanized pipe on arched truss spans between wheeled A-frame towers, turning slowly around the center tower,
     // with a curtain of water falling from the drop nozzles (one scrolling picture, no particles) and the end gun throwing an arc past the last tower
     const g = new T.Group(); g.position.set(cx, 0, cz); scene.add(g); O.pivot.g = g;
@@ -7860,8 +7860,14 @@ function init(container) {
       // tower at the outer end of each span: A-frame legs down to a gearbox beam with two big tires
       for (const k of [-1, 1]) { const l = P(new T.BoxGeometry(0.12, PH + 0.3, 0.12), galv, x1, PH / 2, k * 0.9); l.rotation.x = -k * 0.25; }
       P(new T.BoxGeometry(0.25, 0.25, 3.4), dark, x1, 0.95, 0);
-      for (const k of [-1, 1]) P(new T.CylinderGeometry(0.75, 0.75, 0.45, 10).rotateX(Math.PI / 2), tire, x1, 0.75, k * 1.7);
+      // the tires sit fore and aft on the gearbox beam and roll the way the tower travels (round the circle, local z), so their
+      // axles point along the arm (local x). They used to be turned the other way, rolling sideways along the arm (owner, v1.97.97).
+      for (const k of [-1, 1]) { const w = P(new T.CylinderGeometry(0.75, 0.75, 0.45, 10).rotateZ(Math.PI / 2), tire, x1, 0.75, k * 1.7); O.pivot.wheels.push({ m: w, r: x1 }); }
+      // solid: three round footprints per tower (both tires and the A-frame between), moved with the arm by updatePivot
+      for (const lz of [-1.7, 0, 1.7]) { const c = [0, 0, lz ? 0.85 : 0.7]; c.lx = x1; c.lz = lz; extraCols.push(c); O.pivot.cols.push(c); }
     }
+    { const c = [cx, cz, 1.7]; extraCols.push(c); }   // the center tower
+    pivotCols();
     // water: a soft curtain under the whole arm and the end gun's arc. The picture scrolls down; nothing is recalculated per drop.
     const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const c = cv.getContext('2d');
     for (let i = 0; i < 90; i++) { const x = Math.random() * 64, y = Math.random() * 128, l = 6 + Math.random() * 14; c.strokeStyle = 'rgba(225,240,255,' + (0.25 + Math.random() * 0.5).toFixed(2) + ')'; c.lineWidth = 1 + Math.random(); c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + l); c.stroke(); }
@@ -10121,13 +10127,20 @@ function updateKia(dt) {
 }
 
 // center pivot: one full turn about every 8 minutes (a real one takes a day or so, but then you'd never see it move); the water keeps falling
+function pivotCols() {   // keep each tower's footprints under it as the arm turns
+  const P = O.pivot; if (!P || !P.g) return; const a = P.g.rotation.y, c = Math.cos(a), s = Math.sin(a);
+  for (const q of P.cols) { q[0] = P.cx + q.lx * c + q.lz * s; q[1] = P.cz - q.lx * s + q.lz * c; }
+}
 function updatePivot(dt) {   // the pivot runs on its own diesel gen-set, so the plant's outage does not stop it
   const P = O.pivot; if (!P || !P.g) return;
   const G = PIVOT_GEN;
   if (G.lamp) G.lamp.material.color.setHex(G.running ? 0x2fdc84 : 0x3a1010);   // the run lamp is battery-fed: it works in an outage too
   for (const w of P.sheets || []) w.visible = G.running;
   if (!G.running) return;                     // engine off: the arm stays where it stopped and the water is off
-  P.g.rotation.y -= dt * Math.PI * 2 / 480;
+  const da = dt * Math.PI * 2 / 480;
+  P.g.rotation.y -= da;
+  for (const w of P.wheels) w.m.rotation.x += da * w.r / 0.75;   // rolling: tower speed (radius x turn rate) / tire radius
+  pivotCols();
   for (const t of P.water) t.offset.y = (t.offset.y + dt * 1.6) % 1;
   G.fuel = Math.max(0, G.fuel - dt / 3600 * G.burn);
   if (G.fuel <= 0) { G.running = false; if (PIVOT_NOTIFY) PIVOT_NOTIFY('⛽ The pivot engine ran out of diesel - the pivot has stopped.'); }
