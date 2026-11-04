@@ -29,8 +29,10 @@ assert.ok(html.includes('scene = new T.Scene(); lightInstall();'), 'the shader p
 assert.ok(!/new T\.SpotLight\(/.test(html.slice(html.indexOf('function init('), html.indexOf('function init(') + 8000)) && html.includes("headlamp = { intensity: 0, color: new T.Color(0xfff1d6) };"),
   'the headlamp is no longer a three.js SpotLight (that put a light loop on every pixel in the game)');
 assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); mergeStatic();'), 'lamps are collected before the static merge folds their meshes away');
-{ const i = html.indexOf("stepSafe('lighting', () => lightUpdate(dt));"), j = html.indexOf('renderer.render(scene, camera);', i);
-  assert.ok(i > 0 && j > i && j - i < 300, 'the lighting is updated every frame, after the camera and right before the render'); }
+{ const i = html.indexOf("stepSafe('lighting', () => lightUpdate(dt));"), j = html.indexOf('renderer.render(scene, camera);', i), between = html.slice(i, j);
+  const code = between.split('\n').filter(l => l.trim() && !l.trim().startsWith('//'));
+  assert.ok(i > 0 && j > i && code.length <= 7 && !/renderer\.render\(/.test(between), 'the lighting is updated every frame, after the camera and right before the one render (' + code.length + ' code lines apart)');
+  assert.ok(/PERF\.title = titleCover\(\);\n\s*if \(!PERF\.title\) \{/.test(between), 'the only thing between them is the title gate (v1.97.149)'); }
 assert.ok(html.includes('CSU.csG.value.w = 1; renderer.render(hudScene, hudCam); CSU.csG.value.w = 0;'), 'the first-person HUD pass bypasses the world lighting');
 assert.ok(html.includes('hudHemi.intensity = Math.max(floor, Math.max(0.8, hemi.intensity) * hk + LIGHT.hud.irr * 0.6 + lamp);'), 'and is lit by where you stand instead');
 { const s = html.slice(html.indexOf('function setPowerOutage(on) {'), html.indexOf('POWER_OUTAGE.apply = function'));

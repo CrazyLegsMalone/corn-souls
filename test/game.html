@@ -4863,7 +4863,20 @@ const TIER = perfTier();
 // render() call and the HUD is the last render of the frame, so "dc" was 1-3 no matter what the world cost. With
 // autoReset off we reset once ourselves, just before the world render, so these numbers cover the shadow pass, the
 // world and (after the capture point) nothing else.
-const PERF = { dc: 0, tri: 0, draw: 0, frame: 0, casters: 0, compile: 0, errs: 0, err: '', msg: '' };
+const PERF = { dc: 0, tri: 0, draw: 0, frame: 0, casters: 0, compile: 0, errs: 0, err: '', msg: '', title: false };
+// v1.97.148: while the title screen covers the window, nothing of the plant is on screen - #splash is an opaque panel and the
+// 3D bonfire on it has its own renderer and canvas (title3D) - so the world pass is not drawn at all until the title starts
+// to fade. The simulation keeps running (the clock, the netcode, the roof map); it is only the drawing that stops. The first
+// frames are still drawn, because those are what upload the textures and warm the shaders, and the moment go() adds the
+// title's `.out` class (same statement as live = false) the world is drawn again, so it is live through the whole fade.
+const TITLE_WARM = 40;   // frames drawn after load before the gate closes (~0.7 s at 60 fps)
+let titleFrames = 0, titleEl = null; try { titleEl = document.getElementById('splash'); } catch (e) {}
+function titleHidesWorld(el, warm) {
+  if (!el || !el.isConnected) return false;       // no title, or it is already gone: always draw
+  if (el.classList.contains('out')) return false; // the fade has started: draw from its first frame
+  return warm >= TITLE_WARM;
+}
+const titleCover = () => titleHidesWorld(titleEl, titleFrames);
 // One broken sub-system must never freeze the frame. Everything in the per-frame tail runs through here, so a throw
 // costs that one update instead of the render, the first-person gun and the paintball cooldown that follow it in the
 // chain - and the first failure of each is named in the console AND on the fps line, so a silent freeze is impossible.
@@ -10250,11 +10263,16 @@ function update(sim, dt, events) {
     camera.lookAt(cam.tx, cam.ty, cam.tz);
   }
   stepSafe('lighting', () => lightUpdate(dt));
-  shadowFollow(); shadowRefresh(); renderer.info.reset();
-  const _rt = performance.now();
-  renderer.render(scene, camera);
-  PERF.draw = performance.now() - _rt; PERF.dc = renderer.info.render.calls; PERF.tri = renderer.info.render.triangles;   // shadow pass + world, excluding the HUD pass below
-  drawHudGun();
+  // v1.97.148: the title is covering the window, so the shadow pass, the world and the HUD are not drawn (see TITLE_WARM).
+  // Everything above still ran: the plant is simulated behind the title exactly as before.
+  PERF.title = titleCover();
+  if (!PERF.title) {
+    shadowFollow(); shadowRefresh(); renderer.info.reset();
+    const _rt = performance.now();
+    renderer.render(scene, camera);
+    PERF.draw = performance.now() - _rt; PERF.dc = renderer.info.render.calls; PERF.tri = renderer.info.render.triangles;   // shadow pass + world, excluding the HUD pass below
+    drawHudGun();
+  } else { renderer.info.reset(); PERF.draw = PERF.dc = PERF.tri = 0; }   // so the fps line reads 0 dc, not the last world frame
 }
 
 // ---------- IBC LIQUID TOTE (275 gal, 48 x 40 x 46 in): a plain box with low-res photos on the sides (long-side photo on the 48 in faces,
@@ -15250,12 +15268,14 @@ function paceUpdate(now) {   // keeps a rolling median of the refresh gap; re-pi
 function frame(now) {
   paceUpdate(now);
   if (PACE.k > 1 && (++PACE.n % PACE.k) !== 0) { requestAnimationFrame(frame); return; }
+  titleFrames++;   // frames actually drawn: the title gate's warm-up counts these, not screen refreshes (v1.97.148)
   fpsN++; if (!fpsT) fpsT = now; if (now - fpsT >= 1000) {
     const pf = P3.perf || {}, pz = $('modal').classList.contains('open'), vm = P3.viewmodel || {};
     const badGun = P3.walking && !vm.third && vm.held === 'gun' && !vm.gun;   // should be up but is not: tell the player
     $('fps').textContent = Math.round(fpsN * 1000 / (now - fpsT)) + ' fps  ' + P3.drawCalls + ' dc  ' + Math.round(P3.triCount / 1000) + 'k tri  ' + (pf.frame || 0).toFixed(1) + ' ms'
       + ' · ' + ((P3.tier && P3.tier.name) || '?')   // which quality tier this device got
       + (pz ? ' · PAUSED' : '')                       // a modal is swallowing the clock: dt is 0, nothing moves
+      + (pf.title ? ' · title' : '')                  // the title covers the window: the plant is simulated but not drawn (v1.97.148)
       + (badGun ? ' · noGun' : '')                    // the gun should be showing but its mesh is not visible
       + (pf.errs ? ' · !' + pf.err + '×' + pf.errs : '');   // a guarded sub-update is failing (see the console)
     fpsN = 0; fpsT = now; }
