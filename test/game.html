@@ -5173,6 +5173,7 @@ function manDoor(x, z, alongX, col, inward) {   // inward: +1/-1 = which way is 
 const EGRESS = { list: [], lens: null };
 const EGRESS_OFF = 0.24, EGRESS_Y = 2.78;   // clear of the wall face (walls are 0.25-0.3 thick) and above the door-name plates at 2.45
 function egressStrobe(x, z, ix, iz) {
+  if (EGRESS.list.some(q => Math.abs(q.position.x - (x + ix * EGRESS_OFF)) < 0.05 && Math.abs(q.position.z - (z + iz * EGRESS_OFF)) < 0.05)) return;   // one per door
   const lens = EGRESS.lens || (EGRESS.lens = batteryLight(new T.MeshBasicMaterial({ color: 0x3a0e0e })));
   const m = new T.Mesh(new T.SphereGeometry(0.085, 10, 7), lens);
   m.position.set(x + ix * EGRESS_OFF, EGRESS_Y, z + iz * EGRESS_OFF); m.scale.set(1, 1, 0.7);
@@ -5668,6 +5669,27 @@ function exitHalo(w, h, x, y, z, rotY) {   // the soft glow just in front of a s
   const m = new T.Mesh(new T.PlaneGeometry(w, h), exitHaloMat());
   m.position.set(x, y, z); m.rotation.y = rotY || 0; m.userData.noHit = true; scene.add(m);
 }
+// v1.97.136, owner (photo of a lit EXIT sign over a man door, under its red strobe): "make the personel doors that open to the
+// outside like this. obviosly only from the inside". Every exterior man door already has an egress strobe on its inside face
+// (egressStrobe), so each strobe gets the lit EXIT sign + halo under it, on that same inside face, centred on the door. A door that
+// already has an EXIT sign close by keeps just the one.
+function exitSignsForEgress() {
+  const have = []; scene.traverse(o => { if (o.isMesh && o.material === EXIT_SIGN.mat) have.push(o.getWorldPosition(V3())); });
+  let n = 0;
+  for (const s of EGRESS.list) {
+    const ix = Math.sin(s.rotation.y), iz = Math.cos(s.rotation.y), dx = s.position.x - ix * EGRESS_OFF, dz = s.position.z - iz * EGRESS_OFF;   // the door's centre in the wall line
+    if (have.some(p => Math.hypot(p.x - dx, p.z - dz) < 1.8 && (p.x - dx) * ix + (p.z - dz) * iz > 0)) continue;   // already signed on the inside
+    const sx = dx + ix * 0.25, sz = dz + iz * 0.25, along = Math.abs(ix) > Math.abs(iz);
+    let top = 0; for (const d of O.swingDoors || []) { const p = d.g.getWorldPosition(V3()); if (Math.hypot(p.x - dx, p.z - dz) < 2.6) top = Math.max(top, new T.Box3().setFromObject(d.g).max.y); }
+    const y = Math.max(EXIT_Y, top + 0.21);   // a taller door: the sign sits clear above it
+    if (y + 0.15 > s.position.y - 0.1) s.position.y = y + 0.27;   // and its strobe goes up to stay above the sign
+    box(along ? 0.12 : 0.7, 0.3, along ? 0.7 : 0.12, exitSignMat(), sx, y, sz);
+    exitHalo(1.1, 0.55, dx + ix * 0.318, y, dz + iz * 0.318, Math.atan2(ix, iz));
+    have.push(V3(sx, y, sz)); n++;
+  }
+  return n;
+}
+const EXIT_Y = 2.47;   // between the door head (2.21) and the strobe (2.78), like the owner's photo
 function concreteFloor(x0, x1, z0, z1) { box(x1 - x0 - 0.3, 0.1, z1 - z0 - 0.3, mat(0x8d9196), (x0 + x1) / 2, 0.16, (z0 + z1) / 2); }
 // ---------- pipe-rack support: a steel post with a short cross-arm under an overhead pipe ----------
 function tpost(x, z, y, alongX) {
@@ -6505,6 +6527,7 @@ function init(container) {
       for (const s2 of [-1, 1]) signFace(s2 > 0 ? pair[0] : pair[1], s2, cx, cz, alongX, th, DH);
     };
     const signFace = (text, s2, cx, cz, alongX, th, DH) => {
+      if (!text) return;   // (no plate on that face: e.g. the inside of an exterior door, where the EXIT sign goes)
       if (!signTex[text]) {
         const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112; const g = cv.getContext('2d');
         g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, 512, 112); g.strokeStyle = '#2b3a4a'; g.lineWidth = 8; g.strokeRect(4, 4, 504, 104);
@@ -6632,7 +6655,6 @@ function init(container) {
     wall(FXW + FR - 0.3, ZN, FXE - FR + 0.3, ZN, PH, wm, [[AC - 1.0 - (FXW + FR - 0.3), 2.95, 3.05], [AC + 2.2 - (FXW + FR - 0.3), 0.95]], { trim: true, leaf: 1 });   // north end of the ferm alley: roll-up door (west) + man door (east)
       egressStrobe(AC + 2.2, ZN, 0, 1);   // north-end man door of the ferm alley, strobe inside
     rollDoor(AC - 1.0, ZN + 0.05, true, 2.9, 3.0, -1, 'slat', 1);                                   // housing inside (south), bollards outside
-    box(0.7, 0.3, 0.12, exitSignMat(), AC + 2.2, DH0 + 0.35, ZN + 0.25); exitHalo(1.1, 0.55, AC + 2.2, DH0 + 0.35, ZN + 0.318, 0);   // EXIT sign inside
     { // open steel tower with catwalks between Ferm 4 and 5, from the end wall up to the tank tops (photo)
       const st = mat(0x6f7378), rail = mat(0xb8a24a), x0 = AC - 3.0, x1 = AC + 3.0, z0 = ZN - 2.6, z1 = ZN + 2.6, top = FH + 1.2;
       for (const x of [x0, x1]) for (const z of [z0, z1]) box(0.35, top - PH, 0.35, st, x, (top + PH) / 2, z);
@@ -6784,7 +6806,6 @@ function init(container) {
     }
     wallSegs.push([WW + 0.2, OZS - 0.6, WW + 0.3 + 14 * 0.305, OZS - 0.6]);
     box(0.08, 0.3, 0.7, batteryLight(new T.MeshBasicMaterial({ color: 0xd8262c })), WW + 0.2, DH + 0.3, OZS - 1.3);
-    box(0.06, 0.2, 0.55, exitSignMat(), WW + 0.25, DH + 0.3, OZS - 1.3); exitHalo(0.9, 0.4, WW + 0.288, DH + 0.3, OZS - 1.3, Math.PI / 2);   // lit, lettered face over the hall door
     // break room table, lab island, control room console (simple shapes)
     // ---- laboratory (from the four corner photos): white base cabinets with dark tops along the walls, a center island,
     // instruments (HPLCs, GCs, analyzer), a desk at the control room window, glass-front upper cabinets on the south wall.
@@ -6900,12 +6921,11 @@ function init(container) {
       // shop east wall (photos, scaled from the man door): man door with EXIT sign, big Cornell roll-up (~14 x 14 ft), then a smaller roll-up (~10 x 10 ft) ~5.5 ft from the SE corner
       rollDoor(MX1 - 0.05, 34.5, false, 4.27, 4.9, -1, 'slat', 1);   // yellow bollards outside, both sides   // outside photo: ~14 ft wide x ~16 ft tall
       rollDoor(MX1 - 0.05, 40.5, false, 3.05, 3.2, -1, 'slat', 1);
-      box(0.12, 0.3, 0.7, exitSignMat(), MX1 - 0.25, DH0 + 0.35, 17.7); exitHalo(1.1, 0.55, MX1 - 0.318, DH0 + 0.35, 17.7, -Math.PI / 2);   // shop EXIT sign
       rollDoor(MX1 - 0.05, OZN - 2.6, false, 3.05, 3.5, -1, 'slat', 1);   // east roll-up door at the end of the aisle
       // NE block (satellite + paced): from Ferm 1 the wall jogs 8 ft south (ferm alley wall line), runs 40 ft east, then the east face
       // runs 44 ft south past the methanator tanks: 8 ft wall, green double man door (FERM MCC, 6.5 ft), 9 ft wall, 10 ft mesh roll-up, 10.5 ft wall
       wall(FXE, BNZ, BEX, BNZ, PH, wm, [], { trim: true });
-      wall(BEX, BNZ, BEX, BSZ, PH, wm, [[BEX - BEX + (BSZ - 2.4 - 1.0 - BNZ), 2.0, 0, ['FERM MCC', 'OUTSIDE']], [BSZ - 8.7 - BNZ, 3.05, 3.3]], { trim: true, leaf: -1 });
+      wall(BEX, BNZ, BEX, BSZ, PH, wm, [[BEX - BEX + (BSZ - 2.4 - 1.0 - BNZ), 2.0, 0, ['FERM MCC', null]], [BSZ - 8.7 - BNZ, 3.05, 3.3]], { trim: true, leaf: -1 });
       egressStrobe(BEX, BSZ - 3.4, -1, 0);   // green FERM MCC double door, strobe inside
       O.swingDoors.slice(-2).forEach(d => { d.g.children[0].material = mat(0x2f5a3a); });   // green leaves (photo)
       rollDoor(BEX + 0.05, BSZ - 8.7, false, 3.05, 3.3, -1, 'mesh', 1);   // into the process building; bollards outside
@@ -8271,7 +8291,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); buildDirtHills(); buildGrainPiles(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
+  buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting

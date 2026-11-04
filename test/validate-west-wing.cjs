@@ -49,8 +49,11 @@ const replacedBySnack=o=>{const p=o.position;return p.x>-60.2&&p.x<-59.0&&p.y<2.
 // Door-sign plates are deliberately resized (every label in the plant shrank by 25%), so their geometry signature moves
 // while the sign itself stays exactly where it was.
 const resizedSign=o=>o.geometry?.type==='PlaneGeometry'&&Math.abs(o.geometry.parameters.width-1.15)<1e-6&&Math.abs(o.geometry.parameters.height-0.25)<1e-6;
+// v1.97.136: the hall door's small hand-placed EXIT sign (and its halo) gave way to the standard lit sign that exitSignsForEgress puts
+// over every exterior door when the world is built (validate-exit-signs.cjs), so those two are not in the source any more.
+const replacedExit=o=>{const g=o.geometry?.parameters||{};return (o.geometry?.type==='BoxGeometry'&&near(g.width,0.06)&&near(g.height,0.2)&&near(g.depth,0.55))||(o.geometry?.type==='PlaneGeometry'&&near(g.width,0.9)&&near(g.height,0.4)&&o.position.x<-73);};
 for(const o of office(old).filter(o=>!(o.geometry?.parameters.depth>7))) {
- if(replacedByModel(o)||replacedBySnack(o)||resizedSign(o))continue;
+ if(replacedByModel(o)||replacedBySnack(o)||resizedSign(o)||replacedExit(o))continue;
  assert.ok(relocated.has(signature(o,3)),'office object preserved at translated position: '+signature(o,3));
 }
 assert.deepEqual(next.NPCS.map(n=>n.id),old.NPCS.map(n=>n.id));

@@ -1,3 +1,22 @@
+## TEST v1.97.136 — a lit EXIT sign inside every door to the outside (2026-11-04)
+- Owner (photo: a lit EXIT sign over a man door, under its red egress strobe): *"make the personel doors that open to the outside like this. obviosly only from the inside"*.
+- Every exterior man door already had an egress strobe on its inside face (`egressStrobe`). The new world-build pass `exitSignsForEgress()` (run after the grain pile, before `lightBuild()` so the signs get their battery-backed red glow) gives each strobe the lit EXIT sign and halo under it. The sign goes on that same inside face, centred on the door at 2.47 m, between the head and the strobe as in the photo. From outside the wall hides it.
+- **21 exterior doors, one sign each.** Verified in the running game: door by door, the signs, door heights and anything else on the wall. Rendered the shop's east door from inside (strobe + EXIT, matching the photo) and from outside (nothing), plus the green FERM MCC double doors.
+- **Fixed along the way:**
+  - **Stray sign.** The shop's old hand-placed sign hung on blank wall at z 17.7; its door (and strobe) are at z -8. It's removed, and the door now has the standard sign.
+  - **One standard sign.** The ferm-alley north door and west hall door had hand-placed signs (the hall one a smaller size). Both are replaced by the standard sign from the pass.
+  - **FERM MCC double door.** Its inside face had a door-name plate reading "OUTSIDE" exactly where the sign goes. The EXIT sign replaces it (`['FERM MCC', null]`; `signFace` skips an empty label). The "FERM MCC" plate on the outside stays.
+  - **Tall door.** One door (x 82, z -125.5) is 2.43 m tall. Its sign sits 0.21 m above the door, and its strobe moves up to stay above the sign.
+  - **Duplicate strobe.** The door at (-76.3, 82.8) had two identical strobes. `egressStrobe` now makes only one per spot.
+- New suite `test/validate-exit-signs.cjs` (added to CI) runs the game's own `egressStrobe` + `exitSignsForEgress` on four test doors. It checks:
+  - signs are centred and on the inside face, facing into the room;
+  - each sits above the door head and below the strobe;
+  - a tall door lifts both the sign and its strobe;
+  - a door with an existing sign gets no second one, and a repeat strobe is not added;
+  - the stray shop sign is gone and the OUTSIDE plate is dropped.
+- `validate-interior-dark.cjs` / `validate-ranger.cjs`: updated for the new init line. `validate-power-outage.cjs`: the source now has 3 `exitSignMat()` / `exitHalo(` uses (builder, lab door, the pass). `validate-west-wing.cjs`: the hall door's old small sign + halo are expected to be gone (replaced, not moved). All 39 suites pass.
+- Bumped TEST to `1.97.136` / `corn-souls-test-shell-v163`.
+
 ## TEST v1.97.135 — 90% fewer grass tufts (2026-11-04)
 - Owner: *"remove 90% of the grass tufts"*.
 - `GRASS.density` 0.16 → **0.0165** tufts per m². Below 3 tufts per 4 m cell, `grassChunk` keeps only that fraction of cells (`keep = n / 3`), and each kept cell still gets a clump of 3. The grass stays clumpy instead of turning into lone blades. Previously the per-cell count could never go below 1, so a lower density alone couldn't get there.
