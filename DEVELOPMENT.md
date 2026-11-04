@@ -1,3 +1,16 @@
+## TEST v1.97.147 — the roof map rebuild no longer freezes the game (2026-11-04)
+- Owner: *"fix the roof collision rebuild"* (audit item: the second roof-map build, 12 s after you start walking, drew the whole plant top-down into one target and read it back in one go, a ~150 ms freeze mid-walk).
+- The rebuild is now sliced (`roofMapRebuildStart` / `roofMapStep`, run from `powerUpdate`):
+  - one 128 x 128 tile drawn a frame, two in flight, read back with `readRenderTargetPixelsAsync` (synchronous fallback);
+  - the old map stays in use until the last tile lands, then the new one is swapped in whole with its wall tops;
+  - a failure (`roofMapGuard`) drops back to the old map and shows `roofmap` on the fps line.
+- The grid corner is snapped to whole cells (`roofMapGrid`), so a part moving at the plant's edge no longer shifts every cell a fraction between builds.
+- Moving things now left out of the map: the main-line through trains, pigeons, rats, lizards, frogs, thrown corn, and the irrigation pivot (its 345 m arm sweeps the field, so a map of it is wrong a minute later; it used to leave invisible floors behind). A mid-line `//` comment added during this work had hidden the `O.cars` skip; caught and fixed.
+- Measured headless (SwiftShader): one-shot 155 ms; sliced, 40 tiles, worst frame 9–11 ms. Sliced against one-shot: same grid, wall tops identical, 3 of 577,760 roof cells differ (by under 2 cm, on a swaying tall part). Before the pivot was skipped, two builds a few seconds apart differed in ~315 roof cells.
+- The first build, when you start walking, is still one-shot: the map is needed at once.
+- New `validate-roofmap.cjs` runs the rebuild against a stand-in renderer with a known height pattern (6 tiles; every cell checked across the seams; one tile a frame, two in flight; renderer state restored; failure path; skip list read from code, not comments). All 43 suites pass.
+- Bumped TEST to `1.97.147` / `corn-souls-test-shell-v174`.
+
 ## TEST v1.97.146 — the equipment panel is switched off (2026-11-04)
 - Owner (screenshot of the Tin Bin 1 side panel in Savior Mode): *"remove that menu we dont need it at this point"*.
 - Every way in goes through `selectUnit`:

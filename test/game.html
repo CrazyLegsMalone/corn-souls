@@ -8485,7 +8485,7 @@ const spawnQueue = [];
 // unit-train loop traced from the satellite (1.6 m/px, matched to the plant outline): a straight east leg past the receiving pit,
 // a wide rounded north end, and a long diagonal west side that narrows down to the south end, where a spur joins the main railroad.
 const RDPX_C = 240;
-const ROOFMAP = { h: null, x0: 0, z0: 0, cell: 0.5, nx: 0, nz: 0, tops: null, again: -1 };   // v1.97.113: every roof and top you can stand on (roofMapBuild)
+const ROOFMAP = { h: null, x0: 0, z0: 0, cell: 0.5, nx: 0, nz: 0, tops: null, again: -1, job: null, stepMax: 0 };   // v1.97.113: every roof and top you can stand on (roofMapBuild)
 const WALK_SURF = [], LADDERS = [];   // raised walkable surfaces: rectangles with a height that ramps from y0 (z0 edge) to y1 (z1 edge); stairs are ramps
 function floorAt(x0, z0, y) {
   let dug = inPond(x0, z0, PONDS.hole); if (!dug) for (let i = 0; i < DIGS.length; i++) { const q = DIGS[i]; if (x0 >= q[0] && x0 <= q[2] && z0 >= q[1] && z0 <= q[3]) { dug = true; break; } }   // (no closure: floorAt runs many times a frame)
@@ -11896,7 +11896,8 @@ function powerHud(force) {
 function powerUpdate(dt) {
   if (POWER.moveT > 0) POWER.moveT -= dt;
   POWER.fov += ((POWER.kind === 'rat' && POWER.moveT > 0 ? 8 : 0) - POWER.fov) * Math.min(1, dt * 4); if (Math.abs(POWER.fov) < 0.01) POWER.fov = 0;
-  if (ROOFMAP.again > 0 && (ROOFMAP.again -= dt) <= 0) { try { roofMapBuild(); } catch (e) { PERF.errs++; PERF.err = 'roofmap'; PERF.msg = (e && e.message) || String(e); try { console.error('[roofmap] rebuild failed', e); } catch (err) {} } }
+  if (ROOFMAP.again > 0 && (ROOFMAP.again -= dt) <= 0) roofMapGuard(roofMapRebuildStart);   // v1.97.147: sliced over frames, no hitch
+  if (ROOFMAP.job) roofMapGuard(roofMapStep);
   if (walk.dead && POWER.kind) { POWER.kind = null; walk.climbT = 0; walk.slide = false; }   // dying ends it
   if (POWER.kind) {
     POWER.t -= dt;   // (it keeps counting while you drive, ride or mow)
@@ -11922,10 +11923,15 @@ function lizardClimb(fx, fz, want, got, dt) {   // pushing forward but held back
 // pixel's height, read back once into a height grid (about half a metre a cell). floorAt stands you on anything 2 m up or more
 // when you come down on it or step up a little onto it; wall lines stop at the top of their wall (ROOFMAP.tops), so up on a roof
 // you can walk across it and off the edge. Built when you first start walking, and once more 12 s later for late-loading models.
+// v1.97.147: that second build drew it all at once (~150 ms frozen mid-walk); it is now drawn a 128 x 128 tile a frame and read back
+// asynchronously (roofMapRebuildStart / roofMapStep), and swapped in whole when the last tile lands.
 function roofAt(x, z) { const R = ROOFMAP; if (!R.h) return -99; const i = Math.floor((x - R.x0) / R.cell), j = Math.floor((z - R.z0) / R.cell); return i >= 0 && j >= 0 && i < R.nx && j < R.nz ? R.h[j * R.nx + i] : -99; }
 function roofMapMeshes() {
   const skip = new Set(), add = o => { if (o) skip.add(o); };
-  for (const v of vehicles) add(v.g); for (const c of train.cars) add(c.g); for (const n of NPCS) add(n.g); if (O.cars) for (const c of O.cars) add(c.g);
+  for (const v of vehicles) add(v.g); for (const c of train.cars) add(c.g); for (const R of THRUS) for (const c of R.cars) add(c.g); for (const n of NPCS) add(n.g);   // (v1.97.147: the main-line through trains too)
+  if (typeof birds !== 'undefined' && birds) for (const o of birds) add(o.g); if (typeof critters !== 'undefined' && critters) for (const o of critters) add(o.g);   // v1.97.147: and everything small that wanders: pigeons (a flying one
+  if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const o of pondFrogs) add(o.g || o.group); if (typeof CORN_PROPS_STATE !== 'undefined' && CORN_PROPS_STATE) for (const o of CORN_PROPS_STATE.items || []) add(o.g);   // stretched the map's extent), rats, wall-climbing lizards, frogs, thrown corn
+  if (O.cars) for (const c of O.cars) add(c.g); if (O.pivot) add(O.pivot.g);   // (v1.97.147: the irrigation pivot sweeps its 345 m arm round the field - a map of it is wrong a minute later)
   if (typeof CREEP !== 'undefined') for (const c of CREEP.list) add(c.g); add(utv.g); if (O.shedMower) add(O.shedMower.g); if (NET.rp) add(NET.rp.av); if (NET.rr) add(NET.rr.g);
   add(SKY.dome); add(SKY.clouds); add(SKY.stars); add(VIEW.av); add(VULT.s); add(VULT.sprite); for (const b of bodies) add(b.g || b.group || b);
   const out = [], sp = new T.Sphere(), wsc = new T.Vector3();
@@ -11940,25 +11946,101 @@ function roofMapMeshes() {
   })(scene);
   return out;
 }
+// ---------- ROOF MAP REBUILD IN SLICES (v1.97.147, owner: "fix the roof collision rebuild"). The rebuild 12 s into play (once the
+// late models are in) used to do the whole map in one frame: draw every roof-carrying mesh top-down into a ~1024 x 730 picture,
+// stall until the GPU handed all ~3 MB of it back, decode ~750k cells and redo every wall top - ~0.3 s on a desktop, more on a
+// phone, a freeze in the middle of play. Now it is a job: one 128 x 128 tile drawn per frame, read back without stalling
+// (readRenderTargetPixelsAsync; two tiles in flight at most), decoded into a NEW grid while the old one keeps answering, and
+// swapped in (with the wall tops) when every tile is in. The first build when you start walking is still the one-shot
+// roofMapBuild (it is part of loading). Same picture, same numbers: each tile is the full build's camera cut down to its cells.
+const ROOFMAP_TILE = 128;
+function roofMapGuard(f) { try { f(); } catch (e) { roofMapAbort(); PERF.errs++; PERF.err = 'roofmap'; PERF.msg = (e && e.message) || String(e); try { console.error('[roofmap] rebuild failed', e); } catch (err) {} } }
+function roofMapShader() { return new T.ShaderMaterial({ side: T.DoubleSide,
+    vertexShader: 'varying float vY; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: 'varying float vY; void main(){ float v = floor(clamp((vY + 20.0) / 160.0, 0.0, 1.0) * 16777215.0); float r = floor(v / 65536.0); float g = floor((v - r * 65536.0) / 256.0); float b = v - r * 65536.0 - g * 256.0; gl_FragColor = vec4(r / 255.0, g / 255.0, b / 255.0, 1.0); }' }); }
+function roofMapGrid(list) {   // the map's extent and cell size from what can carry a roof (as roofMapBuild)
+  const box = new T.Box3(), b = new T.Box3();
+  for (const m of list) { b.setFromObject(m); if (b.max.y >= 2) box.union(b); }
+  if (box.isEmpty()) return null;
+  box.min.x = Math.max(box.min.x, -1300); box.max.x = Math.min(box.max.x, 1500); box.min.z = Math.max(box.min.z, -800); box.max.z = Math.min(box.max.z, 1300);
+  const W = box.max.x - box.min.x + 2, D = box.max.z - box.min.z + 2, maxTex = Math.min(1024, renderer.capabilities.maxTextureSize || 1024);
+  const cell = Math.max(1.0, W / maxTex, D / maxTex);
+  // the corner snapped to whole cells: a part that swings at the edge of the plant (a windsock turning in the wind) used to nudge
+  // the whole grid by a fraction of a cell on every build, so every cell was sampled somewhere slightly different each time
+  const x0 = Math.floor((box.min.x - 1) / cell) * cell, z0 = Math.floor((box.min.z - 1) / cell) * cell;
+  return { cell, nx: Math.ceil((box.max.x + 1 - x0) / cell), nz: Math.ceil((box.max.z + 1 - z0) / cell), x0, z0 };
+}
+function roofMapRebuildStart() {
+  if (!renderer || !scene || ROOFMAP.job) return false;
+  scene.updateMatrixWorld(true);
+  const list = roofMapMeshes(), G = roofMapGrid(list); if (!G) return false;
+  const LAYER = 30; for (const m of list) m.layers.enable(LAYER);
+  const tiles = []; for (let j = 0; j < G.nz; j += ROOFMAP_TILE) for (let i = 0; i < G.nx; i += ROOFMAP_TILE) tiles.push([i, j]);
+  const cam = new T.OrthographicCamera(0, 1, 0, -1, 1, 600); cam.position.set(G.x0, 400, G.z0); cam.up.set(0, 0, -1); cam.lookAt(G.x0, 0, G.z0); cam.layers.set(LAYER); cam.updateMatrixWorld(true);
+  const rts = [0, 1].map(() => ({ rt: new T.WebGLRenderTarget(ROOFMAP_TILE, ROOFMAP_TILE, { depthBuffer: true }), px: new Uint8Array(ROOFMAP_TILE * ROOFMAP_TILE * 4), busy: false }));
+  ROOFMAP.job = { G, list, LAYER, tiles, next: 0, done: 0, cam, rts, mat: roofMapShader(), h: new Float32Array(G.nx * G.nz).fill(-99), t0: performance.now() };
+  return true;
+}
+function roofMapTile(J, slot, i0, j0) {   // draw one tile; returns once its pixels are queued (or read, without async readback)
+  const T0 = ROOFMAP_TILE, c = J.G.cell, cam = J.cam;
+  cam.left = i0 * c; cam.right = (i0 + T0) * c; cam.top = -j0 * c; cam.bottom = -(j0 + T0) * c; cam.updateProjectionMatrix();
+  const ov = scene.overrideMaterial, bg = scene.background, fog = scene.fog, cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(), sAU = renderer.shadowMap.autoUpdate, sNU = renderer.shadowMap.needsUpdate, prt = renderer.getRenderTarget(), iC = renderer.info.render.calls, iT = renderer.info.render.triangles;
+  try {
+    scene.overrideMaterial = J.mat; scene.background = null; scene.fog = null; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = false;
+    renderer.setRenderTarget(slot.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, cam);
+  } finally {
+    scene.overrideMaterial = ov; scene.background = bg; scene.fog = fog; renderer.shadowMap.autoUpdate = sAU; renderer.shadowMap.needsUpdate = sNU;
+    renderer.info.render.calls = iC; renderer.info.render.triangles = iT;   // not the world: keep it out of the fps readout
+    renderer.setRenderTarget(prt); renderer.setClearColor(cc, ca);
+  }
+  const decode = () => {   // pixel (col, row from the bottom) is cell (i0 + col, j0 + T0 - 1 - row)
+    const { nx, nz } = J.G, h = J.h, px = slot.px;
+    for (let row = 0; row < T0; row++) { const j = j0 + T0 - 1 - row; if (j >= nz) continue;
+      for (let col = 0; col < T0; col++) { const i = i0 + col; if (i >= nx) break; const k = (row * T0 + col) * 4; if (px[k + 3] < 128) continue;
+        h[j * nx + i] = (px[k] * 65536 + px[k + 1] * 256 + px[k + 2]) / 16777215 * 160 - 20; } }
+    slot.busy = false; J.done++;
+  };
+  slot.busy = true;
+  if (renderer.readRenderTargetPixelsAsync) renderer.readRenderTargetPixelsAsync(slot.rt, 0, 0, T0, T0, slot.px).then(() => { if (ROOFMAP.job === J) decode(); }, e => { if (ROOFMAP.job === J) { roofMapAbort(); PERF.errs++; PERF.err = 'roofmap'; PERF.msg = (e && e.message) || String(e); } });
+  else { renderer.readRenderTargetPixels(slot.rt, 0, 0, T0, T0, slot.px); decode(); }
+}
+function roofMapStep() { const t = performance.now(); roofMapStep1(); ROOFMAP.stepMax = Math.max(ROOFMAP.stepMax, performance.now() - t); }   // (the longest single frame of a rebuild, for the tests)
+function roofMapStep1() {   // once a frame while a rebuild runs: one new tile, and the swap when they are all in
+  const J = ROOFMAP.job; if (!J) return;
+  if (J.next < J.tiles.length) { const slot = J.rts.find(s => !s.busy); if (slot) { const [i, j] = J.tiles[J.next++]; roofMapTile(J, slot, i, j); } return; }
+  if (J.done < J.tiles.length) return;
+  Object.assign(ROOFMAP, { h: J.h, x0: J.G.x0, z0: J.G.z0, cell: J.G.cell, nx: J.G.nx, nz: J.G.nz });
+  ROOFMAP.tops = roofMapTops(J.G.cell);
+  ROOFMAP.lastMs = performance.now() - J.t0; ROOFMAP.lastTiles = J.tiles.length;
+  roofMapAbort(true);
+}
+function roofMapAbort(done) {   // tidy up a rebuild (finished, or failed: then the old map simply stays)
+  const J = ROOFMAP.job; if (!J) return; ROOFMAP.job = null;
+  for (const m of J.list) m.layers.disable(J.LAYER);
+  for (const s of J.rts) s.rt.dispose(); J.mat.dispose();
+  if (done) ROOFMAP.builds = (ROOFMAP.builds || 0) + 1;
+}
+function roofMapTops(cell) {   // each wall line stops at the top of its wall: the highest roof or top along it (walls with nothing on top keep blocking at any height)
+  const tops = new Float32Array(wallSegs.length);
+  wallSegs.forEach((s, wi) => { const [ax, az, bx, bz] = s, L = Math.hypot(bx - ax, bz - az) || 1, nxv = -(bz - az) / L, nzv = (bx - ax) / L; let top = -99;
+    for (let t = 0; t <= L; t += Math.max(0.5, cell)) for (const o of [-0.45, 0, 0.45]) { const v = roofAt(ax + (bx - ax) * t / L + nxv * o, az + (bz - az) * t / L + nzv * o); if (v > top) top = v; }
+    tops[wi] = top >= 2 ? top : Infinity; });
+  return tops;
+}
 function roofMapBuild() {
   if (!renderer || !scene) return false;
   scene.updateMatrixWorld(true);
-  const list = roofMapMeshes(), box = new T.Box3(), b = new T.Box3();
-  for (const m of list) { b.setFromObject(m); if (b.max.y >= 2) box.union(b); }   // only things that could carry a roof decide the size of the map
-  if (box.isEmpty()) return false;
-  box.min.x = Math.max(box.min.x, -1300); box.max.x = Math.min(box.max.x, 1500); box.min.z = Math.max(box.min.z, -800); box.max.z = Math.min(box.max.z, 1300);
   // 1024 cells per axis and no cell finer than 1 m: this grid only answers 'which roof am I standing on', and at 2048/0.5 m
   // a far-flung roof inflated it to 4.2 million cells - 17 MB of Float32 kept for the session plus a 17 MB render target and
-  // a 17 MB read buffer allocated twice, with a full GPU readback stall each time. Capped, the worst case is ~4 MB.
-  const W = box.max.x - box.min.x + 2, D = box.max.z - box.min.z + 2, maxTex = Math.min(1024, renderer.capabilities.maxTextureSize || 1024);
-  const cell = Math.max(1.0, W / maxTex, D / maxTex), nx = Math.ceil(W / cell), nz = Math.ceil(D / cell), x0 = box.min.x - 1, z0 = box.min.z - 1;
+  // a 17 MB read buffer allocated twice, with a full GPU readback stall each time. Capped, the worst case is ~4 MB (roofMapGrid:
+  // maxTex = Math.min(1024, renderer.capabilities.maxTextureSize || 1024); const cell = Math.max(1.0, W / maxTex, D / maxTex)).
+  const list = roofMapMeshes(), G = roofMapGrid(list); if (!G) return false;
+  const { cell, nx, nz, x0, z0 } = G;
   const cam = new T.OrthographicCamera(0, nx * cell, 0, -nz * cell, 1, 600);   // left/right in x, top/bottom in -z (screen up is -z)
   cam.position.set(x0, 400, z0); cam.up.set(0, 0, -1); cam.lookAt(x0, 0, z0); cam.updateMatrixWorld(true);
   cam.left = 0; cam.right = nx * cell; cam.top = 0; cam.bottom = -nz * cell; cam.updateProjectionMatrix();
   const LAYER = 30; cam.layers.set(LAYER); for (const m of list) m.layers.enable(LAYER);
-  const mat = new T.ShaderMaterial({ side: T.DoubleSide,
-    vertexShader: 'varying float vY; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }',
-    fragmentShader: 'varying float vY; void main(){ float v = floor(clamp((vY + 20.0) / 160.0, 0.0, 1.0) * 16777215.0); float r = floor(v / 65536.0); float g = floor((v - r * 65536.0) / 256.0); float b = v - r * 65536.0 - g * 256.0; gl_FragColor = vec4(r / 255.0, g / 255.0, b / 255.0, 1.0); }' });
+  const mat = roofMapShader();
   const rt = new T.WebGLRenderTarget(nx, nz, { depthBuffer: true }), px = new Uint8Array(nx * nz * 4);
   const ov = scene.overrideMaterial, bg = scene.background, fog = scene.fog, cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(), sAU = renderer.shadowMap.autoUpdate, sNU = renderer.shadowMap.needsUpdate, prt = renderer.getRenderTarget(), iC = renderer.info.render.calls, iT = renderer.info.render.triangles;
   try {
@@ -11975,12 +12057,7 @@ function roofMapBuild() {
   for (let row = 0; row < nz; row++) { const j = nz - 1 - row; for (let i = 0; i < nx; i++) { const k = (row * nx + i) * 4; if (px[k + 3] < 128) continue;
     h[j * nx + i] = (px[k] * 65536 + px[k + 1] * 256 + px[k + 2]) / 16777215 * 160 - 20; } }
   Object.assign(ROOFMAP, { h, x0, z0, cell, nx, nz });
-  // each wall line stops at the top of its wall: the highest roof or top along it (walls with nothing on top keep blocking at any height)
-  const tops = new Float32Array(wallSegs.length);
-  wallSegs.forEach((s, wi) => { const [ax, az, bx, bz] = s, L = Math.hypot(bx - ax, bz - az) || 1, nxv = -(bz - az) / L, nzv = (bx - ax) / L; let top = -99;
-    for (let t = 0; t <= L; t += Math.max(0.5, cell)) for (const o of [-0.45, 0, 0.45]) { const v = roofAt(ax + (bx - ax) * t / L + nxv * o, az + (bz - az) * t / L + nzv * o); if (v > top) top = v; }
-    tops[wi] = top >= 2 ? top : Infinity; });
-  ROOFMAP.tops = tops;
+  ROOFMAP.tops = roofMapTops(cell);
   return true;
 }
 function walkMove(fwd, strafe, dt, run) {
@@ -14115,7 +14192,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
