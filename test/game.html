@@ -13008,8 +13008,20 @@ function deadNear(r) {   // any corpse within reach that somebody is not already
   if (critters) for (const c of critters) if (c.state === 'hit' && !c.held) cand.push(c);
   if (typeof birds !== 'undefined' && birds) for (const b of birds) if ((b.state === 'fall' || b.state === 'down') && !b.held && b.g.visible) cand.push(b);   // (v1.97.112: a pigeon lying on the ground too, so it can be eaten)
   if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);
-  let best = null, bd = r || 2.2;
-  for (const o of cand) { const p = o.g.position, d = Math.hypot(p.x - walk.x, p.z - walk.z); if (d < bd) { bd = d; best = o; } }
+  // v1.97.132: two ways to reach it. Within 2.2 m any way round you, or (like the corn cubes) up to 3.8 m away where you are looking.
+  // The launcher's corn-cube carry used to grab corpses lying 2.2-3.8 m off: carried with no B-to-eat and no power. Now this always reaches first.
+  const R0 = r || 2.2, cp = camera.getWorldPosition(V3()), dir = camera.getWorldDirection(V3()), hl = Math.hypot(dir.x, dir.z) || 1;
+  let best = null, bs = Infinity;
+  for (const o of cand) {
+    const p = o.g.position, d = Math.hypot(p.x - walk.x, p.z - walk.z); let s = d < R0 ? d : Infinity;
+    if (s === Infinity) {   // in front of you: the corn carry's reach (3.8 m to the eye, within 1.25 m of the line of sight, or 1 m of it flat)
+      const dx = p.x - cp.x, dy = p.y - cp.y, dz = p.z - cp.z, dist = Math.hypot(dx, dy, dz), fwd = dx * dir.x + dy * dir.y + dz * dir.z;
+      if (dist <= 3.8 && fwd > 0.08) { let side = Math.sqrt(Math.max(0, dist * dist - fwd * fwd));
+        if (side > 1.25) { const hF = (dx * dir.x + dz * dir.z) / hl, hD = Math.hypot(dx, dz), hS = Math.sqrt(Math.max(0, hD * hD - hF * hF)); if (hF > 0.05 && hD <= 3.2 && hS <= 1) side = hS + 0.25; }
+        if (side <= 1.25) s = R0 + side; }
+    }
+    if (s < bs) { bs = s; best = o; }
+  }
   return best;
 }
 function critterPick() {   // X: pick a corpse up, or put down the one you are carrying

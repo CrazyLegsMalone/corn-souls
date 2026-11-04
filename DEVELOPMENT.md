@@ -1,3 +1,23 @@
+## TEST v1.97.132 — every dead critter you pick up can be eaten (2026-11-04)
+- Owner: *"some are killed but when picked up there is no eat option"* (frogs, pigeons, lizards and rats).
+- **Cause:** two pickups competed for X:
+  - The game's eating pickup (`deadNear`) only reached corpses within **2.2 m** of you, in any direction.
+  - The launcher's older corn-cube carry (`cornInteract`, which wraps dead critters as carry items) reached **3.8 m** along where you look.
+  - So a corpse lying 2.2–3.8 m away in front of you was grabbed by the corn carry: "Picked up dead rat — fire to throw", with no B-to-eat and no power. Reproduced in the game through the real X then B path. At 3 m ahead, before: corn carry, no eat. After: "Picked up the dead rat - ... B to eat it", eaten, and rat speed given. At 1 m it worked both before and after.
+- **Fix (both sides):**
+  - `deadNear` also reaches anything the corn carry could: within 3.8 m of your eyes, in front, within 1.25 m of your line of sight (or 1 m of it flat). The nearer, all-round 2.2 m catch still wins.
+  - The launcher's corn carry now skips critters, so it only ever carries corn cubes and ears.
+- New suite `test/validate-critter-eat.cjs` (added to CI) runs the game's own `deadNear` with a real camera. It checks:
+  - corpses 2.5, 3.0 and 3.4 m ahead, and slightly off-line, are reachable;
+  - one 1.8 m behind you is still reachable;
+  - 3 m behind, 3 m off to the side and 4.5 m ahead are not;
+  - held corpses are skipped;
+  - the nearer corpse wins;
+  - dead pigeons and pond frogs are covered;
+  - the corn carry skips critters, and X tries the eating pickup first.
+- `validate-traffic.cjs` asserted the old corn-carry grab, so it now checks whichever launcher it is given: on TEST the corn carry must leave critters alone, while on LIVE (run through `validate-live-promotion.cjs`, still pre-eating) it keeps the old grab-and-throw check. All 38 suites pass.
+- Bumped TEST to `1.97.132` / `corn-souls-test-shell-v159`.
+
 ## TEST v1.97.131 — the "Cry & Dry" title screen (2026-11-04)
 - Owner pasted a Gemini "Claude Prompt Blueprint" for a *CORN SOULS: CRY & DRY* title screen (Abyssal Harvest Fire: a PS1 cob bonfire in a dark silo, left-aligned gothic title and menu, PRESS ANY KEY then a flash into the menu, a tuner with 6 toggles and 5 sliders, silhouettes, embers, CRT), then: *"when your done with this. add it to test"*.
 - Built first as a standalone page (sent to the owner), then **ported into the game's own splash** rather than bolted on beside it: the blueprint's Tailwind / three r128 / Tone.js are not loaded. The scene uses the game's bundled three (r170; light intensities scaled for physical units), the CSS is hand-written and scoped under `#splash`, and the existing WebAudio title music (drone, bells, crackle) and the boom stay.

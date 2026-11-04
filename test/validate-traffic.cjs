@@ -154,18 +154,28 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
   ['dead lizard',critterCtx.critters[1].g,critterCtx.critters[1]],
   ['dead frog',critterCtx.pondFrogs[0].group,critterCtx.pondFrogs[0]]
  ];
+ // v1.97.132: the corn carry leaves dead critters alone. It used to grab them 2.2-3.8 m off with no B-to-eat and no power
+ // ("some are killed but when picked up there is no eat option"). The game's own pickup (deadNear / critterPick / critterEat /
+ // critterThrow) carries, eats and throws them: validate-critter-eat.cjs, validate-critter-powers.cjs, validate-critter-sync.cjs.
+ // LIVE (validate-live-promotion runs this file against it) predates eating, so there the corn carry is still the only grab.
+ const carrySkipsCritters=cornSrc.includes("t.net==='them'||t.isCritter||");
  for(const [label,grp,ref] of targets){
   grp.position.set(0,0.2,-1.8);
-  const pickMsg=critterCtx.cornInteract();
-  assert.equal(pickMsg,'Picked up '+label+' — fire to throw');
-  assert.equal(ref.held,true,label+' marked held');
-  critterCtx.cornUpdate(0.016);
-  assert.equal(critterCtx.cornThrow(),true,label+' thrown on fire');
-  assert.equal(ref.held,false,label+' released on throw');
-  assert.equal(ref.thrown,true,label+' marked thrown');
-  critterCtx.cornUpdate(0.05);
-  assert.ok(grp.position.z<-1.9,label+' moves forward when thrown');
+  if(carrySkipsCritters){
+   assert.equal(critterCtx.cornInteract(),false,label+': the corn carry does not pick it up');
+   assert.notEqual(ref.held,true,label+' not marked held by the corn carry');
+   assert.equal(critterCtx.CORN_PROPS_STATE.held,null,label+': nothing in the corn carry');
+  }else{
+   assert.equal(critterCtx.cornInteract(),'Picked up '+label+' — fire to throw');
+   assert.equal(ref.held,true,label+' marked held');
+   critterCtx.cornUpdate(0.016);
+   assert.equal(critterCtx.cornThrow(),true,label+' thrown on fire');
+   assert.equal(ref.held,false,label+' released on throw');
+   assert.equal(ref.thrown,true,label+' marked thrown');
+   critterCtx.cornUpdate(0.05);
+   assert.ok(grp.position.z<-1.9,label+' moves forward when thrown');
+  }
   grp.position.set(100,0.2,100);
  }
- console.log('PASS: first-person HUD pass/visibility/state, loader patches, generated JS syntax, version, semi spawn/interpolation/turn/stall/despawn, fixed highway headings, shared geometry/materials, host traffic clock, dead bird/frog/rat/lizard grab & throw.');
+ console.log('PASS: first-person HUD pass/visibility/state, loader patches, generated JS syntax, version, semi spawn/interpolation/turn/stall/despawn, fixed highway headings, shared geometry/materials, host traffic clock, dead bird/frog/rat/lizard '+(carrySkipsCritters?'left to the game\'s own eat/throw pickup.':'grab & throw (corn carry).'));
 })().catch(e=>{console.error(e);process.exitCode=1;});
