@@ -9097,6 +9097,7 @@ function updatePlumes(dt) {
   if (!plumeTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 2, 32, 32, 31);
     g.addColorStop(0, 'rgba(255,255,255,0.85)'); g.addColorStop(0.55, 'rgba(245,247,248,0.4)'); g.addColorStop(1, 'rgba(245,247,248,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); plumeTex = new T.CanvasTexture(cv); }
   const to = (WIND.from + 180) * Math.PI / 180, ws = Math.max(0.5, WIND.mph * 0.447 * 0.6), wx = Math.sin(to) * ws, wz = -Math.cos(to) * ws;
+  const pk = SKY.k * SKY.k * (3 - 2 * SKY.k), plK = 0.2 + 0.8 * pk;   // steam dims with the sky like the clouds, so it does not glow white at night
   for (const S of STACKS) {
     if (!S.parts) S.parts = [];
     S.acc = (S.acc || 0) + dt * (POWER_OUTAGE.on && S.grid ? 0 : S.rate);   // grid-fed stacks (RTO, cooling tower) go cold with the plant
@@ -9106,7 +9107,7 @@ function updatePlumes(dt) {
     for (const q of S.parts) { if (!q.alive) continue; q.age += dt; if (q.age > q.life) { q.alive = false; q.s.visible = false; continue; }
       const k = Math.min(1, dt * 0.6); q.v.x += (wx - q.v.x) * k; q.v.z += (wz - q.v.z) * k; q.v.y += (0.6 - q.v.y) * dt * 0.35;   // leans downwind, rise slows
       q.p.addScaledVector(q.v, dt); const f = q.age / q.life, sz = S.r * 2.4 + f * 14; q.s.position.copy(q.p); q.s.scale.set(sz, sz, 1);
-      q.s.material.opacity = Math.min(1, q.age * 2) * (1 - f) * 0.5; }
+      q.s.material.opacity = Math.min(1, q.age * 2) * (1 - f) * 0.5; q.s.material.color.setRGB(0.905 * plK, 0.92 * plK, 0.93 * plK); }
   }
 }
 function updatePuffs(dt) {
@@ -9140,15 +9141,17 @@ function daylight(hours) {
   scene.background.copy(prev.skyC).lerp(now.skyC, f); scene.fog.color.copy(scene.background);
   hemi.color.copy(prev.hemiC).lerp(now.hemiC, f); hemi.intensity = prev.hk + (now.hk - prev.hk) * f;
   sunL.color.copy(prev.sunC).lerp(now.sunC, f); sunL.intensity = prev.sk + (now.sk - prev.sk) * f;
+  // how bright the clear sky of this hour is, 1 by day .. ~0.1 at night: the clouds and the weather gray follow it down
+  { const b = scene.background; SKY.k = Math.min(1, (b.r * 0.3 + b.g * 0.55 + b.b * 0.15) / 0.55); }
   // weather on top of the time of day: clouds dim the sun and gray the sky; rain is darker; snow is bright gray
   const W = { sunny: [0, 1, 1], cloudy: [0.65, 0.35, 0.82], rain: [0.7, 0.25, 0.8], snow: [0.6, 0.35, 0.95] }[weather.kind] || [0, 1, 1];
-  if (W[0]) { scene.background.lerp(WGRAY[weather.kind] || WGRAY.cloudy, W[0]); scene.fog.color.copy(scene.background); }
+  if (W[0]) { scene.background.lerp(_wgray.copy(WGRAY[weather.kind] || WGRAY.cloudy).multiplyScalar(Math.max(0.12, SKY.k)), W[0]); scene.fog.color.copy(scene.background); }   // an overcast night is dark gray, not day gray
   sunL.intensity *= W[1]; hemi.intensity *= W[2];
   (LIGHT.bg0 || (LIGHT.bg0 = new T.Color())).copy(scene.background); LIGHT.bgDim = true;   // the undimmed sky, for scripted darkness
 }
 // ---------- SKY: a big dome with a vertical gradient (horizon matches the fog, deeper color overhead), a sun glow, soft drifting clouds
 // (one merged mesh of flat cloud cards, one draw call) and stars at night. Cheap: two draw calls, a tiny shader.
-const SKY = { dome: null, clouds: null, stars: null };
+const SKY = { dome: null, clouds: null, stars: null, k: 1 }, _wgray = new T.Color();   // k: clear-sky brightness of the hour (daylight)
 function buildSky() {
   const geo = new T.SphereGeometry(8000, 24, 12);
   const m = new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, fog: false,
@@ -9185,7 +9188,9 @@ function updateSky(dt) {
   U.sunDir.value.copy(SUN_DIR); U.sunCol.value.copy(sunL.color); U.sunK.value = grayW ? 0.15 : Math.min(1, sunL.intensity / 1.6);
   SKY.clouds.rotation.y += dt * 0.004;   // slow drift
   const cm = SKY.clouds.material; cm.opacity = weather.kind === 'sunny' ? 0.8 : weather.kind === 'cloudy' ? 0.95 : 0.9;
-  cm.color.setRGB(1, 1, 1).lerp(hor, grayW ? 0.55 : 0.12).multiplyScalar(lum < 0.35 ? 0.55 : 1);
+  // clouds darken with the sky: white by day, warm at sunset (they take on the sky's colour), dim blue-gray shapes at night
+  const sk = SKY.k * SKY.k * (3 - 2 * SKY.k);
+  cm.color.setRGB(1, 1, 1).lerp(hor, grayW ? 0.55 : 0.12 + 0.55 * (1 - sk)).multiplyScalar(0.09 + 0.91 * sk);
   SKY.stars.material.opacity = Math.max(0, Math.min(1, (0.42 - lum) * 4)) * (grayW ? 0.15 : 1);
 }
 // ---------- LIGHTING (v1.97.99): indoors is dark, lamps make pools, the headlamp cuts through.

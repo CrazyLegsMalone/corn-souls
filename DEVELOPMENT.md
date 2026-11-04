@@ -1,3 +1,11 @@
+## TEST v1.97.104 — clouds, overcast sky and stack steam darken with the sky (2026-11-03)
+- Owner: *"make the clouds darken as the sky does"*.
+- `daylight()` now records `SKY.k`, how bright the clear sky of the hour is (1 by day, ~0.18 at night, ~0.08 in deep night, from the look's sky colour before weather).
+- Clouds (`updateSky`): brightness `0.09 + 0.91·k'` (k' = smoothstep of `SKY.k`) and they take on more of the sky's colour as it darkens: white by day, a touch dimmer and warmer at sunset, dim blue-gray shapes at night. Was a fixed ×0.55 below a brightness threshold.
+- Overcast / rain / snow: the weather gray the sky blends toward is scaled by `SKY.k` too, so a cloudy night is dark gray instead of daytime gray.
+- Stack and cooling-tower steam (`updatePlumes`) dims the same way so it no longer glows white at night.
+- `validate-game-clock.cjs`: wiring, plus the cloud brightness over the eight looks (white by day, dimmer at sunset, dim at night, dimmest in deep night).
+
 ## TEST v1.97.103 — eight 3-hour looks; night falls at 10 PM (2026-11-03)
 - Owner: *"Can we make the day night change every 3 hours instead of six"* — chose Option B (eight looks on a real 24-hour day) over speeding the clock up.
 - `LOOKS` now has eight entries on the sun/moon badge's hours: 7 AM sunrise, 10 AM morning, 1 PM midday, 4 PM late afternoon, 7 PM sunset, **10 PM night** (was 1 AM), 1 AM deep night (the darkest, sky light 0.56, was 0.66 at the darkest), 4 AM pre-dawn. Same one-hour fade.

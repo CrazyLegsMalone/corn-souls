@@ -51,4 +51,18 @@ assert.ok(html.includes('time: { set: o => gameTimeSet(o), date: () => gameDate(
   assert.ok(hk(1) >= 0.5, 'deep night still lets you make out the plant');
   assert.ok(L.filter(l => l.hk >= 1.06).every(l => [10, 13, 16].includes(l.at)), 'full daylight 10 AM to 7 PM (yard lamps off)');
   assert.ok((1.06 - hk(22)) / 0.4 >= 1, 'the yard lamps are fully on by night'); }
-console.log('PASS: game clock (real / set hour / +-1 h / fast cycle), every time-of-day reader wired to it, debug Time of day menu, eight 3-hour looks');
+// v1.97.104: the clouds, an overcast sky and the stack steam darken with the sky instead of staying day-white at night
+{ assert.ok(html.includes('SKY.k = Math.min(1, (b.r * 0.3 + b.g * 0.55 + b.b * 0.15) / 0.55);'), 'daylight() works out how bright the clear sky of the hour is');
+  assert.ok(html.includes('_wgray.copy(WGRAY[weather.kind] || WGRAY.cloudy).multiplyScalar(Math.max(0.12, SKY.k))'), 'an overcast night is dark gray, not day gray');
+  assert.ok(html.includes("cm.color.setRGB(1, 1, 1).lerp(hor, grayW ? 0.55 : 0.12 + 0.55 * (1 - sk)).multiplyScalar(0.09 + 0.91 * sk);"), 'cloud colour follows SKY.k');
+  assert.ok(html.includes('q.s.material.color.setRGB(0.905 * plK, 0.92 * plK, 0.93 * plK);'), 'and so does the stack steam');
+  // the same sums, over the eight looks' sky colours (linear, as three.js holds them)
+  const lib = { window: {}, console }; vm.runInNewContext([...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).find(x => x.includes('window.THREE=eu')), lib);
+  const Tc = lib.window.THREE.Color, ls = html.slice(html.indexOf('const LOOKS = ['), html.indexOf('].map(', html.indexOf('const LOOKS = [')) + 1);
+  const L = vm.runInNewContext(ls.replace('const LOOKS = ', '(') + ')');
+  const cloud = hex => { const c = new Tc(hex), k = Math.min(1, (c.r * 0.3 + c.g * 0.55 + c.b * 0.15) / 0.55), sk = k * k * (3 - 2 * k); return 0.09 + 0.91 * sk; };
+  const by = h => cloud(L.find(l => l.at === h).sky);
+  assert.ok([10, 13, 16].every(h => by(h) > 0.95), 'clouds stay white by day');
+  assert.ok(by(19) > 0.6 && by(19) < 0.95, 'a little dimmer at sunset (' + by(19).toFixed(2) + ')');
+  assert.ok(by(22) < 0.3 && by(1) < 0.2 && by(1) >= 0.09, 'dim shapes at night (' + by(22).toFixed(2) + '), dimmest in deep night (' + by(1).toFixed(2) + ')'); }
+console.log('PASS: game clock (real / set hour / +-1 h / fast cycle), every time-of-day reader wired to it, debug Time of day menu, eight 3-hour looks, clouds and steam darken at night');
