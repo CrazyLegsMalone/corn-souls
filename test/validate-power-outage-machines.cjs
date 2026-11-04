@@ -493,14 +493,14 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   // ---------------------------------------------------------------- killing a critter, carrying it and eating it
   assert.ok(html.includes('function critterPick()'), 'X can pick a corpse up');
   assert.ok(html.includes("if (critters) for (const c of critters) if (c.state === 'hit' && !c.held) cand.push(c);"), 'dead critters count');
-  assert.ok(html.includes("for (const b of birds) if (b.state === 'fall' && !b.held) cand.push(b);"), 'so do fallen birds');
+  assert.ok(html.includes("for (const b of birds) if ((b.state === 'fall' || b.state === 'down') && !b.held && b.g.visible) cand.push(b);"), 'so do fallen birds (falling or on the ground, v1.97.112)');
   assert.ok(html.includes("for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);"), 'and dead frogs');
   assert.ok(html.includes('camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6);'), 'a picked-up corpse is carried in front of the camera');
   // X carries and puts down, B eats, fire throws - three verbs, three buttons, as the owner asked
   assert.ok(html.includes('- X to put it down, B to eat it, fire to throw it.'), 'the prompt names all three buttons');
-  assert.ok(html.includes("if (heldDead) { const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }"), 'X on a held corpse puts it down');
+  assert.ok(html.includes("if (heldDead) { if (heldDead.eating) return 'Chewing...'; const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }"), 'X on a held corpse puts it down');
   assert.ok(html.includes('function critterEat()'), 'B eats');
-  assert.ok(html.includes("o.state = 'gone'; o.held = false; o.thrown = false; heldDead = null;"), 'eating takes it out of the world');
+  assert.ok(html.includes("if (o.group) { o.state = 'hit'; o.eaten = true; o.t = 20 + Math.random() * 20; } else { o.state = 'gone'; o.t = 10 + Math.random() * 20; }") && html.includes('eatGone(h.o); if (heldDead === h) heldDead = null;'), 'eating takes it out of the world (after the bites, v1.97.112)');
   assert.ok(html.includes('const m = P3.critterEat(); if (m) toast(m);'), 'the B press is wired to eating, and still closes a panel first');
   assert.ok(html.includes("m: 'START', h: 'SELECT', y: 'Y', b: 'B' }"), 'the keyboard has a B key');
   assert.ok(html.includes('function critterThrow()'), 'fire throws');

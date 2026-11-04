@@ -9847,7 +9847,7 @@ function update(sim, dt, events) {
   updatePuffs(dt); updateWeather(dt);
   // every cosmetic / gameplay sub-update in the frame tail is guarded: one throw must not take the render, the
   // first-person gun and the paintball pump cooldown down with it (see stepSafe)
-  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('creeps', () => updateCreeps(dt));
+  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt));
   stepSafe('vehTops', () => updateVehTops());
   stepSafe('deadDrop', () => { if (heldDead && (walk.dead || walk.drive)) deadDrop(); });   // dying or getting in puts the corpse down
   stepSafe('ducks', () => updateDucks(dt)); stepSafe('windsock', () => updateWindsock(dt)); stepSafe('pivot', () => updatePivot(dt));
@@ -9982,7 +9982,8 @@ function netDrop() {
   NET.conn = null;
   if (O.cars) for (const c of O.cars) { if (c.passFig) c.passFig.visible = false; if (c.drvFig) c.drvFig.visible = false; }   // nobody else in the cars now
   if (walk.pass) passExit();
-  if (typeof cornNetDrop === 'function') cornNetDrop();   // corn they were carrying or had thrown falls where it is
+  if (typeof cornNetDrop === 'function') cornNetDrop();
+  critNetDrop();   // corn they were carrying or had thrown falls where it is
   if (NET.rp) { scene.remove(NET.rp.av); NET.rp = null; }
   if (NET.rr) { scene.remove(NET.rr.g); NET.rr = null; }
 }
@@ -10033,7 +10034,11 @@ function wsApply(m) {   // guest: the host's world
 function wsClock() { return GT.real ? null : [Math.round(gameDate().getTime()), GT.rate]; }
 function netRecv(m) {
   if (!m || !m.t) return;
-  if (m.t === 'cp') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }   // corn ears and cubes the other player is moving (v1.97.111)
+  if (m.t === 'cp') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }
+  if (m.t === 'crs') { if (!NET.host) critApply(m); return; }   // critters (v1.97.112)
+  if (m.t === 'crh') { if (NET.host) critRecvHit(m); return; }
+  if (m.t === 'crp') { if (NET.host) critRecvP(m); return; }
+  if (m.t === 'cre') { critRecvEat(m); return; }   // corn ears and cubes the other player is moving (v1.97.111)
   if (m.t === 'p') {
     netRemote(); const R = NET.rp; R.walk = m.w; R.drive = m.d; R.ps = !!m.ps; R.tx = m.x; R.ty = m.y; R.tz = m.z; R.tyaw = m.yaw; R.aim = m.a || 0; if (m.am !== undefined) { R.am = m.am; R.sh = m.sh; }
     const mh = m.h === 'washer' ? 'gun' : m.h;   // water ammo is the same gun
@@ -11381,7 +11386,7 @@ function walkMove(fwd, strafe, dt, run) {
     walk.ride.lz = Math.max(-1.15, Math.min(1.15, walk.ride.lz + dx * Math.sin(a) + dz * Math.cos(a)));
     return;
   }
-  const sp = (run ? 18.9 : 9.9) * dt / Math.max(1, Math.hypot(fwd, strafe));
+  const sp = (run ? 17.01 : 8.91) * dt / Math.max(1, Math.hypot(fwd, strafe));   // v1.97.112: 10% slower (was 18.9 sprint, 9.9 walk)
   const n = Math.max(1, Math.ceil(sp * Math.max(1, Math.hypot(fwd, strafe)) / 0.25));
   for (let i = 0; i < n; i++) { walk.x += (fx * fwd + rx * strafe) * sp / n; walk.z += (fz * fwd + rz * strafe) * sp / n; pushOut(); }
 }
@@ -12353,6 +12358,7 @@ function crLeg(c, away) {   // pick a clear straight run along the floor (one di
 }
 function updateCritters(dt) {
   if (!critters) critters = [makeCritter('rat'), makeCritter('lizard')];
+  if (critNetGuest()) return;   // 2 player: the host's critters (critNetUpdate mirrors them)
   if ((crSolidsT += dt) > 10 || !crSolids.length) { crSolids = crSolidsNear(collectSolids(true)); crSolidsT = 0; }
   for (const c of critters) {
     const p = c.g.position;
@@ -12374,11 +12380,11 @@ function updateCritters(dt) {
 // is carried in front of the camera while you hold it (a held corpse is also exempt from the clean-up timer that makes
 // unclaimed bodies vanish, because c.held is already the flag those updates check), and eating it takes it out of the world.
 let heldDead = null;
-function deadName(o) { return o.kind === 'rat' ? 'rat' : o.kind === 'lizard' ? 'lizard' : o.pond ? 'frog' : 'pigeon'; }
+function deadName(o) { return o.kind === 'rat' ? 'rat' : o.kind === 'lizard' ? 'lizard' : (o.pond || o.group) ? 'frog' : 'pigeon'; }
 function deadNear(r) {   // any corpse within reach that somebody is not already carrying
   const cand = [];
   if (critters) for (const c of critters) if (c.state === 'hit' && !c.held) cand.push(c);
-  if (typeof birds !== 'undefined' && birds) for (const b of birds) if (b.state === 'fall' && !b.held) cand.push(b);
+  if (typeof birds !== 'undefined' && birds) for (const b of birds) if ((b.state === 'fall' || b.state === 'down') && !b.held && b.g.visible) cand.push(b);   // (v1.97.112: a pigeon lying on the ground too, so it can be eaten)
   if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);
   let best = null, bd = r || 2.2;
   for (const o of cand) { const p = o.g.position, d = Math.hypot(p.x - walk.x, p.z - walk.z); if (d < bd) { bd = d; best = o; } }
@@ -12386,22 +12392,48 @@ function deadNear(r) {   // any corpse within reach that somebody is not already
 }
 function critterPick() {   // X: pick a corpse up, or put down the one you are carrying
   if (!walk.on || walk.dead) return null;
-  if (heldDead) { const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }
+  if (heldDead) { if (heldDead.eating) return 'Chewing...'; const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }
   const o = deadNear(); if (!o) return null;
   const nm = deadName(o);
   o.held = true; heldDead = { o, g: o.g, nm };
   camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6); o.g.rotation.set(0.2, 0.6, 0.3);
   return 'Picked up the dead ' + nm + ' - X to put it down, B to eat it, fire to throw it.';
 }
-function critterEat() {   // B: the corpse leaves the world
-  if (!heldDead) return null;
-  const nm = heldDead.nm, o = heldDead.o, g = heldDead.g;
-  if (g.parent) g.parent.remove(g);
-  o.state = 'gone'; o.held = false; o.thrown = false; heldDead = null;
-  return 'You ate the ' + nm + '.';
+function critterEat() {   // B: eat it - v1.97.112: brought up to your mouth in three crunchy bites, crumbs flying (updateEat)
+  if (!heldDead || heldDead.eating) return null;
+  heldDead.eating = true; EAT = { h: heldDead, t: 0, bites: 0, s: heldDead.g.scale.x };
+  return 'You eat the ' + heldDead.nm + '...';
+}
+let EAT = null;
+function chompSnd(v) {   // a short crunch: a burst of noise through a band-pass, a little different every bite
+  const C = tsnd.ctx; if (!C) return; const t = C.currentTime, len = 0.1 * C.sampleRate | 0, buf = C.createBuffer(1, len, C.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5) * (Math.random() < 0.3 ? 1 : 0.45);
+  const n = C.createBufferSource(), f = C.createBiquadFilter(), gn = C.createGain(); n.buffer = buf; f.type = 'bandpass'; f.frequency.value = 700 + Math.random() * 700; f.Q.value = 1.4;
+  gn.gain.value = 0.4 * (v == null ? 1 : v); n.connect(f); f.connect(gn); gn.connect(C.destination); n.start(t);
+}
+function eatCrumbs(p, o) {   // bits of it, and a little red
+  const c = o && o.mats && o.mats[0] && o.mats[0].color ? o.mats[0].color.getHex() : 0x8a6a4a;
+  for (let i = 0; i < 4; i++) puff(p.clone().add(V3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.25)), 0.035 + Math.random() * 0.03, i % 2 ? 0x8e2a22 : c);
+}
+function eatGone(o) {   // eaten: out of the world (it comes back later as a fresh one, like any other critter)
+  const g = critG(o); if (g.parent !== scene) scene.attach(g); g.visible = false; o.held = false; o.thrown = false;
+  if (o.group) { o.state = 'hit'; o.eaten = true; o.t = 20 + Math.random() * 20; } else { o.state = 'gone'; o.t = 10 + Math.random() * 20; }
+}
+function updateEat(dt) {
+  if (!EAT) return; const E = EAT, h = E.h, g = h.g; E.t += dt;
+  const k = Math.min(1, E.t / 0.95), chew = Math.sin(E.t * 28) * 0.012 * (1 - k);
+  g.position.set(0.3 - 0.3 * k, -0.3 + 0.12 * k + chew, -0.6 + 0.33 * k); g.scale.setScalar(E.s * (1 - 0.8 * k));
+  if (E.t > 0.15 + E.bites * 0.3 && E.bites < 3) { E.bites++; chompSnd(); eatCrumbs(g.getWorldPosition(V3()), h.o); }
+  if (k >= 1) eatFinish();
+}
+function eatFinish() {
+  const E = EAT; if (!E) return; EAT = null; const h = E.h; h.g.scale.setScalar(E.s); h.g.position.set(0, 0, 0);
+  eatGone(h.o); if (heldDead === h) heldDead = null; critNetEat(h.o);
+  if (DMG_NOTIFY && walk.on && !walk.dead) DMG_NOTIFY('You ate the ' + h.nm + '.');
 }
 function deadDrop() {   // X, dying, or getting into something: the corpse goes down on the floor where you are
   if (!heldDead) return null;
+  if (heldDead.eating) { eatFinish(); return null; }   // mid-bite: it is eaten
   const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; heldDead = null;
   if (g.parent === camera) scene.attach(g);
   const f = floorAt(g.position.x, g.position.z, g.position.y + 0.3);
@@ -12413,6 +12445,7 @@ function deadDrop() {   // X, dying, or getting into something: the corpse goes 
 const THROWN = [];
 function critterThrow() {   // returns a line for the UI, or null so the fire button falls through to the tool
   if (!heldDead || !walk.on || walk.dead) return null;
+  if (heldDead.eating) return 'Chewing...';
   const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; o.thrown = true; o.t = 45; heldDead = null;
   scene.attach(g);
   const dir = camera.getWorldDirection(V3(0, 0, 0));
@@ -12432,12 +12465,97 @@ function updateThrown(dt) {
     }
   }
 }
+// ---------- 2 PLAYER CRITTERS (v1.97.112): the host runs the pigeons, the rat and the lizard and the pond frogs for both players
+// and sends where they all are 8x a second ('crs'); the guest only mirrors them (no AI of its own) and its hits go to the host
+// ('crh'). A corpse is driven by whoever carries or throws it: the guest sends the one it carries or threw ('crp') until it
+// comes to rest, then it is the host's again; the host's carried ones are in its snapshot. Eating one is sent too ('cre').
+const CRNET = { t: 0, st: 0, applying: false }, _crw = new T.Vector3();
+function critNetOn() { return !!(NET.conn && NET.conn.open); }
+function critNetGuest() { return critNetOn() && !NET.host; }
+function critLists() { return { b: birds || [], c: critters || [], f: typeof pondFrogs !== 'undefined' ? pondFrogs : [] }; }
+function critG(o) { return o.g || o.group; }
+function critKey(o) { const L = critLists(); for (const k in L) { const i = L[k].indexOf(o); if (i >= 0) return [k, i]; } return null; }
+function critAlive(k, s) { return k === 'b' ? (s === 'perch' || s === 'fly') : k === 'c' ? (s === 'idle' || s === 'run') : s === 'live'; }
+function critNearRp(p, r) { const R = NET.rp; return !!(R && R.av && R.av.visible && Math.hypot(p.x - R.x, p.z - R.z) < r && Math.abs(p.y - (R.y || 0)) < 8); }
+function critNetHit(o, col) {   // top of hitBird / hitCritter / hitPondFrog: on the guest, the hit goes to the host
+  if (CRNET.applying || !critNetGuest()) return; const k = critKey(o); if (!k) return;
+  netSend({ t: 'crh', k: k[0], i: k[1], c: col == null ? null : col }); o.lock = 0.8;   // and the host's older state does not undo it meanwhile
+}
+function critNetEat(o) { if (!critNetOn()) return; const k = critKey(o); if (k) { netSend({ t: 'cre', k: k[0], i: k[1] }); o.lock = 1.5; o.net = null; } }
+function critRow(k, o) {   // [state, x, y, z, rx, ry, rz, there, carried, colours (dead ones)]
+  const g = critG(o), cam = g.parent === camera, p = g.getWorldPosition(_crw);
+  return [o.state, +p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), cam ? 0 : +g.rotation.x.toFixed(2), cam ? +walk.yaw.toFixed(2) : +g.rotation.y.toFixed(2), cam ? 3.14 : +g.rotation.z.toFixed(2),
+    (k === 'f' ? !o.eaten : g.visible) ? 1 : 0, o.held || o.thrown ? 1 : 0, !critAlive(k, o.state) && o.mats ? o.mats.map(m => m.color.getHex()) : 0];
+}
+function critSnapshot() { const L = critLists(), m = { t: 'crs' }; for (const k in L) m[k] = L[k].map(o => critRow(k, o)); return m; }
+function critBase(k, o) { if (k === 'b') { o.mats[0].color.setHex(0x8a8f99); o.mats[1].color.setHex(0x4b5260); } else if (o.cols && o.mats) o.mats.forEach((m, i) => m.color.setHex(o.cols[i])); }
+function critSet(k, o, r, snap) {   // r: a critRow
+  const g = critG(o), was = o.state; o.state = r[0]; if (!o.nT) o.nT = new T.Vector3();
+  o.nT.set(r[1], r[2], r[3]); if (snap || !o.seen || !g.visible || o.nT.distanceTo(g.position) > 8) { g.position.copy(o.nT); o.seen = true; }   // snap on first sight / a respawn
+  g.rotation.set(r[4], r[5], r[6]);
+  if (r[9]) r[9].forEach((h, j) => o.mats[j] && o.mats[j].color.setHex(h)); else if (critAlive(k, o.state) && !critAlive(k, was)) critBase(k, o);
+  if (critAlive(k, was) && !critAlive(k, o.state) && g.visible) for (let i = 0; i < 3; i++) puff(g.position.clone().add(V3((Math.random() - 0.5) * 0.3, 0.1, (Math.random() - 0.5) * 0.3)), 0.08, 0xf2f2f2);   // knocked over
+  if (k === 'f') { o.eaten = !r[7]; if (o.eaten && !critAlive(k, o.state)) g.visible = false; } else g.visible = !!r[7];
+}
+function critApply(m) {   // the guest: the host's critters
+  const L = critLists();
+  for (const k of ['b', 'c', 'f']) { const rows = m[k]; if (!rows) continue;
+    rows.forEach((r, i) => { const o = L[k][i]; if (!o) return;
+      if (o.net === 'me' || o.lock > 0 || ((o.held || o.thrown) && o.net !== 'them')) return;   // mine right now (carried, thrown, just hit or just eaten)
+      critSet(k, o, r, false); o.held = !!r[8]; o.net = r[8] ? 'them' : null; }); }
+}
+function critRecvP(m) {   // the host: a corpse the guest carries or threw, or where it came to rest
+  const L = critLists();
+  for (const r of m.a) { const o = L[r[0]] && L[r[0]][r[1]]; if (!o || o.net === 'me' || (heldDead && heldDead.o === o)) continue;
+    const row = r.slice(2, 12), rest = r[12] === 'rest'; critSet(r[0], o, row, rest);
+    if (rest) { o.held = false; o.thrown = false; o.net = null; o.t = 45; } else { o.held = true; o.net = 'them'; } }
+}
+function critRecvHit(m) {   // the host: the guest shot (or knocked over) one of my critters
+  const o = critLists()[m.k] && critLists()[m.k][m.i]; if (!o || !critAlive(m.k, o.state)) return;
+  CRNET.applying = true;
+  try { if (m.k === 'b') hitBird(o, m.c); else if (m.k === 'c') hitCritter(o, m.c); else if (typeof hitPondFrog === 'function') hitPondFrog(o, m.c); } finally { CRNET.applying = false; }
+}
+function critRecvEat(m) {   // the other player ate one: crumbs where it was, and it is gone
+  const o = critLists()[m.k] && critLists()[m.k][m.i]; if (!o || (heldDead && heldDead.o === o)) return;
+  const g = critG(o), p = g.getWorldPosition(V3()); eatCrumbs(p, o);
+  const d = camera.position.distanceTo(p); if (d < 15) chompSnd(Math.min(1, 3 / (d + 1)));
+  eatGone(o); o.net = null; o.nT = null;
+}
+function critNetDrop() {   // the other player left: their corpse falls where it is; a guest's mirrored critters get going on their own
+  for (const [k, list] of Object.entries(critLists())) for (const o of list) {
+    if (o.net === 'them') { o.held = false; o.thrown = false; o.net = null; o.t = 45; }
+    if (k === 'b' && o.state === 'fly' && !o.from) flyTo(o, farPerch(o, 15));
+    if (k === 'b' && o.state === 'fall' && !o.vel) { o.vel = V3(0, 0, 0); o.spin = V3(0, 0, 0); }
+    if (k === 'c' && o.state === 'run' && !o.dir) { o.state = 'idle'; o.t = 0.5; }
+  }
+}
+function critNetUpdate(dt) {
+  if (!critNetOn()) return;
+  const L = critLists(), guest = !NET.host;
+  for (const k in L) for (const o of L[k]) { if (o.lock > 0) o.lock -= dt;
+    const g = critG(o); if (o.nT && g.parent !== camera && (o.net === 'them' || (guest && o.net !== 'me' && !o.held && !o.thrown))) g.position.lerp(o.nT, Math.min(1, dt * 12));
+    if (guest && o.net !== 'me') {   // the mirrors' own little motions
+      if (k === 'b') { if (o.state === 'fly') { const f = Math.sin(clock * 32) * 0.9; o.wl.rotation.set(0, 0, f); o.wr.rotation.set(0, 0, -f); } else if (o.state === 'perch') { o.wl.rotation.set(0, 1.45, 0); o.wr.rotation.set(0, -1.45, 0); } }
+      else if (k === 'c' && g.userData.sprite) g.userData.sprite.material.rotation = critAlive(k, o.state) ? (o.state === 'run' ? 0.08 * Math.sin(clock * 30) : 0) : Math.PI;
+      else if (k === 'f') g.visible = !(o.eaten && !critAlive(k, o.state)) && (walk.on && Math.hypot(g.position.x - walk.x, g.position.z - walk.z) < 175 || g.parent === camera || o.held);
+    } }
+  if (!guest) { if ((CRNET.st += dt) > 0.125) { CRNET.st = 0; netSend(critSnapshot()); } return; }
+  if ((CRNET.t += dt) < 0.1) return; CRNET.t = 0;
+  const rows = [];
+  for (const k in L) L[k].forEach((o, i) => {
+    if ((o.held || o.thrown) && o.net !== 'them') { o.net = 'me'; rows.push([k, i].concat(critRow(k, o))); }
+    else if (o.net === 'me') { rows.push([k, i].concat(critRow(k, o), ['rest'])); o.net = null; o.lock = 1.5; }   // at rest: one last word, then it is the host's again
+  });
+  if (rows.length) netSend({ t: 'crp', a: rows });
+}
 function hitCritter(c, col) {
+  critNetHit(c, col);   // 2 player: the guest tells the host (v1.97.112)
   critterHits++; c.state = 'hit'; c.t = 45; c.held = false; c.thrown = false; if (col != null) c.mats.forEach(m => m.color.setHex(col));
   const sp = c.g.userData.sprite; if (sp) sp.material.rotation = Math.PI; else { c.g.rotation.z = Math.PI; c.g.position.y += 0.13; }   // knocked belly-up
   for (let i = 0; i < 3; i++) puff(c.g.position.clone().add(V3((Math.random() - 0.5) * 0.3, 0.1, (Math.random() - 0.5) * 0.3)), 0.08, 0xf2f2f2);
 }
 function hitBird(b, c) {
+  critNetHit(b, c);
   pigeonHits++; b.state = 'fall'; b.held = false; b.thrown = false; if (c != null) b.mats.forEach(m => m.color.setHex(c));
   b.vel = V3((Math.random() - 0.5) * 3, 2.5, (Math.random() - 0.5) * 3); b.spin = V3(Math.random() * 8, Math.random() * 4, Math.random() * 8);
   const at = b.g.position.clone(); at.y += 0.3;
@@ -12717,6 +12835,7 @@ function rainSound() {
 }
 function updateBirds(dt) {
   if (!birds) { buildPerches(); birds = Array.from({ length: 10 }, () => { const b = makeBird(); perchAt(b, farPerch(null, 25)); return b; }); }
+  if (critNetGuest()) return;   // 2 player: the host's pigeons
   for (const b of birds) {
     const g = b.g;
     if (b.state === 'perch') {
@@ -12725,7 +12844,7 @@ function updateBirds(dt) {
       b.idle -= dt;
       b.cooT = (b.cooT == null ? Math.random() * 6 : b.cooT) - dt;
       if (b.cooT <= 0) { b.cooT = 4 + Math.random() * 6; const d = camera.position.distanceTo(g.position); if (d < 35) pigeonCoo(Math.min(1, 6 / (d + 2)), g.position); }
-      const near = walk.on && !walk.dead && Math.hypot(g.position.x - walk.x, g.position.z - walk.z) < 8 && Math.abs(g.position.y - walk.y) < 8;
+      const near = (walk.on && !walk.dead && Math.hypot(g.position.x - walk.x, g.position.z - walk.z) < 8 && Math.abs(g.position.y - walk.y) < 8) || critNearRp(g.position, 8);   // either player scares them
       if (b.idle <= 0 || near) flyTo(b, farPerch(b, 15));
     } else if (b.state === 'fly') {
       b.t = Math.min(1, b.t + dt / b.dur);
@@ -13114,7 +13233,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
