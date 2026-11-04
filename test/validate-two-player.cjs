@@ -106,4 +106,10 @@ assert.ok(!html.includes('NET.rp && NET.rp.av.visible) {   // my paintball'), 't
   assert.ok(pu.includes('const s = carSeat(V.car, -1); walk.x = s.x; walk.z = s.z; walk.y = s.y - EYE;'), 'in a car you sit in its passenger seat, eyes at the passenger\'s eye'); }
 assert.ok(html.includes("return (NET.rp.drive && rideToggle()) || 'The other player is driving that one';"), 'X at the car they are driving: ride along (it used to just say they were driving it)');
 assert.ok(html.includes("carFigure(CAR_ON, 'passFig', -1).visible = true;") && html.includes("carFigure(c, 'drvFig', 1).visible = !!theirs;"), 'the driver sees you in the passenger seat, you see them at the wheel');
+
+// a car index arrives over the network: it has to be checked, or a malformed or cross-version message throws every time
+assert.ok(html.includes('const c = m.car && O.cars ? O.cars[m.car[0]] : null; if (!c) R.car = null;'), 'their ride message bounds-checks the car index');
+assert.ok(html.includes('const c = O.cars ? O.cars[m.i] : null; if (c) {'), 'and so does the car position message');
+assert.ok(html.includes("const c = O.cars && typeof remote === 'object' ? O.cars[remote.i] : null; if (c) {"), 'and the stereo car index');
+
 console.log('PASS: host world state (power, clock, darkness, light events, creatures) reaches the guest, guest changes reach the host and stick, host-run creatures for both players (hits, bites, ear lure, Daddy), ride-along wiring');

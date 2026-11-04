@@ -109,7 +109,7 @@ assert.ok(html.includes("+ 'k tri  ' + (pf.frame || 0).toFixed(1) + ' ms'"), 'an
 assert.ok(html.includes('function stepSafe(name, fn) {') && html.includes("console.error('[update:' + name + '] failed '"),
   'the frame tail runs through a guard that reports the failure instead of dying silently');
 for (const g of ["stepSafe('balls', () => updateBalls(dt));", "stepSafe('gun', () => updateGun(dt));",
-                 "stepSafe('birds', () => updateBirds(dt));", "stepSafe('power', () => applyPowerOutage());"]) {
+                 "stepSafe('birds', () => updateBirds(dt));", "stepSafe('powerApply', () => applyPowerOutage());"]) {
   assert.ok(html.includes(g), 'guarded every frame: ' + g);
 }
 assert.ok(html.includes('if (!B || !B.m || !B.v) { balls.splice(i, 1); continue; }'),
@@ -132,6 +132,15 @@ assert.ok(html.includes('PAUSED'), 'a modal quietly swallowing the clock is visi
   assert.equal(ctx.PERF.errs, 1, 'and the failure is counted');
   assert.equal(ctx.PERF.err, 'bad', 'and named');
   assert.equal(ctx.PERF.msg, 'boom', 'and its message kept');
+}
+
+
+{   // one label per guarded sub-update: with two sharing a name the fps badge cannot say which one is failing
+  const labels = [...html.matchAll(/stepSafe\('([a-zA-Z]+)'/g)].map(m => m[1]);
+  assert.ok(labels.length > 20, 'the frame tail is guarded (' + labels.length + ' labels)');
+  const dup = [...new Set(labels.filter((l, i) => labels.indexOf(l) !== i))];
+  assert.equal(dup.length, 0, 'duplicate stepSafe label(s): ' + dup.join(', '));
+  assert.ok(labels.includes('powerSim') && labels.includes('powerApply'), 'the power sub-update and the outage pass have their own labels');
 }
 
 console.log('PASS: quality tier (low/medium/high + manual override), lazy shadow map at the tier rate, one info reset per frame so the fps readout counts the shadow and world passes, warm shader compile, Lambert imports');

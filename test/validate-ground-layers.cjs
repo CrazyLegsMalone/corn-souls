@@ -112,4 +112,15 @@ assert.ok(html.includes("const markMat = c => MARK_MATS[c] || (MARK_MATS[c] = ne
 for (const l of html.split('\n').filter(l => l.includes("GY('paint')") && !l.includes('const GLAYER'))) {
   assert.ok(!/\bmat\(0x/.test(l), 'no marking on the paint layer uses a plain mat() (no depth pull, so the asphalt beat it at range): ' + l.trim().slice(0, 90)); }
 assert.ok(html.includes('dash = markMat(0xffffff)') && html.includes('wht = markMat(0xffffff), ylw = markMat(0xffd84d)'), 'plant road dashes and highway lines use it');
+
+{   // an sRGB tag must be guarded or go through the helper: a bare assignment is undefined on a build without the constant
+  const bad = [];
+  html.split(String.fromCharCode(10)).forEach((l, i) => {
+    if (!/colorSpace\s*=\s*T\.SRGBColorSpace/.test(l)) return;
+    if (/if \(T\.SRGBColorSpace\)/.test(l) || /srgbTex\(/.test(l)) return;
+    bad.push(i + 1);
+  });
+  assert.equal(bad.length, 0, 'unguarded colorSpace assignment at line(s) ' + bad.join(', '));
+}
+
 console.log('PASS: one ground layer table (grass < dirt < dirtroad < asphalt < paint < pad), height and depth pull in lockstep, every overlay takes both from it - so the cross road between the process building and the energy center is above the dirt yard again');

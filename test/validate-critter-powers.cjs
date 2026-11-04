@@ -93,11 +93,14 @@ assert.equal(ctx.powerKindOf({ kind: 'rat' }), 'rat'); assert.equal(ctx.powerKin
 
 // wiring
 assert.ok(html.includes("critNetEat(h.o); powerGive(powerKindOf(h.o), 'You ate the ' + h.nm + '. ');"), 'eating a critter gives its power');
-assert.ok(html.includes("stepSafe('power', () => powerUpdate(dt));"), 'the power clock runs every frame (driving or not)');
+assert.ok(html.includes("stepSafe('powerSim', () => powerUpdate(dt));"), 'the power clock runs every frame (driving or not), under its own guard label');
 assert.ok(html.includes('P3.jumpHold(!!(pad.held.A || kb.space || jumpBtnHeld));'), 'holding jump (A, Space or the touch button) is passed in for gliding');
 assert.ok(html.includes("if (!ROOFMAP.h) { try { roofMapBuild(); } catch (e) { console.warn('roof map', e); } ROOFMAP.again = 12; }"), 'the roof map is built when you start walking, and again once the late models are in');
 assert.ok(html.includes('const f = 42 + POWER.fov - 12 * aimK;'), 'the rat view widening reaches the camera');
 { const rm = cut('function roofMapMeshes() {', 'function roofMapBuild() {');
   for (const k of ['vehicles', 'train.cars', 'NPCS', 'O.cars', 'CREEP.list', 'utv.g', 'O.shedMower', 'NET.rp', 'SKY.dome', 'VULT.s', 'bodies']) assert.ok(rm.includes(k), 'the roof map leaves out moving things: ' + k);
   assert.ok(rm.includes('m.transparent && m.opacity < 0.95') && rm.includes('!o.isInstancedMesh'), 'and see-through things and the corn'); }
+// a roof map that cannot build must say so: roof collision and the lizard climb silently never work without it
+assert.ok(html.includes("PERF.err = 'roofmap';"), 'a failed roof-map rebuild is reported on the fps line, not swallowed');
+
 console.log('PASS: critter powers (frog jump + safe landing, pigeon flaps / glide / safe falls, lizard climb onto the roof and gentle slide, rat speed + wider view; 45 s, counts on in a vehicle, swap, wear off, death) and roofs you can stand on (roof map in floorAt, walls stop at their tops)');
