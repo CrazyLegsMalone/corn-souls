@@ -7356,7 +7356,7 @@ function init(container) {
       const geo = new T.BufferGeometry(), pos = new Float32Array(gp), uv = new Float32Array(pos.length / 3 * 2);
       for (let i = 0, j = 0; i < pos.length; i += 3, j += 2) { uv[j] = (pos[i] + pos[i + 2]) * 0.6; uv[j + 1] = pos[i + 1] * 0.6; }
       geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.computeVertexNormals();
-      const glassMesh = new T.Mesh(geo, VGLASS); glassMesh.renderOrder = 1; glassMesh.userData.panes = panes; g.add(glassMesh);
+      const glassMesh = new T.Mesh(geo, VGLASS); glassMesh.userData.panes = panes; g.add(glassMesh);   // default draw order: sorted by distance with fog, steam, smoke (forcing it last drew it over fog in front)
       // the lower body, with a footwell: solid up to the belt everywhere but the cabin, which is a well with a floor, door
       // panels down the sides, the dash at the front, front seats and (when there is room) a rear bench
       const dark = mat(0x232528), seat = mat(0x2c2e33), B = (w, h, d, m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
@@ -10721,7 +10721,7 @@ function breakPane(V, m, i, mine, at) {
   const pos = m.geometry.attributes.position, a = pos.array, k0 = P.s * 3, k1 = (P.s + P.n) * 3;
   if (!m.userData.pos0) m.userData.pos0 = a.slice();
   let bm = m.userData.broken;
-  if (!bm) { const g2 = m.geometry.clone(); g2.attributes.position.array.fill(0); bm = new T.Mesh(g2, brokenGlassMat()); bm.renderOrder = 1; bm.position.copy(m.position); bm.rotation.copy(m.rotation); m.parent.add(bm); m.userData.broken = bm; }
+  if (!bm) { const g2 = m.geometry.clone(); g2.attributes.position.array.fill(0); bm = new T.Mesh(g2, brokenGlassMat()); bm.position.copy(m.position); bm.rotation.copy(m.rotation); m.parent.add(bm); m.userData.broken = bm; }
   const b = bm.geometry.attributes.position.array, p0 = m.userData.pos0;
   for (let k = k0; k < k1; k++) b[k] = p0[k];                                   // the pane shows cracked in the broken mesh...
   for (let k = k0; k < k1; k += 3) { a[k] = a[k0]; a[k + 1] = a[k0 + 1]; a[k + 2] = a[k0 + 2]; }   // ...and folds to a point in the intact one (no area: rays pass)

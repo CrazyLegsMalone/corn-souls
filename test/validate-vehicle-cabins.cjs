@@ -37,6 +37,7 @@ for (let i = 0; i < calls.length; i++) {
   glass[0].geometry.computeBoundingBox(); const gb = glass[0].geometry.boundingBox;
   assert.ok(gb.max.x <= W / 2 + 1e-6 && gb.min.x >= -W / 2 - 1e-6, name + ': glass stays inside the body');
   assert.ok(glass[0].geometry.attributes.uv, name + ': glass has UVs (the cracked-glass texture needs them)');
+  assert.equal(glass[0].renderOrder, 0, name + ': glass sorts by distance with the other see-through things (forced last, it drew over the ammonia fog in front of it)');
   // side windows split at the pillars: each side has (pillars + 1) panes
   const sideTris = (() => { const p = glass[0].geometry.attributes.position.array; let n = 0; for (let k = 0; k < p.length; k += 9) if (Math.abs(p[k]) > W / 2 - 0.2 && Math.abs(p[k] - p[k + 3]) < 1e-6 && Math.abs(p[k] - p[k + 6]) < 1e-6) n++; return n; })();
   assert.ok(sideTris >= 2 * ((spec.bp || []).length + 1), name + ': side windows on both sides, split at the pillars (' + sideTris + ' triangles)');
@@ -92,6 +93,7 @@ for (let i = 0; i < calls.length; i++) {
   const broke = panes.filter(P => P.broken); assert.equal(broke.length, 1, 'only the window that was hit breaks'); assert.equal(broke[0].kind, 'side');
   const wsNow = (() => { const P = panes.find(P => P.kind === 'windshield'); return Array.from(m.geometry.attributes.position.array.slice(P.s * 3, (P.s + P.n) * 3)); })();
   assert.deepEqual(wsNow, ws0, 'the windshield is untouched');
+  assert.equal(m.userData.broken.renderOrder, 0, 'the cracked panes too');
   assert.ok(m.userData.broken && m.userData.broken.material === BROKEN && m.userData.broken.parent === g, 'the smashed pane shows cracked in a second mesh on the car (two glass draw calls at most)');
   assert.equal(sent.at(-1).pane, panes.indexOf(broke[0]), 'the other player is told which pane'); assert.equal(car.broken, true, 'a smashed window lets you into a drivable car without keys');
   const h2 = hitAt(new T.Vector3(3, 1.18, 0.3), new T.Vector3(-1, 0, 0));

@@ -1,3 +1,9 @@
+## TEST v1.97.107 — car windows fog over like the rest of the car (2026-11-03)
+- Owner (screenshot, cars seen through the ammonia cloud): *"the windows look weird through the ammonia fog"*.
+- Cause: the cabin glass (v1.97.105) had `renderOrder = 1`, which makes three.js draw it after every other see-through thing regardless of distance, so the windows were painted on top of fog, steam and smoke sitting in front of them: dark, crisp rectangles in a washed-out car.
+- Fix: glass and the cracked-glass mesh use the default draw order, so they sort by distance with the fog sprites like everything else.
+- `validate-vehicle-cabins.cjs`: glass and cracked panes have render order 0.
+
 ## TEST v1.97.106 — the crowbar breaks only the window it hits (2026-11-03)
 - Owner: *"only the window struck by the crowbar should shatter not all the cars window. if you break the side windows the windshield should still be intact"*.
 - Before: any tool hit anywhere on a vehicle ran `breakGlass`, which swapped every glass part of that vehicle to the cracked material.
