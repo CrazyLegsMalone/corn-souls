@@ -4944,11 +4944,29 @@ function building(x0, x1, z0, z1, h, northOpen, eastOpen, westOpen, southOpen) {
     for (const [c, ow] of wop) glazing(E, x0, 1.7, c, 3.0 + ow * 0.5);
     for (const [c, ow] of eop) glazing(E, x1, 1.7, c, 3.0 + ow * 0.5); }
 }
+// ---------- ROLL-UP DOORS (v1.97.119, owner: "make all rolling door design uniform only size can differ" and "fix all the doors
+// that have cracks where you can see through"): one design for every roll-up in the plant. Gray coiling steel slats with a dark
+// bottom bar; the curtain runs 4 cm into a steel guide on each side and up into a head strip, so there is no gap round it to see
+// through; a round coil hood on one face of the wall. (cx, cz) is the centre of the opening, alongX = the wall runs along x,
+// opt.side = the face the hood sits on (+1 / -1 across the wall, local x), opt.y0 = floor height. It opens when Squeeg walks up
+// (the shared animation squeezes the curtain up into the head), and its wall line only blocks while it is shut.
+function rollUpDoor(cx, cz, alongX, w, h, opt) {
+  opt = opt || {}; const side = opt.side || 1;
+  const g = new T.Group(); g.position.set(cx, opt.y0 || 0, cz); if (alongX) g.rotation.y = Math.PI / 2; scene.add(g);   // local: the wall runs along z, x is across it
+  const panel = new T.Mesh(new T.BoxGeometry(0.08, h, w + 0.08), mat(0x9aa1a8)); panel.position.y = h / 2; g.add(panel);   // the curtain, 4 cm into each guide
+  for (let y = -h / 2 + 0.11; y < h / 2 - 0.05; y += 0.22) { const r = new T.Mesh(new T.BoxGeometry(0.1, 0.03, w), mat(0x7f868d)); r.position.y = y; panel.add(r); }   // slat joints
+  const bar = new T.Mesh(new T.BoxGeometry(0.12, 0.1, w + 0.02), mat(0x50565c)); bar.position.y = -h / 2 + 0.05; panel.add(bar);   // bottom bar
+  for (const s of [-1, 1]) { const gd = new T.Mesh(new T.BoxGeometry(0.42, h + 0.1, 0.12), mat(0x8a9097)); gd.position.set(0, (h + 0.1) / 2, s * (w / 2 + 0.02)); g.add(gd); }   // side guides (inner face 4 cm inside the opening)
+  const head = new T.Mesh(new T.BoxGeometry(0.42, 0.14, w + 0.16), mat(0x8a9097)); head.position.set(0, h + 0.03, 0); g.add(head);   // head strip (4 cm below the lintel: no flicker against it)
+  const hood = new T.Mesh(new T.CylinderGeometry(0.34, 0.34, w + 0.3, 16).rotateX(Math.PI / 2), mat(0xc9ced3)); hood.position.set(side * 0.52, h + 0.42, 0); g.add(hood);   // coil hood
+  const seg = alongX ? [cx - w / 2, cz, cx + w / 2, cz] : [cx, cz - w / 2, cx, cz + w / 2]; wallSegs.push(seg);
+  const d = { panel, seg, home: seg.slice(), x: cx, z: cz, h, open: 0, g }; (O.rollDoors = O.rollDoors || []).push(d); return d;
+}
 // a plain man door that vanishes as Squeeg walks up (like the other doors): center (x, z) on a wall running along x (alongX) or z, leaf color,
 // plus a concrete floor helper for the simple buildings
 function manDoor(x, z, alongX, col, inward) {   // inward: +1/-1 = which way is inside (exterior doors only)
   const g = new T.Group(); g.position.set(x, 0, z); if (!alongX) g.rotation.y = Math.PI / 2; scene.add(g);
-  const leaf = new T.Mesh(new T.BoxGeometry(0.89, 2.07, 0.06), mat(col || 0x4a525c)); leaf.position.set(0, 1.035, 0); g.add(leaf);
+  const leaf = new T.Mesh(new T.BoxGeometry(0.99, 2.15, 0.06), mat(col || 0x4a525c)); leaf.position.set(0, 1.075, 0); g.add(leaf);   // fills the 0.95 x 2.13 opening: 2 cm into the wall each side and into the head (v1.97.119: no light round it)
   for (const s of [-1, 1]) { const kn = new T.Mesh(new T.SphereGeometry(0.04, 6, 4), mat(0xc0c6cc)); kn.position.set(0.34, 1.0, s * 0.05); g.add(kn); }
   const fr = new T.Mesh(new T.BoxGeometry(1.05, 0.1, 0.36), mat(0x56606b)); fr.position.set(0, 2.16, 0); g.add(fr);
   (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x, z, open: 0 });
@@ -6326,10 +6344,10 @@ function init(container) {
         box(alongX ? w + 0.2 : th + 0.12, 0.12, alongX ? th + 0.12 : w + 0.2, frameM, cx, DH, cz);   // door frame
         // closed door leaves that swing open when Squeeg walks up (single door, or a pair for double doors)
         if (w <= 2.6 && !noLeaf) {
-          const pair = w > 1.6, lw = (pair ? w / 2 : w) - 0.06;
+          const pair = w > 1.6, lw = pair ? w / 2 : w + 0.04;   // v1.97.119: a single leaf runs 4 cm into the wall past the latch edge, a pair meets in the middle; both reach up into the frame (no light round them)
           for (const k of pair ? [-1, 1] : [-1]) {
             const g = new T.Group(); g.position.set(cx + k * ux * w / 2, 0, cz + k * uz * w / 2); g.rotation.y = rot; scene.add(g);
-            const leaf = new T.Mesh(new T.BoxGeometry(lw, DH - 0.06, 0.06), leafM); leaf.position.set(-k * lw / 2, (DH - 0.06) / 2, 0); g.add(leaf);
+            const leaf = new T.Mesh(new T.BoxGeometry(lw, DH, 0.06), leafM); leaf.position.set(-k * lw / 2, DH / 2, 0); g.add(leaf);
             const knob = new T.Mesh(new T.SphereGeometry(0.04, 6, 4), mat(0xc0c6cc)); knob.position.set(-k * (lw - 0.1), 1.0, 0.06); g.add(knob);
             const win = new T.Mesh(new T.BoxGeometry(0.14, 0.5, 0.07), new T.MeshLambertMaterial({ color: 0x9fc4d8 })); win.position.set(-k * lw * 0.62, 1.55, 0); g.add(win);
             (O.swingDoors = O.swingDoors || []).push({ g, rot, dir: -k * side, x: cx, z: cz, open: 0 });
@@ -6349,20 +6367,11 @@ function init(container) {
     // side = which side the bollards and housing sit on (+1 / -1 across the wall), style 'mesh' (high-speed curtain) or 'slat' (coiling steel)
     const rollDoor = (cx, cz, alongX, w, h, side, style, bside) => {
       bside = bside || side;   // bollards can sit on the other side from the housing
-      const g = new T.Group(); g.position.set(cx, 0, cz); if (alongX) g.rotation.y = Math.PI / 2; scene.add(g);   // local: wall along z, across = x
-      const pm = style === 'mesh' ? new T.MeshLambertMaterial({ color: 0x4d4630, transparent: true, opacity: 0.85 }) : mat(0x9aa1a8);
-      const panel = new T.Mesh(new T.BoxGeometry(0.1, h, w - 0.1), pm); panel.position.y = h / 2; g.add(panel);
-      if (style === 'mesh') {
-        for (const dz of [-w / 2 + 0.1, 0, w / 2 - 0.1]) { const r = new T.Mesh(new T.BoxGeometry(0.14, h, 0.1), mat(0xc0c6cc)); r.position.z = dz; panel.add(r); }
-        for (const y of [-h / 3, 0, h / 3]) { const r = new T.Mesh(new T.BoxGeometry(0.14, 0.08, w - 0.1), mat(0xc0c6cc)); r.position.y = y; panel.add(r); }
-      } else for (let y = -h / 2 + 0.15; y < h / 2; y += 0.22) { const r = new T.Mesh(new T.BoxGeometry(0.13, 0.03, w - 0.15), mat(0x7f868d)); r.position.y = y; panel.add(r); }
-      const hs = new T.Mesh(new T.CylinderGeometry(0.38, 0.38, w + 0.4, 14).rotateX(Math.PI / 2), mat(0xd0d5da)); hs.position.set(side * 0.45, h + 0.45, 0); g.add(hs);   // roll housing
+      const d = rollUpDoor(cx, cz, alongX, w, h, { side }), g = d.g;   // the plant's one roll-up design (v1.97.119; 'style' is no longer used)
       for (const dz of [-w / 2 - 0.4, w / 2 + 0.4]) {                                                          // yellow bollards
         const b = new T.Mesh(new T.CylinderGeometry(0.17, 0.17, 1.1, 10), mat(0xf2c200)); b.position.set(bside * 0.55, 0.55, dz); g.add(b);
         const wx = cx + (alongX ? dz : bside * 0.55), wz = cz + (alongX ? -bside * 0.55 : dz); wallSegs.push([wx - 0.05, wz, wx + 0.05, wz]);
       }
-      const seg = alongX ? [cx - w / 2, cz, cx + w / 2, cz] : [cx, cz - w / 2, cx, cz + w / 2]; wallSegs.push(seg);
-      (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: cx, z: cz, h, open: 0 });
     };
     rollDoor(WW + 0.05, OZN - 2.6, false, 3.05, 3.5, 1, 'mesh');   // 10 ft wide x ~11.5 ft tall, measured with the 12 in ruler in the user's photo                                               // west end of the cook alley
    // housing inside, bollards outside (photos)                                                     // north end of the ferm alley, between Ferm 4 and 5
@@ -7152,12 +7161,12 @@ function init(container) {
       WALK_SURF.push({ x0: X0 - 2 - RL, x1: X0 - 2, z0: rz - 0.65, z1: rz + 0.65, y0: 0, y1: FY, ax: 'x' }); }
     // doors: glass entrance pair, and the inside doors (they vanish when Squeeg is near, like the plant's)
     const leaf = (x, z, alongX, w, m) => { const g = new T.Group(); g.position.set(x, FY, z); const d = new T.Mesh(new T.BoxGeometry(alongX ? w : 0.05, DH, alongX ? 0.05 : w), m); d.position.y = DH / 2; g.add(d); scene.add(g); (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x, z, open: 0 }); };
-    leaf(X0, HZ - 0.45, false, 0.88, glassM); leaf(X0, HZ + 0.45, false, 0.88, glassM);
+    leaf(X0, HZ - 0.45, false, 0.9, glassM); leaf(X0, HZ + 0.45, false, 0.9, glassM);   // (v1.97.119: the glass pair meets in the middle and at the frame)
       egressStrobe(X0, HZ, 1, 0);   // glass entrance pair: one strobe inside
     const doorM = mat(0x8a6a45);
-    leaf(TX, HZ, false, DOOR - 0.05, doorM);
-    for (const x of [80, 75, 67]) leaf(x, HN, true, DOOR - 0.05, doorM);
-    for (const x of [78, 71, 65]) leaf(x, HS, true, DOOR - 0.05, doorM);
+    leaf(TX, HZ, false, DOOR + 0.04, doorM);   // (v1.97.119: inside doors run 2 cm into the frame each side, no light round them)
+    for (const x of [80, 75, 67]) leaf(x, HN, true, DOOR + 0.04, doorM);
+    for (const x of [78, 71, 65]) leaf(x, HS, true, DOOR + 0.04, doorM);
     // door signs facing the hallway
     const sign = (text, x, z, dz) => nameplate(text, x, FY + DH + 0.3, z, 0.1, 0, dz);
     nameplate('TECH ROOM', TX, FY + DH + 0.3, HZ, 0.1, -1, 0);   // faces down the hallway
@@ -7263,9 +7272,7 @@ function init(container) {
     const slope = Math.hypot(D / 2 + 0.25, RIDGE - EAVE), ang = Math.atan2(RIDGE - EAVE, D / 2 + 0.25);
     for (const sd of [-1, 1]) { const r = add(new T.BoxGeometry(W + 0.4, 0.06, slope), roofM, cx, (EAVE + RIDGE) / 2, cz + sd * (D / 4 + 0.06), null, true); r.rotation.x = sd * ang; }
     // roll-up door (white slats, opens when Squeeg walks up), header, ramp down to the yard
-    const panel = new T.Mesh(new T.BoxGeometry(0.05, RH, RD - 0.05), mat(0xf2f3f4)); panel.position.set(X1 + 0.06, FL + RH / 2, cz); scene.add(panel);
-    const seg = [X1, cz - RD / 2, X1, cz + RD / 2]; wallSegs.push(seg);
-    (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: X1, z: cz, h: RH, open: 0 }); const shedDoor = O.rollDoors[O.rollDoors.length - 1];
+    const shedDoor = rollUpDoor(X1, cz, false, RD, RH, { y0: FL, side: 1 });   // the plant's one roll-up design (v1.97.119), hood outside
     box(0.1, 0.2, 3.5, trim, X1 + 0.08, FL + RH + 0.1, cz);
     const rL = 1.2, ramp = add(new T.BoxGeometry(Math.hypot(rL, FL), 0.06, 3.2), mat(0x6e5a3e), X1 + rL / 2, FL / 2, cz, null); ramp.rotation.z = -Math.atan2(FL, rL);
     WALK_SURF.push({ x0: X1, x1: X1 + rL, z0: cz - 1.6, z1: cz + 1.6, y0: FL, y1: 0, ax: 'x' });
@@ -7328,12 +7335,9 @@ function init(container) {
     enclosure(X0, X1, Z0, Z1, H);   // roofed: dark inside except its doorways (the lighting pass adds the doors and high-bays)
     add(new T.BoxGeometry(X1 - X0, 0.12, Z1 - Z0), mat(0x8f949a), (X0 + X1) / 2, 0.06, (Z0 + Z1) / 2, null, true);   // concrete floor
     // roll-up door (opens when Squeeg walks up, like the plant's) and the two man doors (vanish when Squeeg is near)
-    const panel = new T.Mesh(new T.BoxGeometry(GW - 0.1, GH, 0.12), mat(0x9aa1a8)); panel.position.set(GX, GH / 2, Z1); scene.add(panel);
-    const seg = [GX - GW / 2, Z1, GX + GW / 2, Z1]; wallSegs.push(seg);
-    (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: GX, z: Z1, h: GH, open: 0 });
-    box(GW + 0.6, 0.7, 0.9, mat(0x7d838a), GX, GH + 0.35, Z1 - 0.5);                                               // roll housing inside
+    rollUpDoor(GX, Z1, true, GW, GH, { side: 1 });   // the plant's one roll-up design (v1.97.119), hood inside
     for (const [x, z] of [[MX, Z1], [NX, Z0]]) {
-      const g = new T.Group(); g.position.set(x, 0, z); g.add(new T.Mesh(new T.BoxGeometry(0.95, 2.1, 0.06), mat(0x3a4048))); g.children[0].position.y = 1.05; scene.add(g);
+      const g = new T.Group(); g.position.set(x, 0, z); g.add(new T.Mesh(new T.BoxGeometry(1.04, 2.17, 0.06), mat(0x3a4048))); g.children[0].position.y = 1.085; scene.add(g);   // fills the 1.0 x 2.13 opening (v1.97.119)
       (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x, z, open: 0 });
       egressStrobe(x, z, 0, z === Z1 ? -1 : 1);   // south / north man door, strobe inside
     }
@@ -7650,16 +7654,10 @@ function init(container) {
     const RUX = E1 - 7.16 - 1.52, MDX = RUX - 2.75, RW = 3.05, RH = 3.0;   // 23.5 paces from the NE corner to the roll-up (paced)
     building(E0, E1, EZ0, EZ1, 12, [[RUX, RW, RH], [MDX, 0.95, 2.13]], [[EZ0 + 3.95, 1.8, 2.13], [EZ0 + 23.7, 0.95, 2.13], [EZ0 + 27.7, 0.95, 2.13], [EZ0 + 30.8, 3.8, 4.0], [EZ0 + 72.5, 0.95, 2.13]], [[EZ0 + 14, 0.95, 2.13], [EZ0 + 28.9, 19.4, 12], [EZ0 + 67.4, 4.8, 4.4]]);   // energy center (34 x 76 m); west wall open into the bump-out
     box(E1 - E0 - 0.3, 0.1, EZ1 - EZ0 - 0.3, mat(0x8d9196), (E0 + E1) / 2, 0.16, (EZ0 + EZ1) / 2);   // concrete floor
-    { const z = EZ0, g = new T.Group(); g.position.set(RUX, 0, z); g.rotation.y = Math.PI / 2; scene.add(g);            // roll-up (opens when Squeeg walks up)
-      const panel = new T.Mesh(new T.BoxGeometry(0.1, RH, RW - 0.1), mat(0x2a2c2e)); panel.position.y = RH / 2; g.add(panel);   // dark coiling slat door
-      for (let y = -RH / 2 + 0.15; y < RH / 2; y += 0.2) { const r = new T.Mesh(new T.BoxGeometry(0.13, 0.025, RW - 0.15), mat(0x1c1d1f)); r.position.y = y; panel.add(r); }
-      const lt = new T.Mesh(new T.BoxGeometry(0.14, 0.06, RW - 0.15), mat(0xd9b23a)); lt.position.set(0, RH - 0.06, 0); g.add(lt);   // yellow reflective strip along the bottom bar at the head
-      for (const dz of [-RW / 2 - 0.05, RW / 2 + 0.05]) { const j = new T.Mesh(new T.BoxGeometry(0.2, RH + 0.3, 0.12), mat(0x9aa0a6)); j.position.set(0.12, (RH + 0.3) / 2, dz); g.add(j); }   // side guides
-      const hs = new T.Mesh(new T.BoxGeometry(0.5, 0.5, RW + 0.3), mat(0x8a9097)); hs.position.set(-0.3, RH + 0.3, 0); g.add(hs);
-      const seg = [RUX - RW / 2, z, RUX + RW / 2, z]; wallSegs.push(seg); (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: RUX, z, h: RH, open: 0 });
+    { const z = EZ0; rollUpDoor(RUX, z, true, RW, RH, { side: -1 });   // roll-up (opens when Squeeg walks up): the plant's one design (v1.97.119)
       for (const x of [RUX + RW / 2 + 0.6, RUX - RW / 2 - 0.4]) { cyl(0.15, 1.1, mat(0xf2c200), x, 0, z - 0.45, null, 10); extraCols.push([x, z - 0.45, 0.2]); } }
-    { const z = EZ0, lw = 0.89, g = new T.Group(); g.position.set(MDX - 0.475, 0, z); scene.add(g);   // hinged on the west                       // green man door (vanishes as Squeeg walks up)
-      const leaf = new T.Mesh(new T.BoxGeometry(lw, 2.07, 0.06), mat(0x2f4a3a)); leaf.position.set(lw / 2, 1.035, 0); g.add(leaf);
+    { const z = EZ0, lw = 0.97, g = new T.Group(); g.position.set(MDX - 0.485, 0, z); scene.add(g);   // hinged on the west; fills its 0.95 m opening (v1.97.119)                       // green man door (vanishes as Squeeg walks up)
+      const leaf = new T.Mesh(new T.BoxGeometry(lw, 2.15, 0.06), mat(0x2f4a3a)); leaf.position.set(lw / 2, 1.075, 0); g.add(leaf);
       const kn = new T.Mesh(new T.SphereGeometry(0.04, 6, 4), mat(0xc0c6cc)); kn.position.set(lw - 0.1, 1.0, -0.06); g.add(kn);
       (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x: MDX, z, open: 0 });
       egressStrobe(MDX, z, 0, 1);   // north-wall green man door, strobe inside
@@ -7689,7 +7687,7 @@ function init(container) {
       // lever handles, wall pack light over it, extinguisher + red arrow sign to the north (right), a small switch box to the south (left)
       const dz = EZ0 + 3.95, grn = mat(0x2a4436), X = E1 + 0.04, g = new T.Group(); g.position.set(X, 0, dz); scene.add(g);
       const P = (w, h, d, m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); g.add(o); return o; };
-      for (const sd of [-1, 1]) { P(0.06, 2.07, 0.86, grn, 0.02, 1.035, sd * 0.44); P(0.04, 0.03, 0.12, 0xc0c6cc, 0.08, 1.0, sd * 0.1); P(0.04, 0.12, 0.03, 0xc0c6cc, 0.08, 0.98, sd * 0.05); }   // leaves + levers
+      for (const sd of [-1, 1]) { P(0.06, 2.15, 0.92, grn, 0.02, 1.075, sd * 0.46);   /* (v1.97.119: the pair fills the 1.8 m opening) */ P(0.04, 0.03, 0.12, 0xc0c6cc, 0.08, 1.0, sd * 0.1); P(0.04, 0.12, 0.03, 0xc0c6cc, 0.08, 0.98, sd * 0.05); }   // leaves + levers
       P(0.02, 0.24, 0.32, 0xf4f4f0, 0.065, 1.6, 0.42); P(0.022, 0.06, 0.3, 0x1f56a8, 0.067, 1.69, 0.42);   // NOTICE (left leaf as you face it = south)
       P(0.02, 0.24, 0.32, 0xf4f4f0, 0.065, 1.6, -0.42); P(0.022, 0.06, 0.3, 0xc8211c, 0.067, 1.69, -0.42);    // DANGER HIGH VOLTAGE (right leaf = north)
       (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x: E1, z: dz, open: 0 });
@@ -7699,27 +7697,10 @@ function init(container) {
       box(0.3, 0.22, 0.2, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 9, 3), E1 + 0.2, 3.35, dz);                                  // wall pack light
       extWall(E1 + 0.3, 1.0, dz - 1.45, Math.PI / 2); box(0.02, 0.5, 0.1, mat(0xf4f4f0), E1 + 0.17, 1.55, dz - 1.45); box(0.025, 0.3, 0.04, mat(0xc8211c), E1 + 0.18, 1.55, dz - 1.45);   // extinguisher + arrow sign (north)
       box(0.1, 0.16, 0.12, mat(0x8a8f94), E1 + 0.2, 1.3, dz + 1.3); box(0.04, 0.9, 0.04, mat(0x8a8f94), E1 + 0.18, 0.75, dz + 1.3); }   // switch box + conduit (south)
-    const ecRoll = (x, z, w, h, col) => { const g = new T.Group(); g.position.set(x, 0, z); scene.add(g);   // roll-up in a wall running north-south (opens when Squeeg walks up)
-      const panel = new T.Mesh(new T.BoxGeometry(0.1, h, w - 0.1), mat(col || 0x8f979e)); panel.position.y = h / 2; g.add(panel);
-      for (let y = -h / 2 + 0.15; y < h / 2; y += 0.22) { const r = new T.Mesh(new T.BoxGeometry(0.13, 0.025, w - 0.15), mat(0x6f777e)); r.position.y = y; panel.add(r); }
-      box(0.5, 0.5, w + 0.3, mat(0x8a9097), x, h + 0.3, z);
-      const seg = [x, z - w / 2, x, z + w / 2]; wallSegs.push(seg); (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x, z, h, open: 0 }); };
-    ecRoll(E0 - 3.6, EZ0 + 28.4, 4.0, 4.2); ecRoll(E0, EZ0 + 67.4, 4.8, 4.4); { // east roll-up (photo, looking west): TWO doors in one opening: a regular metal roll-up (rolled up into its coil box at the head) and a
+    const ecRoll = (x, z, w, h) => rollUpDoor(x, z, false, w, h, { side: 1 });   // roll-up in a wall running north-south: the plant's one design (v1.97.119)
+    ecRoll(E0 - 3.6, EZ0 + 28.4, 4.0, 4.2); ecRoll(E0, EZ0 + 67.4, 4.8, 4.4); { // east roll-up (photo, looking west; was TWO doors in one opening: a regular metal roll-up (rolled up into its coil box at the head) and a
       // MESH roll-up (closed, see-through screen with dark wind bars and a center seam) that opens when Squeeg walks up; aluminum side frames, yellow bollards both sides, DANGER overhead door crush hazard sign by the control room door
-      const z = EZ0 + 30.8, w = 3.8, h = 4.0, g = new T.Group(); g.position.set(E1, 0, z); scene.add(g);
-      const panel = new T.Group(); panel.position.y = h / 2; g.add(panel);
-      { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'); c.strokeStyle = 'rgba(40,42,44,0.9)'; c.lineWidth = 1.2;
-        for (let i = 0; i <= 32; i += 4) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 32); c.moveTo(0, i); c.lineTo(32, i); c.stroke(); }
-        const t = srgbTex(new T.CanvasTexture(cv)); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set((w - 0.1) / 0.12, h / 0.12);
-        const mm = new T.MeshLambertMaterial({ map: t, color: 0x9aa0a4, transparent: true, opacity: 0.55, depthWrite: false, side: T.DoubleSide }); t.minFilter = T.LinearFilter;
-        const sc = new T.Mesh(new T.PlaneGeometry(w - 0.1, h), mm); sc.rotation.y = Math.PI / 2; panel.add(sc);
-        const haze = new T.Mesh(new T.PlaneGeometry(w - 0.1, h), new T.MeshLambertMaterial({ color: 0x3a3e42, transparent: true, opacity: 0.5, depthWrite: false, side: T.DoubleSide })); haze.renderOrder = 3; haze.rotation.y = Math.PI / 2; haze.position.x = 0.01; panel.add(haze); }   // the mesh screen
-      for (let y = -h / 2 + 0.05; y <= h / 2; y += (h - 0.1) / 6) { const st = new T.Mesh(new T.BoxGeometry(0.06, 0.06, w - 0.1), mat(0x2a2c2e)); st.position.y = y; panel.add(st); }
-      const seam = new T.Mesh(new T.BoxGeometry(0.06, h, 0.03), mat(0x2a2c2e)); panel.add(seam);
-      for (const dz of [-w / 2 - 0.12, w / 2 + 0.12]) box(0.25, h + 0.4, 0.22, mat(0xa9adb0), E1 + 0.13, (h + 0.4) / 2, z + dz);   // aluminum side frames
-      box(0.4, 0.45, w + 0.5, mat(0xa9adb0), E1 + 0.2, h + 0.25, z);                                                              // mesh door head box
-      { const coil = add(new T.CylinderGeometry(0.32, 0.32, w + 0.3, 16), mat(0x8f979e), E1 + 0.5, h + 0.75, z, null); coil.rotation.x = Math.PI / 2; box(0.25, 0.08, w + 0.3, mat(0x6f777e), E1 + 0.55, h + 0.38, z); }   // metal roll-up, rolled up in its coil (open)
-      const seg = [E1, z - w / 2, E1, z + w / 2]; wallSegs.push(seg); (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: E1, z, h, open: 0 });
+      const z = EZ0 + 30.8, w = 3.8, h = 4.0; rollUpDoor(E1, z, false, w, h, { side: 1 });   // v1.97.119: the plant's one roll-up design (it was a mesh screen door + a rolled-up metal door)
       for (const dz of [-w / 2 - 0.5, w / 2 + 0.5]) { cyl(0.15, 1.2, mat(0xf2c200), E1 + 0.55, 0, z + dz, null, 10); extraCols.push([E1 + 0.55, z + dz, 0.2]); }
       box(0.02, 0.22, 0.3, mat(0xf4f4f0), E1 + 0.17, 1.95, z - w / 2 - 0.4); box(0.025, 0.06, 0.26, mat(0xc8211c), E1 + 0.18, 2.03, z - w / 2 - 0.4);   // DANGER sign
       box(0.3, 0.22, 0.2, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xffffff })), 9, 3), E1 + 0.2, 4.6, z - w / 2 - 1.2); }                      // wall light
@@ -7849,9 +7830,9 @@ function init(container) {
       box(TX1 - TX0 - 0.3, 0.1, TZ1 - TZ0 - 0.3, mat(0x8d9196), (TX0 + TX1) / 2, 0.16, (TZ0 + TZ1) / 2);
       const grn = mat(0x3a4a48), red = mat(0xd23a2a), ext = (x, z) => extWall(x, 0.85, z, x > TX1 ? Math.PI / 2 : -Math.PI / 2);
       // man doors (vanish as Squeeg walks up): [wall x, center z, outward sign (+1 east / -1 west), hinge at the -z end?, leaves]
-      const mdoor = (wx, zc, out, hingeN, pair) => { const W = pair ? 1.75 : 0.95, lw = (pair ? W / 2 : W) - 0.06;
+      const mdoor = (wx, zc, out, hingeN, pair) => { const W = pair ? 1.75 : 0.95, lw = pair ? W / 2 : W + 0.04;   // (v1.97.119: leaves fill the opening)
         for (const k of pair ? [-1, 1] : [hingeN ? -1 : 1]) { const g = new T.Group(); g.position.set(wx, 0, zc + k * W / 2); g.rotation.y = Math.PI / 2; scene.add(g);
-          const sg = k < 0 ? -1 : 1, leaf = new T.Mesh(new T.BoxGeometry(lw, 2.07, 0.06), grn); leaf.position.set(sg * lw / 2, 1.035, 0); g.add(leaf);
+          const sg = k < 0 ? -1 : 1, leaf = new T.Mesh(new T.BoxGeometry(lw, 2.15, 0.06), grn); leaf.position.set(sg * lw / 2, 1.075, 0); g.add(leaf);
           const kn = new T.Mesh(new T.SphereGeometry(0.04, 6, 4), mat(0xc0c6cc)); kn.position.set(sg * (lw - 0.1), 1.0, out * 0.06); g.add(kn);
           (O.swingDoors = O.swingDoors || []).push({ g, rot: Math.PI / 2, dir: 1, x: wx, z: zc, open: 0 }); egressStrobe(wx, zc, -out, 0); }
         box(0.4, 0.1, W + 0.1, mat(0x56606b), wx, 2.16, zc); };
@@ -7866,10 +7847,7 @@ function init(container) {
         const lv = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshLambertMaterial({ map: srgbTex(new T.CanvasTexture(cv)) })); lv.position.set(x, y, z); lv.rotation.y = ry; lv.userData.noHit = true; scene.add(lv); };
       louver(4.3, 3.4, TX1 + 0.17, 2.1, TZM - 3.95, Math.PI / 2, true);                                       // east double louver
       louver(1.4, 2.85, TX0 - 0.17, 1.85, TZ0 + 1.36, -Math.PI / 2, false);                                    // west louver
-      { const z = WRU, g = new T.Group(); g.position.set(TX0, 0, z); scene.add(g);   // west roll-up (opens when Squeeg walks up)
-        const panel = new T.Mesh(new T.BoxGeometry(0.1, RUH, RUW - 0.1), mat(0x4e5658)); panel.position.y = RUH / 2; g.add(panel);
-        for (let y = -RUH / 2 + 0.15; y < RUH / 2; y += 0.22) { const r = new T.Mesh(new T.BoxGeometry(0.13, 0.025, RUW - 0.15), mat(0x3e4547)); r.position.y = y; panel.add(r); }
-        const seg = [TX0, z - RUW / 2, TX0, z + RUW / 2]; wallSegs.push(seg); (O.rollDoors = O.rollDoors || []).push({ panel, seg, home: seg.slice(), x: TX0, z, h: RUH, open: 0 });
+      { const z = WRU; rollUpDoor(TX0, z, false, RUW, RUH, { side: 1 });   // west roll-up (opens when Squeeg walks up): the plant's one design (v1.97.119)
         for (const dz of [-RUW / 2 - 0.25, RUW / 2 + 0.25]) { cyl(0.15, 1.1, mat(0xf2c200), TX0 - 0.5, 0, z + dz, null, 10); extraCols.push([TX0 - 0.5, z + dz, 0.2]); } }
       box(4, 0.08, 5, mat(0xa3a39c), TX0 - 2.6, 0.05, WRU);                                                   // concrete walk to the roll-up
       // south wall (~45 paces): pad-mount transformer + yellow blocks, small vent; two exhaust fans high on the turbine room's south face

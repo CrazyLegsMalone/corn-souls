@@ -24,6 +24,7 @@ function build(source, westWing){
  ctx.loadVendMachine=()=>({});ctx.vendSpawn=noop;   // vending props are placed through their own loader
  ctx.seatedPerson=(x,z)=>{const o=new T.Group();o.position.set(x,0,z);ctx.scene.add(o);return o;};
  vm.createContext(ctx);
+ { const r0=html.indexOf('function rollUpDoor('),r1=html.indexOf('\n// a plain man door',r0); vm.runInContext(html.slice(r0,r1),ctx); }   // the plant's one roll-up door builder (v1.97.119)
  vm.runInContext(source.slice(source.indexOf('  // ---------- PROCESS BUILDING'),source.indexOf('  // beer well pump inside the alley')),ctx);
  return ctx;
 }
