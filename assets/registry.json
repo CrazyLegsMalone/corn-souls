@@ -506,6 +506,90 @@
       ],
       "evidence": "5 meshes, 5 materials, one embedded PNG.",
       "notes": "The stand-alone water item."
+    },
+    {
+      "id": "first-party-cob-stalker",
+      "title": "Cob Stalker",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLB (generated at the owner's direction), exported with THREE.GLTFExporter",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/cob_stalker.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at 0.42 scale, turned 180 degrees so its mouth leads; its parts are folded into one mesh per material at load (body) and per leg (the six Leg_Hip_* nodes), and the legs are swung in code for a walk cycle. The red eye material is given a red glow. No geometry, textures or names changed in the file.",
+      "files": [
+        "assets/models/cob_stalker.glb"
+      ],
+      "checked_on": "2026-11-03",
+      "reviewer": "Owner",
+      "evidence": "Added by the project owner, exported with THREE.GLTFExporter like the owner's other generated models. 138 nodes, 95 meshes, 6 materials, three embedded PNG textures, no skins, no baked animations; six named Leg_Hip_0..5 leg pivots.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The two creatures that hunt in the north corn field, in the TEST channel."
+    },
+    {
+      "id": "first-party-daddy-cob-legs",
+      "title": "Daddy Cob Legs (boss)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLB (generated at the owner's direction), exported with THREE.GLTFExporter",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/daddy_cob_legs.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Used at 0.4 scale (about 7.4 m across), turned 180 degrees, folded per material (body) and per leg (the eight Daddy_Leg_Hip_* nodes) at load, legs swung in code. The red eye material is given a red glow. No geometry, textures or names changed in the file.",
+      "files": [
+        "assets/models/daddy_cob_legs.glb"
+      ],
+      "checked_on": "2026-11-03",
+      "reviewer": "Owner",
+      "evidence": "Added by the project owner, exported with THREE.GLTFExporter like the owner's other generated models. 444 nodes, 323 meshes, 7 materials, three embedded PNG textures, no skins, no baked animations; eight named Daddy_Leg_Hip_L/R_0..3 leg pivots.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The boss that climbs out of the north corn field after both cob stalkers die, in the TEST channel."
+    },
+    {
+      "id": "first-party-small-teal-motor-pump",
+      "title": "Industrial motor pump (small, teal)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLB (generated at the owner's direction), exported with THREE.GLTFExporter",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/small_teal_motor_pump.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Scaled to the plant pump length (3.0 m x 0.85 = 2.55 m) and placed on the plant's yellow pad; every copy is folded into one mesh per material in world space. No geometry, textures or names changed in the file.",
+      "files": [
+        "assets/models/small_teal_motor_pump.glb"
+      ],
+      "checked_on": "2026-11-03",
+      "reviewer": "Owner",
+      "evidence": "Added by the project owner, exported with THREE.GLTFExporter like the owner's other generated models. 65 nodes, 53 meshes, 9 materials, four embedded PNG textures, no skins or animations.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The fermenter recirculation pumps in the ferm alley, in the TEST channel."
+    },
+    {
+      "id": "first-party-large-teal-motor-pump",
+      "title": "Industrial motor pump (large, teal)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLB (generated at the owner's direction), exported with THREE.GLTFExporter",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/large_teal_motor_pump.glb",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "Scaled to the plant pump length (3.3 m x 0.9) and placed on the plant's yellow pad, folded into one mesh per material. No geometry, textures or names changed in the file.",
+      "files": [
+        "assets/models/large_teal_motor_pump.glb"
+      ],
+      "checked_on": "2026-11-03",
+      "reviewer": "Owner",
+      "evidence": "Added by the project owner, exported with THREE.GLTFExporter like the owner's other generated models. 65 nodes, 53 meshes, 9 materials, four embedded PNG textures, no skins or animations.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The beer well pump, in the TEST channel."
     }
   ]
 }

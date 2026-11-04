@@ -17,6 +17,9 @@ Shipped 3D GLB models in `assets/models/`:
 - `shifty_food_machine.glb`, `shifty_popcorn.glb`, `shifty_corn_chips.glb`, `shifty_roasted_corn.glb`, `milo_rade_can.glb`, `water_can.glb` - Shifty Food vending machine, its three snack packets, the Milo-Rade can and the water can - first-party (project owner, AI-generated with ChatGPT, from the shifty_food_cline_package).
 - `milorade_machine.glb` — "Milo Rade Vending Machine" — first-party (project owner, AI-generated with ChatGPT), break room + scale house vending machines in the TEST channel.
 - `1x4_cooling_tower_raised_sill.glb` — "1x4 Cooling Tower (Raised Sill)" — first-party (project owner, AI-generated with ChatGPT), cooling tower in the TEST channel.
+- `cob_stalker.glb` - "Cob Stalker" - first-party (project owner), the two creatures in the north corn field in the TEST channel.
+- `daddy_cob_legs.glb` - "Daddy Cob Legs" - first-party (project owner), the corn field boss in the TEST channel.
+- `small_teal_motor_pump.glb`, `large_teal_motor_pump.glb` - industrial motor pumps - first-party (project owner), the fermenter recirculation pumps and the beer well pump in the TEST channel.
 - `pallet.glb` — "Pallet" by Thingits — CC BY 4.0.
 
 See `../../assets/registry.json`, `../../CREDITS.md`, `../../credits.html`, and `../../ASSET_POLICY.md` for full creator attribution, source URLs, license links, and modification notes.
