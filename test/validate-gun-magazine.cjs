@@ -61,6 +61,18 @@ assert.ok(html.includes('const slot = MAG - mags[ammo];   // the round leaving')
     api.setRounds('paint', n); const nearest = ctx.balls.findIndex(b => b.visible); if (n) assert.equal(slotCol(nearest), PAINT[(MAG - n) % 4], 'the next round showing nearest the gun is the next colour to fly'); }
   assert.deepEqual(fired, [1, 2, 3, 4, 1, 2], 'a full magazine fires its six rounds in the order they sit, gun end first'); }
 assert.ok(html.includes("const t = new T.TextureLoader().load('/corn-souls/assets/textures/paintball/' + key + '.png'); t.magFilter = T.NearestFilter;"), "splats use the owner's PSX decals, crisp pixels");
-assert.ok(html.includes('const dm = decalMat(c), s = dm ? new T.Mesh(decalGeo(), dm) : new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c));'), 'one decal per hit in the ball colour (any other colour still gets a cut-out splat)');
+assert.ok(html.includes('const dm = decalMat(c, glance ? 1 : 0), s = dm ? new T.Mesh(decalGeo(), dm) : new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c));'), 'one decal per hit in the ball colour (any other colour still gets a cut-out splat)');
+// v1.97.120: 5% smaller; the side splatter (shape 1) for glancing hits, shapes 2-5 for the rest
+assert.ok(html.includes('new T.PlaneGeometry(0.7125, 0.7125)'), 'splats 5% smaller (0.75 -> 0.7125 m)');
+assert.ok(html.includes("const key = PAINT_NAME[k] + '-impact-0' + (shape || 2 + (Math.random() * 4 | 0));"), 'shape 1 only when asked for; otherwise one of 2-5');
+assert.ok(html.includes('const cosI = Math.abs(nrm.dot(dir)), glance = cosI < SPLAT_GLANCE;') && html.includes('const SPLAT_GLANCE = 0.6;'), 'a glancing hit: more than ~53 degrees off square');
+{ // the side splatter's spray (texture -x) is turned to run on along the ball's path across the surface: the game's own sums
+  const lib = { window: {}, console }; vm.runInNewContext([...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).find(x => x.includes('window.THREE=eu')), lib); const T = lib.window.THREE;
+  for (const [nrm, dir] of [[[0, 0, 1], [-0.9, 0, -0.436]], [[1, 0, 0], [-0.5, 0.1, 0.86]], [[0, 1, 0], [0.8, -0.3, 0.52]]]) {
+    const n = new T.Vector3(...nrm), d = new T.Vector3(...dir).normalize(), s = new T.Object3D(); s.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), n);
+    const ex = new T.Vector3(1, 0, 0).applyQuaternion(s.quaternion), ey = new T.Vector3().crossVectors(n, ex), tv3 = d.clone().addScaledVector(n, -d.dot(n));
+    s.rotateZ(Math.atan2(tv3.dot(ey), tv3.dot(ex)) + Math.PI);
+    const spray = new T.Vector3(-1, 0, 0).applyQuaternion(s.quaternion); assert.ok(spray.dot(tv3.normalize()) > 0.999, 'spray along the path on a ' + nrm + ' surface'); } }
+
 { const fs2 = require('fs'), path = require('path'); for (const c of ['blue', 'lime', 'orange', 'pink']) for (let k = 1; k <= 5; k++) assert.ok(fs2.existsSync(path.join(__dirname, '..', 'assets', 'textures', 'paintball', c + '-impact-0' + k + '.png')), 'decal file ' + c + ' ' + k); }
 console.log("PASS: the magazine feeds from the gun end - slot 0 (nearest the receiver) leaves first, the water level recedes from the same end, and the repeat guard still holds; shots fly in the colour of the round leaving; the owner's decals for splats");

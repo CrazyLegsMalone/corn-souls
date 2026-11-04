@@ -13307,10 +13307,12 @@ function fire() {
 // colour and shape, loaded the first time it is needed; crisp pixels (no smoothing) for the PS1 look, cut out on alpha so no
 // sorting, lit like the paint they replace (dark at night), and pushed toward the camera so they never flicker on the wall.
 const DECALS = { mats: {}, geo: null };
-function decalGeo() { return DECALS.geo || (DECALS.geo = new T.PlaneGeometry(0.75, 0.75)); }
-function decalMat(c) {
+function decalGeo() { return DECALS.geo || (DECALS.geo = new T.PlaneGeometry(0.7125, 0.7125)); }   // v1.97.120: 5% smaller (was 0.75)
+// v1.97.120: shape 1 (the one with its spray trailing off to one side) is for shots that hit at an angle, shapes 2-5 for the rest
+const SPLAT_GLANCE = 0.6;   // |cos| between the ball's path and the surface normal below this (more than ~53 degrees off square) = a glancing hit
+function decalMat(c, shape) {
   const k = PAINT.indexOf(c); if (k < 0) return null;
-  const key = PAINT_NAME[k] + '-impact-0' + (1 + (Math.random() * 5 | 0));
+  const key = PAINT_NAME[k] + '-impact-0' + (shape || 2 + (Math.random() * 4 | 0));
   if (!DECALS.mats[key]) {
     const t = new T.TextureLoader().load('/corn-souls/assets/textures/paintball/' + key + '.png'); t.magFilter = T.NearestFilter; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
     DECALS.mats[key] = new T.MeshLambertMaterial({ map: t, alphaTest: 0.5, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
@@ -13326,9 +13328,16 @@ function splatAt(hit, c, dir) {
     return new T.ShapeGeometry(sh);
   });
   const nrm = hit.object ? upNormal(hit).clone() : V3(0, 1, 0); if (nrm.dot(dir) > 0) nrm.negate();
-  const dm = decalMat(c), s = dm ? new T.Mesh(decalGeo(), dm) : new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c)); s.userData.noHit = true;   // the owner's decal for the ball's colour (a shape cut in code for any other colour)
+  const cosI = Math.abs(nrm.dot(dir)), glance = cosI < SPLAT_GLANCE;   // how square the ball hit
+  const dm = decalMat(c, glance ? 1 : 0), s = dm ? new T.Mesh(decalGeo(), dm) : new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c)); s.userData.noHit = true;   // the owner's decal for the ball's colour (a shape cut in code for any other colour)
   s.position.copy(hit.point).addScaledVector(nrm, 0.02);
-  s.quaternion.setFromUnitVectors(V3(0, 0, 1), nrm); s.rotateZ(Math.random() * 6.28); s.scale.setScalar(0.8 + Math.random() * 0.6);
+  s.quaternion.setFromUnitVectors(V3(0, 0, 1), nrm);
+  const k0 = 0.8 + Math.random() * 0.6;
+  if (glance && dm) {   // the side splatter: its spray (the texture's -x side) runs on along the ball's path across the surface, stretched the shallower the hit
+    const ex = V3(1, 0, 0).applyQuaternion(s.quaternion), ey = V3().crossVectors(nrm, ex), tv3 = dir.clone().addScaledVector(nrm, -dir.dot(nrm));
+    s.rotateZ(Math.atan2(tv3.dot(ey), tv3.dot(ex)) + Math.PI);
+    s.scale.set(k0 * Math.min(1.5, 1 / Math.max(0.35, cosI) * 0.7 + 0.3), k0, 1);
+  } else { s.rotateZ(Math.random() * 6.28); s.scale.setScalar(k0); }
   scene.add(s); if (hit.object) hit.object.attach(s);   // stays put on trucks and train cars too
   splats.push(s); if (splats.length > 60) splats.shift().removeFromParent();
 }
