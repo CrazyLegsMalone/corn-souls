@@ -91,6 +91,15 @@ assert.ok(html.includes("time: { set: o => { gameTimeSet(o); wsLock('gt'); netSe
 assert.ok(html.includes("dark: (a, f, h) => { wsLock('dk'); netSend({ t: 'dk', a, f, h }); return lightsDark(a, f, h); },"), 'darkness is shared');
 assert.ok(html.includes("netSend({ t: 'le', k: 'kill',") && html.includes("netSend({ t: 'le', k: 'flick',"), 'flicker and blackout are shared');
 assert.ok(html.includes("const r = setPowerOutage(!!on); if (typeof wsLock === 'function') wsLock('po');"), 'the power switch locks out the host\'s older state for a moment');
+// v1.97.110: you can be shot in a vehicle or on the mower; a tag knocks you out of it first
+{ const tb = slice('function netTargetBody(R) {', '\nfunction updateBalls(dt) {');
+  for (const k of ['if (R.av.visible) return [R.x, R.y + 0.9, R.z, 0.95];', 'if (R.drive && R.car && O.cars && O.cars[R.car[0]])', 'if (R.drive && NET.rr && NET.rr.g)', 'if (R.ps && utv.g)', 'if (R.mow && O.shedMower && O.shedMower.g)']) assert.ok(tb.includes(k), 'a paintball can find them: ' + k.slice(0, 40));
+  const tc = { T, Math, O: { cars: [], shedMower: { g: { position: new T.Vector3(10, 0.2, 20) } } }, NET: { rr: null }, utv: { g: null }, walk: {}, CAR_ON: null };
+  vm.createContext(tc); vm.runInContext(tb + '\nthis.f = netTargetBody;', tc);
+  assert.deepEqual(Array.from(tc.f({ av: { visible: false }, mow: [10, 0.2, 20, 0, 1] })), [10, 0.2 + 0.95, 20, 0.6], 'on the mower: the rider is a target');
+  assert.equal(tc.f({ av: { visible: false } }), null, 'nowhere: no target');
+  assert.ok(html.includes("if (walk.pass) passExit(); if (walk.mow) mowExit(true); if (walk.drive) utvExit();"), 'tagged in a vehicle: out of it, then down'); }
+assert.ok(!html.includes('NET.rp && NET.rp.av.visible) {   // my paintball'), 'the old on-foot-only check is gone');
 // riding along
 { const pu = slice('function passUpdate(dt) {', '\nfunction passExit() {');
   assert.ok(!/Q\.drive/.test(pu) && html.includes('const R = NET.rp; if (!R || !R.drive) return null;'), 'riding along checks the other PLAYER is driving (it read a flag their Ranger never had, so you fell out at once)');

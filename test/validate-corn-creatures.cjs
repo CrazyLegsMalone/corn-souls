@@ -130,6 +130,27 @@ assert.match(ctx.creepDebug('reset'), /two cob stalkers/); assert.equal(S().leng
   const padS = small.find(o => o.material === pc.mat(0xf2c200)); padS.geometry.computeBoundingBox(); assert.ok(padS.geometry.boundingBox.max.y <= 0.31 && padS.geometry.boundingBox.min.y >= -0.01, 'on a 30 cm yellow pad');
   assert.ok(bbOf(small).min.y >= -0.01, 'nothing below the floor');
 }
+// v1.97110: they face the way they walk (the models' mouths are +z already; a 180 degree turn put them chasing you backwards)
+assert.ok(html.includes("s.scale.setScalar(K.scale); s.position.y = -P.minY * K.scale; s.add(m); g.add(s);") && !/m\.rotation\.y \+= Math\.PI; s\.scale/.test(html), 'no extra turn on the model');
+{ const c = S()[0] || C.list[0]; assert.equal(c.s.children[0].rotation.y, 0, 'model unturned inside its heading group'); }
+// v1.97.110: the mower cuts the corn
+{ const m0 = html.indexOf('// ---------- MOWING THE CORN (v1.97.110)'), m1 = html.indexOf('function mowBlocked(x, z) {', m0);
+  assert.ok(m0 > 0 && m1 > m0, 'corn mowing section');
+  const clicks = [], mc = { T, Math, CORN: {}, V3: (x, y, z) => new T.Vector3(x, y, z), puff() {}, gunClick: () => clicks.push(1) };
+  vm.createContext(mc); vm.runInContext(html.slice(m0, m1) + '\nthis.cornField = cornField; this.cornCut = cornCut;', mc);
+  const geo = new T.PlaneGeometry(1, 2), im = new T.InstancedMesh(geo, new T.MeshBasicMaterial(), 40), d = new T.Object3D();
+  for (let i = 0; i < 40; i++) { d.position.set((i % 10) * 3.1, 0.15, Math.floor(i / 10) * 4); d.rotation.set(0, 0.7, 0); d.scale.set(1, 1.1, 1); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }
+  mc.cornField(im); assert.equal(mc.CORN.fields.length, 1, 'the field is indexed');
+  const v0 = im.instanceMatrix.version, n = mc.cornCut(6.2, 4, 1.2);
+  assert.equal(n, 1, 'the deck over one clump cuts that one'); assert.ok(im.instanceMatrix.version > v0, 'and the instance buffer is re-sent');
+  const m4 = new T.Matrix4(), sc = new T.Vector3(), q = new T.Quaternion(), ps = new T.Vector3();
+  im.getMatrixAt(12, m4); m4.decompose(ps, q, sc); assert.ok(Math.abs(sc.y - 0.11) < 1e-6 && Math.abs(ps.x - 6.2) < 1e-6, 'cut to stubble where it stood');
+  im.getMatrixAt(13, m4); m4.decompose(ps, q, sc); assert.ok(Math.abs(sc.y - 1.1) < 1e-6, 'its neighbour 3 m away still stands');
+  assert.equal(mc.cornCut(6.2, 4, 1.2), 0, 'cut corn stays cut'); assert.equal(clicks.length, 1, 'a chop sound for each cut');
+  let total = 0; for (let x = 0; x < 31; x += 0.5) total += mc.cornCut(x, 8, 1.2); assert.equal(total, 10, 'a pass along a row takes the whole row');
+  assert.ok(html.includes('if (MOW.blade) cornCut(g.position.x + fx * 0.2, g.position.z + fz * 0.2, 1.2);'), 'the mower cuts while its blades are on');
+  assert.ok(html.includes('if (M[4]) cornCut(g.position.x, g.position.z, 1.2);'), 'the other player\'s mower cuts on my screen too');
+  assert.ok(html.includes('cm.userData.noHit = true; scene.add(cm); cornField(cm);') && html.includes('pm.userData.noHit = true; scene.add(pm); cornField(pm);'), 'both corn fields can be mowed'); }
 // wiring
 assert.equal((html.match(/pumpModel\('small', PX, PZ, 'z', 1, id, 0\.85\);/g) || []).length, 1, 'the fermenter recirculation pumps use the small teal model');
 assert.ok(html.includes("pumpModel('large', BPX, BPZ, 'z', -1, 'beer', 0.9);"), 'the beer well pump uses the large one');
