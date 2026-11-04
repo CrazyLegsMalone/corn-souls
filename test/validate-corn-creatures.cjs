@@ -152,8 +152,9 @@ assert.ok(html.includes("s.scale.setScalar(K.scale); s.position.y = -P.minY * K.
   assert.ok(html.includes('if (M[4]) cornCut(g.position.x, g.position.z, 1.2);'), 'the other player\'s mower cuts on my screen too');
   assert.ok(html.includes('cm.userData.noHit = true; scene.add(cm); cornField(cm);') && html.includes('pm.userData.noHit = true; scene.add(pm); cornField(pm);'), 'both corn fields can be mowed'); }
 // wiring
-assert.equal((html.match(/pumpModel\('small', PX, PZ, 'z', 1, id, 0\.85\);/g) || []).length, 1, 'the fermenter recirculation pumps use the small teal model');
-assert.ok(html.includes("pumpModel('large', BPX, BPZ, 'z', -1, 'beer', 0.9);"), 'the beer well pump uses the large one');
+assert.equal((html.match(/pumpModel\('small', PX, PZ, 'x', -d, id, 0\.85\);/g) || []).length, 1, 'the fermenter recirculation pumps use the small teal model (pointing at their tanks, v1.97.114)');
+assert.ok(html.includes("pumpModel('small', DX, zg, 'x', -d, id, 0.6);"), 'and the four shared drain pumps a smaller copy of it');
+assert.ok(html.includes("pumpModel('large', BPX, BPZ, 'x', 1, 'beer', 0.9);"), 'the beer well pump uses the large one');
 assert.ok(html.includes('  loadPumpModels();') && html.includes('  loadCreeps();'), 'both load at start-up');
 assert.ok(html.includes("stepSafe('creeps', () => updateCreeps(dt));"), 'creatures update every frame');
 assert.ok(html.includes('if (!done && CREEP.list.length && creepPaintHit(p, dir, len, B.c)) { splatSnd(p); done = true; }'), 'paintballs hit them');

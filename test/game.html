@@ -6135,6 +6135,10 @@ function init(container) {
   const fz = [Z7, Z7 - ROW, Z7 - 2 * ROW];                                       // rows 2-4 (east) and 7-6-5 (west)
   const fx = [[FXE, Z1], [FXE, fz[0]], [FXE, fz[1]], [FXE, fz[2]], [FXW, fz[2]], [FXW, fz[1]], [FXW, fz[0]]];
   const ZN = fz[2], AC = (FXW + FXE) / 2;                                        // northmost row, alley center line
+  // the four pairs side by side in their column and the gap between each pair: Ferm 1-2 and 3-4 (east), 5-6 and 7 + beer well (west)
+  const GZS = Z7 + FR + GAP / 2, GZN = fz[1] - FR - GAP / 2;                         // south gaps (1-2, 7-BW) and north gaps (3-4, 5-6)
+  const FERM_GAP = [GZS, GZS, GZN, GZN, GZN, GZN, GZS];                            // the gap each fermenter shares with its pair
+  const FERM_PAIRS = [[FXE, GZS, 'f0'], [FXE, GZN, 'f2'], [FXW, GZN, 'f4'], [FXW, GZS, 'f6']];   // drain pump spots (column, gap, clicks open)
   const bubbleGeo = new T.SphereGeometry(0.45, 6, 5);
   fx.forEach(([x, z], i) => {
     const t = tank(x, z, FR, FH, 0x3ddc84, 0xd9a441, 'f' + i, { level: 0.8, dome: false, noRail: true });   // flat top (deck + guardrail added below)
@@ -6169,14 +6173,25 @@ function init(container) {
     const shaft = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, FH, 6), mat(0x8a96a3)); shaft.position.y = FH / 2 + 1; ag.add(shaft);
     for (const y of [2.8, 7.5]) for (let k = 0; k < 2; k++) { const bl = new T.Mesh(new T.BoxGeometry(FR * 0.7, 0.25, 0.6), mat(0x8a96a3)); bl.position.y = y; bl.rotation.y = k * Math.PI / 2; ag.add(bl); }
     scene.add(ag); spinners.push({ o: ag, axis: 'y', k: 'agit', i });
-    // recirculation pump inside the building, tucked against the alley side of the tank (motor along the wall, alley center stays clear)
-    const tx = x - d * FR * 0.95, PX = x - d * (FR + 1.1), PZ = z + 3.2;
-    pipe([[tx, 1.6, z + 2.6], [PX, 1.6, PZ]], id, 0.36);
-    pumpModel('small', PX, PZ, 'z', 1, id, 0.85);   // the owner's teal motor pump (v1.97.108)
-    const rec = [[PX, 1.6, PZ], [PX, 12, PZ], [tx, 12, z + 2.6]];
+    // recirculation pump (v1.97.114, owner's picture of Ferm 1 / 2): at the foot of the tank on the alley side, next to the gap it
+    // shares with its pair (1-2, 3-4, 5-6, 7 and the beer well), pointing straight at the tank: volute and suction toward the
+    // tank, motor out toward the alley. The pair's shared drain pump sits in the gap between them (FERM_PAIRS below).
+    const zg = FERM_GAP[i], PZ = zg + Math.sign(z - zg) * 2.0, wo = Math.sqrt(FR * FR - (PZ - z) * (PZ - z)), PX = x - d * (wo + 1.4), tx = x - d * (wo - 0.15);
+    pipe([[tx, 0.85, PZ], [PX + d * 0.35, 0.85, PZ]], id, 0.32);   // suction: straight out of the tank into the volute
+    pumpModel('small', PX, PZ, 'x', -d, id, 0.85);   // the owner's teal motor pump, motor toward the alley
+    const rec = [[PX, 1.25, PZ], [PX, 12, PZ], [tx, 12, PZ]];   // discharge: up off the top of the volute and back into the top of the tank
     pipe(rec, id, 0.36);
-    O.ferms[i].rec = flow([[tx, 1.6, z + 2.6], [PX, 1.6, PZ], ...rec].map(q => V3(...q)), new T.SphereGeometry(0.28, 6, 5), 0xd9a441, 16, { speed: 5 });
+    O.ferms[i].rec = flow([[tx, 0.85, PZ], [PX, 0.85, PZ], ...rec].map(q => V3(...q)), new T.SphereGeometry(0.28, 6, 5), 0xd9a441, 16, { speed: 5 });
   });
+  // the shared drain pumps (v1.97.114): a smaller pump in the mouth of each pair's gap, pointing into the gap like the ferm pumps,
+  // a drain line from each tank of the pair into it, and its discharge up to the pipe rack beam that rests across the gap
+  for (const [x, zg, id] of FERM_PAIRS) {
+    const d = x === FXE ? 1 : -1, DX = x - d * 4.5;
+    pumpModel('small', DX, zg, 'x', -d, id, 0.6);
+    for (const s of [-1, 1]) pipe([[x - d * 2.2, 0.6, zg + s * 1.5], [x - d * 2.7, 0.6, zg]], id, 0.22);   // out of each tank's foot inside the gap, meeting in the middle
+    pipe([[x - d * 2.7, 0.6, zg], [DX + d * 0.3, 0.6, zg]], id, 0.24);   // and on into the drain pump's volute
+    pipe([[DX, 1.2, zg], [DX, FY - 0.9, zg]], id, 0.26);   // discharge up to the rack
+  }
   // Beer leaves a fermenter through the drain in its own bottom head into the transfer main inside the building. There is
   // no drain run lying on the concrete along the outside of either column, no stub off every tank, and nothing climbing
   // the office wall to reach the beer well - that is not how the fermenters connect to each other or to the beer well.
@@ -6890,7 +6905,7 @@ function init(container) {
     scene.traverse(o => { if (o.isMesh && o.material === roofM && !o.userData.ribs) { o.userData.ribs = 1; const uv = o.geometry.attributes.uv, k = o.geometry.parameters.depth / 0.61; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * k); } });
   }
   // beer well pump inside the alley on the east side of the beer well; beer goes overhead to distillation
-  const BPX = FXW + Math.sqrt(BWR * BWR - 25) + 1.1, BPZ = BWZ - 5;
+  const BPZ = Z7 + FR + GAP / 2 + 2.0, BWO = Math.sqrt(BWR * BWR - (BWZ - BPZ) * (BWZ - BPZ)), BPX = FXW + BWO + 1.4;   // v1.97.114: by the gap it shares with Ferm 7, pointing at the beer well
 
   // ---------- DISTILLATION (placeholder): a marked area outside, south of the cook building ----------
   // distillation: outdoor concrete pad south of the evap alley, as wide as the evap alley (process building west block), north of the cross road
@@ -6899,8 +6914,9 @@ function init(container) {
     box(w, 0.35, d, mat(0xa0a6ad), x, 0.2, z, 'col');                                              // curb
   box(DISTW, 0.25, DISTD, mat(0xc9ccd1), DISTX, 0.15, DISTZ, 'col');                              // concrete pad
   // beer well pump inside the building (east side of the beer well); beer goes overhead to distillation
-  pumpModel('large', BPX, BPZ, 'z', -1, 'beer', 0.9);   // the owner's big teal motor pump (v1.97.108)
-  const bwOut = [[BPX - 1.1, 1.6, BPZ + 0.5], [BPX, 1.6, BPZ], [BPX, 7.6, BPZ], [BPX, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 1.6, DISTZ0 + 2]];   // beer runs overhead down the ferm alley, out the south wall
+  pumpModel('large', BPX, BPZ, 'x', 1, 'beer', 0.9);   // the owner's big teal motor pump, motor toward the alley
+  const BRX = FXW + BWR + 1.1;   // the beer line runs south just clear of the beer well (it used to clip its side)
+  const bwOut = [[FXW + BWO - 0.15, 0.9, BPZ], [BPX, 0.9, BPZ], [BPX, 7.6, BPZ], [BRX, 7.6, BPZ], [BRX, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 1.6, DISTZ0 + 2]];   // beer runs overhead down the ferm alley, out the south wall
   pipe(bwOut, 'dist', 0.42);
   
   O.fFeed = flow(bwOut.map(q => V3(...q)), blob, 0xd9a441, 60, { speed: 7 });
