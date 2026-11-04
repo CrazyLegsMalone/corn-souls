@@ -1,3 +1,11 @@
+## TEST v1.97.135 — 90% fewer grass tufts (2026-11-04)
+- Owner: *"remove 90% of the grass tufts"*.
+- `GRASS.density` 0.16 → **0.0165** tufts per m². Below 3 tufts per 4 m cell, `grassChunk` keeps only that fraction of cells (`keep = n / 3`), and each kept cell still gets a clump of 3. The grass stays clumpy instead of turning into lone blades. Previously the per-cell count could never go below 1, so a lower density alone couldn't get there.
+- Measured over a 7 x 7 block of chunks with the game's own chunk code: **1,956 tufts vs 19,635 before (10.0%)**. In the running game, 279 tufts are around you on open grass.
+- A density saved in the browser from before (`cs_grass` without `v: 2`, only ever set from the console) is ignored, so nobody keeps the old amount. New saves carry `v: 2`.
+- `validate-grass.cjs` now builds chunks at the game's own default. It checks that the count is 7–13% of the old 0.16 over 49 chunks and that tufts come in threes.
+- Bumped TEST to `1.97.135` / `corn-souls-test-shell-v162`.
+
 ## TEST v1.97.134 — one grain pile, as asked (2026-11-04)
 - Owner: *"just needs the one pile in the spot i asked for. i nevewr asked for 2 piles"*.
 - **Removed the second pile** (the "loader heap" across the track, added in v1.97.130 as a landing bank and reshaped in v1.97.133) and its code: the cut-face profile, `gpPchip`, the `GP_TRACK` lookup and the second heightfield. `GRAIN_PILES` is now the one plain heap. It is unchanged from v1.97.133: 4.8 m peak at x -224, repose sides, rounded uneven outline. It still sits where the jump has been since v1.97.130, just west of the box on the owner's map.

@@ -74,9 +74,10 @@ const stubs = () => ({
   scene: { add() {}, remove() {} }, renderer: {}, localStorage: { getItem: () => null, setItem() {} },
   GRASS_H: 0.42, GRASS_W: 0.5, GRASS_SINK: 0.42 * 2 / 32
 });
-const grassCtx = (probe = () => 0) => {
+const GAME_DENSITY = +html.match(/const GRASS = \{\s*on: true, density: ([0-9.]+),/)[1];   // the game's own default
+const grassCtx = (probe = () => 0, density = GAME_DENSITY) => {
   const ctx = stubs();
-  ctx.GRASS = { on: true, density: 0.16, dist: 96, chunk: 64, ring: 1, atlas: {}, mats: {}, geo: {}, chunks: new Map(), solids: [1], solidsT: 0, made: 0, shown: 0 };
+  ctx.GRASS = { on: true, density, dist: 96, chunk: 64, ring: 1, atlas: {}, mats: {}, geo: {}, chunks: new Map(), solids: [1], solidsT: 0, made: 0, shown: 0 };
   ctx.grassProbe = probe;
   ctx.grassGeo = () => ({});
   ctx.grassMat = () => ({});
@@ -90,8 +91,11 @@ const grassCtx = (probe = () => 0) => {
 {
   const a = grassCtx(), b = grassCtx();
   a.grassChunk(0, 0); b.grassChunk(0, 0);
-  assert.ok(a.GRASS.made > 0, 'a chunk on open grass grows tufts (' + a.GRASS.made + ' of ' + Math.round(64 * 64 * 0.16) + ' samples)');
-  assert.ok(a.GRASS.made < 64 * 64 * 0.16 * 0.8, 'but sparsely - the clump mask leaves bare ground between them');
+  assert.ok(a.GRASS.made > 0, 'a chunk on open grass grows tufts (' + a.GRASS.made + ')');
+  // v1.97.135, owner: "remove 90% of the grass tufts" - a tenth of what the old 0.16 default grew, still in clumps of 3
+  let old = 0, now = 0; for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) { const o = grassCtx(() => 0, 0.16), n = grassCtx(); o.grassChunk(cx, cz); n.grassChunk(cx, cz); old += o.GRASS.made; now += n.GRASS.made; }
+  console.log('  grass: ' + now + ' tufts vs ' + old + ' before (' + (100 * now / old).toFixed(1) + '%)'); assert.ok(now / old > 0.07 && now / old < 0.13, 'about a tenth of the old tufts (' + now + ' vs ' + old + ', ' + (100 * now / old).toFixed(1) + '%)');
+  assert.ok(now % 3 === 0, 'still in clumps of three, not lone blades');
   assert.equal(a.GRASS.made, b.GRASS.made, 'and the same chunk grows the same tufts every session (seeded)');
   assert.ok(a.GRASS.chunks.get('0:0').meshes.length <= 6, 'packed into at most one instanced mesh per frame');
   const c = grassCtx(() => null);   // a probe that never finds grass: dirt, concrete, the corn, a floor
