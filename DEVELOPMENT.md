@@ -1,3 +1,14 @@
+## TEST v1.97.155 — a cooling tower plume off every fan, not one out of the middle (2026-11-04)
+- Owner: *"cooling tower clouds should come from each cooling fan that is running not just a single point"*.
+- **What it was:** one `STACKS` entry at the tower's centre (`x: TOWER.x, z: TOWER.z`, rate 8, radius `max(2.6, w * 0.12)`), so a single column rose out of the middle of a 47 m deck while four fan rotors turned on top of it.
+- **Now:** one plume per fan rotor (`Fan_Rotor_0..3`, the same nodes the fans spin on), each at that rotor's own world position on the deck (`f.getWorldPosition(V3())`, never below the deck top `bb.max.y - 0.6`), with the same **8 puffs a second split between them** (2 each) and a smaller cloud each (`FR = max(1.2, w * 0.045)` against the old deck-wide radius). So four columns rise eleven metres apart and blend into one drift above the tower instead of one column out of the centre. `TOWER.stacks` holds them.
+- **"that is running":** `updateCoolingTower` now sets `spinning` on each of the tower's plumes (`!POWER_OUTAGE.on`), and `updatePlumes` makes no puffs for a stack with `spinning === false` - so an outage stops the fans *and* their drift together, and the hook is there if a single cell is ever taken out of service.
+- **Fallback:** a model with no named rotors still gets the single deck plume it had before, at rate 8.
+- Cost is unchanged: the total rate is the same 8 a second and the sprite pool is per stack, so ~22 live sprites a plume (~88 for four) against ~88 before.
+- Tests: `validate-power-outage-machines.cjs` (which owns the tower) now reads the four rotor positions straight out of the GLB's node matrices and prints them - **x 33.5, 44.5, 55.5, 66.5, closest pair 11.0 m apart**, all up on the deck - so "four plumes, not one point" is measured, not assumed. It also pins the per-fan position code, the `spinning` flag both ways, and the no-rotor fallback.
+- Verified locally: the 46 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.155` / `corn-souls-test-shell-v182`.
+
 ## TEST v1.97.154 — half as many grass tufts (2026-11-04)
 - Owner: *"there should be half as many tufts"*.
 - `GRASS.density` goes **0.0165 -> 0.00825 tufts/m²**, exactly half. Everything else about the grass is untouched: 4 m probe grid, 3 tufts in a kept cell (so it is still clumps, not lone blades), the clump mask, the seeded per-chunk scatter, 64 m chunks, the 3x3 ring and the 96 m draw distance.

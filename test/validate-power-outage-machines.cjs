@@ -305,9 +305,35 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('if (!TOWER.fans.length || POWER_OUTAGE.on) return;'), 'the fans stop dead with the plant');
   assert.ok(html.includes('POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'grid-fed stacks (RTO, cooling tower) go cold with the plant');
   assert.ok(html.includes('rate: 7, grid: true });'), 'the RTO stack is flagged grid-fed');
+  // v1.97.155, owner: "cooling tower clouds should come from each cooling fan that is running not just a single point". One
+  // drift per fan rotor, at that fan's own place on the deck, the same 8 puffs a second split between them, and a fan that
+  // is not turning makes none (TOWER.stacks carry `spinning`, and the plume loop reads it).
+  assert.ok(html.includes('fans: [], stacks: [], ready: false }'), 'the tower keeps its own list of plumes');
+  assert.ok(html.includes('const p = f.getWorldPosition(V3()), S = { x: p.x, y: Math.max(FY, p.y + 0.2), z: p.z, r: FR, rate: 8 / TOWER.fans.length, grid: true, fan: f, spinning: true };'),
+    'one drift per fan rotor, at that fan, with the rate split between them');
+  assert.ok(html.includes('for (const S of TOWER.stacks) S.spinning = spinning;'), 'the fans tell their plumes whether they are turning');
+  assert.ok(html.includes('S.spinning === false ? 0 : POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'and the plume loop makes no puffs for a fan that is not');
+  assert.ok(html.includes("else { const S = { x: TOWER.x, y: FY, z: TOWER.z, r: Math.max(2.6, w * 0.12), rate: 8, grid: true, spinning: true };"),
+    'a model with no named rotors still gets one drift off the deck, as before');
+  assert.ok(html.includes('const FY = bb.max.y - 0.6, FR = Math.max(1.2, w * 0.045);'), 'each fan gets a smaller cloud than the one deck-wide plume did');
   assert.ok(html.includes("nameplate('COOLING TOWER|CELLS 1-4'"), 'the hardstand is labelled');
   assert.ok(!html.includes("mark('COOLING"), 'the painted placeholder is gone');
   const SC = 2, roadEdge = 185 + 10.7 / 2, towerNorth = 202 + mn[2] * SC, towerSouth = 202 + mx[2] * SC;
+  // v1.97.155: four fans, four plumes. Each rotor's place in the *placed* tower (scale 2 at x 50, z 202) is where its drift
+  // starts, so they have to be four different places along the deck - not one point in the middle, which is what it was.
+  { const fans = [];
+    const find = (i, parent) => {
+      const n = doc.nodes[i], mm = mul(parent, nmat(n));
+      if (/^Fan_Rotor_\d$/.test(n.name || '')) fans.push([mm[0][3] * SC + 50, mm[1][3] * SC, mm[2][3] * SC + 202]);
+      for (const c of n.children || []) find(c, mm);
+    };
+    for (const i of doc.scenes[doc.scene || 0].nodes) find(i, I);
+    assert.equal(fans.length, 4, 'four rotors in the model, so four plumes');
+    const xs = fans.map(f2 => f2[0]).sort((a, b) => a - b), gap = Math.min(...xs.slice(1).map((x, i) => x - xs[i]));
+    console.log('  cooling tower fans at x ' + xs.map(x => x.toFixed(1)).join(', ') + ', closest pair ' + gap.toFixed(1) + ' m apart');
+    assert.ok(gap > 8, 'the fans stand metres apart along the deck (' + gap.toFixed(1) + ' m), so four plumes read as four');
+    assert.ok(xs[0] > 50 - 26 && xs[3] < 50 + 26 && fans.every(f2 => f2[1] > 4), 'and all four are up on the deck, spread across it');
+  }
   assert.ok(Math.abs((mx[0] - mn[0]) * SC - 47.3) < 1.2, 'the footprint really is doubled: ' + ((mx[0] - mn[0]) * SC).toFixed(1) + ' x ' + ((mx[2] - mn[2]) * SC).toFixed(1) + ' m');
   assert.ok(towerNorth - roadEdge > 3, 'the doubled tower clears the south road by ' + (towerNorth - roadEdge).toFixed(1) + ' m');
   assert.ok(towerNorth > roadEdge, 'and never crosses it (north face at z ' + towerNorth.toFixed(1) + ', road edge ' + roadEdge.toFixed(1) + ')');

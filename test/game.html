@@ -5382,7 +5382,7 @@ function loadSubstation() {
 // ---------- COOLING TOWER: the owner's 1x4 raised-sill model, on the cooling-tower area south of the south road.
 // Its four fans turn with the plant and stop dead in an outage; the white drift off the fan deck joins STACKS as a
 // grid-fed plume, so it dies with the plant the same way the RTO's does.
-const TOWER = { x: 50, z: 202, yaw: 0, scale: 2, fans: [], ready: false };
+const TOWER = { x: 50, z: 202, yaw: 0, scale: 2, fans: [], stacks: [], ready: false };
 // ---------- MILO RADE vending machines: one in the process break room, one in the scale house. Both instances share one
 // upload of the model (clone() shares geometry and materials), and the machine's advert panel is its embedded PNG.
 // ---------- NPC CHARACTER MODELS: same rigid-part rig family as Squeeg (flat export, named parts), so the limbs are
@@ -5710,11 +5710,22 @@ function loadCoolingTower() {
     nameplate('COOLING TOWER|CELLS 1-4', TOWER.x, bb.max.y * 0.62, bb.min.z - 0.5, 0.2, 0, -1, 1.6);
     wallSegs.push([bb.min.x, bb.min.z, bb.max.x, bb.min.z], [bb.min.x, bb.max.z, bb.max.x, bb.max.z],
       [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
-    STACKS.push({ x: TOWER.x, y: bb.max.y - 0.6, z: TOWER.z, r: Math.max(2.6, w * 0.12), rate: 8, grid: true });   // drift off the fan deck
+    // v1.97.155, owner: "cooling tower clouds should come from each cooling fan that is running not just a single point".
+    // One drift per fan rotor, where that fan sits on the deck: the same 8 puffs a second between them and a smaller cloud
+    // each, so four columns rise and blend over the deck instead of one column out of the middle. A fan that is not turning
+    // makes none (see updateCoolingTower / updatePlumes).
+    scene.updateMatrixWorld(true);
+    const FY = bb.max.y - 0.6, FR = Math.max(1.2, w * 0.045);
+    if (TOWER.fans.length) for (const f of TOWER.fans) {
+      const p = f.getWorldPosition(V3()), S = { x: p.x, y: Math.max(FY, p.y + 0.2), z: p.z, r: FR, rate: 8 / TOWER.fans.length, grid: true, fan: f, spinning: true };
+      TOWER.stacks.push(S); STACKS.push(S);
+    } else { const S = { x: TOWER.x, y: FY, z: TOWER.z, r: Math.max(2.6, w * 0.12), rate: 8, grid: true, spinning: true }; TOWER.stacks.push(S); STACKS.push(S); }   // no named rotors: one drift off the deck, as before
     TOWER.ready = true;
   }, 'cooling tower');
 }
 function updateCoolingTower(dt) {
+  const spinning = !POWER_OUTAGE.on;   // v1.97.155: drift comes off each fan, and a fan that is not turning makes none
+  for (const S of TOWER.stacks) S.spinning = spinning;
   if (!TOWER.fans.length || POWER_OUTAGE.on) return;   // no power: the fans stop where they are
   for (const f of TOWER.fans) f.rotateY(dt * 7.5);
 }
@@ -9503,7 +9514,7 @@ function updatePlumes(dt) {
   const pk = SKY.k * SKY.k * (3 - 2 * SKY.k), plK = 0.2 + 0.8 * pk;   // steam dims with the sky like the clouds, so it does not glow white at night
   for (const S of STACKS) {
     if (!S.parts) S.parts = [];
-    S.acc = (S.acc || 0) + dt * (POWER_OUTAGE.on && S.grid ? 0 : S.rate);   // grid-fed stacks (RTO, cooling tower) go cold with the plant
+    S.acc = (S.acc || 0) + dt * (S.spinning === false ? 0 : POWER_OUTAGE.on && S.grid ? 0 : S.rate);   // grid-fed stacks (RTO, cooling tower) go cold with the plant, and a fan stack follows its own fan (v1.97.155)
     while (S.acc >= 1) { S.acc -= 1; let q = S.parts.find(o => !o.alive);
       if (!q) { if (S.parts.length >= 70) break; const sp = new T.Sprite(new T.SpriteMaterial({ map: plumeTex, color: 0xf4f6f7, transparent: true, depthWrite: false, opacity: 0 })); sp.userData.noHit = true; scene.add(sp); q = { s: sp }; S.parts.push(q); }
       q.alive = true; q.age = 0; q.life = 9 + Math.random() * 4; q.p = V3(S.x + (Math.random() - 0.5) * S.r, S.y, S.z + (Math.random() - 0.5) * S.r); q.v = V3((Math.random() - 0.5) * 0.4, 2.6 + Math.random(), (Math.random() - 0.5) * 0.4); q.s.visible = true; }
