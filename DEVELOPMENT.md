@@ -1,3 +1,9 @@
+## TEST v1.97.117 — ribbed metal siding on every building's outside walls (2026-11-04)
+- Owner (screenshot of the process building's ribbed wall): *"use this texture for all exterior building walls"*.
+- **Siding** (`METAL SIDING` next to `wallSegs`): the process building's sheeting texture (faint gray vertical ribs every foot) is now shared (`ribTexture`), and `ribWall(m)` puts it on a wall material, keeping that building's colour as a tint. Applied to the gray metal buildings from `building()` (energy center, MCC rooms, yeast cooler ...), the evap tower enclosure, the scale house, the storage shed, the DDG building and the receiving building (its own copy of the yellow; `mat()` colours are shared). The process building and maintenance shop already had it. Once the plant is built, `ribAll()` sets each box wall's texture coordinates so there is one rib per foot along every face, short wall or long.
+- **Fix on the way:** `mergeStatic` threw texture coordinates away when it folded the see-through wall meshes together, which flattened any textured wall to one colour; it now keeps them for textured materials.
+- New suite `test/validate-siding.cjs` (added to CI): the game's own `ribGeo` on test walls (100 ribs on a 100 ft wall, 10 on a 10 ft one, untouched other materials, idempotent), each building's wall material, and the merge keeping UVs. `validate-interior-dark.cjs` / `validate-ranger.cjs` (init order line) and `validate-west-wing.cjs` (a stand-in for `ribWall`) updated. Checked with a screenshot of each building's outside wall.
+
 ## TEST v1.97.116 — the Ranger's wheels are real tyres with rims (2026-11-04)
 - Owner (screenshot of the Ranger's wheels at night): *"fix wheels"*.
 - **Cause:** the model's wheel (`wheel_L_mesh` / `wheel_R_mesh`) is a 10-sided block with the tread texture wrapped onto its sides as well, so each wheel read as a box of tread lugs with no rim.

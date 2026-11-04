@@ -4876,6 +4876,25 @@ function tank(x, z, r, h, accent, liquid, st, opts) {
 
 // solid wall segments for walk mode: [x0, z0, x1, z1]
 const wallSegs = [], wallMats = [];   // wall materials: see-through from above, solid in Squeeg mode
+// ---------- METAL SIDING (v1.97.117, owner: "use this texture for all exterior building walls"): the process building's sheeting
+// (faint gray vertical ribs every foot) on every building's outside walls. ribWall(m) marks a wall material (each keeps its own
+// colour as a tint); once the plant is built (before mergeStatic), ribAll() gives every box wall drawn with one the right number
+// of ribs along its length, so the ribs stay a foot apart on a short wall or a long one.
+let RIB_TEX = null;
+function ribTexture() {
+  if (RIB_TEX) return RIB_TEX;
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 4; const g = cv.getContext('2d');
+  g.fillStyle = '#f3f4f3'; g.fillRect(0, 0, 64, 4); g.fillStyle = '#cfd3d7'; g.fillRect(0, 0, 3, 4); g.fillStyle = '#e4e7e9'; g.fillRect(3, 0, 3, 4); g.fillRect(30, 0, 2, 4);
+  const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return RIB_TEX = t;
+}
+function ribWall(m) { m.map = ribTexture(); m.userData.ribSiding = true; m.needsUpdate = true; return m; }
+function ribGeo(geo) {   // a box: each face gets one texture repeat per foot along its width (the ribs run up the wall)
+  if (!geo || geo.userData.ribbed || geo.type !== 'BoxGeometry') return; geo.userData.ribbed = true;
+  const P = geo.parameters, uv = geo.attributes.uv, n = geo.attributes.normal;
+  for (let i = 0; i < uv.count; i++) { const span = Math.abs(n.getX(i)) > 0.5 ? P.depth : P.width; uv.setX(i, uv.getX(i) * span / 0.3048); }
+  uv.needsUpdate = true;
+}
+function ribAll() { scene.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.ribSiding) ribGeo(o.geometry); }); }
 // ---------- ROOMS FOR THE LIGHTING PASS ----------
 // Nothing in the renderer knows indoors from outdoors: there is no baked light and no occlusion, so the sky light lights
 // an interior exactly like the yard. Every roofed building therefore registers an envelope, and every window or doorway
@@ -4901,7 +4920,7 @@ function building(x0, x1, z0, z1, h, northOpen, eastOpen, westOpen, southOpen) {
   { let at = z0; for (const [c, w] of eop) { wallSegs.push([x1, at, x1, c - w / 2]); at = c + w / 2; } wallSegs.push([x1, at, x1, z1]); }
   { let at = x0; for (const [c, w, , sill] of nop) { if (sill) continue; wallSegs.push([at, z0, c - w / 2, z0]); at = c + w / 2; } wallSegs.push([at, z0, x1, z0]); }
   const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  const wall = new T.MeshLambertMaterial({ color: 0xa7afb8, transparent: true, opacity: 0.5, depthWrite: false });
+  const wall = ribWall(new T.MeshLambertMaterial({ color: 0xa7afb8, transparent: true, opacity: 0.5, depthWrite: false }));   // ribbed metal siding
   const roof = new T.MeshLambertMaterial({ color: 0x4a5058, transparent: true, opacity: 0.42, depthWrite: false });
   wallMats.push(wall, roof);
   { let at = x0; for (const [c, ow, oh, sill] of nop) { const a = c - ow / 2, y0 = sill || 0; if (a - at > 0.05) add(new T.BoxGeometry(a - at, h, 0.3), wall, (at + a) / 2, h / 2, z0, null, true);
@@ -5748,7 +5767,7 @@ function init(container) {
   const G0 = scene.children.length;
   // ---------- RECEIVING BUILDING: 2 drive-through lanes, each with a pit; full trucks in the north doors, empties out the south ----------
   {
-    const bx0 = -202, bx1 = -172, bz0 = -12, bz1 = 12, wallH = 9, wall = mat(0xf4c430), trim = mat(0xd94848);
+    const bx0 = -202, bx1 = -172, bz0 = -12, bz1 = 12, wallH = 9, wall = ribWall(new T.MeshLambertMaterial({ color: 0xf4c430 })), trim = mat(0xd94848);   // (its own copy of the yellow: mat() is shared)
     add(holeySlab(bx0, bz0, bx1, bz1, 0.25, [...RPITS, RSTAIR]), mat(0xb5b9bf), 0, 0.095, 0, 'recv');           // floor, open over the three pits and the stairwell
     box(0.6, wallH, bz1 - bz0, wall, bx0, wallH / 2, 0, 'recv'); box(0.6, wallH, bz1 - bz0, wall, bx1, wallH / 2, 0, 'recv');
     for (const x of [bx0, bx1]) wallSegs.push([x + GDX, bz0 + GDZ, x + GDX, bz1 + GDZ, -1, 50]);   // side walls (the basement runs out under the east one)
@@ -6938,7 +6957,7 @@ function init(container) {
     const STORY = 4.2, TOWER = PH + 4 * STORY, TOP = TOWER + 3.2;   // 4 more stories over Evaps 3-8; tops stick out ~3 m above the top deck
     xs.forEach((x, i) => { evap(x, EZ, 0.1, TOP); extraCols.push([x, EZ, 2.3]); nameplate('EVAP #' + (i + 1), x, 2.4, EZ, 2.24, 0, -1); });   // faces the evap alley aisle
     // enclosure over Evaps 3-8, from the main roof up to the top deck (see-through from above like the other walls)
-    const T0 = xs[2] - 2.6, T1 = xs[7] + 2.6, TZ0 = EZ - 3.0, TZ1 = SZ, tw = new T.MeshLambertMaterial({ color: 0xe9ebe6, transparent: true, opacity: 0.5, depthWrite: false });
+    const T0 = xs[2] - 2.6, T1 = xs[7] + 2.6, TZ0 = EZ - 3.0, TZ1 = SZ, tw = ribWall(new T.MeshLambertMaterial({ color: 0xe9ebe6, transparent: true, opacity: 0.5, depthWrite: false }));
     wallMats.push(tw);
     const th = TOWER - PH, tcy = PH + th / 2;
     add(new T.BoxGeometry(T1 - T0, th, 0.3), tw, (T0 + T1) / 2, tcy, TZ0, null, true); add(new T.BoxGeometry(T1 - T0, th, 0.3), tw, (T0 + T1) / 2, tcy, TZ1, null, true);
@@ -7083,7 +7102,7 @@ function init(container) {
     const SH0 = scene.children.length, SHW = wallSegs.length, SHS = WALK_SURF.length, SHD = (O.swingDoors || []).length;   // everything after this moves east with the road
     const X0 = 56, X1 = 90, ZN = NROAD + 4.5, ZS = SCZ_OUT - 4.5, FY = 0.3, H = 3.2, HZ = (ZN + ZS) / 2;   // building outline, floor height
     const TX = 82, HN = HZ - 0.7, HS = HZ + 0.7, WINX = 86;                                                // tech room west wall, hallway walls, window x
-    const wm = new T.MeshLambertMaterial({ color: 0xf1f1ee, transparent: true, opacity: 0.6, depthWrite: false }); wallMats.push(wm);
+    const wm = ribWall(new T.MeshLambertMaterial({ color: 0xf1f1ee, transparent: true, opacity: 0.6, depthWrite: false })); wallMats.push(wm);   // outside walls: ribbed siding
     const iw = new T.MeshLambertMaterial({ color: 0xe6e2d8, transparent: true, opacity: 0.6, depthWrite: false }); wallMats.push(iw);
     const glassM = new T.MeshLambertMaterial({ color: 0x9fc4d8, transparent: true, opacity: 0.45 });
     // a straight wall from a to b along x (fixed z) or along z (fixed x); openings: [center, width, bottom, top] (bottom 0 = doorway)
@@ -7222,7 +7241,7 @@ function init(container) {
   {
     const X0 = 37.4 + 8.7, X1 = X0 + 7.3, Z0 = 44, Z1 = 44 + 3.66, FL = 0.25, EAVE = 3.1, RIDGE = EAVE + 0.6, trim = mat(0x8a6f42);
     const cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2, W = X1 - X0, D = Z1 - Z0, T2 = 0.1;
-    const wood = new T.MeshLambertMaterial({ color: 0xb59a5e, transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide }); wallMats.push(wood);
+    const wood = ribWall(new T.MeshLambertMaterial({ color: 0xb59a5e, transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide })); wallMats.push(wood);
     const wbox = (w, h, d, x, y, z) => add(new T.BoxGeometry(w, h, d), wood, x, y, z, null, true);
     // floor (raised) and walls, with openings for the roll-up door (east), man door and window (south)
     add(new T.BoxGeometry(W, FL, D), mat(0x9a8058), cx, FL / 2, cz, null);
@@ -7289,7 +7308,7 @@ function init(container) {
   // Big roll-up door at the SW corner facing south with a man door just east of it; another man door at the NE corner facing north.
   {
     const X0 = -201, X1 = -169, Z0 = 31.5, Z1 = 71.5, H = 18;
-    const wm = new T.MeshLambertMaterial({ color: 0xc9c4b8, transparent: true, opacity: 0.55, depthWrite: false });
+    const wm = ribWall(new T.MeshLambertMaterial({ color: 0xc9c4b8, transparent: true, opacity: 0.55, depthWrite: false }));
     const rm = new T.MeshLambertMaterial({ color: 0x5a6068, transparent: true, opacity: 0.45, depthWrite: false });
     wallMats.push(wm, rm);
     // one wall line along x (at z) with door openings [[center x, width, height], ...]
@@ -8083,7 +8102,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); buildDirtHills(); lightBuild(); mergeStatic();
+  buildBillboards(); buildDirtHills(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
@@ -10248,9 +10267,10 @@ function mergeStatic() {
   for (const G of groups.values()) {
     if (G.list.length < 2) continue;
     let n = 0; const parts = G.list.map(o => { let g = o.geometry; g = g.index ? g.toNonIndexed() : g.clone(); g.applyMatrix4(o.matrixWorld); n += g.attributes.position.count; return g; });
-    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let k = 0;
-    for (const g of parts) { pos.set(g.attributes.position.array, k * 3); nor.set(g.attributes.normal.array, k * 3); k += g.attributes.position.count; g.dispose(); }
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); geo.computeBoundingSphere();
+    const withUV = !!G.m.map && parts.every(g => g.attributes.uv);   // a textured material keeps its texture coordinates (v1.97.117: the wall siding ribs)
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uvs = withUV ? new Float32Array(n * 2) : null; let k = 0;
+    for (const g of parts) { pos.set(g.attributes.position.array, k * 3); nor.set(g.attributes.normal.array, k * 3); if (uvs) uvs.set(g.attributes.uv.array, k * 2); k += g.attributes.position.count; g.dispose(); }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); if (uvs) geo.setAttribute('uv', new T.BufferAttribute(uvs, 2)); geo.computeBoundingSphere();
     const m = new T.Mesh(geo, G.m); m.castShadow = G.cast; m.receiveShadow = G.recv; m.matrixAutoUpdate = false; scene.add(m);
     if (G.pk) { Object.assign(m.userData, G.pk); pickables.push(m); }
     const gone = new Set(G.list); for (const o of G.list) { scene.remove(o); removed++; }
