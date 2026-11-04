@@ -5382,6 +5382,18 @@ function loadGlbModel(url, onReady, tag) {
     .then(buf => onReady(glbBuild(buf)))
     .catch(e => console.warn('[' + (tag || 'glb') + '] ' + url.split('/').pop() + ' not loaded:', e && e.message));
 }
+// ---------- FIRE HYDRANT (v1.97.143, owner: lopoly_hydrant.glb): the owner's low-poly hydrant in place of the old code-drawn flat
+// picture. 2.1 units tall as made, drawn 0.88 m (the old picture's height), its three 64 px colour maps kept crisp (the model asks for
+// nearest-pixel sampling, which the shared GLB reader doesn't apply). Its round collider is the one placed with it.
+const HYDRANT_SCALE = 0.42;
+function hydrantModel(x, z, yaw) {
+  if (typeof document === 'undefined') return;
+  loadGlbModel('/corn-souls/assets/models/lopoly_hydrant.glb', ({ root }) => {
+    root.scale.setScalar(HYDRANT_SCALE); root.position.set(x, 0, z); root.rotation.y = yaw || 0; root.name = 'hydrant';
+    root.traverse(o => { if (o.isMesh && o.material.map) { const t = o.material.map; t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; } });
+    scene.add(root);
+  }, 'hydrant');
+}
 function loadSubstation() {
   loadGlbModel('/corn-souls/assets/models/main_power_building.glb', ({ root, byName }) => {
       const g = new T.Group(); g.position.set(SUBSTATION.x, 0, SUBSTATION.z); g.rotation.y = SUBSTATION.yaw;
@@ -7314,7 +7326,7 @@ function init(container) {
   nameplate('TF-8401|190 PROOF TANK', PRX, 2.2, P190Z, 5, -1, 0); nameplate('TS-8403|200 PROOF TANK', PRX, 2.2, P200Z, 5, -1, 0);
   { // ethanol LOADOUT shack (4 photos): 10 x 10 ft white panel shed with a gray barn-style (gambrel) metal roof, ~6 ft walls, 9 ft peak,
     // on gravel just north of Final Product Tank 1. Ridge east-west: door in the east gable (spill-kit + fire-extinguisher signs either side),
-    // double-hung window on the south wall, 6-pane window + vent in the west gable (hydrant + bollard out front), NO SMOKING on the north wall.
+    // double-hung window on the south wall, 6-pane window + vent in the west gable (hydrant + bollard out front; the hydrant is the owner's model), NO SMOKING on the north wall.
     const S = 3.05, H = 1.8, PK = 2.74, x = FPX + 1.5 - 8 * 0.3048, z = FP1Z - 28.7, h = S / 2;   // satellite: under the pipe rack, between the south road and the tank farm fence
     const tex = (w, hh, draw) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = hh; const c = cv.getContext('2d'); draw(c, w, hh); return srgbTex(new T.CanvasTexture(cv)); };
     const panels = tex(128, 64, (c, W, Hh) => { c.fillStyle = '#e9ebec'; c.fillRect(0, 0, W, Hh); c.fillStyle = '#b9bec2'; for (let k = 0; k < 8; k++) c.fillRect(k * 16, 0, 2, Hh); });
@@ -7350,7 +7362,7 @@ function init(container) {
     box(S + 5, 0.06, S + 5, mat(0xa58a5c), x, 0.03, z).castShadow = false; box(1.6, 0.08, 1.4, mat(0x9c9a94), x + h + 0.8, 0.04, z).castShadow = false;
     // fire hydrant + yellow bollard west of the shack
     { const hx = x - h - 1.6, hz = z + 0.4, red = mat(0xb5241e);
-      billboard('hydrant', hx, hz, 1); add(new T.CylinderGeometry(0.15, 0.15, 1.1, 10), mat(0xf2c200), hx + 0.1, 0.55, hz - 0.9);
+      hydrantModel(hx, hz, -Math.PI / 2); add(new T.CylinderGeometry(0.15, 0.15, 1.1, 10), mat(0xf2c200), hx + 0.1, 0.55, hz - 0.9);
       extraCols.push([hx, hz, 0.25], [hx + 0.1, hz - 0.9, 0.25]); }
     wallSegs.push([x - h, z - h, x + h, z - h], [x + h, z - h, x + h, z - 0.45], [x + h, z + 0.45, x + h, z + h], [x + h, z + h, x - h, z + h], [x - h, z + h, x - h, z - h]);
   }
@@ -10481,7 +10493,8 @@ function netUpdate(dt) {
     for (const w of Q.wheels) { w.w.rotation.x = -Q.spin; w.pv.rotation.y = w.front ? -Q.steer : 0; } if (Q.sw) Q.sw.rotation.z = -Q.steer * 3;
   }
 }
-// ---------- BILLBOARDS: trees and fire hydrants are flat pictures (drawn in code, no image files) that always turn to face the camera,
+// ---------- BILLBOARDS: trees are flat pictures (drawn in code, no image files) that always turn to face the camera (the fire hydrant
+// was one too, until the owner's 3D model replaced it in v1.97.143),
 // staying upright. All of one kind are one instanced mesh = one draw call. They still block Squeeg and the Ranger (round colliders).
 const BILL = { list: {}, mesh: {}, camX: 1e9, camZ: 1e9 };
 const BILL_SPEC = {   // width, height (m) at scale 1, canvas size, painter
@@ -10501,14 +10514,6 @@ const BILL_SPEC = {   // width, height (m) at scale 1, canvas size, painter
     }
     c.fillStyle = '#2e6b39'; c.beginPath(); c.moveTo(cx, 1); c.lineTo(cx + 4, 16); c.lineTo(cx - 4, 16); c.fill();   // leader at the very top
   }],
-  hydrant: [0.52, 0.86, 48, 80, (c, W, H) => {
-    const red = '#b8231c', dk = '#7e1611', hi = '#e0473d';
-    c.fillStyle = dk; c.fillRect(10, H - 8, 28, 8);                                    // base flange
-    c.fillStyle = red; c.fillRect(14, 22, 20, H - 30); c.fillStyle = hi; c.fillRect(16, 24, 5, H - 34);   // barrel + highlight
-    c.fillStyle = red; c.beginPath(); c.arc(24, 22, 11, Math.PI, 0); c.fill(); c.fillStyle = dk; c.fillRect(12, 20, 24, 4);   // bonnet
-    c.fillStyle = '#c9b25a'; c.fillRect(21, 6, 6, 6);                                  // operating nut
-    c.fillStyle = red; c.fillRect(4, 38, 10, 9); c.fillRect(34, 38, 10, 9); c.fillStyle = dk; c.fillRect(2, 37, 4, 11); c.fillRect(42, 37, 4, 11);   // side nozzles + caps
-    c.fillStyle = dk; c.beginPath(); c.arc(24, 50, 6, 0, 7); c.fill(); c.fillStyle = red; c.beginPath(); c.arc(24, 50, 4, 0, 7); c.fill(); }],   // front pumper cap
 };
 function billboard(kind, x, z, s) { (BILL.list[kind] = BILL.list[kind] || []).push([x, z, s || 1]); }
 function buildBillboards() {

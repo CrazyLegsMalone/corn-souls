@@ -1,3 +1,22 @@
+## TEST v1.97.143 — the owner's low-poly fire hydrant (2026-11-04)
+- Owner sent `lopoly_hydrant.glb`. The first upload arrived as the text "[object Object]" (15 bytes) and was re-sent; the second came through intact. I'd said it would replace the game's one hydrant unless told otherwise.
+- **The model:** 43.7 KB, made with THREE.GLTFExporter, kept unchanged in `assets/models/lopoly_hydrant.glb`. 18 nodes, 14 meshes, 3 materials with three 64 x 64 colour maps (red barrel / dome / nozzles, gold top nut and caps, dark gray base and rings), and nearest-pixel samplers.
+- **In the game** (`hydrantModel`): it replaces the old code-drawn flat hydrant (a camera-facing picture) west of the ethanol load-out shack, beside its yellow bollard. Placement details:
+  - 2.1 units tall as made, drawn at 0.42 scale = **0.88 m**, the old picture's height;
+  - turned so its big front nozzle faces west, away from the shack;
+  - colour maps forced to nearest-pixel (the shared GLB reader ignores glTF samplers), so it stays crisp like the rest of the PS1 look;
+  - same round collider as before.
+- The old picture's code (`BILL_SPEC.hydrant`) is removed; trees are the only billboards now.
+- Registered as `first-party-lopoly-hydrant`, credited in CREDITS.md, and listed in `assets/models/README.md`.
+- Verified in the running game: loads at x -169.5, z 193.7; its bounding box is 0.60 x 0.88 x 0.65 m, standing on the ground, all 14 parts nearest-pixel. Rendered close up and wide.
+- New suite `test/validate-hydrant.cjs` (added to CI) checks:
+  - the file is a whole GLB with the expected parts and nearest samplers;
+  - its height as made x the game's scale is 0.88 m;
+  - the loader, the crisp maps and the placement;
+  - the flat picture is gone;
+  - the registry entry and the credit.
+- Bumped TEST to `1.97.143` / `corn-souls-test-shell-v170`.
+
 ## TEST v1.97.142 — the owner's pixel fire for fires (2026-11-04)
 - Owner (an animated pixel-art fire GIF): *"can we use this for fires"*.
 - **Assets:**

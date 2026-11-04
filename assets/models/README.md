@@ -20,6 +20,7 @@ Shipped 3D GLB models in `assets/models/`:
 - `cob_stalker.glb` - "Cob Stalker" - first-party (project owner), the two creatures in the north corn field in the TEST channel.
 - `daddy_cob_legs.glb` - "Daddy Cob Legs" - first-party (project owner), the corn field boss in the TEST channel.
 - `small_teal_motor_pump.glb`, `large_teal_motor_pump.glb` - industrial motor pumps - first-party (project owner), the fermenter recirculation pumps and the beer well pump in the TEST channel.
+- `lopoly_hydrant.glb` - low-poly fire hydrant - first-party (project owner), by the ethanol load-out shack in the TEST channel.
 - `pallet.glb` — "Pallet" by Thingits — CC BY 4.0.
 
 See `../../assets/registry.json`, `../../CREDITS.md`, `../../credits.html`, and `../../ASSET_POLICY.md` for full creator attribution, source URLs, license links, and modification notes.

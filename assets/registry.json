@@ -361,6 +361,27 @@
       "notes": "The buzzard that perches on the RTO stack and carries bodies to the far pond, in the TEST channel."
     },
     {
+      "id": "first-party-lopoly-hydrant",
+      "title": "Low-poly fire hydrant",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLB (lopoly_hydrant.glb, exported with THREE.GLTFExporter)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/lopoly_hydrant.glb",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "None to the file. Drawn at 0.42 scale (2.1 units as made -> 0.88 m), its colour maps sampled nearest-pixel as the model asks (v1.97.143). Replaces the old code-drawn flat hydrant west of the ethanol load-out shack.",
+      "files": [
+        "assets/models/lopoly_hydrant.glb"
+      ],
+      "checked_on": "2026-11-04",
+      "reviewer": "Owner",
+      "evidence": "Sent by the project owner in the TEST channel (v1.97.143). 18 nodes, 14 meshes, 3 materials with three embedded 64 x 64 PNG colour maps (red, gold, dark gray), nearest-pixel samplers, no skins or animations. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-provided; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The fire hydrant by the ethanol load-out shack, in the TEST channel."
+    },
+    {
       "id": "first-party-ps1-utv-ranger",
       "title": "PS1 UTV Ranger",
       "creator": "CrazyLegsMalone (project owner) - model generated with Gemini",
