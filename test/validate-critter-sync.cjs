@@ -21,7 +21,7 @@ const make = host => {
   const off = host ? 0 : 30;   // the guest's own random critters start somewhere else
   const ctx = { T, Math, console, scene, camera, clock: 0, walk: { on: true, dead: false, drive: false, x: 0, y: 0, z: 0, yaw: 0 },
     birds: [bird(10 + off, 10), bird(-12 + off, 6)], critters: [crit('rat', 3 + off, 2), crit('lizard', -3 + off, -2)], pondFrogs: [frog(40 + off, 40), frog(44 + off, 40)],
-    V3: (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z), puff: (p, s, c) => puffs.push(c), floorAt: () => 0, tsnd: { ctx: null }, DMG_NOTIFY: m => notes.push(m),
+    V3: (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z), puff: (p, s, c) => puffs.push(c), powerGive: (k, pre) => notes.push((pre || '') + 'power:' + k), powerKindOf: o => o.kind || (o.group ? 'frog' : 'pigeon'), floorAt: () => 0, tsnd: { ctx: null }, DMG_NOTIFY: m => notes.push(m),
     flyTo: (o, p) => { o.state = 'fly'; o.from = o.g.position.clone(); o.to = p; }, farPerch: () => new T.Vector3(0, 3, 0), scareNear() {}, pigeonHits: 0, critterHits: 0,
     NET: { host, conn: { open: true, send: o => q.push(JSON.parse(JSON.stringify(o))) }, rp: null }, q, puffs, notes };
   ctx.netSend = o => { if (ctx.NET.conn && ctx.NET.conn.open) ctx.NET.conn.send(o); };
@@ -69,7 +69,7 @@ G.walk.x = G.critters[0].g.position.x; G.walk.z = G.critters[0].g.position.z + 1
 G.puffs.length = 0; assert.match(G.critterEat(), /You eat the rat/); assert.equal(G.critterEat(), null, 'one bite at a time');
 assert.equal(G.critterThrow(), 'Chewing...', 'no throwing it mid-meal'); assert.equal(G.critterPick(), 'Chewing...', 'nor putting it down');
 step(0.5); assert.ok(G.held() && G.held().g.scale.x < 1, 'it goes up to your mouth, smaller with each bite');
-step(0.8); assert.equal(G.held(), null, 'eaten'); assert.ok(G.puffs.length >= 12, 'three bites of crumbs (' + G.puffs.length + ')'); assert.ok(G.notes.includes('You ate the rat.'));
+step(0.8); assert.equal(G.held(), null, 'eaten'); assert.ok(G.puffs.length >= 12, 'three bites of crumbs (' + G.puffs.length + ')'); assert.ok(G.notes.includes('You ate the rat. power:rat'), 'and you get its power (v1.97.113)');
 assert.equal(G.critters[0].state, 'gone'); assert.equal(G.critters[0].g.visible, false); assert.equal(G.critters[0].g.parent, G.scene, 'back in the world (hidden) so it can come back later');
 assert.ok(Math.abs(G.critters[0].g.scale.x - 1) < 1e-6, 'at its own size again');
 assert.equal(H.critters[0].state, 'gone', 'the host sees it eaten'); assert.equal(H.critters[0].g.visible, false);
@@ -86,10 +86,10 @@ H.birds[1].state = 'fly'; step(0.4); G.NET.conn = null; G.critNetDrop(); assert.
 assert.ok(html.includes("  if (critNetGuest()) return;   // 2 player: the host's pigeons") && html.includes("  if (critNetGuest()) return;   // 2 player: the host's critters"), 'the guest runs no pigeon or critter AI of its own');
 assert.ok(loader.includes("if(typeof critNetGuest==='function'&&critNetGuest())return;") && loader.includes("if(typeof critNetHit==='function')critNetHit(f,col);"), 'nor frog AI; a guest\'s frog hit goes to the host');
 assert.ok(loader.includes("const frog={group,g:group,"), 'frogs can be picked up (deadNear reads .g)');
-assert.ok(html.includes("stepSafe('eat', () => updateEat(dt)); stepSafe('critNet', () => critNetUpdate(dt));"), 'eating and critter sync run every frame');
+assert.ok(html.includes("stepSafe('eat', () => updateEat(dt));") && html.includes("stepSafe('critNet', () => critNetUpdate(dt));"), 'eating and critter sync run every frame');
 for (const t of ["m.t === 'crs'", "m.t === 'crh'", "m.t === 'crp'", "m.t === 'cre'"]) assert.ok(html.includes(t), 'handles ' + t);
 assert.ok(html.includes('  critNetDrop();'), 'a dropped connection lets go of their critters');
 assert.ok(html.includes('|| critNearRp(g.position, 8);   // either player scares them'), 'pigeons fly off from either player');
 // walking and sprinting 10% slower
-assert.ok(html.includes('const sp = (run ? 17.01 : 8.91) * dt'), 'walk 8.91, sprint 17.01 (10% under 9.9 and 18.9)');
+assert.ok(html.includes("const sp = (run ? 17.01 : 8.91) * (POWER.kind === 'rat' ? 1.5 : 1) * dt"), 'walk 8.91, sprint 17.01 (10% under 9.9 and 18.9)');
 console.log('PASS: 2 player critters (pigeons, rat, lizard, frogs mirrored from the host, guest hits land on the host, carried corpse shown and protected, thrown corpse rests in the same spot, eaten on both), eating effect (three bites, crumbs, put back for respawn), walk/sprint 10% slower');
