@@ -49,11 +49,13 @@ assert.ok(upd.indexOf("stepSafe('lighting', () => lightUpdate(dt));") < guard, '
 const body = fn(html, 'frameBody');
 assert.ok(body.includes('Sim.step(sim,') && body.includes('P3.update(sim, sdt, evs);'), 'the simulation still runs behind the title (clock, netcode, roof map)');
 assert.ok(!body.includes('titleCover'), 'the gate is not in the frame body: it only decides whether to draw');
-// the warm-up counts drawn frames, after the pacing gate
+// the warm-up counts drawn frames, after the pacing gate, through the bridge (the counter is engine-block state)
 const frameSrc = fn(html, 'frame');
-assert.ok(frameSrc.includes('titleFrames++;'), 'frame() counts the frames it draws');
-assert.ok(frameSrc.indexOf('titleFrames++') > frameSrc.indexOf('if (PACE.k > 1'), 'after the pacing skip, so a capped screen warms up at the rate it draws');
-assert.ok(frameSrc.indexOf('titleFrames++') < frameSrc.indexOf('frameBody(now)'), 'and before the frame body runs');
+assert.ok(frameSrc.includes('P3.frameDrawn();'), 'frame() counts the frames it draws, through the bridge');
+assert.ok(!frameSrc.includes('titleFrames'), 'and never touches the engine block\'s counter directly (that threw a ReferenceError in v1.97.149-152, see validate-frame-loop.cjs)');
+assert.ok(frameSrc.indexOf('P3.frameDrawn()') > frameSrc.indexOf('if (PACE.k > 1'), 'after the pacing skip, so a capped screen warms up at the rate it draws');
+assert.ok(frameSrc.indexOf('P3.frameDrawn()') < frameSrc.indexOf('frameBody(now)'), 'and before the frame body runs');
+assert.ok(html.includes('frameDrawn: () => { titleFrames++; },'), 'the bridge bumps that counter');
 // the readout can say so, the same way it says PAUSED / noGun
 assert.ok(html.includes("(pf.title ? ' · title' : '')"), 'the fps line names the state');
 assert.ok(html.includes("err: '', msg: '', title: false }"), 'P3.perf carries it');
