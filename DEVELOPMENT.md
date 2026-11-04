@@ -1,3 +1,13 @@
+## TEST v1.97.151 — a phone Eat button, only while something edible is in your hands (2026-11-04)
+- Owner, on the audit's open question about a touch-screen eat button: *"yes add eat button only visible when holding something edible"*.
+- **The button:** `#eatBtn` (🍖) in the HUD next to the interact and jump buttons, `display:none` unless `body.walking:not(.pc):not(.driving).canEat`. So it is on phones and tablets, never on a desktop (`.pc`), never in a vehicle, never in pad mode, and only while it would do something.
+- **"Something edible"** is `P3.canEat` - `!!(heldDead && !heldDead.eating)` - which is exactly the condition `critterEat()` needs, so the button cannot appear with nothing in your hands or while you are already chewing. The frame body sets the class from it, the way it already sets `driving` / `nearutv` from `P3.driving` / `P3.nearUTV`.
+- **What it does:** the same call as the B key (`P3.critterEat()`), so it plays the same three crunchy bites and shows the same toast. No second code path to drift.
+- Placed above the interact button (bottom right, 104 px up) so it never covers the fire button or the act button's reach.
+- Tests: `validate-critter-eat.cjs` (which owns eating) now checks the markup, both CSS rules and the two exclusions, the `canEat` getter, the frame-body toggle, and that the handler is the same `critterEat()` + toast as B.
+- Verified locally: the 44 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes. LIVE is untouched.
+- Bumped TEST to `1.97.151` / `corn-souls-test-shell-v178`.
+
 ## TEST v1.97.150 — a hard landing costs a third of what it did (2026-11-04)
 - Owner, asked whether landings on the grain pile should be softer (18-34 HP per jump): *"lets try this"*.
 - **Where the damage came from:** not the pile itself - `vehVertical` charges the vehicle when it lands, `(hit - AIR.HURT) * 6` HP, and jumping the pile sends the Ranger off a 4.5-5 m peak and lands it on the grass past the track at 11-15 m/s, i.e. 2-6 m/s over the 9 m/s limit. That is the 18-34 the owner saw.

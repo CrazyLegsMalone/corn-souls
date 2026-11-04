@@ -37,4 +37,15 @@ assert.ok(launcher.includes("if(t.held||t.net==='them'||t.isCritter||"), 'the co
 // and X tries the eating pickup before the corn carry
 const xi = html.indexOf("{ const m = P3.critterPick(); if (m) { toast(m); return; } }"), ci = html.indexOf('const r = P3.kiaToggle() || P3.radioToggle()');
 assert.ok(xi > 0 && ci > xi, 'X: critterPick runs before the launcher-patched interact line (where cornInteract goes)');
-console.log('PASS: every dead critter you can pick up can be eaten (eating pickup reaches 2.2 m round you or 3.8 m where you look; the corn carry leaves critters alone)');
+// v1.97.151, owner: "add eat button only visible when holding something edible" - a phone button that is on screen only while a
+// corpse you can eat is in your hands, does exactly what B does, and never appears in a vehicle or behind a modal/pad.
+assert.ok(html.includes('<button id="eatBtn" aria-label="Eat what you are carrying">🍖</button>'), 'the button exists in the HUD');
+assert.ok(html.includes('#eatBtn{display:none;') && html.includes('body.walking:not(.pc):not(.driving).canEat #eatBtn{display:block}'),
+  'hidden by default, shown only while walking, on touch, out of a vehicle, with the canEat class');
+assert.ok(html.includes('body.driving #eatBtn{display:none!important}') && html.includes('body.padmode #eatBtn{display:none!important}'),
+  'and never over the driving controls or the pad mode');
+assert.ok(html.includes('get canEat() { return !!(heldDead && !heldDead.eating); }'), 'P3.canEat is exactly "a corpse is in my hands and I am not already chewing it"');
+assert.ok(html.includes("document.body.classList.toggle('canEat', P3.walking && !P3.driving && !!P3.canEat);"), 'the frame body drives the class from that');
+assert.ok(html.includes("$('eatBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); const m = P3.critterEat(); if (m) toast(m); });"),
+  'and the button does what B does, with the same toast');
+console.log('PASS: every dead critter you can pick up can be eaten (eating pickup reaches 2.2 m round you or 3.8 m where you look; the corn carry leaves critters alone), and on a phone there is an Eat button that only shows while something edible is in your hands');
