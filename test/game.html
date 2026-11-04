@@ -127,8 +127,8 @@ body.padmode #fireBtn,body.padmode #swapBtn,body.padmode #actBtn,body.padmode #j
 body.driving #nosBar{display:block}body.nonos #nosBar,body.nonos #nosBtn{display:none!important}
 
 /* v1.97.131: the "Cry & Dry" title screen (the owner's Abyssal Harvest Fire design): a 3D PS1 cob bonfire in a silo, the title
-   and menu down the left third, CRT lines and a deep vignette over it, and a tuner folded away top right */
-#splash{position:fixed;inset:0;z-index:50;display:flex;align-items:center;background:#070403;color:#d9cbb0;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;transition:opacity 1.2s ease;overflow:hidden;--sp-ember:#ff7a1a}
+   and menu down the left third, CRT lines and a deep vignette over it (v1.97.144: the owner's settings fixed, tuner removed, magenta-pink title) */
+#splash{position:fixed;inset:0;z-index:50;display:flex;align-items:center;background:#070403;color:#d9cbb0;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;transition:opacity 1.2s ease;overflow:hidden;--sp-ember:#ff3d8b}
 #splash.out{opacity:0;pointer-events:none}
 #splash canvas#spEmb{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 #splash .crt{position:absolute;inset:0;pointer-events:none}
@@ -140,20 +140,19 @@ body.driving #nosBar{display:block}body.nonos #nosBar,body.nonos #nosBtn{display
 @keyframes spCrt{0%{opacity:.85}100%{opacity:1}}
 @keyframes spRoll{0%{top:-25vh}100%{top:110vh}}
 #splash .col{position:relative;margin-left:clamp(20px,7vw,120px);max-width:min(560px,86vw)}
-#splash .kick{font-family:'Cinzel',Georgia,serif;letter-spacing:.55em;font-size:clamp(10px,1vw,13px);color:#8a7357;margin-bottom:18px}
-#splash h1{margin:0;font-family:'Cinzel',Georgia,serif;font-weight:900;font-size:clamp(46px,8.4vw,124px);line-height:.92;letter-spacing:.04em;background:linear-gradient(180deg,#fff1c9 0%,#e9c46a 28%,#f2a03d 55%,#c24a12 82%,#9e1b14 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(255,120,30,.28)) drop-shadow(0 2px 0 rgba(0,0,0,.9));white-space:nowrap}
+#splash h1{margin:0;font-family:'Cinzel',Georgia,serif;font-weight:900;font-size:clamp(46px,8.4vw,124px);line-height:.92;letter-spacing:.04em;background:linear-gradient(180deg,#ffe6f2 0%,#ff9fd0 26%,#ff4fa2 52%,#d81b6a 78%,#8c0d3f 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(255,50,140,.32)) drop-shadow(0 2px 0 rgba(0,0,0,.9));white-space:nowrap}
 #splash h1 span{display:block}
-#splash .rule{width:min(380px,70vw);height:1px;margin:22px 0 14px;background:linear-gradient(90deg,rgba(233,196,106,.7),rgba(233,196,106,0))}
+#splash .rule{width:min(380px,70vw);height:1px;margin:22px 0 14px;background:linear-gradient(90deg,rgba(255,110,180,.75),rgba(255,110,180,0))}
 #splash .sub{font-style:italic;font-weight:600;font-size:clamp(20px,2.4vw,32px);letter-spacing:.08em;color:#d9cbb0}
 #splash .sub b{font-style:normal;font-weight:600;color:var(--sp-ember)}
-#splash .tap{margin-top:clamp(40px,9vh,90px);font-family:'Cinzel',Georgia,serif;font-weight:600;letter-spacing:.42em;font-size:clamp(12px,1.3vw,16px);color:#f6e3ae;text-shadow:0 0 12px rgba(255,140,40,.55);animation:spTap 2.6s ease-in-out infinite}
+#splash .tap{margin-top:clamp(40px,9vh,90px);font-family:'Cinzel',Georgia,serif;font-weight:600;letter-spacing:.42em;font-size:clamp(12px,1.3vw,16px);color:#ffe3f0;text-shadow:0 0 12px rgba(255,60,150,.6);animation:spTap 2.6s ease-in-out infinite}
 @keyframes spTap{0%,100%{opacity:.25}50%{opacity:1}}
 #splash .menu{margin-top:clamp(28px,6vh,60px);display:none;flex-direction:column;align-items:flex-start;gap:3px}
 #splash.m .menu{display:flex}#splash.m .tap{display:none}
 #splash .menu button{position:relative;text-align:left;background:none;border:0;padding:7px 0 7px 30px;font:600 clamp(14px,1.5vw,19px) 'Cinzel',Georgia,serif;letter-spacing:.22em;color:rgba(217,203,176,.55);cursor:pointer;transition:color .25s,letter-spacing .35s,text-shadow .25s;animation:spIn .7s ease both}
 #splash .menu button small{display:block;margin-top:2px;font:italic 500 clamp(12px,1.1vw,15px) 'Cormorant Garamond',Georgia,serif;letter-spacing:.12em;color:rgba(138,115,87,.75);text-transform:none}
-#splash .menu button::before{content:'';position:absolute;left:4px;top:15px;width:10px;height:14px;transform:scale(.2);opacity:0;background:radial-gradient(ellipse at 50% 70%,#fff3c4 0%,#f2a03d 35%,#9e1b14 75%,transparent 78%);border-radius:50% 50% 45% 45%/65% 65% 35% 35%;transition:transform .25s,opacity .25s;filter:drop-shadow(0 0 6px rgba(255,120,30,.9))}
-#splash .menu button.sel,#splash .menu button:hover{color:#f6e3ae;letter-spacing:.28em;text-shadow:0 0 14px rgba(255,130,40,.55)}
+#splash .menu button::before{content:'';position:absolute;left:4px;top:15px;width:10px;height:14px;transform:scale(.2);opacity:0;background:radial-gradient(ellipse at 50% 70%,#ffe6f2 0%,#ff4fa2 35%,#8c0d3f 75%,transparent 78%);border-radius:50% 50% 45% 45%/65% 65% 35% 35%;transition:transform .25s,opacity .25s;filter:drop-shadow(0 0 6px rgba(255,50,140,.9))}
+#splash .menu button.sel,#splash .menu button:hover{color:#ffe3f0;letter-spacing:.28em;text-shadow:0 0 14px rgba(255,60,150,.6)}
 #splash .menu button.sel::before{opacity:1;transform:scale(1);animation:spFlk .18s steps(2) infinite}
 #splash .menu button:nth-child(2){animation-delay:.08s}#splash .menu button:nth-child(3){animation-delay:.16s}#splash .menu button:nth-child(4){animation-delay:.24s}
 @keyframes spIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
@@ -161,33 +160,15 @@ body.driving #nosBar{display:block}body.nonos #nosBar,body.nonos #nosBtn{display
 #splash .menu input{font:600 clamp(18px,2.4vw,28px) 'Cinzel',Georgia,serif;width:7em;text-align:center;text-transform:uppercase;letter-spacing:.3em;background:rgba(0,0,0,.45);color:#f6e3ae;border:1px solid rgba(233,196,106,.35);border-radius:0;padding:8px 0;outline:none}
 #splash .menu input:focus{border-color:var(--sp-ember)}
 #splash .menu .hint{font-style:italic;font-size:clamp(14px,1.3vw,17px);color:#8a7357;letter-spacing:.06em;max-width:80vw}
-#splash .flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 62% 58%,#fff6dc 0%,#ffb15a 35%,#8a2410 75%,#2a0703 100%)}
+#splash .flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 62% 58%,#fff0f7 0%,#ff7ab8 35%,#8a103e 75%,#2a0310 100%)}
 #splash .flash.go{animation:spFlash 1.1s ease-out forwards}
 @keyframes spFlash{0%{opacity:0}8%{opacity:.95}100%{opacity:0}}
 #splash.shake canvas#spEmb{animation:spShake .45s steps(6)}
 @keyframes spShake{0%{transform:none}20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-3px,2px)}80%{transform:translate(2px,-1px)}100%{transform:none}}
 #splash .foot{position:absolute;left:clamp(20px,7vw,120px);bottom:22px;font:10px 'Cinzel',Georgia,serif;letter-spacing:.32em;color:rgba(138,115,87,.7)}
 #splash .sv{position:absolute;bottom:22px;right:3vw;font:11px 'Cinzel',Georgia,serif;color:rgba(138,115,87,.75);letter-spacing:.2em}
-#splash .tuner{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;width:262px;max-width:calc(100vw - 28px);background:linear-gradient(180deg,rgba(26,15,8,.94),rgba(10,6,4,.94));border:1px solid rgba(233,196,106,.28);box-shadow:0 10px 40px rgba(0,0,0,.65);color:#d9cbb0;font-family:'Cormorant Garamond',Georgia,serif;text-align:left}
-#splash .tuner .th{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer;user-select:none;font:700 10px 'Cinzel',Georgia,serif;letter-spacing:.24em;color:#e9c46a}
-#splash .tuner .th i{font-style:normal;color:#8a7357;transition:transform .25s}
-#splash .tuner.closed .th i{transform:rotate(-90deg)}#splash .tuner.closed .tbd{display:none}
-#splash .tuner .tbd{padding:4px 12px 12px;border-top:1px solid rgba(233,196,106,.18);max-height:calc(100vh - 90px);overflow:auto}
-#splash .tuner .sect{font:9px 'Cinzel',Georgia,serif;letter-spacing:.3em;color:#8a7357;margin:10px 0 4px}
-#splash .tuner .tg{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:15px;cursor:pointer}
-#splash .tuner .tg input{appearance:none;-webkit-appearance:none;width:30px;height:15px;margin:0;background:#1e130c;border:1px solid rgba(233,196,106,.35);position:relative;cursor:pointer}
-#splash .tuner .tg input::after{content:'';position:absolute;top:2px;left:2px;width:9px;height:9px;background:#8a7357;transition:left .18s,background .18s}
-#splash .tuner .tg input:checked{background:#3a1606;border-color:var(--sp-ember)}
-#splash .tuner .tg input:checked::after{left:17px;background:var(--sp-ember);box-shadow:0 0 6px var(--sp-ember)}
-#splash .tuner .sl{padding:4px 0 2px}
-#splash .tuner .sl label{display:flex;justify-content:space-between;font-size:15px}
-#splash .tuner .sl output{font:11px 'Cinzel',Georgia,serif;color:#f2a03d}
-#splash .tuner input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;margin:8px 0 4px;background:linear-gradient(90deg,#9e1b14,#f2a03d);outline:none}
-#splash .tuner input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:16px;background:#f6e3ae;border:1px solid #000;cursor:pointer;box-shadow:0 0 8px rgba(255,140,40,.7)}
-#splash .tuner input[type=range]::-moz-range-thumb{width:10px;height:16px;background:#f6e3ae;border:1px solid #000;border-radius:0;cursor:pointer}
-#splash .tuner .rst{margin-top:10px;width:100%;background:none;border:1px solid rgba(233,196,106,.3);color:#e9c46a;font:10px 'Cinzel',Georgia,serif;letter-spacing:.25em;padding:7px 0;cursor:pointer}
-@media (max-width:720px){#splash .col{margin-left:18px}#splash .tuner{width:226px}}
-@media (max-aspect-ratio:4/5){#splash{align-items:flex-end;padding-bottom:58px}#splash .kick{margin-bottom:8px}#splash .tap{margin-top:26px}#splash .menu{margin-top:16px}#splash .crt .lean{background:linear-gradient(0deg,rgba(7,4,3,.92) 0%,rgba(7,4,3,.6) 45%,rgba(7,4,3,0) 70%)}#splash .foot{bottom:14px}#splash .sv{bottom:14px}}
+@media (max-width:720px){#splash .col{margin-left:18px}}
+@media (max-aspect-ratio:4/5){#splash{align-items:flex-end;padding-bottom:58px}#splash .tap{margin-top:26px}#splash .menu{margin-top:16px}#splash .crt .lean{background:linear-gradient(0deg,rgba(7,4,3,.92) 0%,rgba(7,4,3,.6) 45%,rgba(7,4,3,0) 70%)}#splash .foot{bottom:14px}#splash .sv{bottom:14px}}
 @media (prefers-reduced-motion:reduce){#splash .crt .lines,#splash .crt .roll,#splash .tap,#splash .menu button.sel::before{animation:none}}
 body.splash #modal{z-index:60}
 </style>
@@ -220,46 +201,25 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
 <canvas id="spEmb"></canvas>
 <div class="crt"><div class="lean"></div><div class="vig"></div><div class="roll"></div><div class="lines"></div></div>
 <div class="col">
-<div class="kick">A TALE OF THE NORTH FIELD</div>
 <h1><span>CORN</span><span>SOULS</span></h1>
 <div class="rule"></div>
-<div class="sub"><b>Cry</b> &amp; <b>Dry</b> &mdash; the harvest remembers</div>
+<div class="sub"><b>Cry</b> &amp; <b>Dry</b></div>
 <div class="tap" id="spTap">TAP TO BEGIN</div>
-<div class="menu" id="spMain"><button data-a="one">NEW HARVEST<small>1 player</small></button><button data-a="host">KINDLE A BONFIRE<small>2 player &middot; host</small></button><button data-a="join">JOIN A BONFIRE<small>2 player &middot; join with a code</small></button><button data-a="ctl">RITES &amp; CONTROLS<small>how to play</small></button></div>
+<div class="menu" id="spMain"><button data-a="one">SOLO HARVEST<small>1 player</small></button><button data-a="host">HOST MULTIPLAYER<small>2 player &middot; host</small></button><button data-a="join">JOIN MULTIPLAYER<small>2 player &middot; join with a code</small></button></div>
 <div class="menu" id="spJoin" style="display:none"><div class="hint">Type the 5-letter code shown on the host's screen</div><input id="spCode" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false"><button data-a="joingo">JOIN</button><button data-a="back">BACK</button></div>
 </div>
 <div class="foot">NO KERNEL LEFT UNBURNT</div>
 <div class="flash"></div>
-<div class="tuner closed" id="spTuner">
-<div class="th" id="spTunerHead" role="button" tabindex="0" aria-expanded="false">CORN SOULS MENU TUNER <i>&#9662;</i></div>
-<div class="tbd">
-<div class="sect">LAYERS</div>
-<label class="tg">3D PS1 Bonfire <input type="checkbox" data-k="bonfire"></label>
-<label class="tg">Silhouettes <input type="checkbox" data-k="sil"></label>
-<label class="tg">Soul Embers <input type="checkbox" data-k="embers"></label>
-<label class="tg">PS1 Pixelation <input type="checkbox" data-k="pixel"></label>
-<label class="tg">CRT Scanlines <input type="checkbox" data-k="crt"></label>
-<label class="tg">Audio <input type="checkbox" data-k="audio"></label>
-<div class="sect">FLAME</div>
-<div class="sl"><label>Flame Intensity <output data-o="intensity"></output></label><input type="range" data-k="intensity" min="40" max="150"></div>
-<div class="sl"><label>Flame Color Hue <output data-o="hue"></output></label><input type="range" data-k="hue" min="0" max="360"></div>
-<div class="sl"><label>Cobfire Size <output data-o="size"></output></label><input type="range" data-k="size" min="50" max="250"></div>
-<div class="sect">PLACEMENT</div>
-<div class="sl"><label>Pos X (Left / Right) <output data-o="x"></output></label><input type="range" data-k="x" min="-6" max="6" step="0.1"></div>
-<div class="sl"><label>Pos Z (Fwd / Back) <output data-o="z"></output></label><input type="range" data-k="z" min="-6" max="4" step="0.1"></div>
-<button class="rst" type="button" id="spTunerReset">RESTORE DEFAULTS</button>
-</div></div>
 <div class="sv" id="spVer"></div>
 </div>
 <script>
 (function () {
   var sp = document.getElementById('splash'), cv = document.getElementById('spEmb'), live = true;
   if (!('ontouchstart' in window)) document.getElementById('spTap').textContent = 'PRESS ANY KEY';
-  // the title screen's tuner settings (remembered on this device)
-  var TDEF = { bonfire: true, sil: true, embers: true, pixel: true, crt: true, audio: true, intensity: 100, hue: 28, size: 100, x: 3.4, z: 0 }, TS = {}, k0;
-  for (k0 in TDEF) TS[k0] = TDEF[k0];
-  try { var sv0 = JSON.parse(localStorage.getItem('cs_title') || 'null'); if (sv0) for (k0 in TDEF) if (typeof sv0[k0] === typeof TDEF[k0]) TS[k0] = sv0[k0]; } catch (e) {}
-  function tsSave() { try { localStorage.setItem('cs_title', JSON.stringify(TS)); } catch (e) {} }
+  // v1.97.144, owner: "set the menu the way the settings are in the menu tuner then remove the menu tuner" - the owner's settings, fixed:
+  // 3D bonfire on, silhouettes off, soul embers on, PS1 pixelation on, CRT lines on, title music off, flame intensity 139, hue 0 (the
+  // magenta-pink fire), size 100%, placed at x 4.0, z 2.8
+  var TS = { bonfire: true, sil: false, embers: true, pixel: true, crt: true, audio: false, intensity: 139, hue: 0, size: 100, x: 4.0, z: 2.8 };
   // ---------- the 3D cob bonfire (v1.97.131, the owner's "Cry & Dry" title screen): the game's own three.js, rendered at a
   // third of the screen size and drawn back up with hard pixels; a silo wall, ash, embers, Daddy Cob Legs and a pump in the fog.
   // It starts as soon as three.js is in (the splash shows before the engine loads) and is torn down when the game starts.
@@ -397,26 +357,17 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
   }
 
   var R3 = null;
-  (function wait3D() { if (!live) return; if (window.THREE) { try { R3 = title3D(window.THREE); } catch (e) { console.warn('[title] 3D bonfire failed:', e && e.message); } } else setTimeout(wait3D, 60); })();
-  function tunerApply() {
-    sp.classList.toggle('nocrt', !TS.crt); sp.style.setProperty('--sp-ember', 'hsl(' + TS.hue + ',100%,55%)');
+  (function wait3D() { if (!live) return; if (window.THREE) { try { R3 = title3D(window.THREE); applyLook(); } catch (e) { console.warn('[title] 3D bonfire failed:', e && e.message); } } else setTimeout(wait3D, 60); })();
+  function applyLook() {   // the fixed settings onto the page and the 3D scene
+    sp.classList.toggle('nocrt', !TS.crt);
     if (R3) { R3.setHue(); R3.setLayout(); R3.setLayers(); }
-    if (typeof AC !== 'undefined' && AC && AC.out) AC.out.gain.setTargetAtTime(TS.audio ? 0.5 : 0.0001, AC.currentTime, 0.3);
-    Array.prototype.forEach.call(document.querySelectorAll('#spTuner [data-k]'), function (el) { var k = el.dataset.k; if (el.type === 'checkbox') el.checked = TS[k]; else el.value = TS[k]; });
-    Array.prototype.forEach.call(document.querySelectorAll('#spTuner [data-o]'), function (o) { var k = o.dataset.o, v = TS[k]; o.textContent = k === 'size' ? v + '%' : k === 'hue' ? v + '°' : (k === 'x' || k === 'z') ? (+v).toFixed(1) : v; });
   }
-  Array.prototype.forEach.call(document.querySelectorAll('#spTuner [data-k]'), function (el) {
-    el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', function () { TS[el.dataset.k] = el.type === 'checkbox' ? el.checked : parseFloat(el.value); tunerApply(); tsSave(); }); });
-  function tunerToggle() { var t = document.getElementById('spTuner'); t.classList.toggle('closed'); document.getElementById('spTunerHead').setAttribute('aria-expanded', !t.classList.contains('closed')); }
-  document.getElementById('spTunerHead').addEventListener('click', tunerToggle);
-  document.getElementById('spTunerHead').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tunerToggle(); } });
-  document.getElementById('spTunerReset').addEventListener('click', function () { for (var k in TDEF) TS[k] = TDEF[k]; tunerApply(); tsSave(); });
-  function inTuner(e) { return !!(e && e.target && e.target.closest && e.target.closest('#spTuner')); }
 
   // title music, made on the fly (no file): a low droning fifth, a slow minor bell tune with a long echo, and the bonfire crackling.
   // The app starts it straight away; a web browser keeps it silent until the first tap (browser autoplay rules).
   var AC = null, mus = null;
   function music() {
+    if (!TS.audio) return;   // the owner's settings: no title music (the start gong still sounds)
     try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     var C = AC, out = C.createGain(); out.gain.value = 0.0001; out.connect(C.destination); out.gain.setTargetAtTime(0.5, C.currentTime, 1.5);
     var dly = C.createDelay(2), fb = C.createGain(), wet = C.createGain(); dly.delayTime.value = 0.62; fb.gain.value = 0.45; wet.gain.value = 0.5; dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(out);
@@ -444,13 +395,13 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
       [55, 82.5, 110.7, 164.8].forEach(function (f, i) { var o = C.createOscillator(); o.type = i ? 'sine' : 'triangle'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.97, t + 3); var k = C.createGain(); k.gain.value = [0.9, 0.5, 0.3, 0.15][i]; o.connect(k); k.connect(g); o.start(t); o.stop(t + 3.3); });
       setTimeout(function () { clearInterval(mus); C.close && C.close(); }, 3600); } catch (e) {}
   }
-  // title → menu (1 player / host / join / controls) → game
+  // title → menu (solo / host / join) → game
   var mode = 'title', sel = 0, prevPad = {};
   function list() { return Array.prototype.slice.call(document.querySelectorAll(mode === 'join' ? '#spJoin button' : '#spMain button')); }
   function mark() { list().forEach(function (b, i) { b.classList.toggle('sel', i === sel); }); }
   function show(m) { mode = m; sel = 0; sp.classList.add('m'); document.getElementById('spMain').style.display = m === 'menu' ? 'flex' : 'none'; document.getElementById('spJoin').style.display = m === 'join' ? 'flex' : 'none';
     if (m === 'join') setTimeout(function () { document.getElementById('spCode').focus(); }, 50); mark(); }
-  function toMenu() { if (AC && AC.state === 'suspended') AC.resume(); if (!AC) music(); show('menu'); wakeFx(); tunerApply(); }
+  function toMenu() { if (AC && AC.state === 'suspended') AC.resume(); if (!AC) music(); show('menu'); wakeFx(); applyLook(); }
   function wakeFx() {   // the flash, a jolt and the fire roaring up as the menu comes in
     var f = sp.querySelector('.flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
     sp.classList.add('shake'); setTimeout(function () { sp.classList.remove('shake'); }, 500); if (R3) R3.flare(1.6);
@@ -474,7 +425,7 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
   function modalOpen() { var m = document.getElementById('modal'); return m && m.classList.contains('open'); }
   function move(d) { var n = list().length; sel = (sel + d + n) % n; mark(); }
   function key(e) {
-    if (!live || modalOpen() || window.__wnClose || inTuner(e)) return;   // the controls card / patch notes card / title tuner handle their own keys
+    if (!live || modalOpen() || window.__wnClose) return;   // the controls card / patch notes card handle their own keys
     if (e.target && e.target.id === 'spCode') return;   // typing the join code: the box handles its own keys (below)
     var typing = false; e.stopImmediatePropagation();
     if (mode === 'title') { e.preventDefault(); toMenu(); return; }
@@ -490,16 +441,16 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
     if (n === 'DOWN') move(1); else if (n === 'UP') move(-1); else if (n === 'A' || n === 'START') act(list()[sel].dataset.a); else if ((n === 'B' || n === 'BACK') && mode === 'join') show('menu');
   };
   var shownAt = 0;
-  sp.addEventListener('pointerdown', function (e) { if (inTuner(e)) return; if (mode === 'title') { e.preventDefault(); shownAt = performance.now(); toMenu(); } });
+  sp.addEventListener('pointerdown', function (e) { if (mode === 'title') { e.preventDefault(); shownAt = performance.now(); toMenu(); } });
   sp.addEventListener('click', function (e) {   // menu picks on click (after the finger lifts), so the join box can take focus; the tap that opened the menu doesn't count
-    if (mode === 'title' || performance.now() - shownAt < 350 || inTuner(e)) return;
+    if (mode === 'title' || performance.now() - shownAt < 350) return;
     var t = e.target.closest && e.target.closest('button'); if (t) { sel = list().indexOf(t); mark(); act(t.dataset.a); }
   });
   window.addEventListener('keydown', key, true);
   document.getElementById('spCode').addEventListener('keydown', function (e) {   // keep the letters out of the game's own keys
     e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); act('joingo'); } else if (e.key === 'Escape') { e.preventDefault(); show('menu'); }
     else if (e.key === 'ArrowDown') { e.preventDefault(); e.target.blur(); move(1); } });
-  tunerApply();
+  applyLook();
   document.body.classList.add('splash');
   window.__splashOn = function () { return live && !!document.getElementById('splash'); };
 })();

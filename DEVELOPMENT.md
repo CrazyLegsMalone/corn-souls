@@ -1,3 +1,20 @@
+## TEST v1.97.144 — title screen: the owner's settings, no tuner, pink, new menu names (2026-11-04)
+- Owner (screenshot of the tuner set up): *"set the menu the way the settings are in the menu tuner then remove the menu tuner. give Corn Souls the magenta pinkish color scheme matching the fire. remove the harvest rememebers from the start menu. remove rites and controls. new harvest should be solo harvest. kindle a bonfire should be Host Multiplayer. join a bonfire should be Join Multiplayer. remove a tale of the north field."*
+- **Settings fixed** at the screenshot's values (`var TS`):
+  - 3D bonfire on, silhouettes **off**, soul embers on, PS1 pixelation on, CRT lines on, audio **off**;
+  - flame intensity 139, hue 0 (the magenta-pink fire), size 100%, x 4.0, z 2.8.
+  - Audio off means no title music (`music()` returns early). The start gong still plays.
+- **Tuner removed:** its markup, ~18 CSS rules, its handlers, its keyboard / tap guards and its `cs_title` storage. A browser that saved tuner settings before keeps nothing from them. `applyLook()` puts the fixed look on the page and the 3D scene.
+- **Colours:** CORN SOULS is a magenta-pink gradient (`#ffe6f2 → #ff9fd0 → #ff4fa2 → #d81b6a → #8c0d3f`) with a pink glow. The accent colour (`--sp-ember`, "Cry & Dry") is `#ff3d8b`. The rule line, PRESS ANY KEY glow, menu flame marker, selected-item glow and the wake-up flash are pink to match.
+- **Text:**
+  - "A TALE OF THE NORTH FIELD" removed;
+  - the subtitle is just "Cry & Dry";
+  - menu: **SOLO HARVEST** (1 player), **HOST MULTIPLAYER**, **JOIN MULTIPLAYER**;
+  - RITES & CONTROLS removed. The controls card is still in the in-game menu (🎮 Controls).
+- Verified in the running game at 1280 x 720 (title and menu). Old saved tuner settings in the browser are ignored.
+- `validate-title.cjs` rewritten for the new menu names and order, no controls item, no kicker or old subtitle, the tuner fully gone, the exact fixed settings, title music off, and the pink title.
+- Bumped TEST to `1.97.144` / `corn-souls-test-shell-v171`.
+
 ## TEST v1.97.143 — the owner's low-poly fire hydrant (2026-11-04)
 - Owner sent `lopoly_hydrant.glb`. The first upload arrived as the text "[object Object]" (15 bytes) and was re-sent; the second came through intact. I'd said it would replace the game's one hydrant unless told otherwise.
 - **The model:** 43.7 KB, made with THREE.GLTFExporter, kept unchanged in `assets/models/lopoly_hydrant.glb`. 18 nodes, 14 meshes, 3 materials with three 64 x 64 colour maps (red barrel / dome / nozzles, gold top nut and caps, dark gray base and rings), and nearest-pixel samplers.

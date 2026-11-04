@@ -1,33 +1,33 @@
 // Run from the test/ directory: node validate-title.cjs
 // v1.97.131: the "Cry & Dry" title screen (the owner's Abyssal Harvest Fire design) in the splash: a 3D PS1 cob bonfire, the
-// title and menu on the left, CRT lines and a tuner. Checks the menu still drives the real game actions, the tuner's 6 toggles
-// and 5 sliders, that the tuner's keys/taps don't start the game, that the 3D scene is torn down with the splash, and that no
-// class in the splash collides with one of the game's own global styles (the game's .tb touch buttons hid the tuner once).
+// title and menu on the left, CRT lines. Checks the menu drives the real game actions, the owner's fixed settings (v1.97.144: the
+// tuner is gone), the magenta-pink title, that the 3D scene is torn down with the splash, and that no class in the splash collides
+// with one of the game's own global styles.
 const fs = require('fs'), assert = require('assert/strict');
 const html = fs.readFileSync('game.html', 'utf8');
 const m0 = html.indexOf('<div id="splash"'), m1 = html.indexOf('<script>', m0);
 assert.ok(m0 > 0 && m1 > m0, 'the splash markup');
 const mk = html.slice(m0, m1);
 const s0 = m1, s1 = html.indexOf('</script>', s0), js = html.slice(s0, s1);
-// the menu: themed names, the same four actions (one / host / join / ctl) and the join box
-for (const a of ['one', 'host', 'join', 'ctl', 'joingo', 'back']) assert.ok(mk.includes('data-a="' + a + '"'), 'menu action ' + a);
-for (const id of ['spEmb', 'spTap', 'spMain', 'spJoin', 'spCode', 'spVer', 'spTuner', 'spTunerHead', 'spTunerReset']) assert.ok(mk.includes('id="' + id + '"'), '#' + id);
-assert.ok(/NEW HARVEST[\s\S]*KINDLE A BONFIRE[\s\S]*JOIN A BONFIRE[\s\S]*RITES &amp; CONTROLS/.test(mk), 'the themed menu, in order');
-assert.ok(mk.includes('<span>CORN</span><span>SOULS</span>') && mk.includes('<b>Cry</b> &amp; <b>Dry</b>'), 'the title and subtitle');
-// the tuner: 6 toggles, 5 sliders, all known settings, remembered on the device (guarded)
-const toggles = [...mk.matchAll(/type="checkbox" data-k="(\w+)"/g)].map(m => m[1]), sliders = [...mk.matchAll(/type="range" data-k="(\w+)"/g)].map(m => m[1]);
-assert.deepEqual(toggles, ['bonfire', 'sil', 'embers', 'pixel', 'crt', 'audio'], 'six layer toggles');
-assert.deepEqual(sliders, ['intensity', 'hue', 'size', 'x', 'z'], 'five sliders');
-const tdef = js.match(/var TDEF = (\{[^}]*\})/); assert.ok(tdef, 'TDEF');
-const TDEF = Function('return ' + tdef[1])();
-for (const k of toggles.concat(sliders)) assert.ok(k in TDEF, 'default for ' + k);
-for (const k of toggles) assert.equal(TDEF[k], true, k + ' on by default');
-assert.ok(/try \{ var sv0 = JSON\.parse\(localStorage\.getItem\('cs_title'\)/.test(js) && /function tsSave\(\) \{ try \{ localStorage\.setItem\('cs_title'/.test(js), 'settings load/save are wrapped in try/catch');
-// the tuner's own input never starts the game
-assert.ok(/function inTuner\(e\)/.test(js), 'inTuner');
-assert.ok(/if \(!live \|\| modalOpen\(\) \|\| window\.__wnClose \|\| inTuner\(e\)\) return;/.test(js), 'keys typed in the tuner are left alone');
-assert.ok(/addEventListener\('pointerdown', function \(e\) \{ if \(inTuner\(e\)\) return;/.test(js), 'taps on the tuner do not leave the title');
-assert.ok(/shownAt < 350 \|\| inTuner\(e\)\) return;/.test(js), 'clicks on the tuner do not pick a menu item');
+// v1.97.144, owner: "set the menu the way the settings are in the menu tuner then remove the menu tuner. give Corn Souls the magenta
+// pinkish color scheme matching the fire. remove the harvest remembers ... remove rites and controls. new harvest should be solo
+// harvest. kindle a bonfire should be Host Multiplayer. join a bonfire should be Join Multiplayer. remove a tale of the north field."
+for (const a of ['one', 'host', 'join', 'joingo', 'back']) assert.ok(mk.includes('data-a="' + a + '"'), 'menu action ' + a);
+assert.ok(!mk.includes('data-a="ctl"') && !mk.includes('RITES'), 'no controls item on the title (the controls card is in the in-game menu)');
+for (const id of ['spEmb', 'spTap', 'spMain', 'spJoin', 'spCode', 'spVer']) assert.ok(mk.includes('id="' + id + '"'), '#' + id);
+assert.deepEqual([...mk.matchAll(/data-a="(one|host|join)">([A-Z ]+)</g)].map(m => m[2]).join('|'), 'SOLO HARVEST|HOST MULTIPLAYER|JOIN MULTIPLAYER', 'the menu, renamed, in order');
+assert.ok(mk.includes('<span>CORN</span><span>SOULS</span>') && mk.includes('<div class="sub"><b>Cry</b> &amp; <b>Dry</b></div>'), 'the title and "Cry & Dry" (no "the harvest remembers")');
+assert.ok(!mk.includes('NORTH FIELD') && !mk.includes('class="kick"'), 'no "A tale of the north field"');
+// the tuner is gone; its settings are fixed at the owner's values
+assert.ok(!html.includes('spTuner') && !html.includes('#splash .tuner') && !js.includes('cs_title') && !js.includes('inTuner'), 'no tuner left (markup, styles, storage, input guards)');
+const ts = js.match(/var TS = (\{[^}]*\});/); assert.ok(ts, 'the fixed settings');
+const TS = Function('return ' + ts[1])();
+assert.equal(JSON.stringify(TS), JSON.stringify({ bonfire: true, sil: false, embers: true, pixel: true, crt: true, audio: false, intensity: 139, hue: 0, size: 100, x: 4.0, z: 2.8 }), 'exactly the owner\'s tuner settings');
+assert.ok(js.includes("function music() {\n    if (!TS.audio) return;"), 'title music off, as set');
+// magenta / pink title to match the fire
+const css0 = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+assert.ok(/#splash h1\{[^}]*linear-gradient\(180deg,#ffe6f2 0%,#ff9fd0 26%,#ff4fa2 52%,#d81b6a 78%,#8c0d3f 100%\)/.test(css0) && css0.includes('--sp-ember:#ff3d8b'), 'CORN SOULS in magenta-pink, accents to match');
+assert.ok(!/#splash h1\{[^}]*#e9c46a/.test(css0), 'not the old gold');
 // the 3D scene: waits for THREE, comes in with the menu, goes with the splash, and frees its WebGL context
 assert.ok(/function title3D\(T\)/.test(js) && /function wait3D\(\) \{ if \(!live\) return; if \(window\.THREE\)/.test(js), 'the 3D scene starts once THREE is loaded');
 assert.equal(html.split('function frame(now) {').length, 2, 'the title scene\'s loop has its own name (other suites slice the game at its frame())');
@@ -45,4 +45,4 @@ const clash = [...classes].filter(c => new RegExp('(^|[},])\\s*\\.' + c + '(?![-
 assert.deepEqual(clash, [], 'splash classes with a global game style: ' + clash.join(', '));
 // the fonts, with a fallback offline
 assert.ok(html.includes('family=Cinzel') && /'Cinzel',Georgia/.test(css), 'Cinzel / Cormorant Garamond with Georgia fallback');
-console.log('PASS: Cry & Dry title screen (themed menu on the real actions; tuner 6 toggles + 5 sliders, saved safely, never starts the game; 3D bonfire torn down with the splash; no class clashes)');
+console.log('PASS: Cry & Dry title screen (Solo Harvest / Host Multiplayer / Join Multiplayer on the real actions; the owner\'s settings fixed, tuner gone; magenta-pink title; 3D bonfire torn down with the splash; no class clashes)');
