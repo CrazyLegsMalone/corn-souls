@@ -692,6 +692,24 @@
       "checked_on": "2026-11-04",
       "reviewer": "Owner",
       "evidence": "Added by the owner's request in the TEST channel (v1.97.126): PSX tree cards for the scenery trees, 8 views per species."
+    },
+    {
+      "id": "first-party-psx-grass-tufts",
+      "title": "PSX grass tufts (6 variants, 32 px, in a 128 x 64 atlas)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided PNGs (psx-grass-cline-pack, Codex output 2026-11-04)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/textures/grass",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "None to the files. Drawn as crossed 0.42 m cutout cards with the pack's ground anchor (16, 30) on the terrain, crisp nearest pixels, seeded and clumped scatter that only takes ground the downward probe finds on the grass layer - never dirt, asphalt, a concrete pad or a building floor.",
+      "files": [
+        "assets/textures/grass/psx-grass-atlas.png",
+        "assets/textures/grass/grass-manifest.json"
+      ],
+      "checked_on": "2026-11-04",
+      "reviewer": "Owner",
+      "evidence": "Added by the owner's request in the TEST channel (v1.97.128): 'sporadically in grassy areas never on dirt or concrete'."
     }
   ]
 }

@@ -1,0 +1,77 @@
+{
+  "atlas": "psx-grass-atlas.png",
+  "atlas_size_px": [
+    128,
+    64
+  ],
+  "frame_size_px": [
+    32,
+    32
+  ],
+  "ground_anchor_px_from_top_left": [
+    16,
+    30
+  ],
+  "frames": [
+    {
+      "id": "short-fan",
+      "file": "sprites/grass-01-short-fan.png",
+      "rect_px": [
+        0,
+        0,
+        32,
+        32
+      ]
+    },
+    {
+      "id": "left-lean",
+      "file": "sprites/grass-02-left-lean.png",
+      "rect_px": [
+        32,
+        0,
+        32,
+        32
+      ]
+    },
+    {
+      "id": "dense-patch",
+      "file": "sprites/grass-03-dense-patch.png",
+      "rect_px": [
+        64,
+        0,
+        32,
+        32
+      ]
+    },
+    {
+      "id": "sparse-sprigs",
+      "file": "sprites/grass-04-sparse-sprigs.png",
+      "rect_px": [
+        0,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "id": "tall-reeds",
+      "file": "sprites/grass-05-tall-reeds.png",
+      "rect_px": [
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    {
+      "id": "wide-clump",
+      "file": "sprites/grass-06-wide-clump.png",
+      "rect_px": [
+        64,
+        32,
+        32,
+        32
+      ]
+    }
+  ]
+}

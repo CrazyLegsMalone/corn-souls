@@ -4796,7 +4796,9 @@ function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are a
   // depth slope, and a floor seen along its own plane has an almost infinite slope, so a factor of -16 pulled the pads so far forward
   // that their fragments went outside the depth range and were clipped - which is why the concrete (and every other overlaid
   // floor) appeared to simply stop a certain distance away. Slope is now always zero.
-  return new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB(kind) });
+  const gm = new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB(kind) });
+  gm.userData.ground = kind;   // the grass tufts place themselves with a downward probe: only a 'grass' hit takes them
+  return gm;
 }
 const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
 function add(geo, m, x, y, z, st, noShadow) {
@@ -5717,7 +5719,7 @@ function init(container) {
   // A pad is a thin flat plane lying on the ground, so it needs the same protection the ground textures have: its own
   // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
   // grass. The offset is resolution steps only - a slope factor here is what made the pad vanish in the distance.
-  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; return m; };
+  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; m.userData.ground = 'pad'; return m; };
   const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, GY('pad'), z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
   { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'), (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
@@ -9886,7 +9888,7 @@ function update(sim, dt, events) {
   stepSafe('kia', () => updateKia(dt)); stepSafe('radio', () => updateShopRadio(dt)); stepSafe('scarecrows', () => updateScarecrows(dt));
   stepSafe('plumes', () => updatePlumes(dt)); stepSafe('nh3', () => updateNH3(dt));
   stepSafe('balls', () => updateBalls(dt)); stepSafe('gun', () => updateGun(dt)); stepSafe('ragdolls', () => updateRagdolls(dt));
-  stepSafe('net', () => netUpdate(dt)); stepSafe('billboards', () => { updateBillboards(); updateTreeSprites(); }); stepSafe('sky', () => updateSky(dt));
+  stepSafe('net', () => netUpdate(dt)); stepSafe('billboards', () => { updateBillboards(); updateTreeSprites(); }); stepSafe('grass', () => updateGrass(dt)); stepSafe('sky', () => updateSky(dt));
   stepSafe('powerApply', () => applyPowerOutage());
 
   // trucks come when the simulation calls them
@@ -10316,6 +10318,128 @@ function updateTreeSprites() {
   }
   for (const k in TREE_SPR.mesh) { const m = TREE_SPR.mesh[k]; m.count = m.userData.n; m.visible = m.count > 0; m.instanceMatrix.needsUpdate = true; }
 }
+// ---------- GRASS (v1.97.128): the owner's PSX grass tuft atlas, scattered over the grass and nowhere else. It streams in
+// 64 m chunks round the camera: each chunk pulls its own seeded points, drops the ones a downward probe finds sitting on
+// anything but the grass layer (dirt, asphalt, concrete pads, building floors, the corn and the pivot circle all fail that
+// probe by construction), and packs the rest into one InstancedMesh per atlas frame. Six shared materials for the whole
+// world, no per-tuft entity, no colliders, no per-frame matrix work: a chunk is built once and only toggled by distance.
+const GRASS = {
+  on: true, density: 0.16, dist: 96, chunk: 64, ring: 1,   // tufts per m2, draw distance (m), chunk size (m), chunks out from the camera
+  atlas: null, mats: [], geo: null, chunks: new Map(), solids: [], solidsT: 99, made: 0, shown: 0
+};
+const GRASS_H = 0.42, GRASS_W = 0.5, GRASS_SINK = GRASS_H * 2 / 32;   // manifest anchor (16, 30): 2 px of 32 above the feet
+function grassAtlas() {
+  if (GRASS.atlas) return GRASS.atlas;
+  const t = new T.TextureLoader().load('/corn-souls/assets/textures/grass/psx-grass-atlas.png');
+  t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false;   // crisp PSX pixels
+  t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+  if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+  return (GRASS.atlas = t);
+}
+function grassMat(f) {   // one material per atlas frame, shared by every chunk in the world
+  if (GRASS.mats[f]) return GRASS.mats[f];
+  const tex = grassAtlas().clone(); tex.needsUpdate = true;
+  tex.repeat.set(0.25, 0.5); tex.offset.set((f % 3) * 0.25, f < 3 ? 0.5 : 0);   // 3 x 2 frames of 32 px in a 128 x 64 atlas
+  const m = new T.MeshLambertMaterial({ map: tex, alphaTest: 0.5, side: T.DoubleSide });   // cutout, depth written, no blending
+  return (GRASS.mats[f] = m);
+}
+function grassGeo() {   // crossed quads: a tuft reads from any angle with no per-frame billboarding (the corn's trick)
+  if (GRASS.geo) return GRASS.geo;
+  const a = new T.PlaneGeometry(GRASS_W, GRASS_H), b = new T.PlaneGeometry(GRASS_W, GRASS_H);
+  a.translate(0, GRASS_H / 2 - GRASS_SINK, 0); b.translate(0, GRASS_H / 2 - GRASS_SINK, 0); b.rotateY(Math.PI / 2);
+  const pos = new Float32Array([...a.attributes.position.array, ...b.attributes.position.array]);
+  const uv = new Float32Array([...a.attributes.uv.array, ...b.attributes.uv.array]);
+  const nor = new Float32Array([...a.attributes.normal.array, ...b.attributes.normal.array]);
+  const idx = [...a.index.array, ...Array.from(b.index.array, v => v + 4)];
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('uv', new T.BufferAttribute(uv, 2));
+  g.setAttribute('normal', new T.BufferAttribute(nor, 3)); g.setIndex(idx); g.computeBoundingSphere();
+  return (GRASS.geo = g);
+}
+function grassSolidsNear(x0, z0, S) {   // only the meshes whose bounds reach this chunk: 16 x 16 probes against 2,000 meshes would be slow
+  const out = [], cx = x0 + S / 2, cz = z0 + S / 2, r = S * 0.71 + 3;
+  for (const o of GRASS.solids) {
+    const g = o.geometry; if (!g) continue;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    const bs = g.boundingSphere; if (!bs) continue;
+    const p = tv.copy(bs.center).applyMatrix4(o.matrixWorld), sc = Math.max(o.scale.x, o.scale.y, o.scale.z) * bs.radius;
+    if (Math.hypot(p.x - cx, p.z - cz) < r + sc) out.push(o);
+  }
+  return out;
+}
+function grassProbe(x, z, list) {   // 'grass' only: dirt, asphalt, concrete pads, floors, equipment and the corn all come back different
+  ray.set(V3(x, 6, z), DOWN); ray.far = 12;
+  const h = ray.intersectObjects(list || GRASS.solids, false)[0]; ray.far = Infinity;
+  if (!h || !h.object || !h.object.material) return null;
+  const layer = h.object.material.userData && h.object.material.userData.ground;
+  return layer === 'grass' && h.point.y < 0.25 ? h.point.y : null;
+}
+function grassChunk(cx, cz) {   // build one chunk: probe a 4 m grid (16 x 16 raycasts, not one per tuft), then scatter
+  const S = GRASS.chunk, key = cx + ':' + cz;
+  if (GRASS.chunks.has(key)) return GRASS.chunks.get(key);
+  const rnd = treeRng((cx * 73856093) ^ (cz * 19349663) ^ 0x9e3779b9);   // stable per chunk: the same grass every session
+  const x0 = cx * S, z0 = cz * S, cell = 4, nc = Math.round(S / cell), k = Math.max(1, Math.round(cell * cell * GRASS.density));
+  const pts = [[], [], [], [], [], []], near = grassSolidsNear(x0, z0, S);   // one prefilter per chunk
+  for (let ix = 0; ix < nc; ix++) for (let iz = 0; iz < nc; iz++) {
+    const px = x0 + ix * cell + cell / 2, pz = z0 + iz * cell + cell / 2;
+    if (rnd() > 0.35 + 0.65 * Math.abs(Math.sin(px * 0.11) * Math.cos(pz * 0.13))) continue;   // clumps, not an even carpet
+    const py = grassProbe(px, pz, near); if (py == null) continue;                                // grass only: never dirt or concrete
+    for (let t = 0; t < k; t++) {
+      const x = px + (rnd() - 0.5) * cell, z = pz + (rnd() - 0.5) * cell, f = (rnd() * 6) | 0, sc = 0.7 + rnd() * 0.7;
+      dummy.position.set(x, py, z); dummy.rotation.set(0, rnd() * 6.283, 0); dummy.scale.set(sc, sc * (0.85 + rnd() * 0.4), sc); dummy.updateMatrix();
+      pts[f].push([dummy.matrix.clone(), 0.86 + rnd() * 0.26]);                                   // matrix + a green tint, per instance
+    }
+  }
+  const meshes = [];
+  for (let f = 0; f < 6; f++) {
+    if (!pts[f].length) continue;
+    const m = new T.InstancedMesh(grassGeo(), grassMat(f), pts[f].length), col = new T.Color();
+    pts[f].forEach(([mat, tint], i) => { m.setMatrixAt(i, mat); col.setRGB(tint, Math.min(1, tint * 1.04), tint * 0.86); m.setColorAt(i, col); });
+    m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    m.castShadow = false; m.receiveShadow = false; m.userData.noHit = true; m.visible = false;
+    m.computeBoundingSphere(); scene.add(m); meshes.push(m);
+  }
+  const c = { key, x: x0 + S / 2, z: z0 + S / 2, meshes, count: pts.reduce((a, p) => a + p.length, 0) };
+  GRASS.chunks.set(key, c); GRASS.made += c.count;
+  return c;
+}
+function grassDrop(key) {
+  const c = GRASS.chunks.get(key); if (!c) return;
+  for (const m of c.meshes) { scene.remove(m); m.dispose(); }   // geometry and materials are shared and stay
+  GRASS.chunks.delete(key); GRASS.made -= c.count;
+}
+function updateGrass(dt) {   // stream the chunk ring round the camera, then show or hide each one by distance
+  if (!GRASS.on || !renderer) return;
+  if ((GRASS.solidsT += dt) > 10 || !GRASS.solids.length) { GRASS.solids = collectSolids(true); GRASS.solidsT = 0; }
+  const cx = Math.round(camera.position.x / GRASS.chunk), cz = Math.round(camera.position.z / GRASS.chunk), R = GRASS.ring, want = new Set();
+  let best = null, bd = 1e9;
+  for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
+    if (Math.hypot(i, j) > R + 0.5) continue;
+    const kx = cx + i, kz = cz + j, key = kx + ':' + kz; want.add(key);
+    if (GRASS.chunks.has(key)) continue;
+    const d = Math.hypot(kx * GRASS.chunk + GRASS.chunk / 2 - camera.position.x, kz * GRASS.chunk + GRASS.chunk / 2 - camera.position.z);
+    if (d < bd) { bd = d; best = [kx, kz]; }   // one new chunk per frame, nearest first: no queue to get stuck in
+  }
+  for (const key of [...GRASS.chunks.keys()]) if (!want.has(key)) grassDrop(key);   // and let the ones behind us go
+  if (best) grassChunk(best[0], best[1]);
+  GRASS.shown = 0;
+  for (const c of GRASS.chunks.values()) {
+    const near = Math.max(0, Math.hypot(c.x - camera.position.x, c.z - camera.position.z) - GRASS.chunk * 0.71) < GRASS.dist;
+    for (const m of c.meshes) m.visible = near;
+    if (near) GRASS.shown += c.count;
+  }
+}
+function grassSet(o) {   // the knobs the debug menu and the tests use
+  if (!o) return GRASS;
+  if (o.on !== undefined) GRASS.on = !!o.on;
+  if (o.density !== undefined) GRASS.density = Math.max(0, Math.min(2, +o.density));
+  if (o.dist !== undefined) GRASS.dist = Math.max(0, Math.min(300, +o.dist));
+  if (o.density !== undefined || o.on === false) { for (const k of [...GRASS.chunks.keys()]) grassDrop(k); }
+  try { localStorage.setItem('cs_grass', JSON.stringify({ on: GRASS.on, density: GRASS.density, dist: GRASS.dist })); } catch (e) {}
+  updateGrass(0);
+  return GRASS;
+}
+try { const g = JSON.parse(localStorage.getItem('cs_grass') || 'null'); if (g) { if (typeof g.on === 'boolean') GRASS.on = g.on; if (isFinite(g.density)) GRASS.density = Math.max(0, Math.min(2, g.density)); if (isFinite(g.dist)) GRASS.dist = Math.max(0, Math.min(300, g.dist)); } } catch (e) {}
 // ---------- performance: merge the thousands of small static parts (boxes, posts, rails, bands...) that share a plain color into a few big
 // meshes per 60 m patch of the map, so the GPU gets a few hundred draw calls instead of thousands. Only plain shared-color meshes standing
 // directly in the scene are merged; anything that moves, blinks, changes color or can be clicked keeps its own mesh.
@@ -13685,7 +13809,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), get spriteTrees() { return TREE_SPR.items.map(i => ({ kind: i.kind, x: +i.x.toFixed(1), z: +i.z.toFixed(1), s: +i.s.toFixed(2) })); }, get treeInfo() { return { count: TREE_SPR.items.length, quad: TREE_SPR.quad, total: Object.keys(TREE_SPR.mesh).length }; }, takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), get spriteTrees() { return TREE_SPR.items.map(i => ({ kind: i.kind, x: +i.x.toFixed(1), z: +i.z.toFixed(1), s: +i.s.toFixed(2) })); }, get treeInfo() { return { count: TREE_SPR.items.length, quad: TREE_SPR.quad, total: Object.keys(TREE_SPR.mesh).length }; }, takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
