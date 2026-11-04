@@ -11,7 +11,7 @@ const cut = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b, i); asser
 const egressSrc = cut('const EGRESS = { list: [], lens: null };', '// EXIT signage:');
 const signSrc = cut('// v1.97.136, owner (photo of a lit EXIT sign', 'function concreteFloor(');
 const scene = new T.Scene(), SIGN = new T.MeshBasicMaterial({ color: 0xff0000 }), HALO = new T.MeshBasicMaterial();
-const ctx = { T, Math, scene, O: { swingDoors: [] }, V3: (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z), batteryLight: m => m,
+const ctx = { T, Math, scene, O: { swingDoors: [] }, mat: c => new T.MeshLambertMaterial({ color: c }), V3: (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z), batteryLight: m => m,
   EXIT_SIGN: { mat: SIGN }, exitSignMat: () => SIGN,
   box: (w, h, d, m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); scene.add(o); return o; },
   exitHalo: (w, h, x, y, z, r) => { const o = new T.Mesh(new T.PlaneGeometry(w, h), HALO); o.position.set(x, y, z); o.rotation.y = r; o.userData.halo = true; scene.add(o); } };
@@ -32,8 +32,10 @@ assert.equal(signs.length, 4, 'one sign per exterior door'); assert.equal(halos.
 const at = (x, z) => signs.find(s => Math.hypot(s.position.x - x, s.position.z - z) < 0.6);
 { const s = at(10, 0.25); assert.ok(s, 'door in an x wall: sign centred on it'); assert.ok(s.position.z > 0.15, 'on the inside face (+z), not the outside'); assert.equal(s.position.y, ctx.EXIT_Y, 'between the door head and the strobe');
   const st = ctx.EGRESS.list[0]; assert.ok(st.position.y - 0.085 > s.position.y + 0.15, 'under the strobe, not into it'); assert.ok(s.position.y - 0.15 > 2.21, 'above the door head');
-  assert.equal(s.geometry.parameters.width, 0.7, 'faces into the room'); }
-{ const s = at(29.75, 5); assert.ok(s && s.position.x < 29.85, 'door in a z wall: sign on the inside (-x) face'); assert.equal(s.geometry.parameters.depth, 0.7, 'turned to face into the room'); }
+  assert.ok(Math.abs(Math.sin(s.rotation.y)) < 1e-9 && Math.cos(s.rotation.y) > 0.99, 'its lettered face looks into the room'); }
+{ const s = at(29.75, 5); assert.ok(s && s.position.x < 29.85, 'door in a z wall: sign on the inside (-x) face'); assert.ok(Math.sin(s.rotation.y) < -0.99, 'turned to face into the room'); }
+// v1.97.139: EXIT only on the face - the housing box behind it is plain, so its ends don't show a squashed EXIT
+assert.ok(signs.filter(o => o.geometry.type === 'PlaneGeometry').length === 3 && scene.children.filter(o => o.isMesh && o.geometry.type === 'BoxGeometry' && o.material !== SIGN && Math.abs(o.geometry.parameters.height - 0.32) < 1e-9).length === 3, 'each new sign: a plain housing + one lettered face');
 { const s = at(50, -0.25), st = ctx.EGRESS.list[2]; assert.ok(s.position.y - 0.15 > 2.43, 'a taller door: the sign sits clear above it (' + s.position.y.toFixed(2) + ')');
   assert.ok(st.position.y - 0.085 > s.position.y + 0.15, 'and its strobe moved up to stay above the sign'); }
 // in the game: built with the world, before the lights are collected; the old one-off signs are gone (one was on blank wall)

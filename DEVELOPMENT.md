@@ -1,3 +1,14 @@
+## TEST v1.97.139 — mesh doors flush at the wall, like the original (2026-11-04)
+- Owner (screenshots: the energy center door, and one where the mesh stood out from the wall): *"also notice how original rolling door with mesh both are flush. new ones it has a huge gap it looks bad. make them more like the original"*.
+- **Cause:** where the steel door's coil hood was on the inside face (11 of 14 doors), v1.97.137 stood the mesh 1.0 m off the wall to clear the hood, so it looked freestanding.
+- **Now every mesh sits flush,** 0.36 m in from the wall line in its tracks. On those 11 doors the **hood goes up over the mesh's head box**, as on the energy center's original, where the coil sat above the mesh: centre at door height + 0.9 m, offset 0.42. It is capped 0.4 m under the building's envelope top. Checked in the game: every lifted hood clears its head box by 8 cm and stays well under its ceiling.
+- **EXIT signs:** the old sign was one box textured on every face, so its ends showed a squashed "EXIT" (visible in the owner's second screenshot). Each sign is now a plain dark housing with one lettered face toward the room. Lighting still finds the lettered face for its red pool.
+- Rendered two hood-inside doors (west-wall cook alley, shop east) with the steel door up and the mesh down: the mesh is flush in its tracks, with its head box and the coil on top.
+- **Tests updated:**
+  - `validate-mesh-doors.cjs`: flush at 0.36, an inside hood clears the head box and stays under the roof, an outside hood is unchanged.
+  - `validate-exit-signs.cjs`: a lettered face looking into the room on a plain housing.
+- Bumped TEST to `1.97.139` / `corn-souls-test-shell-v166`.
+
 ## TEST v1.97.138 — door switch buttons: bigger, reordered, press to act (2026-11-04)
 - Owner: *"make the three buttons a little bigger on the rolling doors. green button on top(opens door and mesh), middle yellow button(mesh closed only), red button on bottom(both closed). dont pull up a toast to select simply do the action when the button is activated. maybe just show a Interact prompt with the west face button symbol"*.
 - **Buttons:** 3 cm → **4.8 cm**, 14 cm apart on a larger station (0.46 x 0.22 m).

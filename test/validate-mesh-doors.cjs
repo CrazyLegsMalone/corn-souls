@@ -25,7 +25,13 @@ assert.equal(ctx.meshDoorsBuild(), 2, 'a mesh door for every roll-up');
 assert.equal(ctx.meshDoorsBuild(), 0, 'built once');
 const wp = o => o.getWorldPosition(new T.Vector3());
 { const m = wp(A.mesh); assert.ok(m.x < 20 && m.x > 19.5, 'east door: the mesh is on the inside (west) face, just inside the steel door (x ' + m.x.toFixed(2) + ')'); }
-{ const m = wp(B.mesh); assert.ok(m.z > 0.8, 'north door: the mesh is on the inside (south) face, clear of the coil hood on that face (z ' + m.z.toFixed(2) + ')'); }
+{ const m = wp(B.mesh); assert.ok(m.z > 0.3 && m.z < 0.45, 'north door: the mesh is on the inside (south) face, flush at the wall (z ' + m.z.toFixed(2) + ')'); }
+// v1.97.139, owner: "original rolling door with mesh both are flush. new ones it has a huge gap" - every mesh sits at the wall; a coil
+// hood on the same face goes up over the mesh's head box (like the original, whose coil sat above it)
+for (const d of [A, B]) assert.ok(Math.abs(Math.abs(d.mesh.parent.position.x) - 0.36) < 1e-9, 'flush: 0.36 m in from the wall line');
+assert.ok(B.hood.position.y - 0.34 > B.h + 0.48, 'north door: its inside coil hood clears the mesh head box (hood bottom ' + (B.hood.position.y - 0.34).toFixed(2) + ' > ' + (B.h + 0.48).toFixed(2) + ')');
+assert.ok(B.hood.position.y + 0.34 < 8 - 0.3, 'and stays under the building\'s roof');
+assert.equal(A.hood.position.y, A.h + 0.42, 'a hood outside stays where it was');
 for (const d of [A, B]) {
   assert.ok(d.sw && Math.hypot(d.sw.x - d.x, d.sw.z - d.z) > d.w / 2 + 0.3, 'a switch beside the door, not in the opening');
   assert.ok(ctx.enclAt(d.sw.x, 1.4, d.sw.z), 'the switch is on the inside');
