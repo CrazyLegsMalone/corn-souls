@@ -12396,59 +12396,26 @@ function buildDirtHills() {
   }
 }
 // ---------- GRAIN PILE JUMP (v1.97.130, owner, on the overhead map: "add a grain pile here. i want to be able to ramp the ranger
-// on it to jump over the train"; v1.97.133: "it was just supposed to look like a normal pile of grain that happens to be able to
-// be used as a ramp not a specific made ramp its too obvious"). North of the north corn field's west end, where the rail loop runs
-// north-south (track centre x ~ -243 at z -305). Two ordinary piles of shelled corn, one each side of the track:
-//  takeoff heap (east)  - a plain dumped pile: a peak 4.6 m high at x -224, sides at grain's angle of repose all round (0.42-0.45,
-//                         ~23 degrees) and a rounded, lumpy outline. Driving west up its face at 40 mph (18 m/s) or more, the
-//                         Ranger leaves the peak and clears a hopper car (5.1 m) on the track; flat out it goes ~10 m up.
-//  loader heap (west)   - a broad oval ground pile a loader has been working from the rail side: its track-facing side is the
-//                         steep cut a bucket leaves (scalloped, with a slumped skirt), ~5 m off the track and following its bend; behind it the
-//                         grain has slumped into a long low dome falling west for ~60 m. The jump comes down on that dome, so
-//                         40-54 mph lands unhurt (flat out, a little; come up short and you meet the cut face).
-// Each pile is ONE heightfield (a 0.5 m grid): the same numbers draw it and are the floor (a WALK_SURF entry with an `hf` sampler,
-// read by floorAt), so walking, the Ranger and the cars all ride exactly what you see. No walls: it's grain, you can climb it.
-let GP_TX = null;
-function GP_TRACK(z) {   // the rail loop's centreline x at this z, from the loop's own samples (LSAMP) along this stretch
-  if (!GP_TX) GP_TX = LSAMP.filter(p => p.x > -320 && p.x < -200 && p.z > -420 && p.z < -200).sort((a, b) => a.z - b.z);
-  for (let i = 0; i < GP_TX.length - 1; i++) { const a = GP_TX[i], b = GP_TX[i + 1]; if (z >= a.z && z <= b.z) return a.x + (b.x - a.x) * (z - a.z) / ((b.z - a.z) || 1); }
-  return z < GP_TX[0].z ? GP_TX[0].x : GP_TX[GP_TX.length - 1].x;
-}
-const GRAIN_PILES = [
-  { name: 'takeoff', kind: 'heap', cx: -224, cz: -305, h: 4.8, sx: 0.42, sz: 0.45, w: 5.5 },
-  { name: 'loader', kind: 'cut', cz: -305, off: 4.7, sz: 0.42, w: 14,   // u = metres west of the cut line (4.7 m off the track); profile in u
-    prof: [[-1.6, 0], [0, 0.5], [1.8, 4.6], [5, 4.5], [11, 4.25], [17, 3.85], [27, 3.0], [36, 2.05], [44, 1.05], [51, 0.4], [57, 0]] }
-];
-function gpPchip(P, u) {   // smooth, no overshoot (monotone cubic) through the profile points
-  const n = P.length; if (u <= P[0][0]) return P[0][1]; if (u >= P[n - 1][0]) return P[n - 1][1];
-  let i = 0; while (u > P[i + 1][0]) i++;
-  const sl = j => (P[j + 1][1] - P[j][1]) / (P[j + 1][0] - P[j][0]);
-  const tan = j => { if (j === 0) return sl(0); if (j === n - 1) return sl(n - 2); const a = sl(j - 1), b = sl(j); return a * b <= 0 ? 0 : 2 / (1 / a + 1 / b); };
-  const h = P[i + 1][0] - P[i][0], t = (u - P[i][0]) / h, t2 = t * t, t3 = t2 * t;
-  return (2 * t3 - 3 * t2 + 1) * P[i][1] + (t3 - 2 * t2 + t) * h * tan(i) + (-2 * t3 + 3 * t2) * P[i + 1][1] + (t3 - t2) * h * tan(i + 1);
-}
+// on it to jump over the train"; v1.97.133: "just supposed to look like a normal pile of grain that happens to be able to be used
+// as a ramp"; v1.97.134: "just needs the one pile in the spot i asked for. i never asked for 2 piles"). North of the north corn
+// field's west end, east of where the rail loop runs north-south (track centre x ~ -242 at z -305): one plain dumped pile of
+// shelled corn, peak 4.8 m at x -224, sides at grain's angle of repose all round (0.42-0.45, ~23 degrees), a short ridge, a
+// rounded uneven outline and gentle lumps. Drive west up its east face at 40 mph (18 m/s) or more and the Ranger leaves the
+// peak and clears a hopper car (5.1 m) on the track; flat out it goes ~11 m up. It comes down on the grass beyond the track.
+// The pile is ONE heightfield (a 0.5 m grid): the same numbers draw it and are the floor (a WALK_SURF entry with an `hf` sampler,
+// read by floorAt), so walking, the Ranger and the cars ride exactly what you see. No walls: it's grain, you can climb it.
+const GRAIN_PILES = [{ cx: -224, cz: -305, h: 4.8, sx: 0.42, sz: 0.45, w: 5.5 }];
 function gpLump(x, z) { return 0.5 * Math.sin(x * 0.61 + z * 0.23) + 0.35 * Math.sin(-x * 0.29 + z * 0.71 + 2) + 0.25 * Math.sin(x * 1.13 - z * 0.97 + 4); }   // -1.1..1.1, gentle
 function gpHeight(H, x, z) {
-  let h, core;
-  if (H.kind === 'heap') {
-    const dx = x - H.cx, w = H.w + 0.7 * Math.sin(x * 0.37 + 1) + 0.4 * Math.sin(x * 0.9), dz = Math.max(0, Math.abs(z - H.cz) - w);
-    const a = Math.atan2(dz, dx), sx = H.sx * (1 + 0.07 * Math.sin(3 * a) * Math.min(1, dz)), sz = H.sz * (1 + 0.08 * Math.sin(5 * a + 1));   // an uneven outline away from the drive line
-    h = H.h - Math.sqrt((sx * dx) * (sx * dx) + (sz * dz) * (sz * dz)); core = Math.abs(z - H.cz) < 5 && dx > -2;   // its east (climb) face and the peak
-  } else {
-    const scal = 0.5 * Math.abs(Math.sin((z - H.cz) * Math.PI / 3.2)), u = GP_TRACK(z) - H.off - scal - x;   // bucket bites along the cut
-    const e = (u - 20) / 40, w = H.w * Math.sqrt(Math.max(0, 1 - e * e)) + 1.2 * Math.sin(u * 0.21 + 0.5) + 0.8 * Math.sin(u * 0.5 + z * 0.05), dz = Math.max(0, Math.abs(z - H.cz) - w);   // an oval ground pile, widest in the middle
-    h = gpPchip(H.prof, u) - H.sz * dz; core = false;
-  }
+  const dx = x - H.cx, w = H.w + 0.7 * Math.sin(x * 0.37 + 1) + 0.4 * Math.sin(x * 0.9), dz = Math.max(0, Math.abs(z - H.cz) - w);
+  const a = Math.atan2(dz, dx), sx = H.sx * (1 + 0.07 * Math.sin(3 * a) * Math.min(1, dz)), sz = H.sz * (1 + 0.08 * Math.sin(5 * a + 1));   // an uneven outline away from the drive line
+  const h = H.h - Math.sqrt((sx * dx) * (sx * dx) + (sz * dz) * (sz * dz)), core = Math.abs(z - H.cz) < 5 && dx > -2;   // its east (climb) face and the peak
   if (h <= 0) return 0;
-  return Math.max(0, h + gpLump(x, z) * 0.035 * h * (core ? 0.15 : 1));   // lumps grow with depth; kept gentle on the climb (it stays a slope, not steps)
-}
-function gpBox(H) {
-  if (H.kind === 'heap') { const rx = H.h / (H.sx * 0.93) + 1, rz = H.w + 1.2 + H.h / (H.sz * 0.92) + 1; return [H.cx - rx, H.cx + rx, H.cz - rz, H.cz + rz]; }
-  const rz = H.w + 2.1 + 4.6 / H.sz + 1, zs = [H.cz - rz, H.cz + rz], xs = zs.map(GP_TRACK);
-  return [Math.min(...xs) - H.off - H.prof[H.prof.length - 1][0] - 1, Math.max(...xs) - H.off - H.prof[0][0] + 1, zs[0], zs[1]];
+  return Math.max(0, h + gpLump(x, z) * 0.035 * h * (core ? 0.15 : 1));   // lumps grow with depth; kept faint on the climb (it stays a slope, not steps)
 }
 function gpGrid(H) {   // the pile on a 0.5 m grid (corner heights) + a bilinear sampler for floorAt
-  const C = 0.5, [x0, x1, z0, z1] = gpBox(H), nx = Math.ceil((x1 - x0) / C) + 1, nz = Math.ceil((z1 - z0) / C) + 1, g = new Float32Array(nx * nz);
+  const C = 0.5, rx = H.h / (H.sx * 0.93) + 1, rz = H.w + 1.2 + H.h / (H.sz * 0.92) + 1, x0 = H.cx - rx, z0 = H.cz - rz;
+  const nx = Math.ceil(2 * rx / C) + 1, nz = Math.ceil(2 * rz / C) + 1, g = new Float32Array(nx * nz);
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) g[j * nx + i] = gpHeight(H, x0 + i * C, z0 + j * C);
   const at = (x, z) => { const fx = (x - x0) / C, fz = (z - z0) / C, i = Math.floor(fx), j = Math.floor(fz); if (i < 0 || j < 0 || i >= nx - 1 || j >= nz - 1) return 0;
     const tx = fx - i, tz = fz - j, k = j * nx + i; return (g[k] * (1 - tx) + g[k + 1] * tx) * (1 - tz) + (g[k + nx] * (1 - tx) + g[k + nx + 1] * tx) * tz; };

@@ -1,9 +1,9 @@
 // Run from the test/ directory: node validate-grain-pile.cjs
-// v1.97.130 / v1.97.133: the grain piles north of the north corn field: "ramp the ranger on it to jump over the train", then
-// "it was just supposed to look like a normal pile of grain that happens to be able to be used as a ramp not a specific made
-// ramp". Two natural heaps (one heightfield each: what you see is the floor). Builds the game's own piles and drives the game's
-// own vehVertical west over them at 60 fps on three lines (the peak line and 3 m either side): clearance over a hopper car on
-// the real rail loop, and how hard it lands. Also checks they look like piles: no walls, rounded outlines, repose slopes.
+// v1.97.130 / .133 / .134: the grain pile north of the north corn field: "ramp the ranger on it to jump over the train", "just
+// supposed to look like a normal pile of grain that happens to be able to be used as a ramp", "just needs the one pile in the spot
+// i asked for. i never asked for 2 piles". ONE natural heap (a heightfield: what you see is the floor). Builds the game's own pile
+// and drives the game's own vehVertical west over it at 60 fps on three lines (the peak line and 3 m either side): clearance over
+// a hopper car on the real rail loop, and where / how hard it lands. Also checks it looks like a pile: no walls, rounded outline.
 const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
 const html = fs.readFileSync('game.html', 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
@@ -19,33 +19,35 @@ const hurts = [];
 const ctx = { T, Math, Float32Array, scene: new T.Scene(), wallSegs: [], WALK_SURF: [], DIGS: [], PONDS: { hole: 0 }, inPond: () => false, ROOFMAP: { h: null }, roofAt: () => -99, srgbTex: t => t, document: undefined,
   utvBump() {}, walk: { drive: true }, dmgHit: (k, n) => hurts.push(n), dmgDrivingKey: () => 'utv' };
 vm.createContext(ctx);
-vm.runInContext(loopSrc + '\n' + pileSrc + '\n' + floorSrc + '\n' + airSrc + '\n' + vvSrc + '\nthis.GRAIN_PILES = GRAIN_PILES; this.buildGrainPiles = buildGrainPiles; this.floorAt = floorAt; this.vehVertical = vehVertical; this.AIR = AIR; this.GP_TRACK = GP_TRACK; this.LSAMP = LSAMP;', ctx);
+vm.runInContext(loopSrc + '\n' + pileSrc + '\n' + floorSrc + '\n' + airSrc + '\n' + vvSrc + '\nthis.GRAIN_PILES = GRAIN_PILES; this.buildGrainPiles = buildGrainPiles; this.floorAt = floorAt; this.vehVertical = vehVertical; this.AIR = AIR; this.LSAMP = LSAMP;', ctx);
 ctx.buildGrainPiles();
 const G = ctx.GRAIN_PILES, CAR_TOP = 5.1, CAR_HALF = 1.55;
+const TX = ctx.LSAMP.filter(p => p.x > -320 && p.x < -200 && p.z > -420 && p.z < -200).sort((a, b) => a.z - b.z);
+const trackX = z => { for (let i = 0; i < TX.length - 1; i++) if (z >= TX[i].z && z <= TX[i + 1].z) return TX[i].x + (TX[i + 1].x - TX[i].x) * (z - TX[i].z) / ((TX[i + 1].z - TX[i].z) || 1); return NaN; };   // the real loop
 const meshes = ctx.scene.children.filter(o => o.name === 'grainPile');
-assert.equal(meshes.length, 2, 'two piles: the takeoff heap and the loader heap');
-assert.equal(ctx.WALK_SURF.length, 2, 'one heightfield floor each');
+assert.equal(G.length, 1, 'one pile (the owner never asked for two)');
+assert.equal(meshes.length, 1, 'one pile mesh');
+assert.equal(ctx.WALK_SURF.length, 1, 'one heightfield floor');
 assert.ok(ctx.WALK_SURF.every(s => typeof s.hf === 'function'), 'their floor is their own heightfield');
 assert.equal(ctx.wallSegs.length, 0, 'no walls: it is grain, you can climb it (no built ramp sides)');
 assert.ok(meshes.every(m => m.userData.noRoof), 'kept out of the roof map (their floor is exact already)');
-// GP_TRACK is the real loop: it matches LSAMP along this stretch
-for (const p of ctx.LSAMP) if (p.x > -320 && p.x < -200 && p.z > -340 && p.z < -270) assert.ok(Math.abs(ctx.GP_TRACK(p.z) - p.x) < 0.05, 'GP_TRACK follows the loop at z ' + p.z.toFixed(1));
 // clear of the track and any car on it, everywhere
 let minC = 99;
-for (const H of G) { const R = H.grid; for (let j = 0; j < R.nz; j++) for (let i = 0; i < R.nx; i++) if (R.g[j * R.nx + i] > 0.02) { const x = R.x0 + i * R.C, z = R.z0 + j * R.C; minC = Math.min(minC, Math.abs(x - ctx.GP_TRACK(z))); } }
-assert.ok(minC > CAR_HALF + 1.5, 'no grain within 1.5 m of a car on the track (closest ' + minC.toFixed(2) + ' m from the centreline)');
+for (const H of G) { const R = H.grid; for (let j = 0; j < R.nz; j++) for (let i = 0; i < R.nx; i++) if (R.g[j * R.nx + i] > 0.02) { const x = R.x0 + i * R.C, z = R.z0 + j * R.C; minC = Math.min(minC, Math.abs(x - trackX(z))); } }
+assert.ok(minC > CAR_HALF + 3, 'well clear of a car on the track (closest grain ' + minC.toFixed(2) + ' m from the centreline)');
+assert.ok(G[0].cx > trackX(G[0].cz) + 15, 'the pile is on the east side, the corn field side of the track');
 // they look like piles: every outer edge is at the ground, the outline is not a rectangle, and the slopes are grain's
 for (const H of G) {
   const R = H.grid; let edge = 0, rows = new Set();
   for (let i = 0; i < R.nx; i++) edge = Math.max(edge, R.g[i], R.g[(R.nz - 1) * R.nx + i]);
   for (let j = 0; j < R.nz; j++) { edge = Math.max(edge, R.g[j * R.nx], R.g[j * R.nx + R.nx - 1]); let w = 0; for (let i = 0; i < R.nx; i++) if (R.g[j * R.nx + i] > 0.02) w++; if (w) rows.add(w); }
-  assert.equal(edge, 0, H.name + ': it comes down to the ground all round (no cut-off sides)');
-  assert.ok(rows.size > 12, H.name + ': a rounded, uneven outline (' + rows.size + ' different row widths), not a box');
+  assert.equal(edge, 0, 'it comes down to the ground all round (no cut-off sides)');
+  assert.ok(rows.size > 12, 'a rounded, uneven outline (' + rows.size + ' different row widths), not a box');
 }
-{ // repose: the takeoff heap is at grain's slope everywhere (under 0.55 incl. lumps); the loader heap too, except its cut face
+{ // repose: grain's slope everywhere (under 0.55 incl. lumps)
   const R = G[0].grid; let mx = 0;
   for (let j = 1; j < R.nz - 1; j++) for (let i = 1; i < R.nx - 1; i++) { const k = j * R.nx + i; if (R.g[k] < 0.3) continue; mx = Math.max(mx, Math.abs(R.g[k + 1] - R.g[k - 1]) / (2 * R.C), Math.abs(R.g[k + R.nx] - R.g[k - R.nx]) / (2 * R.C)); }
-  assert.ok(mx < 0.55, 'takeoff heap: no slope steeper than grain lies (' + mx.toFixed(2) + ')');
+  assert.ok(mx < 0.55, 'no slope steeper than grain lies (' + mx.toFixed(2) + ')');
 }
 // the climb: a slope (launches), not steps, on the peak line and 3 m either side
 for (const z of [-308, -305, -302]) {
@@ -54,14 +56,14 @@ for (const z of [-308, -305, -302]) {
   assert.ok(ctx.floorAt(-224, z, 9) > 4.5, 'z ' + z + ': peak over 4.5 m');
 }
 assert.equal(ctx.floorAt(-205, -305, 0), 0, 'flat grass before the toe');
-assert.ok(ctx.floorAt(-253, -305, 9) > 4.2, 'the loader heap stands ~4.5 m behind its cut');
+assert.equal(ctx.floorAt(-255, -305, 9), 0, 'nothing across the track: flat grass where you land');
 // drive it: west at a steady speed (the gas held), 60 steps a second
 function jump(v, z) {
-  const u = { x: -195, z, y: 0, vx: -v, vz: 0, vy: 0, air: false }, TX = ctx.GP_TRACK(z); hurts.length = 0;
+  const u = { x: -195, z, y: 0, vx: -v, vz: 0, vy: 0, air: false }, tx = trackX(z); hurts.length = 0;
   let over = null, top = 0, landed = null, launched = null;
   for (let i = 0; i < 60 * 8; i++) { u.x += u.vx / 60; ctx.vehVertical(u, 1 / 60); top = Math.max(top, u.y);
     if (u.air && launched === null) launched = u.x;
-    if (Math.abs(u.x - TX) < CAR_HALF && over === null) over = u.y;   // its height over the cars' roofs
+    if (Math.abs(u.x - tx) < CAR_HALF && over === null) over = u.y;   // its height over the cars' roofs
     if (launched !== null && !u.air && landed === null) { landed = { x: u.x, hit: u.land }; break; } }
   return { over, top, launched, landed, hurt: hurts.reduce((a, b) => a + b, 0) };
 }
@@ -72,10 +74,10 @@ for (const z of [-305, -302, -308]) {
   for (const [v, r] of res) assert.ok(r.launched !== null && r.launched < -220, 'z ' + z + ', ' + mph(v).toFixed(0) + ' mph: it leaves the ground off the peak');
   assert.ok(res.filter(([v]) => v >= 18).every(([, r]) => r.over > CAR_TOP + 1), 'z ' + z + ': from 40 mph up it clears a hopper car by a metre or more');
   assert.ok(res.find(([v]) => v === 14)[1].over < CAR_TOP, 'z ' + z + ': at 31 mph it does not make it (a jump you have to commit to)');
-  assert.ok(res.filter(([v]) => v >= 18 && v <= 24).every(([, r]) => r.hurt === 0 && r.landed.x < -248), 'z ' + z + ': 40-54 mph comes down on the loader heap and the Ranger is not damaged');
-  assert.ok(res.find(([v]) => v === 26.4)[1].hurt <= 16, 'z ' + z + ': flat out (59 mph): a hard landing, but only a little damage');
+  assert.ok(res.filter(([v]) => v >= 18).every(([, r]) => r.landed.x < trackX(z) - 8), 'z ' + z + ': from 40 mph it comes down on the grass well past the track');
+  assert.ok(res.every(([, r]) => r.hurt < 40), 'z ' + z + ': a hard landing on flat grass, but it never wrecks the Ranger in one jump');
 }
 assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles();'), 'built with the world, before the static merge');
 assert.ok(html.includes("const h = s.hf ? s.hf(x, z) :"), 'floorAt reads heightfield surfaces');
 assert.ok(html.includes('o.userData.noRoof ||'), 'the roof map skips noRoof meshes');
-console.log('PASS: grain piles look like ordinary heaps (heightfields to the ground, rounded outlines, no walls, clear of the track) and still jump the train: 40+ mph clears a hopper car by a metre, 40-54 mph lands unhurt, on the peak line and 3 m either side');
+console.log('PASS: one grain pile, an ordinary heap (a heightfield to the ground, rounded outline, no walls, clear of the track) that jumps the train: 40+ mph clears a hopper car by a metre on the peak line and 3 m either side, landing on the grass past the track');

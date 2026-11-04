@@ -1,3 +1,26 @@
+## TEST v1.97.134 — one grain pile, as asked (2026-11-04)
+- Owner: *"just needs the one pile in the spot i asked for. i nevewr asked for 2 piles"*.
+- **Removed the second pile** (the "loader heap" across the track, added in v1.97.130 as a landing bank and reshaped in v1.97.133) and its code: the cut-face profile, `gpPchip`, the `GP_TRACK` lookup and the second heightfield. `GRAIN_PILES` is now the one plain heap. It is unchanged from v1.97.133: 4.8 m peak at x -224, repose sides, rounded uneven outline. It still sits where the jump has been since v1.97.130, just west of the box on the owner's map.
+- **The jump, with the game's physics at 60 fps, on the peak line and 3 m either side:**
+  - 31 mph doesn't make it.
+  - 40 mph clears a hopper car by 1.7–2.1 m.
+  - Flat out it goes 10.4–11 m up and 4.5–4.8 m over the cars.
+- **Landing is now on flat grass past the track** (x -258 to -293), so it costs the Ranger health:
+  - 40 mph: ~18 of 100.
+  - 47 mph: ~23.
+  - 54 mph: ~27.
+  - 59 mph: ~32–34.
+- Asked the owner whether landings should be softer.
+- **Why not further east:** I tried moving the peak to x -220 and -216, toward the middle of the marked box. That made it worse. At 40 mph the Ranger only just clears, or doesn't, because the cars are further away when it comes down.
+- `test/validate-grain-pile.cjs` now checks:
+  - exactly one pile;
+  - that it sits east of the track and well clear of it (the track found from the loop's own `LSAMP`);
+  - flat grass across the track;
+  - 40+ mph clears a hopper car by 1 m on all three lines;
+  - 40+ mph lands well past the track;
+  - no single jump does 40 or more damage.
+- Bumped TEST to `1.97.134` / `corn-souls-test-shell-v161`.
+
 ## TEST v1.97.133 — the grain piles are just piles of grain now (2026-11-04)
 - Owner: *"the grain pile by the train was just supposed to look like a normal pile of grain that happens to be able to be used as a ramp not a specific made ramp its too obvious."*
 - **Why it looked made:** v1.97.130 drew each pile as straight wedges from a 2D profile, with flat sheer sides, a 16 m rectangular footprint and side walls. In other words, a ramp.
