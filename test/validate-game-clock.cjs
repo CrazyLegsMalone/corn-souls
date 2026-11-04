@@ -36,8 +36,19 @@ assert.ok(!/new Date\(\)\.getHours|const d = new Date\(\)/.test(eng), 'no direct
 // the debug menu
 assert.ok(html.includes("['🕐 Time of day: ' + timeLabel(), () => timeMenu(code)]"), 'Time of day row on the debug menu');
 const tm = html.slice(html.indexOf('function timeMenu(code) {'), html.indexOf('function debugMenu(code) {'));
-for (const r of ["'⏱ Real time (device clock)'", "['🌅 Morning (9 AM)', 9]", "['☀️ Afternoon (3 PM)', 15]", "['🌇 Evening (9 PM)', 21]", "['🌙 Night (3 AM)', 3]", "'⏩ +1 hour'", "'⏪ −1 hour'", 'Fast cycle', "'Back to debug'"])
+for (const r of ["'⏱ Real time (device clock)'", "['🌅 Sunrise (8 AM)', 8]", "['☀️ Midday (2 PM)', 14]", "['🌇 Sunset (8 PM)', 20]", "['🌙 Night (11 PM)', 23]", "['🌑 Deep night (2 AM)', 2]", "'⏩ +1 hour'", "'⏪ −1 hour'", 'Fast cycle', "'Back to debug'"])
   assert.ok(tm.includes(r), 'time menu row ' + r);
 assert.ok(tm.includes('go({ rate: P3.time.fast ? 1 : 360 })'), 'fast cycle toggles');
 assert.ok(html.includes('time: { set: o => gameTimeSet(o), date: () => gameDate(),'), 'exported as Plant3D.time');
-console.log('PASS: game clock (real / set hour / +-1 h / fast cycle), every time-of-day reader wired to it, debug Time of day menu');
+// v1.97.103: eight looks, one every 3 hours, on the same hours as the sun/moon badge; night falls at 10 PM
+{ const ls = html.slice(html.indexOf('const LOOKS = ['), html.indexOf('].map(', html.indexOf('const LOOKS = [')) + 1);
+  const L = JSON.parse(JSON.stringify(vm.runInNewContext(ls.replace('const LOOKS = ', '(') + ')')));   // out of the vm realm
+  assert.deepEqual(L.map(l => l.at), [7, 10, 13, 16, 19, 22, 1, 4], 'eight looks, every 3 hours, in order round the clock');
+  const slots = [...html.slice(html.indexOf('const SKY_SLOTS = ['), html.indexOf('let skySlot')).matchAll(/\[(\d+), '(sun|moon)'/g)].map(m => +m[1]);
+  assert.deepEqual(L.map(l => l.at).sort((x, y) => x - y), slots.sort((x, y) => x - y), 'same hours as the sun/moon badge');
+  const hk = h => L.find(l => l.at === h).hk;
+  assert.ok(hk(22) < 0.7 && hk(1) < hk(22) && hk(1) === Math.min(...L.map(l => l.hk)), 'night at 10 PM, deep night at 1 AM the darkest');
+  assert.ok(hk(1) >= 0.5, 'deep night still lets you make out the plant');
+  assert.ok(L.filter(l => l.hk >= 1.06).every(l => [10, 13, 16].includes(l.at)), 'full daylight 10 AM to 7 PM (yard lamps off)');
+  assert.ok((1.06 - hk(22)) / 0.4 >= 1, 'the yard lamps are fully on by night'); }
+console.log('PASS: game clock (real / set hour / +-1 h / fast cycle), every time-of-day reader wired to it, debug Time of day menu, eight 3-hour looks');

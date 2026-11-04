@@ -118,6 +118,10 @@ assert.equal(pack.room, null, 'the wall pack is outdoors'); assert.equal(exitL.r
 assert.ok(shed.wins.some(w => w.door === door), 'the roll-up door is a daylight opening of the shed');
 assert.ok(ctx.enclAt(28, 1, 3) === cup && ctx.enclAt(22, 1, 0) === office && ctx.enclAt(50, 1, 50) === null, 'the smallest room wins, outdoors is null');
 
+// The shed's 'tired' lamp flickers on its own at random moments (random seed), which made the exact before/after
+// comparisons below fail about 1 run in 30. It is checked here, then held steady for the rest of the suite.
+{ const tired = L.lamps.filter(l => l.faulty);
+  assert.ok(tired.length === 1 && tired[0].room === shed, 'the shed (the only room with 4+ lamps) gets one tired lamp'); tired.forEach(l => { l.faulty = false; }); }
 const frame = (dt = 0.1) => { ctx.clock += dt; ctx.lightUpdate(dt); };
 const at = (x, y, z) => ctx.lightSample(x, y, z);
 const day = () => { ctx.hemi.intensity = 1.18; }, night = () => { ctx.hemi.intensity = 0.66; };

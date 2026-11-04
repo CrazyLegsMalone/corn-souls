@@ -9117,13 +9117,18 @@ function updatePuffs(dt) {
 // ---------- per-frame update ----------
 const amber = new T.Color(0xd9a441), sick = new T.Color(0x9cc43a), tmpC = new T.Color();
 let puffT = 0;
-// day/night tied to the device clock: four looks that each fade in over an hour starting at 7 AM, 1 PM, 7 PM and 1 AM.
-// Even the night look stays bright enough to read every object and label.
+// day/night tied to the game clock (gameDate: the device clock unless the debug menu moved it): eight looks, one every
+// 3 hours, each fading in over an hour. The hours match the sun/moon badge (SKY_SLOTS). Night falls at 10 PM; deep night
+// (1 AM) is the darkest, still bright enough to make out the plant, and the yard lamps come on as the sky light drops.
 const LOOKS = [
-  { at: 7,  sky: 0xf2d79a, hemi: 0xffe9b8, hk: 1.06, sun: 0xffc46a, sk: 1.6 },   // morning: golden light, honey-colored sky
-  { at: 13, sky: 0x8fd0ff, hemi: 0xffffff, hk: 1.18, sun: 0xfff4e0, sk: 1.75 },  // afternoon: full bright daylight
-  { at: 19, sky: 0xc98a66, hemi: 0xffd6b8, hk: 0.82, sun: 0xff9a5c, sk: 1.0 },   // evening: warm amber, getting dark
-  { at: 1,  sky: 0x3f5f8f, hemi: 0xbfcfff, hk: 0.66, sun: 0x9fb6f0, sk: 0.62 },  // night: cool blue, darker (headlamp helps)
+  { at: 7,  sky: 0xf2c48a, hemi: 0xffe2b0, hk: 0.98, sun: 0xffb45a, sk: 1.45 },  // sunrise: low golden light, peach sky
+  { at: 10, sky: 0xbcdcf0, hemi: 0xfff4dc, hk: 1.12, sun: 0xffe4b8, sk: 1.7 },   // morning: bright, pale blue sky
+  { at: 13, sky: 0x8fd0ff, hemi: 0xffffff, hk: 1.18, sun: 0xfff4e0, sk: 1.75 },  // midday: full bright daylight
+  { at: 16, sky: 0x9cc6e8, hemi: 0xfff0d6, hk: 1.12, sun: 0xffe0b0, sk: 1.6 },   // late afternoon: a touch warmer
+  { at: 19, sky: 0xd98e62, hemi: 0xffd0a8, hk: 0.86, sun: 0xff9050, sk: 1.05 },  // sunset: warm amber, getting dark
+  { at: 22, sky: 0x3a5583, hemi: 0xb8c8f5, hk: 0.66, sun: 0x9fb6f0, sk: 0.6 },   // night: cool blue (headlamp helps)
+  { at: 1,  sky: 0x26375c, hemi: 0xa8b6e0, hk: 0.56, sun: 0x8ea4dc, sk: 0.48 },  // deep night: the darkest
+  { at: 4,  sky: 0x4a6696, hemi: 0xc8d2f0, hk: 0.72, sun: 0xb0bce8, sk: 0.7 },   // pre-dawn: deep blue slowly lifting
 ].map(l => ({ ...l, skyC: new T.Color(l.sky), hemiC: new T.Color(l.hemi), sunC: new T.Color(l.sun) }));
 const FADE_H = 1;
 function daylight(hours) {
@@ -12941,8 +12946,9 @@ function timeLabel() { const d = P3.time.date(); let h = d.getHours(); const m =
   return h + ':' + String(m).padStart(2, '0') + ' ' + ap + (P3.time.real ? ' (real)' : P3.time.fast ? ' (fast)' : ' (set)'); }
 function timeMenu(code) {
   const go = o => { P3.time.set(o); tick(); drawSky(); pickTrack(); timeMenu(code); };
-  const H = [['🌅 Morning (9 AM)', 9], ['☀️ Afternoon (3 PM)', 15], ['🌇 Evening (9 PM)', 21], ['🌙 Night (3 AM)', 3]];   // one in each LOOKS slot
-  modal('<h1>Time of day</h1><p>Game time: <b>' + timeLabel() + '</b></p><p style="font-size:13px;color:#5d6b7c">Only changes the game clock on this device. The light changes at 7 AM, 1 PM, 7 PM and 1 AM (an hour-long fade). Fast cycle runs a whole day in 4 minutes.</p>',
+  const H = [['🌅 Sunrise (8 AM)', 8], ['🌤 Morning (11 AM)', 11], ['☀️ Midday (2 PM)', 14], ['🌥 Late afternoon (5 PM)', 17],   // one inside each LOOKS slot,
+    ['🌇 Sunset (8 PM)', 20], ['🌙 Night (11 PM)', 23], ['🌑 Deep night (2 AM)', 2], ['🌌 Pre-dawn (5 AM)', 5]];          // after its fade
+  modal('<h1>Time of day</h1><p>Game time: <b>' + timeLabel() + '</b></p><p style="font-size:13px;color:#5d6b7c">Only changes the game clock on this device. The light changes every 3 hours (7, 10, 1, 4 day and night) with an hour-long fade; night falls at 10 PM. Fast cycle runs a whole day in 4 minutes.</p>',
     [['Back to debug', () => debugMenu(code)], ['⏱ Real time (device clock)', () => go({ real: true })]]
       .concat(H.map(([n, h]) => [n, () => go({ hour: h })]))
       .concat([['⏩ +1 hour', () => go({ shift: 1 })], ['⏪ −1 hour', () => go({ shift: -1 })],

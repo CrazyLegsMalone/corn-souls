@@ -1,3 +1,11 @@
+## TEST v1.97.103 — eight 3-hour looks; night falls at 10 PM (2026-11-03)
+- Owner: *"Can we make the day night change every 3 hours instead of six"* — chose Option B (eight looks on a real 24-hour day) over speeding the clock up.
+- `LOOKS` now has eight entries on the sun/moon badge's hours: 7 AM sunrise, 10 AM morning, 1 PM midday, 4 PM late afternoon, 7 PM sunset, **10 PM night** (was 1 AM), 1 AM deep night (the darkest, sky light 0.56, was 0.66 at the darkest), 4 AM pre-dawn. Same one-hour fade.
+- Yard lamps follow the sky light as before (`LIGHT.night`), so they are fully on from 10 PM and glimmer on at sunrise/sunset.
+- Debug → Time of day presets are now one per look (8 AM, 11 AM, 2 PM, 5 PM, 8 PM, 11 PM, 2 AM, 5 AM).
+- `validate-game-clock.cjs`: eight looks every 3 hours, same hours as the badge, night at 10 PM, deep night darkest but not black.
+- `validate-interior-dark.cjs` flake fixed (failed ~1 run in 30): the shed's randomly-seeded 'tired' lamp could be mid-flicker during the exact before/after outage comparison. The suite now checks the shed has one tired lamp, then holds it steady (0 fails in 60 runs).
+
 ## TEST v1.97.102 — day/night controls in the debug menu (2026-11-03)
 - Owner: *"Need day night cycle controls in debug"*.
 - **Game clock:** new `gameDate()` in the engine (exported on `window` for the UI script). It is the device clock until the debug menu changes it: a set hour (keeps running at normal speed), ±1 hour, or a fast cycle (×360, a whole day in 4 minutes). Local to this device, resets on reload, not sent to player 2.
