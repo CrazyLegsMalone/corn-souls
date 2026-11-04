@@ -1,3 +1,8 @@
+## TEST v1.97.122 — nibbler rear views (2026-11-04)
+- Owner sent `nibbler-rear-views.zip`: `nibbler-back.png`, `nibbler-rear-quarter-left.png`, `nibbler-rear-quarter-right.png` (40 px), added to `assets/textures/nibbler/` and the `first-party-nibbler-sprites` registry entry.
+- `nibView`: a nibbler turned toward you (within ~100 degrees of the line to the camera) shows its face as before; turned away it shows its back (more than ~150 degrees off) or a rear quarter in between: the left one when you are behind it on its left, the right one on its right. The rear views are not mirrored; a dead one always shows its face. All 23 pictures load up front (texture numbers 21-23 for the rear views).
+- `validate-nibblers.cjs` checks the view for each angle, the no-mirroring and the files. Checked headless: nibblers walking away into the corn show their backs.
+
 ## TEST v1.97.121 — nibblers burst out of dead cob stalkers (the owner's 20-face sprites) (2026-11-04)
 - Owner (with `nibbler-sprites.zip`): *"add these. these spawn from dead cob stalkers. theres 20 different faces to animate them and make them work as 2d sprites that always face you"*.
 - **Assets:** the 20 PNGs (40 px) in `assets/textures/nibbler/`, registered as `first-party-nibbler-sprites`, credited, listed in `assets/textures/README.md`. All 20 load when the creatures do (crisp nearest pixels), so a face never blanks when it first changes.

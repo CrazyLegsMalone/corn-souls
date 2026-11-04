@@ -629,14 +629,14 @@
     },
     {
       "id": "first-party-nibbler-sprites",
-      "title": "Nibbler sprites (20 faces, 40 px)",
+      "title": "Nibbler sprites (20 faces + 3 rear views, 40 px)",
       "creator": "CrazyLegsMalone (project owner)",
       "source_platform": "Owner-provided PNGs (nibbler-sprites.zip)",
       "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/textures/nibbler",
       "license_name": "First-party work, project owner",
       "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
       "status": "in-use",
-      "modifications": "None to the files. Drawn as camera-facing sprites (0.62 m, crisp nearest pixels), the face chosen from what each nibbler is doing.",
+      "modifications": "None to the files. Drawn as camera-facing sprites (0.62 m, crisp nearest pixels), the face chosen from what each nibbler is doing. The rear views (back, left and right rear quarters) show when a nibbler is turned away from the camera (v1.97.122).",
       "files": [
         "assets/textures/nibbler/nibbler-01-wicked-grin.png",
         "assets/textures/nibbler/nibbler-02-happy.png",
@@ -657,7 +657,10 @@
         "assets/textures/nibbler/nibbler-17-taking-damage.png",
         "assets/textures/nibbler/nibbler-18-exhausted.png",
         "assets/textures/nibbler/nibbler-19-unconscious.png",
-        "assets/textures/nibbler/nibbler-20-dead.png"
+        "assets/textures/nibbler/nibbler-20-dead.png",
+        "assets/textures/nibbler/nibbler-back.png",
+        "assets/textures/nibbler/nibbler-rear-quarter-left.png",
+        "assets/textures/nibbler/nibbler-rear-quarter-right.png"
       ],
       "checked_on": "2026-11-04",
       "reviewer": "Owner",

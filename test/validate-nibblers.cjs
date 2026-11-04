@@ -16,7 +16,7 @@ const ctx = { T, Math, NROAD: -134, scene, walk, camera: new T.PerspectiveCamera
   floorAt: () => 0, pushOut() {}, puff() {}, layBody(...x) { ctx.died = x; }, DMG_NOTIFY: m => notes.push(m), tsnd: { ctx: null }, kiaNoise() {}, utv: { g: null },
   loadGlbModel: (url, cb) => { urls.push(url); cb(mkModel(/daddy/.test(url) ? 'Daddy_Cob_Torso' : 'Cob_Body')); }, CORN_PROPS_STATE: { items: [], cans: [] }, NET: { conn: null, host: false, rp: null }, netSend() {} };
 vm.createContext(ctx);
-vm.runInContext(html.slice(a, b) + '\nthis.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepHurt = creepHurt; this.creepPaintHit = creepPaintHit; this.creepSnapshot = creepSnapshot; this.creepApplySnapshot = creepApplySnapshot; this.NIB_FACES = NIB_FACES; this.nibFace = nibFace;', ctx);
+vm.runInContext(html.slice(a, b) + '\nthis.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepHurt = creepHurt; this.creepPaintHit = creepPaintHit; this.creepSnapshot = creepSnapshot; this.creepApplySnapshot = creepApplySnapshot; this.NIB_FACES = NIB_FACES; this.nibFace = nibFace; this.nibView = nibView; this.NIB_REAR = NIB_REAR;', ctx);
 const C = ctx.CREEP, F = ctx.CFIELD, run = (sec, dt = 0.05) => { for (let t = 0; t < sec; t += dt) ctx.updateCreeps(dt); };
 const N = () => C.list.filter(c => c.kind === 'nibbler'), live = () => N().filter(c => c.hp > 0);
 
@@ -67,7 +67,18 @@ walk.x = 900; walk.z = 900; run(181, 0.25); assert.equal(live().length, 0, 'gone
   const g = { ...ctx }; }
 assert.ok(html.includes("const kind = k === 2 ? 'nibbler' : k ? 'daddy' : 'stalker';"), 'the guest makes it a nibbler');
 assert.ok(html.includes("if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);"), 'and animates it like the host');
+// v1.97.122: the rear views: its face when it is turned toward you, its back when it is turned away, a rear quarter in between
+{ const v = (a, cx, cz, st) => { const r = ctx.nibView({ x: 0, z: 0, a, state: st || 'roam' }, cx, cz); return r ? ctx.NIB_REAR[r - 21] : 'face'; };
+  assert.equal(v(0, 0, 10), 'face', 'walking at you (facing +z, you at +z): its face');
+  assert.equal(v(0, 7, 7), 'face', 'at 45 degrees: still its face'); assert.equal(v(0, 10, 0), 'face', 'side on: its face');
+  assert.equal(v(0, 0, -10), 'back', 'walking away from you: its back');
+  assert.equal(v(0, 6, -8), 'rear-quarter-left', 'behind it on its left (+x for one facing +z): the left rear quarter');
+  assert.equal(v(0, -6, -8), 'rear-quarter-right', 'behind it on its right: the right rear quarter');
+  assert.equal(v(Math.PI / 2, -10, 0), 'back', 'it faces +x and you are at -x: its back');
+  assert.equal(v(0, 0, -10, 'dead'), 'face', 'a dead one shows its face'); }
+assert.ok(html.includes("c.sp.scale.set(sz * (c.rear ? 1 : c.flip)"), 'the rear views are not mirrored');
+for (const r of ['back', 'rear-quarter-left', 'rear-quarter-right']) assert.ok(fs.existsSync(path.join(__dirname, '..', 'assets', 'textures', 'nibbler', 'nibbler-' + r + '.png')), 'nibbler-' + r + '.png');
 // the files and the UI
 for (let i = 1; i <= 20; i++) { const f = 'nibbler-' + String(i).padStart(2, '0') + '-' + ctx.NIB_FACES[i - 1] + '.png'; assert.ok(fs.existsSync(path.join(__dirname, '..', 'assets', 'textures', 'nibbler', f)), f); }
 assert.ok(html.includes("hit === 'nibbler' ? 'Squeeg got nibbled to death by the nibblers."), 'a death message for being nibbled');
-console.log('PASS: nibblers (5 burst from each dead cob stalker, sprites facing you, hunt anywhere within their leash, half-bite nibbles, outrunnable, 2 paint hits with a flee, friends mourn, do not hold up Daddy, burrow after 3 min, 20 faces from what they do, 2 player kind)');
+console.log('PASS: nibblers (5 burst from each dead cob stalker, sprites facing you, hunt anywhere within their leash, half-bite nibbles, outrunnable, 2 paint hits with a flee, friends mourn, do not hold up Daddy, burrow after 3 min, 20 faces from what they do, rear views when turned away, 2 player kind)');

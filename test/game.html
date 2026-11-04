@@ -12778,7 +12778,7 @@ function foldModel(root, keepRe) {
   return keeps.length;
 }
 function loadCreeps() {
-  for (let i = 1; i <= NIB_FACES.length; i++) nibTex(i);   // all 20 nibbler faces up front (no blank frame when a face first changes)
+  for (let i = 1; i <= NIB_FACES.length + NIB_REAR.length; i++) nibTex(i);   // all 20 nibbler faces and the 3 rear views up front (no blank frame when one first shows)
   for (const kind in CREEP_K) if (CREEP_K[kind].url) loadGlbModel(CREEP_K[kind].url, ({ root, byName }) => {   // (nibblers are sprites: no model)
     const body = byName[CREEP_K[kind].body]; root.updateMatrixWorld(true);
     const all = new T.Box3().setFromObject(root), bb = body ? new T.Box3().setFromObject(body) : all.clone(), c = bb.getCenter(V3()), s = bb.getSize(V3());
@@ -12977,11 +12977,12 @@ function creepDebug(what) {   // debug menu
 // Each nibbler is a T.Sprite (it always faces you) standing on its feet (centre at the bottom), with its own sprite material so
 // its face can change: what it is doing picks the face, and a hop, a squash on landing, a wobble and a left/right flip animate it.
 const NIB_FACES = ['wicked-grin', 'happy', 'smug', 'sneaky', 'gleeful', 'sad', 'crying', 'terrified', 'confused', 'shocked', 'angry', 'enraged', 'foaming', 'asleep', 'dazed', 'hurt', 'taking-damage', 'exhausted', 'unconscious', 'dead'];
+const NIB_REAR = ['back', 'rear-quarter-left', 'rear-quarter-right'];   // v1.97.122: the owner's rear views, texture numbers 21-23 (nibbler-<name>.png)
 const NIB = { tex: null, per: 5 };
 function nibTex(i) {   // 1-based face number
   if (!NIB.tex) NIB.tex = [];
   if (!NIB.tex[i] && typeof document === 'undefined') return null;   // (outside a browser: no pictures)
-  if (!NIB.tex[i]) { const t = new T.TextureLoader().load('/corn-souls/assets/textures/nibbler/nibbler-' + String(i).padStart(2, '0') + '-' + NIB_FACES[i - 1] + '.png'); t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; NIB.tex[i] = t; }
+  if (!NIB.tex[i]) { const t = new T.TextureLoader().load('/corn-souls/assets/textures/nibbler/nibbler-' + (i > NIB_FACES.length ? NIB_REAR[i - NIB_FACES.length - 1] : String(i).padStart(2, '0') + '-' + NIB_FACES[i - 1]) + '.png'); t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; NIB.tex[i] = t; }
   return NIB.tex[i];
 }
 function nibSpawn(x, z, id) {
@@ -13044,14 +13045,22 @@ function nibFace(c, dt) {   // what it is doing picks its face (1-based numbers 
   return c.idleFace || 2;
 }
 const _nr = new T.Vector3();
+// v1.97.122: which side of it you see. Turned toward you (within ~100 degrees of you): its face. Turned away: the back (more
+// than ~150 degrees off), or a rear quarter in between (left when you are behind it on its left, right on its right).
+function nibView(c, cx, cz) {
+  const vx = cx - c.x, vz = cz - c.z, vl = Math.hypot(vx, vz) || 1, dot = (vx * Math.sin(c.a) + vz * Math.cos(c.a)) / vl, lat = (vx * Math.cos(c.a) - vz * Math.sin(c.a)) / vl;
+  if (c.state === 'dead' || dot > -0.17) return 0;
+  return NIB_FACES.length + (dot < -0.87 ? 1 : lat > 0 ? 2 : 3);
+}
 function nibPose(c, dt) {
-  const f = nibFace(c, dt); if (f !== c.face) { c.face = f; c.sp.material.map = nibTex(f); c.sp.material.needsUpdate = true; }
+  const f = nibFace(c, dt), rear = nibView(c, camera.position.x, camera.position.z), show = rear || f; c.face = f; c.rear = rear;
+  if (show !== c.shown) { c.shown = show; c.sp.material.map = nibTex(show); c.sp.material.needsUpdate = true; }
   const K = c.K, moving = c.speed > 0.3 && c.state !== 'dead';
   c.hop += dt * (moving ? 9 + c.speed * 1.5 : 2);
   const hy = moving ? Math.abs(Math.sin(c.hop)) * 0.16 : 0, sq = moving ? 1 - 0.14 * Math.cos(c.hop * 2) : 1 + 0.03 * Math.sin(c.t * 2.2);   // hop, squash on landing / breathing
   _nr.setFromMatrixColumn(camera.matrixWorld, 0); const side = Math.sin(c.a) * _nr.x + Math.cos(c.a) * _nr.z; if (Math.abs(side) > 0.2) c.flip = side > 0 ? 1 : -1;   // faces the way it goes, left or right on screen
   const sz = K.size, dead = c.state === 'dead';
-  c.sp.scale.set(sz * c.flip * (dead ? 1 : 2 - sq), sz * (dead ? 1 : sq), 1);
+  c.sp.scale.set(sz * (c.rear ? 1 : c.flip) * (dead ? 1 : 2 - sq), sz * (dead ? 1 : sq), 1);   // (the rear views are drawn for their side: not flipped)
   c.sp.material.rotation = dead ? Math.min(1, c.deadT * 3) * 1.45 * c.flip : c.hurtT > 0 ? Math.sin(c.hurtT * 40) * 0.25 : moving ? Math.sin(c.hop) * 0.12 : 0;   // wobble / shake / keel over
   if (dead) { c.sp.material.opacity = Math.max(0, 1 - Math.max(0, c.deadT - 4.5) / 2.5); c.sp.material.transparent = c.deadT > 4.5; }
   const k = 0.35 + 0.65 * (typeof SKY !== 'undefined' ? SKY.k : 1); c.sp.material.color.setRGB(k, k, k);   // darker at night (sprites are unlit)
