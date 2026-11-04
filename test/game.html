@@ -8040,17 +8040,10 @@ function init(container) {
     loadSubstation();
   }
 
-  // trees and fields
-  const TREE_SPOTS = [];
-  for (let i = 0; i < 56; i++) {
-    const a = Math.random() * Math.PI * 2, r = 230 + Math.random() * 100, x = -45 + Math.cos(a) * r, z = Math.sin(a) * r * 0.65;
-    if ((x > WXR - 40 && x < EXR + 10 && z > NROAD - 8 && z < TFZ + TFD / 2 + 16) || (x > EXR && x < EXR + 100 && z > NROAD && z < NROAD + 100) || (Math.abs(z - SCZ_OUT) < 8 && x > EXR - 6 && x < 250) || Math.abs(x - RDPX) < 10 || Math.abs(z - HWY.z(x)) * HWY.c < 26 || (x > TL.xw - 12 && x < TL.x + 6 && z > TL.zn - 12 && z < TL.zs + 12) || (Math.abs(z - NROAD) < 8 && x > -195 && x < 230)) continue;
-    const s = 1 + Math.random();
-    TREE_SPOTS.push([x, z, s]);
-    extraCols.push([x, z, 0.45 * s]);
-  }
-  // v1.97.126 proof of concept: the trees nearest the plant are drawn from the owner's PSX pack (8 views each); every
-  // other tree keeps the code-painted spruce. `TREE_SPRITE_COUNT` decides how many convert, so trying them all is one number.
+  // trees and fields (v1.97.127): 56 PSX tree cards in stands round the plant. The layout is SEEDED, so it is the same
+  // every session, and nothing is placed in the corn field, in the pivot circle, on a road or on the railroad.
+  const TREE_SPOTS = treePlacement();
+  for (const [x, z, sc] of TREE_SPOTS) extraCols.push([x, z, 0.45 * sc]);
   treeSpriteSetup(TREE_SPOTS);
   // corn field: 12 rows, 340 m long. Low dirt ridges, and the corn itself as crossed flat pictures (two quads in an X, drawn in code):
   // ~1,100 clumps in one instanced mesh = one draw call, nothing to update per frame
@@ -10221,15 +10214,66 @@ function updateBillboards() {
     BILL.list[kind].forEach(([x, z, s], i) => { dummy.position.set(x, 0, z); dummy.rotation.set(0, Math.atan2(cx - x, cz - z), 0); dummy.scale.set(s, s, s); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); });
     m.instanceMatrix.needsUpdate = true; }
 }
+// ---------- TREE PLACEMENT (v1.97.127): 56 trees in stands of one species each, at the SAME spots every session, and
+// never in the corn field, in the pivot circle, on a road or on the railroad. The layout runs off a fixed-seed generator
+// instead of Math.random(), so the windbreak round the plant is part of the world now rather than of the weather.
+const TREE_TOTAL = 56;
+const TREE_SEED = 20261104;
+function treeRng(seed) {   // mulberry32: tiny, deterministic, good enough for scattering trees
+  return function () { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+const TREE_STANDS = [   // ten species; the placement gives each a contiguous run of the free arcs round the plant
+  '01-broadleaf', '05-red-maple', '03-silver-birch', '02-leaning-pine', '08-cypress',
+  '06-dead-snag', '04-weeping-willow', '10-acacia', '09-flowering-cherry', '07-fan-palm'
+];
+function treeBlocked(x, z) {   // true where a tree would be standing in something
+  if (x > WXR - 40 && x < EXR + 10 && z > NROAD - 8 && z < TFZ + TFD / 2 + 16) return true;   // the plant itself, every road inside it, the tank farm
+  if (x > EXR && x < EXR + 100 && z > NROAD && z < NROAD + 100) return true;                  // the entrance yard and the scale lane
+  if (Math.abs(z - SCZ_OUT) < 14 && x > EXR - 10 && x < 250) return true;                      // the weighbridge exit road
+  if (inCField(x, z, 12)) return true;                                                        // the north corn field
+  if (O.pivot && Math.hypot(x - O.pivot.cx, z - O.pivot.cz) < O.pivot.R + 12) return true;     // the pivot circle
+  if (Math.abs(z - (HWY.b - HWY.k * x)) < 22) return true;                                    // the highway
+  for (const r of DIRT_ROADS) for (let i = 0; i < r.pts.length - 1; i++) {                    // the dirt tracks
+    const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz;
+    const t = L2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)) : 0;
+    if (Math.hypot(x - (ax + dx * t), z - (az + dz * t)) < r.w / 2 + 6) return true;
+  }
+  return false;
+}
+function treePlacement() {   // free ground first, then one species per contiguous stand round the plant
+  const rnd = treeRng(TREE_SEED), pool = [];
+  for (let i = 0; i < 4000 && pool.length < 420; i++) {   // a pool of clear ground round the plant (seeded, so always the same)
+    const a = rnd() * Math.PI * 2, r = 200 + rnd() * 220;
+    const x = -45 + Math.cos(a) * r, z = Math.sin(a) * r * 0.65;
+    if (!treeBlocked(x, z)) pool.push([x, z, 1.0 + rnd() * 0.8, Math.atan2(z, x + 45)]);
+  }
+  pool.sort((p, q) => p[3] - q[3]);
+  const out = [];
+  for (let k = 0; k < TREE_TOTAL; k++) { const it = pool[Math.floor(k * pool.length / TREE_TOTAL)]; out.push([it[0], it[1], it[2], 0]); }   // spread along the arcs, not clumped
+  out.sort((p, q) => Math.atan2(p[1], p[0] + 45) - Math.atan2(q[1], q[0] + 45));
+  // the free ground comes in arcs (the plant blocks the rest), so split at the real gaps first: a stand must never
+  // straddle two arcs, or the same species turns up on opposite sides of the plant.
+  const ang = t => Math.atan2(t[1], t[0] + 45);
+  const segs = []; let cur = [out[0]];
+  for (let i = 1; i < out.length; i++) { if (ang(out[i]) - ang(out[i - 1]) > 0.5) { segs.push(cur); cur = []; } cur.push(out[i]); }   // 0.5 rad: a real gap, not jitter
+  segs.push(cur);
+  const per = TREE_TOTAL / TREE_STANDS.length, n = TREE_STANDS.length;
+  let si = 0;
+  for (const seg of segs) {
+    const size = Math.max(1, Math.round(seg.length / per));   // this arc's share of the ten stands
+    seg.forEach((t, i) => { t[3] = TREE_STANDS[Math.min(n - 1, si + Math.floor(i * size / seg.length))]; });
+    si += size;
+  }
+  return out;
+}
 // ---------- PSX TREE SPRITES (v1.97.126): the owner's Kernel Art tree pack - 10 species x 8 views at 45 degrees, 64 px
 // frames, ground anchor (32, 62), "nearest 45-degree frame to the viewing angle". PROOF OF CONCEPT: only the trees nearest
 // the plant are drawn from it (TREE_SPRITE_COUNT); every other tree is still the code-painted spruce above. Each
 // (species, view) pair is one instanced mesh, created the first time a tree needs it, so converting all 56 later costs at
 // most species x 8 draw calls and nothing at all up front.
-const TREE_SPRITE_COUNT = 8;                      // how many of the scenery trees use the pack (proof of concept)
+const TREE_SPRITE_COUNT = 999;                    // every tree uses the pack (a proof of concept used 8; drop this to compare against the spruce)
 const TREE_SPR = { items: [], mesh: {}, atlas: {}, dirty: true, camX: 1e9, camZ: 1e9, quad: 8 };
 const TREE_SINK = 0.25;                           // the anchor is 2 px above the bottom of a 64 px tile = 2/64 of an 8 m card
-const TREE_KINDS = ['01-broadleaf', '02-leaning-pine', '03-silver-birch', '05-red-maple', '04-weeping-willow', '06-dead-snag', '08-cypress'];   // the species that suit the plains (no palm, cherry or acacia)
 function treeView(a) { return ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8; }   // 0 front, 2 right, 4 back, 6 left
 function treeAtlas(kind) {
   if (TREE_SPR.atlas[kind]) return TREE_SPR.atlas[kind];
@@ -10252,8 +10296,8 @@ function treeMesh(kind, view) {
 function treeSpriteSetup(spots) {   // called once, after the scenery trees are placed
   const order = spots.map((p, i) => [Math.hypot(p[0] + 45, p[1]), i]).sort((a, b) => a[0] - b[0]);   // nearest the plant first
   for (let n = 0; n < spots.length; n++) {
-    const [x, z, s] = spots[order[n][1]];
-    if (n < TREE_SPRITE_COUNT) TREE_SPR.items.push({ x, z, s, kind: TREE_KINDS[n % TREE_KINDS.length] });
+    const [x, z, s, kind] = spots[order[n][1]];   // the species comes from the tree's stand
+    if (n < TREE_SPRITE_COUNT) TREE_SPR.items.push({ x, z, s, kind });
     else billboard('tree', x, z, s);   // everything else: the code-painted spruce, one instanced mesh for all of them
   }
   updateTreeSprites();
