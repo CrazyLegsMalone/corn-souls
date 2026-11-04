@@ -1,3 +1,13 @@
+## TEST v1.97.146 — the equipment panel is switched off (2026-11-04)
+- Owner (screenshot of the Tin Bin 1 side panel in Savior Mode): *"remove that menu we dont need it at this point"*.
+- Every way in goes through `selectUnit`:
+  - clicking a unit or a station label;
+  - the pad's A / UP / DOWN / L1 / R1 in Savior Mode;
+  - the (hidden) Tanks button.
+- `selectUnit` now returns at once while `UNIT_PANEL` is false. The panel never opens, and nothing else changes. Its code (`buildPanel`, setpoint controls, cycling) is kept, so `UNIT_PANEL = true` brings it back.
+- Verified in the running game: clicking a station label and the Tanks button leaves the panel shut. `validate-frame-stability.cjs` checks the switch. All 42 suites pass.
+- Bumped TEST to `1.97.146` / `corn-souls-test-shell-v173`.
+
 ## TEST v1.97.145 — lit buildings are lit end to end, not just round you (2026-11-04)
 - Owner: *"when inside lit buildings it seems like the building lights up as you walk through it"* (and: *"the building probably doesnt need so many lamps"*).
 - **Cause:** the lighting pass makes pools for only the nearest `CS_N.L` lamps (5 on low, 8 on medium / high), picked each frame by distance from you. The big rooms have far more fixtures: 52 in the 23 x 140 m hall, 38, 30, 22 and 20 in the next ones. A room's even fill was weak (0.35) next to its pools, so everything past the nearest few lamps sat dark, and pools came on ahead of you as you walked. Lamp count alone isn't the fix: even a few lamps across a 140 m hall would pop the same way, and the generated high-bays are one instanced mesh, so they cost almost nothing to draw.

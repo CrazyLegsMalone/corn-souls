@@ -102,6 +102,8 @@ assert.ok(launcher.includes('function csVehiclePenetration(x,z,r,ignore){   // r
 // 5 ---------------------------------------------------------------- no forced layout while walking
 assert.ok(html.includes("const labelsOn = !P3.walking && $('labels').offsetParent;") && html.includes("const panelW = labelsOn && $('panel').classList.contains('open') ? $('panel').offsetWidth : 0;"),
   'the side panel is only measured when the station labels are on screen');
+// v1.97.146, owner: "remove that menu we dont need it at this point" - the equipment panel never opens
+assert.ok(html.includes('const UNIT_PANEL = false;') && html.includes('function selectUnit(id, noCam) {\n  if (!UNIT_PANEL) return;'), 'the equipment panel is switched off at selectUnit (every way in goes through it)');
 assert.ok(html.includes("if (!P3.walking && $('labels').offsetParent) for (const id in labels) { const s = Sim."), 'the 5 Hz label refresh is skipped while walking too');
 
 console.log('PASS: frame stability - shadows every frame with a cheaper pass, critter probes time-sliced and local, refresh-locked frame pacing, no per-frame garbage in vehicle contacts / roofs / hits / floorAt, no layout reads while walking');

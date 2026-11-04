@@ -14177,7 +14177,12 @@ for (const id in ST) {
 
 // ---------- unit panel ----------
 let cur = null, ctls = [], focusIdx = -1;
+// v1.97.146, owner (screenshot of the Tin Bin 1 panel): "remove that menu we dont need it at this point". The equipment panel is
+// switched off: clicking a unit or a station label, the pad's A / UP / DOWN / L1 / R1 in Savior Mode and the Tanks button all go
+// through selectUnit, which now does nothing. The panel code stays; set UNIT_PANEL back to true to bring it back.
+const UNIT_PANEL = false;
 function selectUnit(id, noCam) {
+  if (!UNIT_PANEL) return;
   unlockMouse();
   if (!id || !Sim.UNIT[id]) return;
   cur = id; P3.select(id); if (!noCam) P3.focusUnit(id);
