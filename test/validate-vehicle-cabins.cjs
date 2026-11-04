@@ -71,6 +71,47 @@ for (let i = 0; i < calls.length; i++) {
   assert.ok(lp.some(p => p.y < Math.min(F[1], D[1]) + dy - 0.3 && p.x < F[0] && p.x > D[0]), name + ': its top has the cabin well cut into it');
 }
 
+// v1.97.106: the crowbar breaks only the window it hits
+{ const i0 = html.indexOf('// One window at a time (v1.97.106)'), i1 = html.indexOf('function breakGlass(V, mine) {');
+  assert.ok(i0 > 0 && i1 > i0, 'per-window smashing sits right before the old whole-vehicle breakGlass');
+  const sent = [], BROKEN = new T.MeshLambertMaterial({ color: 0xaabbcc, transparent: true, side: T.DoubleSide }), cars = [];
+  const sx = { T, Math, V3: (x, y, z) => new T.Vector3(x, y, z), netSend: m => sent.push(m), glassSmash() {}, puff() {}, brokenGlassMat: () => BROKEN, get BROKEN_GLASS() { return BROKEN; },
+    isGlass: m => !!m && (m === BROKEN || m === ctx.VGLASS), O: { cars }, VBOXES: [], breakGlass: () => { throw new Error('the whole car broke'); } };
+  vm.createContext(sx); vm.runInContext(html.slice(i0, i1) + '\nthis.breakPane = breakPane; this.smashAt = smashAt; this.smashNet = smashNet; this.unbreakPanes = unbreakPanes;', sx);
+  const make = () => { const i = calls.findIndex((c, k) => nameOf(k) === 'Kia'), W = 1.86, spec = vm.runInNewContext('(' + calls[i][2] + ')', { W, paint: undefined });
+    const g = new T.Group(); ctx.cabin(g, spec); g.updateMatrixWorld(true); const V = { g }; sx.VBOXES.push(V); const car = { g, broken: false }; cars.push(car);
+    return { g, V, car, m: g.children.find(o => o.material === ctx.VGLASS), spec }; };
+  const { g, V, car, m, spec } = make(), panes = m.userData.panes;
+  assert.ok(panes.filter(P => P.kind === 'side').length === 4 && panes.some(P => P.kind === 'windshield') && panes.some(P => P.kind === 'back'), 'Pink Sedan: four side panes (front + rear door, both sides), windshield, back glass');
+  assert.equal(panes.reduce((q, P) => q + P.n, 0), m.geometry.attributes.position.count, 'the panes cover all the glass');
+  const ray = new T.Raycaster(), hitAt = (o, d) => { ray.set(o, d); return ray.intersectObjects(g.children, false)[0]; };
+  const ws0 = (() => { const P = panes.find(P => P.kind === 'windshield'); return Array.from(m.geometry.attributes.position.array.slice(P.s * 3, (P.s + P.n) * 3)); })();
+  // driver's front door window, from outside on the left (+x)
+  const h1 = hitAt(new T.Vector3(3, 1.18, 0.3), new T.Vector3(-1, 0, 0));
+  assert.equal(h1.object, m, 'the swing lands on the glass'); assert.equal(sx.smashAt(V, h1, true), true, 'it smashes');
+  const broke = panes.filter(P => P.broken); assert.equal(broke.length, 1, 'only the window that was hit breaks'); assert.equal(broke[0].kind, 'side');
+  const wsNow = (() => { const P = panes.find(P => P.kind === 'windshield'); return Array.from(m.geometry.attributes.position.array.slice(P.s * 3, (P.s + P.n) * 3)); })();
+  assert.deepEqual(wsNow, ws0, 'the windshield is untouched');
+  assert.ok(m.userData.broken && m.userData.broken.material === BROKEN && m.userData.broken.parent === g, 'the smashed pane shows cracked in a second mesh on the car (two glass draw calls at most)');
+  assert.equal(sent.at(-1).pane, panes.indexOf(broke[0]), 'the other player is told which pane'); assert.equal(car.broken, true, 'a smashed window lets you into a drivable car without keys');
+  const h2 = hitAt(new T.Vector3(3, 1.18, 0.3), new T.Vector3(-1, 0, 0));
+  assert.notEqual(h2.object, m, 'the broken pane no longer stops a ray as intact glass'); assert.equal(sx.smashAt(V, h2, true), false, 'hitting it again does nothing more');
+  // the windshield, from the front
+  const h3 = hitAt(new T.Vector3(0.3, 1.15, 3), new T.Vector3(0, -0.12, -1).normalize());
+  assert.equal(h3.object, m); assert.equal(sx.smashAt(V, h3, true), true); assert.equal(panes.find(P => P.kind === 'windshield').broken, true, 'a hit on the windshield breaks the windshield');
+  assert.equal(panes.filter(P => P.broken).length, 2, 'and nothing else');
+  // the paint: just a dent
+  const h4 = hitAt(new T.Vector3(3, 0.6, 1.8), new T.Vector3(-1, 0, 0)); assert.notEqual(h4.object, m); assert.equal(sx.smashAt(V, h4, true), false, 'a hit on the body breaks no glass');
+  // repair puts every pane back
+  sx.unbreakPanes(m); assert.ok(panes.every(P => !P.broken), 'repair: all panes whole again');
+  assert.equal(hitAt(new T.Vector3(3, 1.18, 0.3), new T.Vector3(-1, 0, 0)).object, m, 'and the glass stops the ray again');
+  // the other player's smash lands on the same pane of the same car
+  const two = make(); sx.smashNet({ i: sx.VBOXES.indexOf(two.V), pane: 3 }); assert.deepEqual(two.m.userData.panes.map(P => !!P.broken), two.m.userData.panes.map((P, k) => k === 3), 'remote: just that pane');
+}
+assert.ok(html.includes("if (smashAt(V, hit, true)) return; if (hit.object.material === BROKEN_GLASS) { gunClick(260, 0.04, 0.1); return; } break;"), 'tool swings smash only what they hit');
+assert.ok(html.includes("} else if (m.t === 'cb') { smashNet(m);"), 'network: per-pane smash');
+assert.ok(html.includes('if (o.isMesh && o.userData.panes) unbreakPanes(o);'), 'a full repair restores the panes');
+
 // wiring
 const lot = html.slice(html.indexOf("    // five employees' vehicles parked in stalls"), html.indexOf('  // ---------- ENERGY CENTER block'));
 assert.ok(!/W \+ 0\.02, (glass|glassM|mat\(glass\)|0x4a6275)\)/.test(lot), 'no stuck-on glass bands left on the vehicles');
@@ -81,4 +122,4 @@ assert.ok(html.includes('wheels: best.wheels, sw: best.sw || null, driver: null,
 assert.ok(html.includes('if (c.sw) c.sw.rotation.z = 0;'), 'parked with the wheel straight');
 { const s = html.slice(html.indexOf('function utvCam(dt) {'), html.indexOf('function walkCam() {'));
   assert.ok(s.includes('if (CAR_ON && CAR_ON.eye) {') && s.includes('.applyMatrix4(CAR_ON.inner.matrixWorld)'), "first person in a car: the camera sits at the cabin's driver eye, riding with the body"); }
-console.log('PASS: hollow cabins on all nine vehicles (see-through glass in one mesh, frames, footwell, dash, gauges, wheel, seats), driver-seat camera, F-150 gone');
+console.log('PASS: hollow cabins on all nine vehicles (see-through glass in one mesh, frames, footwell, dash, gauges, wheel, seats), driver-seat camera, F-150 gone, crowbar breaks one window at a time');

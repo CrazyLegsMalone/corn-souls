@@ -1,3 +1,14 @@
+## TEST v1.97.106 — the crowbar breaks only the window it hits (2026-11-03)
+- Owner: *"only the window struck by the crowbar should shatter not all the cars window. if you break the side windows the windshield should still be intact"*.
+- Before: any tool hit anywhere on a vehicle ran `breakGlass`, which swapped every glass part of that vehicle to the cracked material.
+- Now (`smashAt`, called from `toolHit`): only the glass the swing actually struck breaks.
+  - Cabin cars: the glass mesh records its panes (`userData.panes`: each side window piece, windshield, back glass). `breakPane` moves the struck pane out of the intact mesh (its triangles fold to a point, so rays pass) into a second per-car mesh with the cracked look, made on the first break: at most two glass draw calls per car.
+  - Vehicles with separate glass parts (Ranger, forklifts): just the part that was hit.
+  - A hit on paint or trim breaks no glass (the dent still lands); hitting an already-smashed pane just clinks.
+  - Any smashed window on a drivable car still lets you in without keys.
+- Network: `cb` now carries the pane (or mesh) index (`smashNet`); a message without one (older build) breaks the whole vehicle as before. A full repair (`dmgRestore`) restores every pane (`unbreakPanes`).
+- `validate-vehicle-cabins.cjs`: raycasts real swings at the Pink Sedan: driver window breaks alone and the windshield is untouched, the broken pane lets rays through, a second hit does nothing, the windshield breaks on its own, paint breaks nothing, repair restores, a remote smash hits the same pane.
+
 ## TEST v1.97.105 — see-through car windows, real interiors, a proper driver's seat; F-150 removed (2026-11-03)
 - Owner (photo of the Pink Sedan): *"Can we fix the vehicle windows they are opaque. The first person view in the pink car is pretty bad as well"*, then *"Do 2 and 3 and remove the silver f150"*.
 - **Why the windows were opaque:** every vehicle was one solid side-profile block in body colour with dark panels stuck on the outside, so there was nothing to see through. The Pink Sedan's glass also sat only 1 cm proud of the paint (stripes of pink through it on a phone's depth buffer) and it had no rear window at all.

@@ -7348,14 +7348,15 @@ function init(container) {
       if (rg < 1) { const [nz, ny] = inN(R, D); cabExt(g, [M, D, [D[0] + nz * 0.04, D[1] + ny * 0.04], [M[0] + nz * 0.04, M[1] + ny * 0.04]], xi * 2, paint, 0); }   // painted cab back under the glass
       // the glass: side windows, windshield and back glass in one mesh
       const gp = [], tri = (a, b, c) => gp.push(...a, ...b, ...c);
-      for (const w of wins) for (const sx of [-1, 1]) { const x = sx * (hw - t / 2); for (let i = 1; i < w.length - 1; i++) tri([x, w[0][1], w[0][0]], [x, w[i][1], w[i][0]], [x, w[i + 1][1], w[i + 1][0]]); }
+      const panes = [], open1 = kind => panes.push({ kind, s: gp.length / 3, n: 0 }), close1 = () => { const P = panes[panes.length - 1]; P.n = gp.length / 3 - P.s; };   // each pane breaks on its own (crowbar)
+      for (const w of wins) for (const sx of [-1, 1]) { const x = sx * (hw - t / 2); open1('side'); for (let i = 1; i < w.length - 1; i++) tri([x, w[0][1], w[0][0]], [x, w[i][1], w[i][0]], [x, w[i + 1][1], w[i + 1][0]]); close1(); }
       const pane = (P, Q) => { const [nz, ny] = inN(P, Q), p = [P[0] + nz * 0.015, P[1] + ny * 0.015], q = [Q[0] + nz * 0.015, Q[1] + ny * 0.015];
         tri([-xi, p[1], p[0]], [xi, p[1], p[0]], [xi, q[1], q[0]]); tri([-xi, p[1], p[0]], [xi, q[1], q[0]], [-xi, q[1], q[0]]); };
-      pane(F, A); pane(R, M);
+      open1('windshield'); pane(F, A); close1(); open1('back'); pane(R, M); close1();
       const geo = new T.BufferGeometry(), pos = new Float32Array(gp), uv = new Float32Array(pos.length / 3 * 2);
       for (let i = 0, j = 0; i < pos.length; i += 3, j += 2) { uv[j] = (pos[i] + pos[i + 2]) * 0.6; uv[j + 1] = pos[i + 1] * 0.6; }
       geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.computeVertexNormals();
-      const glassMesh = new T.Mesh(geo, VGLASS); glassMesh.renderOrder = 1; g.add(glassMesh);
+      const glassMesh = new T.Mesh(geo, VGLASS); glassMesh.renderOrder = 1; glassMesh.userData.panes = panes; g.add(glassMesh);
       // the lower body, with a footwell: solid up to the belt everywhere but the cabin, which is a well with a floor, door
       // panels down the sides, the dash at the front, front seats and (when there is room) a rear bench
       const dark = mat(0x232528), seat = mat(0x2c2e33), B = (w, h, d, m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
@@ -9985,7 +9986,7 @@ function netRecv(m) {
   } else if (m.t === 'tag') {   // the other player's paintball got me
     if (walk.on && !walk.dead) { walk.dead = 'paint'; layBody(walk.x, walk.z, walk.yaw, m.v[0] * 0.08, 2.5, m.v[1] * 0.08, 4); walk.diedAt = { x: walk.x, z: walk.z }; }
   } else if (m.t === 'vd') { dmgNet(m);
-  } else if (m.t === 'cb') { const V = VBOXES[m.i]; if (V) breakGlass(V, false);
+  } else if (m.t === 'cb') { smashNet(m);
   } else if (m.t === 'gk') { crackAt(V3(m.p[0], m.p[1], m.p[2]), V3(m.n[0], m.n[1], m.n[2]), false);
   } else if (m.t === 'cp') { if (O.cars) { const c = O.cars[m.i]; c.x = c.tx = m.p[0]; c.z = c.tz = m.p[1]; c.a = c.ta = m.p[2]; c.y = c.ty = m.p[3]; c.remote = false; c.g.position.set(c.x, c.y + 0.13, c.z); c.g.rotation.set(0, c.a, 0);
       const fx = -Math.sin(c.a) * 1.2, fz = -Math.cos(c.a) * 1.2; c.cols[0][0] = c.x + fx; c.cols[0][1] = c.z + fz; c.cols[1][0] = c.x - fx; c.cols[1][1] = c.z - fz; }
@@ -10712,6 +10713,43 @@ function crackAt(p, n, mine) {   // stick a crack on the glass at p facing along
   glassSmash(p); for (let i = 0; i < 4; i++) puff(p.clone().addScaledVector(n, 0.1), 0.08, 0xdfeff8);
   if (mine) netSend({ t: 'gk', p: [p.x, p.y, p.z].map(v => +v.toFixed(3)), n: [n.x, n.y, n.z].map(v => +v.toFixed(3)) });
 }
+// One window at a time (v1.97.106): a cabin's glass is one mesh, so a smashed pane moves out of it into a second mesh with
+// the cracked-glass look (made the first time a pane on that car breaks): never more than two glass draw calls a car.
+// Vehicles without cabin glass (Ranger, forklifts) break just the glass part that was hit.
+function breakPane(V, m, i, mine, at) {
+  const P = m.userData.panes && m.userData.panes[i]; if (!P || P.broken) return false; P.broken = true;
+  const pos = m.geometry.attributes.position, a = pos.array, k0 = P.s * 3, k1 = (P.s + P.n) * 3;
+  if (!m.userData.pos0) m.userData.pos0 = a.slice();
+  let bm = m.userData.broken;
+  if (!bm) { const g2 = m.geometry.clone(); g2.attributes.position.array.fill(0); bm = new T.Mesh(g2, brokenGlassMat()); bm.renderOrder = 1; bm.position.copy(m.position); bm.rotation.copy(m.rotation); m.parent.add(bm); m.userData.broken = bm; }
+  const b = bm.geometry.attributes.position.array, p0 = m.userData.pos0;
+  for (let k = k0; k < k1; k++) b[k] = p0[k];                                   // the pane shows cracked in the broken mesh...
+  for (let k = k0; k < k1; k += 3) { a[k] = a[k0]; a[k + 1] = a[k0 + 1]; a[k + 2] = a[k0 + 2]; }   // ...and folds to a point in the intact one (no area: rays pass)
+  pos.needsUpdate = true; bm.geometry.attributes.position.needsUpdate = true; bm.geometry.computeBoundingSphere();
+  if (at) { glassSmash(at); for (let j = 0; j < 4; j++) puff(at.clone().add(V3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4)), 0.1, 0xdfeff8); }
+  if (O.cars) for (const c of O.cars) if (c.g === V.g || V.g.parent === c.g) c.broken = true;   // any smashed window on a drivable one: hop in, no keys needed
+  if (mine) netSend({ t: 'cb', i: VBOXES.indexOf(V), pane: i });
+  return true;
+}
+function unbreakPanes(m) { const p0 = m.userData.pos0; if (!p0) return; m.geometry.attributes.position.array.set(p0); m.geometry.attributes.position.needsUpdate = true;
+  for (const P of m.userData.panes) P.broken = false; const bm = m.userData.broken; if (bm) { bm.geometry.attributes.position.array.fill(0); bm.geometry.attributes.position.needsUpdate = true; } }
+function smashAt(V, hit, mine) {   // a crowbar / tool hit on a vehicle: only the glass it struck
+  const o = hit.object;
+  if (o.userData.panes && hit.faceIndex != null) { const v = hit.faceIndex * 3, i = o.userData.panes.findIndex(P => v >= P.s && v < P.s + P.n); return breakPane(V, o, i, mine, hit.point); }
+  if (isGlass(o.material) && o.material !== BROKEN_GLASS) {   // a vehicle with separate glass parts: that part
+    o.userData.g0 = o.material; o.material = brokenGlassMat(); glassSmash(hit.point);
+    if (O.cars) for (const c of O.cars) if (c.g === V.g || V.g.parent === c.g) c.broken = true;
+    if (mine) { const list = []; V.g.traverse(q => { if (q.isMesh) list.push(q); }); netSend({ t: 'cb', i: VBOXES.indexOf(V), mesh: list.indexOf(o) }); }
+    return true;
+  }
+  return false;   // paint or trim: the dent already landed, it just clanks
+}
+function smashNet(m) {   // the other player's crowbar
+  const V = VBOXES[m.i]; if (!V) return;
+  if (m.pane != null) { let gm = null; V.g.traverse(q => { if (!gm && q.userData && q.userData.panes) gm = q; }); if (gm) breakPane(V, gm, m.pane, false, gm.localToWorld(V3())); return; }
+  if (m.mesh != null) { const list = []; V.g.traverse(q => { if (q.isMesh) list.push(q); }); const o = list[m.mesh]; if (o && isGlass(o.material) && o.material !== BROKEN_GLASS) { o.userData.g0 = o.material; o.material = brokenGlassMat(); if (O.cars) for (const c of O.cars) if (c.g === V.g || V.g.parent === c.g) c.broken = true; } return; }
+  breakGlass(V, false);   // an older build on the other end: the whole vehicle, like before
+}
 function breakGlass(V, mine) {   // a whole vehicle's windows
   if (V.broken) return false; V.broken = true;
   V.g.traverse(o => { if (o.isMesh && isGlass(o.material) && o.material !== BROKEN_GLASS) { o.userData.g0 = o.material; o.material = brokenGlassMat(); } });
@@ -10750,7 +10788,7 @@ function toolHit() {   // a swing: whatever is right in front of you (about arm 
   for (const h of ray.intersectObjects(scene.children, true)) { let q = h.object, skip = !q.isMesh || q.userData.noHit || q.isSprite || q.isInstancedMesh; while (q && !skip) { skip = q === camera || q === VIEW.av || q === SR.g; q = q.parent; } if (!skip) { hit = h; break; } }
   ray.far = Infinity; TOOL_LAST = hit ? { p: hit.point.toArray().map(v => +v.toFixed(2)), c: hit.object.material && hit.object.material.color && hit.object.material.color.getHexString(), d: +hit.distance.toFixed(2) } : null;
   if (hit) {
-    if (held !== 'wrench') for (const V of VBOXES) { let q = hit.object; while (q && q !== V.g) q = q.parent; if (q) { if (breakGlass(V, true)) return; break; } }   // a car or truck
+    if (held !== 'wrench') for (const V of VBOXES) { let q = hit.object; while (q && q !== V.g) q = q.parent; if (q) { if (smashAt(V, hit, true)) return; if (hit.object.material === BROKEN_GLASS) { gunClick(260, 0.04, 0.1); return; } break; } }   // a car or truck: only the window you hit
     if (held !== 'wrench' && nh3Hit(hit.point)) { gunClick(180, 0.08, 0.2); return; }   // whacked the ammonia tank: it springs a leak
     if (saHit(hit.point)) { gunClick(200, 0.08, 0.18); return; }   // the sulfuric acid tank: a leak (or, with the wrench, a patch)
     if (held !== 'wrench' && isGlass(hit.object.material) && hit.face) { const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld); if (n.dot(dir) > 0) n.negate(); crackAt(hit.point, n, true); return; }
@@ -10792,7 +10830,7 @@ function dmgChar(k) {   // burnt out: everything but the glass goes black
 }
 function dmgRestore(k) {   // fully repaired: paint and windows back
   const d = dmgOf(k), g = dmgG(k); d.burnt = false; if (!g) return;
-  g.traverse(o => { if (o.isMesh && o.userData.m0) { o.material = o.userData.m0; delete o.userData.m0; } if (o.isMesh && o.material === BROKEN_GLASS && o.userData.g0) o.material = o.userData.g0; });
+  g.traverse(o => { if (o.isMesh && o.userData.m0) { o.material = o.userData.m0; delete o.userData.m0; } if (o.isMesh && o.material === BROKEN_GLASS && o.userData.g0) o.material = o.userData.g0; if (o.isMesh && o.userData.panes) unbreakPanes(o); });
   for (const V of VBOXES) if (V.g === g || V.g.parent === g) V.broken = false;
   if (O.cars) for (const c of O.cars) if (c.g === g) c.broken = false;
 }
