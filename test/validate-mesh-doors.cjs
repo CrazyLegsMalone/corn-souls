@@ -89,5 +89,6 @@ assert.ok(html.includes('for (const d of O.rollDoors || []) rollDoorStep(d, dt);
 assert.ok(html.includes("{ const r = P3.rollButtonPress(); if (r !== null) { if (r) toast(r); return; } }"), 'X / E / the hand button on a switch button does it at once');
 assert.ok(!html.includes('function rollSwitchMenu'), 'no menu to pick from any more');
 assert.ok(html.includes('<div id="iprompt">') && html.includes('<circle cx="4.5" cy="12" r="3.6" fill="#fff"/>') && html.includes('P3.rollButtonAim()'), 'an Interact prompt with the west face button (filled) shows while a button is under the crosshair');
+assert.ok(html.includes('<span>Interact</span></div>') && !html.includes("querySelector('small').textContent"), 'just "Interact" - no action text (v1.97.140, owner: the colours are enough)');
 assert.ok(html.includes("return { t: 'ws', rd: rollStates(),") && html.includes('if (L.rd <= 0 && m.rd) rollApply(m.rd);') && html.includes("} else if (m.t === 'rd') {"), 'synced in 2 player');
 console.log('PASS: every roll-up gets a mesh door on its inside face and a switch beside it: open both / close both / close the mesh only, collision follows, no power no hoist, synced in 2 player');

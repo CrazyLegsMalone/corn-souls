@@ -90,7 +90,7 @@ body.walking #lampBtn{display:block}
 #view{transition:filter 1.2s}body.dead #view{filter:grayscale(1) brightness(.82) contrast(1.15)}
 #iprompt{position:fixed;left:50%;top:calc(50% + 46px);transform:translateX(-50%);display:none;align-items:center;gap:8px;background:rgba(14,20,28,.72);color:#fff;border-radius:10px;padding:6px 12px 6px 8px;font:600 14px Arial,sans-serif;z-index:7;pointer-events:none;white-space:nowrap}
 #iprompt.on{display:flex}#iprompt svg{width:24px;height:24px;flex:none}#iprompt .k{display:none;min-width:20px;height:20px;border:2px solid #fff;border-radius:5px;font-size:12px;align-items:center;justify-content:center;padding:0 3px}
-body.pc:not(.padmode) #iprompt svg{display:none}body.pc:not(.padmode) #iprompt .k{display:flex}#iprompt small{font-weight:400;opacity:.8;font-size:12px}
+body.pc:not(.padmode) #iprompt svg{display:none}body.pc:not(.padmode) #iprompt .k{display:flex}
 #toast{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);background:rgba(29,42,58,.9);color:#fff;border-radius:12px;padding:8px 14px;font-size:13px;z-index:8;max-width:80vw;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
 #fps{position:fixed;left:50%;top:4px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.45);border-radius:6px;padding:1px 6px;font:11px monospace;z-index:9;pointer-events:none}
@@ -208,7 +208,7 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
 <button id="ctlBtn">⚙ Tanks</button>
 <div id="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
 <div id="panel"><div id="ph"><button id="pprev">◀</button><h2 id="pname"></h2><button id="pnext">▶</button><button id="pclose">✕</button></div><div id="pb"></div></div>
-<div id="toast"></div><div id="iprompt"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="19.5" cy="12" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="12" cy="19.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="4.5" cy="12" r="3.6" fill="#fff"/></svg><span class="k">E</span><span>Interact <small></small></span></div>
+<div id="toast"></div><div id="iprompt"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="19.5" cy="12" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="12" cy="19.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="4.5" cy="12" r="3.6" fill="#fff"/></svg><span class="k">E</span><span>Interact</span></div>
 <div id="fps"></div>
 <div id="squish"></div><div id="fired"></div><div id="toxic"></div><div id="nh3"></div><button id="fireBtn" aria-label="Use item">🎯</button><button id="swapBtn" aria-label="Switch item">🔄</button><button id="actBtn" aria-label="Interact">✋</button><button id="jumpBtn" aria-label="Jump">⤴</button><button id="aimBtn" aria-label="Aim down sights">AIM</button><button id="ammoBtn" aria-label="Switch ammo">🎨</button><button id="carBtn" class="tb" aria-label="Get in / out">🚙</button><button id="gasBtn" class="tb">GAS</button><button id="brakeBtn" class="tb">BRAKE</button><button id="hbBtn" class="tb">DRIFT</button><button id="camBtn" class="tb" aria-label="Camera">🎥</button><button id="radioBtn" class="tb" aria-label="Stereo">📻</button><button id="nosBtn" class="tb">NOS</button><div id="nosBar"><i></i></div><div id="xhair"></div>
 <audio id="music" loop preload="auto"></audio>
@@ -14949,7 +14949,7 @@ setInterval(() => { const pm = nav === 'pad'; if (navShown !== String(pm)) { nav
 setInterval(() => { const n = P3.railPhoneNotice && P3.railPhoneNotice(); if (n) toast(n); }, 500);
 { let ipOn = null; setInterval(() => {   // v1.97.138: the Interact prompt (west face button; E on a keyboard) while a door switch button is under the crosshair
   const a = P3.walking && !$('modal').classList.contains('open') && P3.rollButtonAim ? P3.rollButtonAim() : null, k = a ? a.mode : '';
-  if (k === ipOn) return; ipOn = k; const el = $('iprompt'); el.classList.toggle('on', !!a); if (a) el.querySelector('small').textContent = '· ' + a.label; }, 100); }   // dispatcher hold about to expire
+  if (k === ipOn) return; ipOn = k; $('iprompt').classList.toggle('on', !!a); }, 100); }   // (v1.97.140, owner: just Interact - the button colours say what each does)   // dispatcher hold about to expire
 const pad = { lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0, held: {} };
 const aimIn = { mouse: false, tog: false };   // aim down sights: right mouse (held), LT / L2 (held), or the AIM button (toggle)
 view.addEventListener('mousedown', e => { if (e.button === 2 && P3.walking && document.pointerLockElement === view) aimIn.mouse = true; });

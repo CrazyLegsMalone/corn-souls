@@ -1,3 +1,9 @@
+## TEST v1.97.140 — the door switch prompt just says "Interact" (2026-11-04)
+- Owner (screenshot, with the action text struck out): *"remove the part i crossed out. the interact prompt and the different colors is enough for player to understand function"*.
+- `#iprompt` is now just the west face button symbol (E on a keyboard) and **Interact**. The "· Close the mesh only" style action text and its styling are gone. Checked in the running game while aiming at the yellow button.
+- `validate-mesh-doors.cjs` checks there's no action text. All 40 suites pass.
+- Bumped TEST to `1.97.140` / `corn-souls-test-shell-v167`.
+
 ## TEST v1.97.139 — mesh doors flush at the wall, like the original (2026-11-04)
 - Owner (screenshots: the energy center door, and one where the mesh stood out from the wall): *"also notice how original rolling door with mesh both are flush. new ones it has a huge gap it looks bad. make them more like the original"*.
 - **Cause:** where the steel door's coil hood was on the inside face (11 of 14 doors), v1.97.137 stood the mesh 1.0 m off the wall to clear the hood, so it looked freestanding.
