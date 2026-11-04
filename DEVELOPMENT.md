@@ -1,3 +1,10 @@
+## TEST v1.97.102 — day/night controls in the debug menu (2026-11-03)
+- Owner: *"Need day night cycle controls in debug"*.
+- **Game clock:** new `gameDate()` in the engine (exported on `window` for the UI script). It is the device clock until the debug menu changes it: a set hour (keeps running at normal speed), ±1 hour, or a fast cycle (×360, a whole day in 4 minutes). Local to this device, resets on reload, not sent to player 2.
+- Everything that went by `new Date()` for time of day now reads it: sky and light (`daylight`, re-lit 5× a second in the fast cycle instead of every 20 s), the beer well transfer schedule, the HUD clock (now ticks every second), the sun/moon badge (every 2 s) and the AM/PM music track.
+- **Debug → 🕐 Time of day: <time> (real/set/fast):** Real time, Morning 9 AM, Afternoon 3 PM, Evening 9 PM, Night 3 AM (one per lighting look; looks change at 7 AM, 1 PM, 7 PM, 1 AM with an hour fade), +1 hour, −1 hour, Fast cycle on/off. Also `Plant3D.time.set({ hour | shift | rate | real })` for scripted use.
+- New suite `test/validate-game-clock.cjs` (added to CI): runs the clock code against a fake `Date.now`, checks every reader is wired and the menu rows.
+
 ## TEST v1.97.101 — background music starts at 20% (2026-11-03)
 - Owner: *"Starting background music should be lower maybe 20%"*.
 - `test/sound-settings.js`: the default music volume (used until the player moves the Sound slider) is now 0.2, was 0.6. A volume already saved with the slider (`cs_music_volume`) is kept. `validate-sound.cjs` expects the new default.

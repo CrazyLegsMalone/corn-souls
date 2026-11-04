@@ -4632,6 +4632,23 @@ const STATIONS = {
 };
 
 let renderer, scene, camera, clock = 0, hemi, sunL, headlamp, dayT = 99;
+// ---------- GAME CLOCK: the device clock, unless the debug menu has set an hour or sped the day up (fast cycle).
+// Everything that goes by time of day (sky and light, HUD clock, sun/moon badge, music, the beer well transfer) reads
+// gameDate(). Local to this device: it resets on reload and is not sent to player 2.
+const GT = { real: true, g0: 0, r0: 0, rate: 1 };
+function gameDate() { return GT.real ? new Date() : new Date(GT.g0 + (Date.now() - GT.r0) * GT.rate); }
+root.gameDate = gameDate;
+function gameTimeSet(o) {   // { real } back to the device clock, or { hour } / { shift: hours } / { rate } from the current game time
+  const now = Date.now();
+  if (o.real) { GT.real = true; GT.rate = 1; }
+  else {
+    let g = gameDate().getTime();
+    if (o.hour != null) { const d = new Date(g); d.setHours(Math.floor(o.hour), Math.round((o.hour % 1) * 60), 0, 0); g = d.getTime(); }
+    if (o.shift) g += o.shift * 3600e3;
+    GT.g0 = g; GT.r0 = now; GT.real = false; if (o.rate != null) GT.rate = o.rate;
+  }
+  dayT = 99;   // re-light right away
+}
 // road grid: west / middle / east roads (x), cross and south roads (z); tank farm square south of the south road
 const GDX = -44, GDZ = -12;
 const RPITS = [[-196, 0, 4, 8], [-186, 0, 5, 6], [-178, 0, 5, 6]];   // receiving pits (unshifted x, z, w, d): rail pit, then the two truck pits
@@ -9646,7 +9663,7 @@ function updateWeather(dt) {
 }
 function update(sim, dt, events) {
   dayT += dt;
-  if (dayT > 20) { dayT = 0; const d = new Date(); daylight(d.getHours() + d.getMinutes() / 60); }
+  if (dayT > (GT.rate > 1 ? 0.2 : 20)) { dayT = 0; const d = gameDate(); daylight(d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600); }   // fast cycle: re-light 5x a second
   clock += dt;
   const Sim = root.Sim, p = sim.sp, o = sim.out, N = 1800;
   const lv = id => Sim.level(sim, id) / 100;
@@ -9691,7 +9708,7 @@ function update(sim, dt, events) {
   O.beerWell.set(lv('beer'));
   O.etoh1.set(lv('etoh')); O.etoh2.set(lv('etoh'));
   { // 200 proof tank fills over 12 h from distillation and is emptied in the half hour after 3 AM / 3 PM (device clock)
-    const d = new Date(), h = (d.getHours() + d.getMinutes() / 60 + 9) % 12, xfer = h < 0.5, toTank = d.getHours() < 12 ? 0 : 1;
+    const d = gameDate(), h = (d.getHours() + d.getMinutes() / 60 + 9) % 12, xfer = h < 0.5, toTank = d.getHours() < 12 ? 0 : 1;
     O.p200.set(xfer ? 0.9 * (1 - h / 0.5) + 0.05 : 0.05 + 0.85 * (h - 0.5) / 11.5);
     O.fXfer.forEach((f, i) => { f.rate = xfer && i === toTank ? 1 : 0; });
     O.f200.rate = O.f190.rate = feed / N;
@@ -12619,6 +12636,7 @@ function updateGun(dt) {
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
 root.Plant3D = { powerSet: on => powerSet(on), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+  time: { set: o => gameTimeSet(o), date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => lightsFlicker(s, r), blackout: (s, r) => lightsBlackout(s, r), dark: (a, f, h) => lightsDark(a, f, h), brightness: i => lightBrightness(i), get brightName() { return CS_BRIGHT[LIGHT.bright][0]; } }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
 })(this);
 </script>
@@ -12918,11 +12936,23 @@ function notesRead() {
   $('card').querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const arr = notesLoad(); arr.splice(+b.dataset.del, 1); notesSave(arr); notesRead(); });
   $('card').querySelectorAll('[data-big]').forEach(im => im.onclick = () => modal('<img src="' + im.src + '" style="width:100%;border-radius:6px">', [['Back', () => notesRead()]], true));   // tap a screenshot to see it bigger
 }
+// debug: day/night cycle controls (game clock only; the device clock is never touched)
+function timeLabel() { const d = P3.time.date(); let h = d.getHours(); const m = d.getMinutes(), ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12;
+  return h + ':' + String(m).padStart(2, '0') + ' ' + ap + (P3.time.real ? ' (real)' : P3.time.fast ? ' (fast)' : ' (set)'); }
+function timeMenu(code) {
+  const go = o => { P3.time.set(o); tick(); drawSky(); pickTrack(); timeMenu(code); };
+  const H = [['🌅 Morning (9 AM)', 9], ['☀️ Afternoon (3 PM)', 15], ['🌇 Evening (9 PM)', 21], ['🌙 Night (3 AM)', 3]];   // one in each LOOKS slot
+  modal('<h1>Time of day</h1><p>Game time: <b>' + timeLabel() + '</b></p><p style="font-size:13px;color:#5d6b7c">Only changes the game clock on this device. The light changes at 7 AM, 1 PM, 7 PM and 1 AM (an hour-long fade). Fast cycle runs a whole day in 4 minutes.</p>',
+    [['Back to debug', () => debugMenu(code)], ['⏱ Real time (device clock)', () => go({ real: true })]]
+      .concat(H.map(([n, h]) => [n, () => go({ hour: h })]))
+      .concat([['⏩ +1 hour', () => go({ shift: 1 })], ['⏪ −1 hour', () => go({ shift: -1 })],
+        [P3.time.fast ? '⏸ Fast cycle: on (tap to stop)' : '▶️ Fast cycle: off (a day in 4 min)', () => go({ rate: P3.time.fast ? 1 : 360 })]]), true);
+}
 function debugMenu(code) {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }   // what the screen looked like when the menu was opened (for a bug note)
   const set = k => { wxForced = k; P3.setWeather(k || wxLive); if (!k) fetchWeather(); toast('Weather: ' + (k || 'live')); };   // back to live: real weather right away, then refresh
   modal('<h1>Debug</h1><p>Weather now: <b>' + P3.weather + '</b> (' + (wxForced ? 'forced' : 'live') + ')' + (code ? '<br>Button code: ' + code : '') + '</p>',
-    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.powerSet(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.powerSet(false); toast('Power restored'); }], ['💡 Lights: flicker', () => { P3.lights.flicker(4); }], ['💡 Lights: blackout nearby (15 s)', () => { P3.lights.blackout(15); }], ['🌑 Darkness everywhere (20 s)', () => { P3.lights.dark(0.88, 2.5, 20); }], ['🌑 Darkness: lift now', () => { P3.lights.dark(0, 1); }], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
+    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.powerSet(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.powerSet(false); toast('Power restored'); }], ['💡 Lights: flicker', () => { P3.lights.flicker(4); }], ['💡 Lights: blackout nearby (15 s)', () => { P3.lights.blackout(15); }], ['🌑 Darkness everywhere (20 s)', () => { P3.lights.dark(0.88, 2.5, 20); }], ['🌑 Darkness: lift now', () => { P3.lights.dark(0, 1); }], ['🕐 Time of day: ' + timeLabel(), () => timeMenu(code)], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
 }
 // every control in the game, grouped by what you're doing: keyboard + mouse · controller · phone
 function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for depends on what the line is doing
@@ -13308,15 +13338,15 @@ function menu() {
 $('menuBtn').onclick = menu;
 $('pauseBtn').onclick = menu;
 // small digital clock from the device time
-function tick() { const d = new Date(); let h = d.getHours(), m = d.getMinutes(); const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; $('clock').textContent = h + ':' + String(m).padStart(2, '0') + ' ' + ap; }
-tick(); setInterval(tick, 10000);
+function tick() { const d = gameDate(); let h = d.getHours(), m = d.getMinutes(); const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; $('clock').textContent = h + ':' + String(m).padStart(2, '0') + ' ' + ap; }
+tick(); setInterval(tick, 1000);   // every second so a debug fast cycle reads right
 // little sun/moon badge: 8 positions, one at each lighting change (7, 1, 7, 1) and one halfway between (10, 4, 10, 4)
 const SKY_SLOTS = [   // [start hour, body, position along the arc 0=left horizon .. 1=right horizon, sky color]
   [7, 'sun', 0.0, '#f6c96a'], [10, 'sun', 0.25, '#f2d79a'], [13, 'sun', 0.5, '#8fd0ff'], [16, 'sun', 0.75, '#9fd2f2'],
   [19, 'sun', 1.0, '#e7a070'], [22, 'moon', 0.0, '#3d5a8a'], [1, 'moon', 0.5, '#2c4572'], [4, 'moon', 1.0, '#4a6a9c']];
 let skySlot = -1;
 function drawSky() {
-  const h = new Date().getHours();
+  const h = gameDate().getHours();
   let i = 0, best = 99; SKY_SLOTS.forEach((s, k) => { const since = (h - s[0] + 24) % 24; if (since < best) { best = since; i = k; } });
   if (i === skySlot) return; skySlot = i;
   const [, body, t, col] = SKY_SLOTS[i];
@@ -13326,12 +13356,12 @@ function drawSky() {
   const stars = body === 'moon' ? '<circle cx="7" cy="8" r=".8" fill="#fff"/><circle cx="25" cy="7" r=".7" fill="#fff"/><circle cx="20" cy="12" r=".6" fill="#fff"/>' : '';
   $('sky').innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" fill="${col}"/>${stars}${body === 'sun' ? sun : moon}<rect y="21" width="32" height="11" fill="${body === 'sun' ? '#6fbf55' : '#3f6b45'}"/></svg>`;
 }
-drawSky(); setInterval(drawSky, 30000);
+drawSky(); setInterval(drawSky, 2000);
 // ---------- background music: one looping track played by the system audio player (hardware decoded, no per-frame work).
 // Volume follows the device's media volume buttons. Paused while the app is in the background.
 const music = $('music'); let musicOn = true, musicPart = '';
 // AM hours get the brighter track, PM hours the calm one; checked every 30 s against the device clock
-function pickTrack() { const part = new Date().getHours() < 12 ? 'am' : 'pm'; if (part !== musicPart) { musicPart = part; const was = !music.paused; music.src = window.__MUS ? __MUS[part] : 'music_' + part + '.mp3'; if (was || musicOn) musicPlay(); } }
+function pickTrack() { const part = gameDate().getHours() < 12 ? 'am' : 'pm'; if (part !== musicPart) { musicPart = part; const was = !music.paused; music.src = window.__MUS ? __MUS[part] : 'music_' + part + '.mp3'; if (was || musicOn) musicPlay(); } }
 pickTrack(); setInterval(pickTrack, 30000);
 try { musicOn = localStorage.getItem('cornsim_music') !== 'off'; } catch (e) {}
 music.volume = 0.6;
