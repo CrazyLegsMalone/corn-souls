@@ -1,0 +1,6 @@
+# Corn Souls rules for Cline
+- Read HANDOFF_CLINE.md first.
+- Work in test/ only (test/game.html). Never promote TEST to LIVE (scripts/sync_test_to_live.py, "PROMOTE TEST to LIVE.bat") without the owner's explicit approval.
+- Every change: bump with scripts/bump_test_version.py, add a DEVELOPMENT.md entry at the top, add/update a test/validate-*.cjs suite (and list it in .github/workflows/validate.yml), run all suites + scripts/check_launcher_anchors.py, commit, push to main.
+- Never put a // comment mid-line before more code in game.html: it silently disables the statements after it.
+- Do only what the owner asked; ask when unsure.
