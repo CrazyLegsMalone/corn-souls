@@ -1,10 +1,10 @@
 // Run from repository root. Exercise the LIVE launcher, not the TEST launcher.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const read=p=>fs.readFileSync(p,'utf8').replaceAll('\r\n','\n');
-// game.html and test/game.html may differ while a TEST build is ahead of LIVE.
+// game.html / sound-settings.js and their test/ copies may differ while a TEST build is ahead of LIVE.
 // Parity is enforced at promotion time by scripts/sync_test_to_live.py --check,
-// which is the step that actually copies TEST over LIVE.
-assert.equal(read('sound-settings.js'),read('test/sound-settings.js'));
+// which is the step that actually copies TEST over LIVE (both files).
+assert.ok(read('sound-settings.js').includes('function soundMusicVolume(')&&read('test/sound-settings.js').includes('function soundMusicVolume('),'both channels ship the Sound menu');
 const loader=read('index.html'),sw=read('sw.js'),manifest=JSON.parse(read('manifest.webmanifest'));
 assert.equal(manifest.id,'/corn-souls/');assert.equal(manifest.scope,'/corn-souls/');
 assert.ok(loader.includes('<base href="/corn-souls/">'));

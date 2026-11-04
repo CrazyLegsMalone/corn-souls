@@ -1,3 +1,8 @@
+## TEST v1.97.101 — background music starts at 20% (2026-11-03)
+- Owner: *"Starting background music should be lower maybe 20%"*.
+- `test/sound-settings.js`: the default music volume (used until the player moves the Sound slider) is now 0.2, was 0.6. A volume already saved with the slider (`cs_music_volume`) is kept. `validate-sound.cjs` expects the new default.
+- LIVE is untouched. `sound-settings.js` now works like `game.html`: TEST may run ahead, `sync_test_to_live.py` copies it on promotion (and `--check` compares it), and `validate-live-promotion.cjs` no longer demands the two copies be identical between promotions.
+
 ## TEST v1.97.100 — headlamp no longer lights far walls white; DDG building goes dark (2026-11-03)
 - Owner (photo, process building, daytime, outage on): *"here's a spot that should be dark right now and isn't"*, and *"Ddg building also did not go dark during power outage and it should"*.
 - **Process building:** the culprit was the headlamp. Its reach window `(1 - q²)²` was not clamped, so past the reach it grew again: a wall 84 m down the ferm alley got a huge boost and rendered white, and everything across a big hall was lit. The window is now clamped to zero past the reach.

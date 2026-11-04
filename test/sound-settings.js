@@ -4,7 +4,7 @@ function soundMusicVolume(){
   const raw=localStorage.getItem('cs_music_volume');
   if(raw!==null&&raw.trim()!==''){const n=Number(raw);if(Number.isFinite(n))return Math.max(0,Math.min(1,n));}
  }catch(e){}
- return .6;
+ return .2;   // default 20%: the old 60% was too loud at start
 }
 function soundSetMusicVolume(value){
  const n=Number(value);if(!Number.isFinite(n))return;

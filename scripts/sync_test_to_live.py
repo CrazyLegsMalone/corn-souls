@@ -9,7 +9,7 @@ and TEST-only tooling (anything inside <TEST-ONLY> markers) never reaches LIVE.
       Regenerate in memory and verify the repo already matches. Writes nothing.
 
   python scripts/sync_test_to_live.py --live-version 1.99
-      Write game.html, index.html, version.json, refresh.html; bump the LIVE
+      Write game.html, sound-settings.js, index.html, version.json, refresh.html; bump the LIVE
       service-worker cache; update test/validate-live-promotion.cjs.
 
 Every transform asserts its match count: a missing pattern aborts the run
@@ -130,6 +130,7 @@ def report_diff(name, expected, actual):
 def verify_launchers():
     """Structural checks that must hold on every promotion."""
     ok = report_diff("game.html parity", read("test/game.html"), read("game.html"))
+    ok &= report_diff("sound-settings.js parity", read("test/sound-settings.js"), read("sound-settings.js"))
     result = subprocess.run([sys.executable, str(ROOT / "scripts/check_launcher_anchors.py")],
                             cwd=str(ROOT))
     return ok and result.returncode == 0
@@ -157,6 +158,7 @@ def check():
     print(f"checking LIVE v{version} (cache {cache.group(1)}) against test/")
     ok = report_diff("index.html", build_live_launcher(version), read("index.html"))
     ok &= report_diff("game.html", read("test/game.html"), read("game.html"))
+    ok &= report_diff("sound-settings.js", read("test/sound-settings.js"), read("sound-settings.js"))
     consistent = (version in read("refresh.html")
                   and f"Alpha v{version}" in read("sw.js")
                   and f"const TEST_VERSION='{version}'" in read("test/validate-live-promotion.cjs")
@@ -174,6 +176,7 @@ def promote(new_version):
     new_cache = f"corn-souls-live-shell-v{int(cache.group(2)) + 1}"
 
     write("game.html", read("test/game.html"))
+    write("sound-settings.js", read("test/sound-settings.js"))
     write("index.html", build_live_launcher(new_version))
     write("sw.js", bump_sw(new_version, new_cache))
     write("version.json", bump_version_json(new_version))
@@ -188,7 +191,7 @@ def promote(new_version):
     print("next steps:")
     print("  1. local check:  double-click 'Start Corn Souls local test server.bat'")
     print("  2. commit + push:")
-    print("       git add game.html index.html sw.js version.json refresh.html test/validate-live-promotion.cjs")
+    print("       git add game.html sound-settings.js index.html sw.js version.json refresh.html test/validate-live-promotion.cjs")
     print(f'       git commit -m "release: LIVE Alpha v{new_version}"')
     print("       git push origin main")
     print(f"  3. poll https://crazylegsmalone.github.io/corn-souls/sw.js until it shows {new_cache}")
