@@ -12518,6 +12518,29 @@ function crSolidsNear(all) {   // only meshes whose bounds reach into a critter 
 }
 function crRay(o, d, far) { ray.set(o, d); ray.far = far; const h = ray.intersectObjects(crSolids, false)[0]; ray.far = Infinity; return h; }
 function crFloor(x, z) { const h = crRay(V3(x, 1.2, z), V3(0, -1, 0), 2); return h && h.point.y < 0.35 ? h.point.y : null; }   // open floor only (no pads or equipment)
+// LIZARDS LIVE ON WALLS (owner, v1.97.125: "lizards should spawn on walls instead of floors"). A horizontal probe from a
+// random spot in their area finds a vertical face - a wall, a tank shell, the side of a pump - and the lizard clings just
+// clear of it, facing out. It crawls along the face, turns round when the face runs out, and drops to the floor only when
+// you walk up to it (or shoot it: the corpse has to land somewhere you can reach).
+function crWallSpot() {
+  const a = CR_AREA[Math.random() * CR_AREA.length | 0], x = a[0] + Math.random() * (a[2] - a[0]), z = a[1] + Math.random() * (a[3] - a[1]);
+  if (walk.on && Math.hypot(x - walk.x, z - walk.z) < 6) return null;   // not right under Squeeg's nose
+  const y = 0.55 + Math.random() * 2.8, an = Math.random() * Math.PI * 2;
+  const h = crRay(V3(x, y, z), V3(Math.sin(an), 0, Math.cos(an)), 7); if (!h) return null;
+  const n = upNormal(h), nl = Math.hypot(n.x, n.z);
+  if (Math.abs(n.y) > 0.45 || nl < 0.1) return null;   // a floor, a roof or a dome - not something to hold on to
+  const nx = n.x / nl, nz = n.z / nl;
+  return { x: h.point.x + nx * 0.07, y: h.point.y, z: h.point.z + nz * 0.07, nx, nz, tx: -nz, tz: nx, dir: Math.random() < 0.5 ? -1 : 1, t: 0 };
+}
+function crWallStep(c, dt) {   // crawl along the face and keep hugging it; turn round where it ends
+  const w = c.wall, p = c.g.position;
+  if ((w.t -= dt) <= 0) { w.t = 1.4 + Math.random() * 2.6; w.up = (Math.random() - 0.35) * 0.6; if (Math.random() < 0.18) w.dir = -w.dir; }
+  const nx = p.x + w.tx * 0.5 * dt * w.dir, ny = p.y + (w.up || 0) * dt, nz = p.z + w.tz * 0.5 * dt * w.dir;
+  const probe = crRay(V3(nx + w.nx * 0.3, ny, nz + w.nz * 0.3), V3(-w.nx, 0, -w.nz), 0.8), n = probe && upNormal(probe);
+  if (probe && n && Math.abs(n.y) < 0.45) { p.set(probe.point.x + w.nx * 0.07, ny, probe.point.z + w.nz * 0.07); }
+  else w.dir = -w.dir;   // ran off the top, the bottom or an end: turn round
+  const sp = c.g.userData.sprite; if (sp) sp.material.rotation = 0.06 * Math.sin(clock * 22);
+}
 // v1.97.92: one ground probe per frame at most. Spawning used to try up to 20 spots in one frame and picking a run up to 8
 // directions, each a ray against every static mesh in the plant - a 5-11 ms spike on a PC (much more on a handheld) about
 // once a second. Now each frame makes one attempt and the critter simply tries again next frame, and the probes only test
@@ -12528,8 +12551,16 @@ function crSpawn(c) {
     c.t = 0;   // try again next frame
     const a = CR_AREA[Math.random() * CR_AREA.length | 0], x = a[0] + Math.random() * (a[2] - a[0]), z = a[1] + Math.random() * (a[3] - a[1]);
     if (walk.on && Math.hypot(x - walk.x, z - walk.z) < 6) continue;   // not right under Squeeg's nose
+    if (c.kind === 'lizard' && (c.spawnTries || 0) < 8) {   // walls first (8 frames of trying), the floor is the last resort
+      const w = crWallSpot(); if (!w) continue;
+      c.spawnTries = 0; c.wall = w;
+      c.g.position.set(w.x, w.y, w.z); c.g.rotation.set(0, Math.atan2(w.nx, w.nz), 0); c.g.visible = true;
+      c.held = false; c.thrown = false; c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i]));
+      const sp = c.g.userData.sprite; if (sp) sp.material.rotation = 0;
+      c.state = 'climb'; c.t = 2 + Math.random() * 5; c.life = 60 + Math.random() * 90; return;
+    }
     const y = crFloor(x, z); if (y == null) continue;
-    c.spawnTries = 0;
+    c.spawnTries = 0; c.wall = null;
     c.g.position.set(x, y, z); c.g.rotation.set(0, Math.random() * 6.3, 0); c.held = false; c.thrown = false; c.mats.forEach((mt, i) => mt.color.setHex(c.cols[i])); if (c.g.userData.sprite) c.g.userData.sprite.material.rotation = 0;
     c.g.visible = true; c.state = 'idle'; c.t = 0.5 + Math.random() * 2; c.life = 60 + Math.random() * 90; return;
   }
@@ -12560,6 +12591,12 @@ function updateCritters(dt) {
     if (c.state === 'idle') {
       if (c.life <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 8 + Math.random() * 25; continue; }   // wandered off
       if (near || (c.t -= dt) <= 0) { if (crLeg(c, near)) c.legTries = 0; else c.t = (c.legTries = (c.legTries || 0) + 1) < 8 ? 0 : (c.legTries = 0, 1); }   // up to 8 frames of one try each, then rest 1 s
+    } else if (c.state === 'climb') {
+      if (c.life <= 0) { c.g.visible = false; c.wall = null; c.state = 'gone'; c.t = 8 + Math.random() * 25; continue; }   // wandered off
+      if (near) {   // you got close: it lets go and runs
+        const y = crFloor(p.x, p.z); if (y != null) { p.y = y; c.wall = null; if (!crLeg(c, true)) c.state = 'idle'; }
+        else c.t = 0.4;   // nowhere to land: hold on a moment longer
+      } else crWallStep(c, dt);
     } else if (c.state === 'run') {
       const st = Math.min(c.left, c.speed * (near ? 1.6 : 1) * dt); p.addScaledVector(c.dir, st); c.left -= st;
       const sp = c.g.userData.sprite; if (sp) { sp.material.rotation = 0.08 * Math.sin(clock * 30); const r = V3().setFromMatrixColumn(camera.matrixWorld, 0); sp.scale.x = (c.dir.x * r.x + c.dir.z * r.z >= 0 ? 1 : -1) * 0.3; }   // lizard wiggle, faces the way it runs
@@ -12665,7 +12702,7 @@ function critNetGuest() { return critNetOn() && !NET.host; }
 function critLists() { return { b: birds || [], c: critters || [], f: typeof pondFrogs !== 'undefined' ? pondFrogs : [] }; }
 function critG(o) { return o.g || o.group; }
 function critKey(o) { const L = critLists(); for (const k in L) { const i = L[k].indexOf(o); if (i >= 0) return [k, i]; } return null; }
-function critAlive(k, s) { return k === 'b' ? (s === 'perch' || s === 'fly') : k === 'c' ? (s === 'idle' || s === 'run') : s === 'live'; }
+function critAlive(k, s) { return k === 'b' ? (s === 'perch' || s === 'fly') : k === 'c' ? (s === 'idle' || s === 'run' || s === 'climb') : s === 'live'; }
 function critNearRp(p, r) { const R = NET.rp; return !!(R && R.av && R.av.visible && Math.hypot(p.x - R.x, p.z - R.z) < r && Math.abs(p.y - (R.y || 0)) < 8); }
 function critNetHit(o, col) {   // top of hitBird / hitCritter / hitPondFrog: on the guest, the hit goes to the host
   if (CRNET.applying || !critNetGuest()) return; const k = critKey(o); if (!k) return;
@@ -12726,7 +12763,7 @@ function critNetUpdate(dt) {
     const g = critG(o); if (o.nT && g.parent !== camera && (o.net === 'them' || (guest && o.net !== 'me' && !o.held && !o.thrown))) g.position.lerp(o.nT, Math.min(1, dt * 12));
     if (guest && o.net !== 'me') {   // the mirrors' own little motions
       if (k === 'b') { if (o.state === 'fly') { const f = Math.sin(clock * 32) * 0.9; o.wl.rotation.set(0, 0, f); o.wr.rotation.set(0, 0, -f); } else if (o.state === 'perch') { o.wl.rotation.set(0, 1.45, 0); o.wr.rotation.set(0, -1.45, 0); } }
-      else if (k === 'c' && g.userData.sprite) g.userData.sprite.material.rotation = critAlive(k, o.state) ? (o.state === 'run' ? 0.08 * Math.sin(clock * 30) : 0) : Math.PI;
+      else if (k === 'c' && g.userData.sprite) g.userData.sprite.material.rotation = critAlive(k, o.state) ? (o.state === 'run' || o.state === 'climb' ? 0.08 * Math.sin(clock * 30) : 0) : Math.PI;
       else if (k === 'f') g.visible = !(o.eaten && !critAlive(k, o.state)) && (walk.on && Math.hypot(g.position.x - walk.x, g.position.z - walk.z) < 175 || g.parent === camera || o.held);
     } }
   if (!guest) { if ((CRNET.st += dt) > 0.125) { CRNET.st = 0; netSend(critSnapshot()); } return; }
@@ -12740,6 +12777,7 @@ function critNetUpdate(dt) {
 }
 function hitCritter(c, col) {
   critNetHit(c, col);   // 2 player: the guest tells the host (v1.97.112)
+  if (c.wall) { const y = crFloor(c.g.position.x, c.g.position.z); if (y != null) c.g.position.y = y; c.wall = null; }   // shot off the wall
   critterHits++; c.state = 'hit'; c.t = 45; c.held = false; c.thrown = false; if (col != null) c.mats.forEach(m => m.color.setHex(col));
   const sp = c.g.userData.sprite; if (sp) sp.material.rotation = Math.PI; else { c.g.rotation.z = Math.PI; c.g.position.y += 0.13; }   // knocked belly-up
   for (let i = 0; i < 3; i++) puff(c.g.position.clone().add(V3((Math.random() - 0.5) * 0.3, 0.1, (Math.random() - 0.5) * 0.3)), 0.08, 0xf2f2f2);

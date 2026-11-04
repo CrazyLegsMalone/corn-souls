@@ -35,6 +35,32 @@ assert.ok(html.includes('crSolids = crSolidsNear(collectSolids(true));'), 'the p
   assert.equal(ctx.out, 2, 'a mesh inside or touching (with 2 m margin) a critter area is kept, far ones are dropped');
 }
 
+// 2b --------------------------------------------------------------- lizards spawn on walls, not floors
+const wallSpot = fn(html, 'crWallSpot'), wallStep = fn(html, 'crWallStep');
+assert.ok(spawn.includes("if (c.kind === 'lizard' && (c.spawnTries || 0) < 8)"), 'a lizard asks for a wall first, and only falls back to the floor after 8 frames');
+assert.ok(spawn.includes("c.state = 'climb'"), 'and it starts out clinging to it');
+assert.ok(html.includes("(s === 'idle' || s === 'run' || s === 'climb')"), 'the 2P mirror counts a climbing lizard as alive, not as a corpse');
+assert.ok(html.includes('if (c.wall) { const y = crFloor(c.g.position.x, c.g.position.z); if (y != null) c.g.position.y = y; c.wall = null; }'), 'shooting one off a wall drops the corpse to the floor');
+{ // a horizontal probe: a wall gives a spot 7 cm clear of the face, facing out; a floor is not something to hold on to
+  class V { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; } }
+  const mk = face => {
+    const hit = { point: new V(3, 2, 4), face: { normal: new V(face[0], face[1], face[2]) } };
+    const ctx = { CR_AREA: [[-10, -10, 10, 10]], walk: { on: false }, V3: (x, y, z) => new V(x, y, z), Math,
+      crRay: () => hit, upNormal: h => h.face.normal };
+    vm.createContext(ctx); vm.runInContext(wallSpot + '\nthis.out = crWallSpot();', ctx); return ctx.out;
+  };
+  const w = mk([-1, 0, 0]);
+  assert.ok(w && Math.abs(w.x - (3 - 0.07)) < 1e-9 && w.y === 2 && w.nx === -1 && w.nz === 0, 'a wall face gives a spot just clear of it, with the normal pointing out');
+  assert.equal(mk([0, 1, 0]), null, 'a floor (or roof) is rejected');
+}
+{ // crawling off the end of the face: it turns round instead of walking into the air
+  class V { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; } set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } }
+  const ctx = { clock: 0, V3: (x, y, z) => new V(x, y, z), crRay: () => null, upNormal: () => ({ x: 0, y: 0, z: 0 }),
+    c: { wall: { x: 1, y: 2, z: 0, nx: -1, nz: 0, tx: 0, tz: 1, dir: 1, t: 5 }, g: { position: new V(1, 2, 0), userData: {} } } };
+  vm.createContext(ctx); vm.runInContext(wallStep + '\ncrWallStep(c, 1 / 60);', ctx);
+  assert.equal(ctx.c.wall.dir, -1, 'no face ahead: the lizard turns round');
+}
+
 // 3 ---------------------------------------------------------------- frame pacing
 { const src = html.slice(html.indexOf('const PACE = {'), html.indexOf('function frame(now) {'));
   const k = (hz, cap) => { const ctx = { FPS_CAP: cap }; vm.createContext(ctx); vm.runInContext(src + '\nlet t = 0; for (let i = 0; i < 1200; i++) { t += 1000 / ' + hz + ' + (i % 3 - 1) * 0.15; paceUpdate(t); } this.k = PACE.k; this.hz = PACE.hz;', ctx); return ctx.k; };
