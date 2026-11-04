@@ -11459,10 +11459,19 @@ function dmgRestore(k) {   // fully repaired: paint and windows back
   for (const V of VBOXES) if (V.g === g || V.g.parent === g) V.broken = false;
   if (O.cars) for (const c of O.cars) if (c.g === g) c.broken = false;
 }
-// flames: a hand-drawn flipbook, chunky and layered like an old 16-bit pre-rendered sprite (dark red edge, orange body, yellow, white-hot core,
-// a rim highlight and a few loose embers). 8 frames in one 512x128 sheet; each fire sprite plays it at its own phase.
-let FLAME_TEX = null; const FLAME_N = 8;
+// flames (v1.97.142, owner: "can we use this for fires"): the owner's pixel-art fire (assets/textures/fire/fire.gif, 8 frames at 90 ms),
+// cut to a 256 x 24 strip of 32 x 24 frames with its dark background keyed out (fire-atlas.png). Crisp nearest pixels, played at the
+// GIF's own speed, each fire sprite at its own phase, anchored at the flames' base. Loaded at start; until it arrives (or if it can't
+// load) the old code-drawn flipbook below stands in.
+let FLAME_TEX = null, FLAME_ART = null; const FLAME_N = 8, FLAME_FPS = 1000 / 90, FLAME_BASE = 2 / 24;   // the flames sit on row 22 of 24
+function flameArt() {
+  if (FLAME_ART || typeof document === 'undefined') return FLAME_ART;
+  const t = new T.TextureLoader().load('/corn-souls/assets/textures/fire/fire-atlas.png', tx => { tx.userData.ready = true; });
+  t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return (FLAME_ART = t);
+}
+try { flameArt(); } catch (e) {}   // fetch it at start, so the first fire already has it
 function flameTex() {
+  { const a = flameArt(); if (a && a.userData.ready) return a; }
   if (FLAME_TEX) return FLAME_TEX; const W = 64, H = 128, cv = document.createElement('canvas'); cv.width = W * FLAME_N; cv.height = H; const c = cv.getContext('2d');
   const tongue = (ox, f, k, sc, col) => {   // one flame silhouette: a wide base, licking tongues that sway with the frame
     const ph = f / FLAME_N * Math.PI * 2; c.fillStyle = col; c.beginPath(); c.moveTo(ox + 32 - 26 * sc, 120);
@@ -11476,8 +11485,8 @@ function flameTex() {
   }
   FLAME_TEX = new T.CanvasTexture(cv); if (T.SRGBColorSpace) FLAME_TEX.colorSpace = T.SRGBColorSpace; FLAME_TEX.magFilter = T.NearestFilter; return FLAME_TEX;
 }
-function flameSprite() { const t = flameTex().clone(); t.needsUpdate = true; t.repeat.set(1 / FLAME_N, 1); const m = new T.SpriteMaterial({ map: t, transparent: true, alphaTest: 0.1, depthWrite: false }); m.userData.keepLit = true;   // fires survive an outage
-  const s = new T.Sprite(m); s.userData.noHit = true; s.userData.ph = Math.random() * FLAME_N; return s; }
+function flameSprite() { const src = flameTex(), art = src === FLAME_ART, t = src.clone(); t.needsUpdate = true; t.repeat.set(1 / FLAME_N, 1); const m = new T.SpriteMaterial({ map: t, transparent: true, alphaTest: 0.1, depthWrite: false }); m.userData.keepLit = true;   // fires survive an outage
+  const s = new T.Sprite(m); s.userData.noHit = true; s.userData.ph = Math.random() * FLAME_N; s.userData.art = art; if (art) s.center.set(0.5, FLAME_BASE); return s; }
 let DMG_NOTIFY = null;
 function updateDamage(dt) {
   for (const k in DMG) { const d = DMG[k], g = dmgG(k); if (!g) continue;
@@ -11485,8 +11494,10 @@ function updateDamage(dt) {
     if (d.fire) {
       d.burnT += dt;
       if (!d.fx) { d.fx = []; for (let i = 0; i < 5; i++) { const s = flameSprite(); scene.add(s); d.fx.push(s); } }
-      d.fx.forEach((s, i) => { const fr = Math.floor(clock * 12 + s.userData.ph) % FLAME_N, big = i === 0 ? 1.5 : 1; s.material.map.offset.x = fr / FLAME_N;   // flipbook at 12 frames a second
-        s.position.set(p.x + (i ? Math.sin(i * 2.4) * 0.7 : 0), p.y + 0.35 * big, p.z + (i ? Math.cos(i * 2.4) * 0.7 : 0)); s.scale.set(0.9 * big, 1.8 * big, 1); });
+      d.fx.forEach((s, i) => { const art = s.userData.art, fr = ((Math.floor(clock * (art ? FLAME_FPS : 12) + s.userData.ph) % FLAME_N) + FLAME_N) % FLAME_N, big = i === 0 ? 1.5 : 1; s.material.map.offset.x = fr / FLAME_N;   // flipbook at the art's speed
+        const ox = i ? Math.sin(i * 2.4) * 0.7 : 0, oz = i ? Math.cos(i * 2.4) * 0.7 : 0;
+        if (art) { s.position.set(p.x + ox, p.y - 0.15, p.z + oz); s.scale.set(2.0 * big, 1.5 * big, 1); }   // the owner's fire: wide and low (4:3), standing on the bed / hood of the wreck
+        else { s.position.set(p.x + ox, p.y + 0.35 * big, p.z + oz); s.scale.set(0.9 * big, 1.8 * big, 1); } });
       if ((d.smokeT -= dt) <= 0) { d.smokeT = 0.18; puff(V3(p.x, p.y + 1.4, p.z), 0.9, 0x2a2a2a); }
       if (Math.random() < dt * 6) fireCrackle(p);
       if (d.burnT > 45 && !d.burnt) { dmgChar(k); dmgOut(k, true); }   // burned itself out: a charred wreck

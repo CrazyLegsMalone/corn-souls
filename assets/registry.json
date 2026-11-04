@@ -667,6 +667,24 @@
       "evidence": "Added by the owner's request in the TEST channel (v1.97.121): nibblers that spawn from dead cob stalkers, 20 faces, 2D sprites that always face you."
     },
     {
+      "id": "first-party-pixel-fire",
+      "title": "Pixel-art fire (8-frame animated GIF, 32 x 24 px art at 8x)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided animated GIF (sent in chat)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/textures/fire",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "fire.gif is kept unchanged. fire-atlas.png is made from it: each of the 8 frames scaled down 8x to its 32 x 24 pixel art (pixel-exact, nearest neighbour), the flat dark background (#211c20) made transparent, laid side by side in a 256 x 24 strip. Drawn as camera-facing flames on burning vehicles, crisp nearest pixels, at the GIF's 90 ms per frame (v1.97.142).",
+      "files": [
+        "assets/textures/fire/fire.gif",
+        "assets/textures/fire/fire-atlas.png"
+      ],
+      "checked_on": "2026-11-04",
+      "reviewer": "Owner",
+      "evidence": "Added by the owner's request in the TEST channel (v1.97.142): \"can we use this for fires\" with the GIF attached."
+    },
+    {
       "id": "first-party-psx-tree-sprites",
       "title": "PSX tree sprites (10 species x 8 views, 64 px, plus 4x2 atlases)",
       "creator": "CrazyLegsMalone (project owner)",

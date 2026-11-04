@@ -1,3 +1,23 @@
+## TEST v1.97.142 — the owner's pixel fire for fires (2026-11-04)
+- Owner (an animated pixel-art fire GIF): *"can we use this for fires"*.
+- **Assets:**
+  - `assets/textures/fire/fire.gif` is kept exactly as sent: 256 x 192, 8 frames at 90 ms, 6 colours, 32 x 24 art drawn at 8x.
+  - `fire-atlas.png` is cut from it: each frame scaled down 8x (pixel-exact: scaling it back up reproduces the GIF frame), the flat dark background (#211c20) made transparent, all eight in one 256 x 24 strip.
+  - Registered as `first-party-pixel-fire`, credited in CREDITS.md, and listed in `assets/textures/README.md`.
+- **Where fires are:** the game's fires are the burning vehicles (a Ranger or car at 0 health, `updateDamage`). They now draw the owner's fire:
+  - five camera-facing sprites, crisp nearest pixels, at the GIF's own 90 ms a frame (`FLAME_FPS`), each at its own phase;
+  - anchored at the flames' base (row 22 of 24) and standing on the bed and hood, wide and low as drawn (2.0 x 1.5 m each, the main one 1.5x);
+  - smoke, crackle and burn-out unchanged.
+- **Loading:** the strip is fetched when the game starts (`flameArt()`). The old code-drawn flipbook only stands in until it arrives, or if it can't load.
+- **Fixed:** the flipbook's frame index could go negative (seen in the running game), which pointed the sprite off the strip and showed a blank frame. It is now kept in range.
+- Verified in the running game: set the Ranger on fire, checked that all five flames use the strip with frames advancing, and rendered it from two sides.
+- New suite `test/validate-fire.cjs` (added to CI) checks:
+  - the GIF is as sent (size, 8 frames, 90 ms);
+  - the strip is a 256 x 24 RGBA PNG with eight crisp frames and a transparent background;
+  - the registry entry and the credit;
+  - the game's loader, speed, anchoring, range fix and preload.
+- Bumped TEST to `1.97.142` / `corn-souls-test-shell-v169`.
+
 ## TEST v1.97.141 — yellow = rolling door open, mesh closed (2026-11-04)
 - Owner: *"pressing the yellow should open the door if the door is closed. basically pressing the yellow should make the door be mesh closed rolling door open. right now if pressed when mesh and door are closed nothing happens"*.
 - **Yellow** now sets the steel door **open** and the mesh **closed** from any state. Before, it only closed the mesh, so with both already shut nothing happened.
