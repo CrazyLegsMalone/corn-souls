@@ -1,3 +1,28 @@
+## TEST v1.97.133 — the grain piles are just piles of grain now (2026-11-04)
+- Owner: *"the grain pile by the train was just supposed to look like a normal pile of grain that happens to be able to be used as a ramp not a specific made ramp its too obvious."*
+- **Why it looked made:** v1.97.130 drew each pile as straight wedges from a 2D profile, with flat sheer sides, a 16 m rectangular footprint and side walls. In other words, a ramp.
+- **Now:** two ordinary piles of shelled corn, each **one heightfield on a 0.5 m grid**. The same numbers draw it and are its floor: a `WALK_SURF` entry with an `hf` sampler that `floorAt` reads. Walking, the Ranger and the cars ride exactly what you see. There are no walls; it's grain, so you can climb it.
+  - **Takeoff heap (east):** a plain dumped pile, 4.8 m peak at x -224. Its sides are at grain's angle of repose all round (0.42–0.45). It has a short ridge, an uneven rounded outline and gentle lumps (kept fainter on the climb, so it stays a slope and not steps).
+  - **Loader heap (west):** a broad oval ground pile, about 57 x 50 m. Its track side is the steep, scalloped cut a loader bucket leaves, with a slumped skirt, ~4.7 m off the track and following it. Behind the cut it slumps into a long low dome. That dome is where the jump comes down.
+  - **Look:** kernel texture, vertex shading (sun-dried on top, dusty toe, patchy), and the rim tucked just under the grass.
+- **Follows the real track:** `GP_TRACK(z)` reads the loop's own samples (`LSAMP`) instead of the straight-line estimate, which was up to 0.9 m off near z -295. The closest grain is 3.2 m from the track centreline (1.6 m clear of a car's side).
+- **The jump still works,** with the game's physics at 60 fps, on the peak line *and* 3 m either side:
+  - 31 mph doesn't make it.
+  - 40 mph clears a hopper car by 1.7–2.1 m.
+  - 40–54 mph lands on the loader heap with no damage.
+  - 59 mph does 7–15 damage.
+- `floorAt` supports heightfield surfaces (`s.hf`), and the roof map skips meshes flagged `userData.noRoof` (the piles), since their floor is already exact.
+- `test/validate-grain-pile.cjs` was rewritten. It checks:
+  - two heightfield floors and no walls, kept out of the roof map;
+  - `GP_TRACK` matches the loop;
+  - no grain within 1.5 m of a car;
+  - every edge at the ground and an uneven outline (not a box);
+  - takeoff slopes under 0.55;
+  - the climb under the 0.45 launch limit on all three lines;
+  - the jump table on all three lines.
+- Verified in the game: rendered from the east, south, north, west and overhead.
+- Bumped TEST to `1.97.133` / `corn-souls-test-shell-v160`.
+
 ## TEST v1.97.132 — every dead critter you pick up can be eaten (2026-11-04)
 - Owner: *"some are killed but when picked up there is no eat option"* (frogs, pigeons, lizards and rats).
 - **Cause:** two pickups competed for X:

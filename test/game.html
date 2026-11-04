@@ -8406,7 +8406,7 @@ function floorAt(x0, z0, y) {
   for (const s of WALK_SURF) {
     let x = x0, z = z0;
     if (s.rot) { const [cx, cz, ph] = s.rot, c = Math.cos(ph), sn = Math.sin(ph), dx = x0 - cx, dz = z0 - cz; x = dx * c - dz * sn; z = dx * sn + dz * c; }   // turned surfaces (pond berms) use local coords
-    if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) { const h = s.y0 + (s.y1 - s.y0) * (s.ax === 'x' ? (x - s.x0) / (s.x1 - s.x0) : (z - s.z0) / (s.z1 - s.z0)); if (h <= y + 0.75 && h > f) f = h; }
+    if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) { const h = s.hf ? s.hf(x, z) : s.y0 + (s.y1 - s.y0) * (s.ax === 'x' ? (x - s.x0) / (s.x1 - s.x0) : (z - s.z0) / (s.z1 - s.z0)); if (h <= y + 0.75 && h > f) f = h; }   // (hf: a heightfield, the grain piles)
   }
   if (ROOFMAP.h) { const h = roofAt(x0, z0); if (h >= 2 && h <= y + 0.3 && h > f) f = h; }   // roofs and tops (2 m up and more; only a small step up onto one)
   return f;
@@ -11815,7 +11815,7 @@ function roofMapMeshes() {
   add(SKY.dome); add(SKY.clouds); add(SKY.stars); add(VIEW.av); add(VULT.s); add(VULT.sprite); for (const b of bodies) add(b.g || b.group || b);
   const out = [], sp = new T.Sphere(), wsc = new T.Vector3();
   (function walk_(o) {
-    if (!o.visible || o.userData.noHit || skip.has(o)) return;
+    if (!o.visible || o.userData.noHit || o.userData.noRoof || skip.has(o)) return;
     if (o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && o.geometry) {
       const ms = Array.isArray(o.material) ? o.material : [o.material];
       if (!ms.some(m => !m || (m.transparent && m.opacity < 0.95) || m.depthWrite === false || m.blending === T.AdditiveBlending)) {
@@ -12396,20 +12396,64 @@ function buildDirtHills() {
   }
 }
 // ---------- GRAIN PILE JUMP (v1.97.130, owner, on the overhead map: "add a grain pile here. i want to be able to ramp the ranger
-// on it to jump over the train"): north of the north corn field's west end, where the rail loop runs north-south (track centre
-// x ~ -243 at z -305). You come at it from the open grass to the east, driving west:
-//  takeoff pile (x -232..-213)  - corn up at grain's natural slope (0.42, 23 degrees) to a 4.6 m crest at x -224 (19 m from the
-//                                 track), then the drop on the track side: the Ranger leaves the ground over the crest. 40 mph
-//                                 (18 m/s) or more clears a hopper car (5.1 m) on the track; flat out it goes ~10 m up.
-//  landing spill (x -311..-249) - the far side of the track: a 4.5 m bank 6 m past the track, nearly flat for 14 m, then falling
-//                                 west for 45 m, shaped against the jump arcs so 40-54 mph lands on a slope with no damage
-//                                 (flat out, a little; come up short of it and you hit its face).
-// Each is a profile of [x, height] points from east to west (a slope between two is a WALK_SURF ramp along x, two at the same x
-// a sheer face) with walls on its sides that only block below the top, like the dirt hills. Drawn in corn: kernel texture.
+// on it to jump over the train"; v1.97.133: "it was just supposed to look like a normal pile of grain that happens to be able to
+// be used as a ramp not a specific made ramp its too obvious"). North of the north corn field's west end, where the rail loop runs
+// north-south (track centre x ~ -243 at z -305). Two ordinary piles of shelled corn, one each side of the track:
+//  takeoff heap (east)  - a plain dumped pile: a peak 4.6 m high at x -224, sides at grain's angle of repose all round (0.42-0.45,
+//                         ~23 degrees) and a rounded, lumpy outline. Driving west up its face at 40 mph (18 m/s) or more, the
+//                         Ranger leaves the peak and clears a hopper car (5.1 m) on the track; flat out it goes ~10 m up.
+//  loader heap (west)   - a broad oval ground pile a loader has been working from the rail side: its track-facing side is the
+//                         steep cut a bucket leaves (scalloped, with a slumped skirt), ~5 m off the track and following its bend; behind it the
+//                         grain has slumped into a long low dome falling west for ~60 m. The jump comes down on that dome, so
+//                         40-54 mph lands unhurt (flat out, a little; come up short and you meet the cut face).
+// Each pile is ONE heightfield (a 0.5 m grid): the same numbers draw it and are the floor (a WALK_SURF entry with an `hf` sampler,
+// read by floorAt), so walking, the Ranger and the cars all ride exactly what you see. No walls: it's grain, you can climb it.
+let GP_TX = null;
+function GP_TRACK(z) {   // the rail loop's centreline x at this z, from the loop's own samples (LSAMP) along this stretch
+  if (!GP_TX) GP_TX = LSAMP.filter(p => p.x > -320 && p.x < -200 && p.z > -420 && p.z < -200).sort((a, b) => a.z - b.z);
+  for (let i = 0; i < GP_TX.length - 1; i++) { const a = GP_TX[i], b = GP_TX[i + 1]; if (z >= a.z && z <= b.z) return a.x + (b.x - a.x) * (z - a.z) / ((b.z - a.z) || 1); }
+  return z < GP_TX[0].z ? GP_TX[0].x : GP_TX[GP_TX.length - 1].x;
+}
 const GRAIN_PILES = [
-  { z0: -313, z1: -297, p: [[-213, 0], [-224, 4.6], [-232, 1.2], [-232, 0]] },   // (a sharp crest: on a flat top the Ranger's climb would level off before the lip)
-  { z0: -314, z1: -296, p: [[-249, 0], [-252, 4.5], [-266, 4.2], [-286, 2.2], [-311, 0]] }   // (shaped against the jump arcs: 40-54 mph land on it unhurt)
+  { name: 'takeoff', kind: 'heap', cx: -224, cz: -305, h: 4.8, sx: 0.42, sz: 0.45, w: 5.5 },
+  { name: 'loader', kind: 'cut', cz: -305, off: 4.7, sz: 0.42, w: 14,   // u = metres west of the cut line (4.7 m off the track); profile in u
+    prof: [[-1.6, 0], [0, 0.5], [1.8, 4.6], [5, 4.5], [11, 4.25], [17, 3.85], [27, 3.0], [36, 2.05], [44, 1.05], [51, 0.4], [57, 0]] }
 ];
+function gpPchip(P, u) {   // smooth, no overshoot (monotone cubic) through the profile points
+  const n = P.length; if (u <= P[0][0]) return P[0][1]; if (u >= P[n - 1][0]) return P[n - 1][1];
+  let i = 0; while (u > P[i + 1][0]) i++;
+  const sl = j => (P[j + 1][1] - P[j][1]) / (P[j + 1][0] - P[j][0]);
+  const tan = j => { if (j === 0) return sl(0); if (j === n - 1) return sl(n - 2); const a = sl(j - 1), b = sl(j); return a * b <= 0 ? 0 : 2 / (1 / a + 1 / b); };
+  const h = P[i + 1][0] - P[i][0], t = (u - P[i][0]) / h, t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * P[i][1] + (t3 - 2 * t2 + t) * h * tan(i) + (-2 * t3 + 3 * t2) * P[i + 1][1] + (t3 - t2) * h * tan(i + 1);
+}
+function gpLump(x, z) { return 0.5 * Math.sin(x * 0.61 + z * 0.23) + 0.35 * Math.sin(-x * 0.29 + z * 0.71 + 2) + 0.25 * Math.sin(x * 1.13 - z * 0.97 + 4); }   // -1.1..1.1, gentle
+function gpHeight(H, x, z) {
+  let h, core;
+  if (H.kind === 'heap') {
+    const dx = x - H.cx, w = H.w + 0.7 * Math.sin(x * 0.37 + 1) + 0.4 * Math.sin(x * 0.9), dz = Math.max(0, Math.abs(z - H.cz) - w);
+    const a = Math.atan2(dz, dx), sx = H.sx * (1 + 0.07 * Math.sin(3 * a) * Math.min(1, dz)), sz = H.sz * (1 + 0.08 * Math.sin(5 * a + 1));   // an uneven outline away from the drive line
+    h = H.h - Math.sqrt((sx * dx) * (sx * dx) + (sz * dz) * (sz * dz)); core = Math.abs(z - H.cz) < 5 && dx > -2;   // its east (climb) face and the peak
+  } else {
+    const scal = 0.5 * Math.abs(Math.sin((z - H.cz) * Math.PI / 3.2)), u = GP_TRACK(z) - H.off - scal - x;   // bucket bites along the cut
+    const e = (u - 20) / 40, w = H.w * Math.sqrt(Math.max(0, 1 - e * e)) + 1.2 * Math.sin(u * 0.21 + 0.5) + 0.8 * Math.sin(u * 0.5 + z * 0.05), dz = Math.max(0, Math.abs(z - H.cz) - w);   // an oval ground pile, widest in the middle
+    h = gpPchip(H.prof, u) - H.sz * dz; core = false;
+  }
+  if (h <= 0) return 0;
+  return Math.max(0, h + gpLump(x, z) * 0.035 * h * (core ? 0.15 : 1));   // lumps grow with depth; kept gentle on the climb (it stays a slope, not steps)
+}
+function gpBox(H) {
+  if (H.kind === 'heap') { const rx = H.h / (H.sx * 0.93) + 1, rz = H.w + 1.2 + H.h / (H.sz * 0.92) + 1; return [H.cx - rx, H.cx + rx, H.cz - rz, H.cz + rz]; }
+  const rz = H.w + 2.1 + 4.6 / H.sz + 1, zs = [H.cz - rz, H.cz + rz], xs = zs.map(GP_TRACK);
+  return [Math.min(...xs) - H.off - H.prof[H.prof.length - 1][0] - 1, Math.max(...xs) - H.off - H.prof[0][0] + 1, zs[0], zs[1]];
+}
+function gpGrid(H) {   // the pile on a 0.5 m grid (corner heights) + a bilinear sampler for floorAt
+  const C = 0.5, [x0, x1, z0, z1] = gpBox(H), nx = Math.ceil((x1 - x0) / C) + 1, nz = Math.ceil((z1 - z0) / C) + 1, g = new Float32Array(nx * nz);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) g[j * nx + i] = gpHeight(H, x0 + i * C, z0 + j * C);
+  const at = (x, z) => { const fx = (x - x0) / C, fz = (z - z0) / C, i = Math.floor(fx), j = Math.floor(fz); if (i < 0 || j < 0 || i >= nx - 1 || j >= nz - 1) return 0;
+    const tx = fx - i, tz = fz - j, k = j * nx + i; return (g[k] * (1 - tx) + g[k + 1] * tx) * (1 - tz) + (g[k + nx] * (1 - tx) + g[k + nx + 1] * tx) * tz; };
+  return { x0, z0, x1: x0 + (nx - 1) * C, z1: z0 + (nz - 1) * C, nx, nz, C, g, at };
+}
 function grainTex() {
   if (typeof document === 'undefined') return null;
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
@@ -12420,26 +12464,23 @@ function grainTex() {
   const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(1 / 1.5, 1 / 1.5); return srgbTex(t);
 }
 function buildGrainPiles() {
-  const tx = grainTex(), m = new T.MeshLambertMaterial(tx ? { map: tx } : { color: 0xd9a52c }); m.side = T.DoubleSide;
+  const tx = grainTex(), m = new T.MeshLambertMaterial(tx ? { map: tx, vertexColors: true } : { color: 0xd9a52c, vertexColors: true });
   for (const H of GRAIN_PILES) {
-    const pos = [], uv = [], q = (a, b, c, d, ua, ub, uc, ud) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); uv.push(...ua, ...ub, ...uc, ...ua, ...uc, ...ud); };
-    const { z0, z1, p } = H;
-    for (let i = 0; i < p.length - 1; i++) {
-      const [xa, ya] = p[i], [xb, yb] = p[i + 1];
-      if (xa === xb) {   // sheer face (facing west, the way you drive off it)
-        const y = Math.max(ya, yb); q([xa, 0, z1], [xa, 0, z0], [xa, y, z0], [xa, y, z1], [z1, 0], [z0, 0], [z0, y], [z1, y]);
-        if (y > 0.6) wallSegs.push([xa, z0, xa, z1, -0.5, y]);
-        continue;
-      }
-      const xl = Math.min(xa, xb), xh = Math.max(xa, xb), yl = xa < xb ? ya : yb, yh = xa < xb ? yb : ya;
-      WALK_SURF.push({ x0: xl, x1: xh, z0, z1, y0: yl, y1: yh, ax: 'x' });
-      q([xa, ya, z0], [xb, yb, z0], [xb, yb, z1], [xa, ya, z1], [xa, z0], [xb, z0], [xb, z1], [xa, z1]);                          // top
-      q([xa, 0, z0], [xa, ya, z0], [xb, yb, z0], [xb, 0, z0], [xa, 0], [xa, ya], [xb, yb], [xb, 0]);                              // north side
-      q([xb, 0, z1], [xb, yb, z1], [xa, ya, z1], [xa, 0, z1], [xb, 0], [xb, yb], [xa, ya], [xa, 0]);                              // south side
-      const lo = Math.min(ya, yb); if (lo > 0.6) for (const z of [z0, z1]) wallSegs.push([xa, z, xb, z, -0.5, lo]);
+    const G = H.grid = gpGrid(H), { nx, nz, C, g } = G, pos = new Float32Array(nx * nz * 3), uv = new Float32Array(nx * nz * 2), col = new Float32Array(nx * nz * 3), idx = [];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, x = G.x0 + i * C, z = G.z0 + j * C, h = g[k];
+      pos[k * 3] = x; pos[k * 3 + 1] = h > 0.005 ? h : -0.08; pos[k * 3 + 2] = z; uv[k * 2] = x; uv[k * 2 + 1] = z;   // the rim tucks just under the grass
+      const sh = 0.86 + 0.1 * Math.min(1, h / 4.5) + 0.05 * gpLump(z, x) - (h < 0.35 ? 0.1 * (1 - h / 0.35) : 0);   // sun-dried on top, dusty / damp at the toe, patchy
+      col[k * 3] = sh; col[k * 3 + 1] = sh * 0.97; col[k * 3 + 2] = sh * 0.9;
     }
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.computeVertexNormals();
-    const o = new T.Mesh(geo, m); o.castShadow = true; o.receiveShadow = true; o.name = 'grainPile'; scene.add(o);
+    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; if (g[a] <= 0.005 && g[b] <= 0.005 && g[c] <= 0.005 && g[d] <= 0.005) continue;
+      idx.push(a, c, b, b, c, d);
+    }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    const o = new T.Mesh(geo, m); o.castShadow = true; o.receiveShadow = true; o.name = 'grainPile'; o.userData.noRoof = true; scene.add(o);   // (its floor is its own heightfield, not the roof map)
+    WALK_SURF.push({ x0: G.x0, x1: G.x1, z0: G.z0, z1: G.z1, y0: 0, y1: 0, hf: G.at });
   }
 }
 // ---------- AIR (owner, v1.97.94: "we can get air on hills?"): the driven vehicle carries vertical speed. On the ground it
