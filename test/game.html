@@ -12745,10 +12745,14 @@ const CREEP = { ready: false, list: [], phase: 'stalkers', t: 0, proto: {}, bite
 // 2 player: the host runs the creatures for both players (targets either of you, bites go to whoever it bit) and sends a
 // snapshot 4x a second in its world state; the guest only mirrors them (no AI of its own) and sends its hits to the host.
 const creepGuest = () => !!(NET.conn && NET.conn.open && !NET.host);
-const CREEP_ST = ['roam', 'stalk', 'hunt', 'lure', 'eat', 'return', 'dead'], CREEP_PH = ['stalkers', 'boss-wait', 'boss', 'quiet'];
+const CREEP_ST = ['roam', 'stalk', 'hunt', 'lure', 'eat', 'return', 'dead', 'flee'], CREEP_PH = ['stalkers', 'boss-wait', 'boss', 'quiet'];
 const CREEP_K = {
   stalker: { url: '/corn-souls/assets/models/cob_stalker.glb', body: 'Cob_Body', scale: 0.42, hp: 10, roam: 1.5, run: 5.0, turn: 3.5, aggro: 30, bite: 1.6, biteCd: 1.1, dmg: 1, lure: 70, gait: 7, swing: 0.35, lift: 0.3 },
-  daddy: { url: '/corn-souls/assets/models/daddy_cob_legs.glb', body: 'Daddy_Cob_Torso', scale: 0.4, hp: 60, roam: 1.1, run: 4.2, turn: 1.6, aggro: 48, bite: 4.2, biteCd: 1.6, dmg: 2, lure: 90, gait: 3.2, swing: 0.25, lift: 0.22 } };
+  daddy: { url: '/corn-souls/assets/models/daddy_cob_legs.glb', body: 'Daddy_Cob_Torso', scale: 0.4, hp: 60, roam: 1.1, run: 4.2, turn: 1.6, aggro: 48, bite: 4.2, biteCd: 1.6, dmg: 2, lure: 90, gait: 3.2, swing: 0.25, lift: 0.22 },
+  // v1.97.121: NIBBLERS (the owner's 20-face sprite set): five burst out of every cob stalker that dies. Little 2D kernels that
+  // always face you, hopping after whoever is near (not tied to the field: a 45 m leash round where they came out). Two paint
+  // hits, a nibble is half a stalker bite, slower than you so you can outrun them. They burrow away after 3 minutes.
+  nibbler: { sprite: true, hp: 2, roam: 1.3, run: 4.4, turn: 9, aggro: 18, bite: 0.95, biteCd: 1.2, dmg: 0.5, lure: 40, leash: 45, life: 180, size: 0.62 } };
 const inCField = (x, z, m) => { m = m || 0; return x > CFIELD.x0 - m && x < CFIELD.x1 + m && z > CFIELD.z0 - m && z < CFIELD.z1 + m; };
 const clampCField = (x, z, m) => [Math.max(CFIELD.x0 + m, Math.min(CFIELD.x1 - m, x)), Math.max(CFIELD.z0 + m, Math.min(CFIELD.z1 - m, z))];
 // fewer draw calls: everything under each kept node (the legs) becomes one mesh per material in that node's own space,
@@ -12774,7 +12778,8 @@ function foldModel(root, keepRe) {
   return keeps.length;
 }
 function loadCreeps() {
-  for (const kind in CREEP_K) loadGlbModel(CREEP_K[kind].url, ({ root, byName }) => {
+  for (let i = 1; i <= NIB_FACES.length; i++) nibTex(i);   // all 20 nibbler faces up front (no blank frame when a face first changes)
+  for (const kind in CREEP_K) if (CREEP_K[kind].url) loadGlbModel(CREEP_K[kind].url, ({ root, byName }) => {   // (nibblers are sprites: no model)
     const body = byName[CREEP_K[kind].body]; root.updateMatrixWorld(true);
     const all = new T.Box3().setFromObject(root), bb = body ? new T.Box3().setFromObject(body) : all.clone(), c = bb.getCenter(V3()), s = bb.getSize(V3());
     root.traverse(o => { if (o.isMesh && o.material && o.material.color) { const col = o.material.color; if (col.r > 0.6 && col.g < 0.1 && col.b < 0.1 && o.material.emissive) { o.material.emissive.setRGB(0.7, 0.02, 0.02); } } });   // red eyes glow in the dark
@@ -12784,6 +12789,7 @@ function loadCreeps() {
   }, 'creeps');
 }
 function creepSpawn(kind, x, z, rise, id) {
+  if (kind === 'nibbler') return nibSpawn(x, z, id);
   const K = CREEP_K[kind], P = CREEP.proto[kind]; if (!P) return null;
   const g = new T.Group(), s = new T.Group(), m = P.root.clone(true); s.scale.setScalar(K.scale); s.position.y = -P.minY * K.scale; s.add(m); g.add(s);   // (the models' mouths already face +z, the way they walk: v1.97.110 took out a wrong 180 degree turn)
   const hips = []; m.traverse(o => { if (/Leg_Hip/.test(o.name || '')) hips.push({ o, q0: o.quaternion.clone(), ph: (hips.length % 2) * Math.PI + (hips.length >> 1) * 0.4 }); });
@@ -12830,9 +12836,9 @@ function creepBite(c, d) { creepSound('bite', c); creepBitten(c.kind, c.K.dmg, c
 function creepBitten(kind, dmg, cx, cz) {   // me, bitten (by my own creature, or the host's when I am the guest)
   if (!walk.on || walk.dead) return;
   CREEP.bites += dmg; CREEP.healT = 0;
-  const d = Math.hypot(walk.x - cx, walk.z - cz) || 1, nx = (walk.x - cx) / d, nz = (walk.z - cz) / d; walk.x += nx * 0.7; walk.z += nz * 0.7; pushOut();   // knocked back
-  if (CREEP.bites >= 3) { CREEP.bites = 0; walk.dead = kind === 'daddy' ? 'daddy' : 'cob'; layBody(walk.x, walk.z, walk.yaw, nx * 2.5, 2, nz * 2.5, 4); walk.diedAt = { x: walk.x, z: walk.z }; }
-  else if (DMG_NOTIFY) DMG_NOTIFY((kind === 'daddy' ? '🕷️ Daddy Cob Legs got you!' : '🌽 A cob stalker bit you!') + ' (' + CREEP.bites + '/3) · get out of the corn');
+  const d = Math.hypot(walk.x - cx, walk.z - cz) || 1, nx = (walk.x - cx) / d, nz = (walk.z - cz) / d, kb = kind === 'nibbler' ? 0.25 : 0.7; walk.x += nx * kb; walk.z += nz * kb; pushOut();   // knocked back
+  if (CREEP.bites >= 3) { CREEP.bites = 0; walk.dead = kind === 'daddy' ? 'daddy' : kind === 'nibbler' ? 'nibbler' : 'cob'; layBody(walk.x, walk.z, walk.yaw, nx * 2.5, 2, nz * 2.5, 4); walk.diedAt = { x: walk.x, z: walk.z }; }
+  else if (DMG_NOTIFY) DMG_NOTIFY((kind === 'daddy' ? '🕷️ Daddy Cob Legs got you!' : kind === 'nibbler' ? '😬 A nibbler nibbled you!' : '🌽 A cob stalker bit you!') + ' (' + (CREEP.bites % 1 ? CREEP.bites.toFixed(1) : CREEP.bites) + '/3)' + (kind === 'nibbler' ? ' · outrun them' : ' · get out of the corn'));
 }
 function creepHurt(c, n, at, col) {
   if (c.hp <= 0 || c.rise > 0.3) return false;
@@ -12843,13 +12849,13 @@ function creepHurt(c, n, at, col) {
   }
   c.hp -= n; c.hurtT = 0.3; c.runT = 4;   // angry: hunts at full speed for a bit
   for (let i = 0; i < 3; i++) puff((at || c.g.position).clone().add(V3((Math.random() - 0.5) * 0.4, Math.random() * 0.3, (Math.random() - 0.5) * 0.4)), c.kind === 'daddy' ? 0.3 : 0.12, col != null ? col : 0xe8d27a);
-  if (c.hp <= 0) { c.state = 'dead'; c.deadT = 0; c.speed = 0; CREEP.kills++; creepSound('die', c); }
-  else creepSound('hurt', c);
+  if (c.hp <= 0) { c.state = 'dead'; c.deadT = 0; c.speed = 0; CREEP.kills++; creepSound('die', c); if (c.kind === 'stalker') nibBurst(c); else if (c.kind === 'nibbler') nibMourn(c); }
+  else { creepSound('hurt', c); if (c.kind === 'nibbler') c.fleeT = 1.8; }   // a nibbler that survives a hit runs off for a moment
   return true;
 }
 function creepSound(kind, c) {   // synthesized: a husky screech, a crunch, a shriek, a low rumbling roar
   const C = tsnd.ctx; if (!C) return; const d = camera.position.distanceTo(c.g.position), v = Math.max(0, 1 - d / (kind === 'roar' ? 160 : 70)); if (v < 0.02) return;
-  const t = C.currentTime, big = c.kind === 'daddy' ? 0.45 : 1;
+  const t = C.currentTime, big = c.kind === 'daddy' ? 0.45 : c.kind === 'nibbler' ? 1.7 : 1;   // (nibblers squeak)
   const sweep = (type, f0, f1, dur, vol) => { const o = C.createOscillator(), g = C.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * v, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(C.destination); o.start(t); o.stop(t + dur + 0.02); };
   if (kind === 'screech') { kiaNoise(C, t, 0.55, 0.22 * v, 2600 * big, 5, C.destination); sweep('sawtooth', 980 * big, 420 * big, 0.5, 0.06); }
@@ -12906,20 +12912,21 @@ function creepAI(c, dt) {
 }
 function updateCreeps(dt) {
   if (!CREEP.ready) return;
-  if (CREEP.bites > 0 && (CREEP.healT += dt) > 25) { CREEP.bites--; CREEP.healT = 0; }
+  if (CREEP.bites > 0 && (CREEP.healT += dt) > 25) { CREEP.bites = Math.max(0, CREEP.bites - 1); CREEP.healT = 0; }   // (nibbles are half bites)
   if (creepGuest()) {   // the host's creatures: glide to where it last said, legs walking at the speed it said
     for (const c of CREEP.list) { const k = Math.min(1, dt * 8); if (c.nx !== undefined) { c.x += (c.nx - c.x) * k; c.z += (c.nz - c.z) * k; c.a += Math.atan2(Math.sin(c.na - c.a), Math.cos(c.na - c.a)) * k; }
-      c.t += dt; c.hurtT = Math.max(0, c.hurtT - dt); c.biteCd = Math.max(0, c.biteCd - dt); c.y = Math.max(0, floorAt(c.x, c.z, 2)); if (c.state === 'dead') c.deadT += dt; else if (c.rise > 0) c.rise = Math.max(0, c.rise - dt / 3.2); creepPose(c, dt);
+      c.t += dt; c.hurtT = Math.max(0, c.hurtT - dt); c.biteCd = Math.max(0, c.biteCd - dt); c.y = Math.max(0, floorAt(c.x, c.z, 2)); if (c.state === 'dead') c.deadT += dt; else if (c.rise > 0) c.rise = Math.max(0, c.rise - dt / 3.2); if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
       if (walk.drive && utv.g && c.hp > 0 && c.biteCd <= 0) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 5 && dv < c.maxR * 0.55 + 1.2) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY)); } } }   // I drove into one: the host takes the damage
     return;
   }
   for (let i = CREEP.list.length - 1; i >= 0; i--) {
     const c = CREEP.list[i];
-    if (c.state === 'dead') { c.deadT += dt; if (c.deadT > 30) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
+    if (c.state === 'dead') { c.deadT += dt; if (c.deadT > (c.kind === 'nibbler' ? 7 : 30)) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
+    else if (c.kind === 'nibbler') { nibAI(c, dt); if (c.gone) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
     else creepAI(c, dt);
-    creepPose(c, dt);
+    if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
   }
-  const alive = CREEP.list.filter(c => c.hp > 0).length;
+  const alive = CREEP.list.filter(c => c.hp > 0 && c.kind !== 'nibbler').length;   // (nibblers do not hold up Daddy)
   if (CREEP.phase === 'stalkers' && !alive) { CREEP.phase = 'boss-wait'; CREEP.t = 0; }
   else if (CREEP.phase === 'boss-wait' && (CREEP.t += dt) > 5) creepDaddy();
   else if (CREEP.phase === 'boss' && !alive) { CREEP.phase = 'quiet'; CREEP.t = 0; if (DMG_NOTIFY && walk.on) DMG_NOTIFY('🌽 The corn goes still.'); }
@@ -12927,18 +12934,19 @@ function updateCreeps(dt) {
 }
 function creepSnapshot() {   // host -> guest, in the world state
   if (!CREEP.ready) return null;
-  return { ph: CREEP_PH.indexOf(CREEP.phase), l: CREEP.list.map(c => [c.id, c.kind === 'daddy' ? 1 : 0, +c.x.toFixed(2), +c.z.toFixed(2), +c.a.toFixed(2), c.hp, CREEP_ST.indexOf(c.state), +c.rise.toFixed(2), +c.speed.toFixed(2)]) };
+  return { ph: CREEP_PH.indexOf(CREEP.phase), l: CREEP.list.map(c => [c.id, c.kind === 'daddy' ? 1 : c.kind === 'nibbler' ? 2 : 0, +c.x.toFixed(2), +c.z.toFixed(2), +c.a.toFixed(2), c.hp, CREEP_ST.indexOf(c.state), +c.rise.toFixed(2), +c.speed.toFixed(2)]) };
 }
 function creepApplySnapshot(S) {   // guest: make my creatures the host's
   if (!CREEP.ready || !S || !S.l) return;
   const seen = new Set();
   for (const [id, k, x, z, a, hp, st, rise, sp] of S.l) {
-    const kind = k ? 'daddy' : 'stalker'; let c = CREEP.list.find(q => q.id === id);
+    const kind = k === 2 ? 'nibbler' : k ? 'daddy' : 'stalker'; let c = CREEP.list.find(q => q.id === id);
     if (c && c.kind !== kind) { scene.remove(c.g); CREEP.list.splice(CREEP.list.indexOf(c), 1); c = null; }
     if (!c) { c = creepSpawn(kind, x, z, rise > 0, id); if (!c) continue; c.a = a; if (kind === 'daddy' && rise > 0.5) creepSound('roar', c); }
     const state = CREEP_ST[st] || 'roam';
     if (state === 'hunt' && c.state !== 'hunt') creepSound('screech', c);
     if (state === 'dead' && c.state !== 'dead') { c.deadT = 0; creepSound('die', c); }
+    if (hp < c.hp && c.kind === 'nibbler') { c.hurtT = 0.3; c.hurtFace = 1.6; }   // (the guest's nibbler faces follow the host's hits)
     c.nx = x; c.nz = z; c.na = a; c.hp = hp; c.state = state; c.speed = sp; if (rise < c.rise || rise === 0) c.rise = rise; seen.add(id);
   }
   for (let i = CREEP.list.length - 1; i >= 0; i--) if (!seen.has(CREEP.list[i].id)) { scene.remove(CREEP.list[i].g); CREEP.list.splice(i, 1); }
@@ -12964,6 +12972,90 @@ function creepDebug(what) {   // debug menu
   if (creepGuest()) { netSend({ t: 'cdbg', w: what }); return what === 'boss' ? 'Asked the host: stalkers down, Daddy Cob Legs comes in 5 s' : 'Asked the host to reset the corn field'; }
   if (what === 'boss') { for (const c of CREEP.list) if (c.hp > 0 && c.kind === 'stalker') creepHurt(c, 99); return 'Both stalkers down: Daddy Cob Legs comes in 5 s'; }
   for (const c of CREEP.list) scene.remove(c.g); CREEP.list.length = 0; CREEP.bites = 0; creepStalkers(); return 'Corn field reset: two cob stalkers';
+}
+// ---------- NIBBLERS (v1.97.121): the owner's sprite set, 20 faces (assets/textures/nibbler/nibbler-NN-<face>.png, 40 px).
+// Each nibbler is a T.Sprite (it always faces you) standing on its feet (centre at the bottom), with its own sprite material so
+// its face can change: what it is doing picks the face, and a hop, a squash on landing, a wobble and a left/right flip animate it.
+const NIB_FACES = ['wicked-grin', 'happy', 'smug', 'sneaky', 'gleeful', 'sad', 'crying', 'terrified', 'confused', 'shocked', 'angry', 'enraged', 'foaming', 'asleep', 'dazed', 'hurt', 'taking-damage', 'exhausted', 'unconscious', 'dead'];
+const NIB = { tex: null, per: 5 };
+function nibTex(i) {   // 1-based face number
+  if (!NIB.tex) NIB.tex = [];
+  if (!NIB.tex[i] && typeof document === 'undefined') return null;   // (outside a browser: no pictures)
+  if (!NIB.tex[i]) { const t = new T.TextureLoader().load('/corn-souls/assets/textures/nibbler/nibbler-' + String(i).padStart(2, '0') + '-' + NIB_FACES[i - 1] + '.png'); t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; NIB.tex[i] = t; }
+  return NIB.tex[i];
+}
+function nibSpawn(x, z, id) {
+  const K = CREEP_K.nibbler, g = new T.Group(), s = new T.Group();
+  const sm = new T.SpriteMaterial({ map: nibTex(2), alphaTest: 0.5 }), sp = new T.Sprite(sm); sp.center.set(0.5, 0); sp.scale.set(K.size, K.size, 1); sp.userData.noHit = true; s.add(sp); g.add(s);
+  g.position.set(x, 0, z); g.userData.creep = true; scene.add(g);
+  const c = { id: id || ++CREEP.nid, kind: 'nibbler', K, g, s, sp, hips: [], x, z, a: Math.random() * 6.28, hp: K.hp, state: 'roam', t: 0, nextT: 0, tx: x, tz: z, hx: x, hz: z, legT: Math.random() * 6, speed: 0, biteCd: 0.8, hurtT: 0, rise: 0, deadT: 0, eatT: 0, runT: 0, yelled: false,
+    hitY: K.size * 0.45, hitR: K.size * 0.55, maxR: K.size * 0.5, y: 0, hop: 0, face: 2, faceT: 0, idleT: 0, burst: 0, vx: 0, vz: 0, flip: 1, mood: Math.random() < 0.5 ? 7 : 1, bitT: 0, sadT: 0, lostT: 0, hurtFace: 0, fleeT: 0 };
+  CREEP.list.push(c); return c;
+}
+function nibBurst(st) {   // a cob stalker dies: its nibblers spill out of it in every direction (the host; the guest sees them in the snapshot)
+  for (let i = 0; i < NIB.per; i++) { const a = i / NIB.per * 6.283 + Math.random() * 0.6, c = nibSpawn(st.x + Math.sin(a) * 0.6, st.z + Math.cos(a) * 0.6); if (!c) continue;
+    c.burst = 0.7; c.vx = Math.sin(a) * (3 + Math.random() * 2); c.vz = Math.cos(a) * (3 + Math.random() * 2); c.a = a; c.hx = st.x; c.hz = st.z; }
+  if (DMG_NOTIFY && walk.on && Math.hypot(walk.x - st.x, walk.z - st.z) < 60) DMG_NOTIFY('😈 Nibblers burst out of the cob stalker!');
+}
+function nibMourn(dead) { for (const c of CREEP.list) if (c !== dead && c.kind === 'nibbler' && c.hp > 0 && Math.hypot(c.x - dead.x, c.z - dead.z) < 6) { c.sadT = 1.4; c.runT = 6; } }   // its friends: sad, then furious
+function nibAI(c, dt) {
+  const K = c.K; c.t += dt; c.biteCd = Math.max(0, c.biteCd - dt); c.hurtT = Math.max(0, c.hurtT - dt); c.runT = Math.max(0, c.runT - dt); c.fleeT = Math.max(0, c.fleeT - dt);
+  c.y = Math.max(0, floorAt(c.x, c.z, 2));
+  if (c.t > K.life) { c.gone = true; for (let i = 0; i < 3; i++) puff(V3(c.x, c.y + 0.1, c.z), 0.12, 0x8a6a3a); return; }   // burrows away
+  if (c.burst > 0) { c.burst -= dt; c.x += c.vx * dt; c.z += c.vz * dt; c.vx *= 0.94; c.vz *= 0.94; c.speed = 2; return; }   // flung out of the stalker
+  let me = walk.on && !walk.dead && !walk.drive && !walk.pass, px = walk.x, pz = walk.z, who = 'me', dP = me ? Math.hypot(px - c.x, pz - c.z) : 1e9;
+  { const R = NET.rp; if (R && NET.conn && NET.conn.open && R.walk && !R.drive && !R.ps) { const d2 = Math.hypot(R.x - c.x, R.z - c.z); if (!me || d2 < dP) { me = true; px = R.x; pz = R.z; dP = d2; who = 'rp'; } } }
+  const home = Math.hypot(c.x - c.hx, c.z - c.hz), lure = creepLure(c), was = c.state; let tx = c.tx, tz = c.tz, sp = K.roam, stopAt = 0.3;
+  if (c.fleeT > 0 && me) { c.state = 'flee'; const d = dP || 1; tx = c.x - (px - c.x) / d * 6; tz = c.z - (pz - c.z) / d * 6; sp = K.run * 1.1; }   // hurt and scared: runs off for a moment
+  else if (lure) { tx = lure.g.position.x; tz = lure.g.position.z; sp = K.run; stopAt = 0.4;
+    if (Math.hypot(tx - c.x, tz - c.z) < 0.7) { c.state = 'eat'; sp = 0; if ((c.eatT += dt) > 2.5) { creepEat(lure); c.eatT = 0; } } else { c.state = 'lure'; c.eatT = 0; } }
+  else if (me && dP < K.aggro + (c.runT > 0 ? 12 : 0) && Math.hypot(px - c.hx, pz - c.hz) < K.leash) { c.state = 'hunt'; tx = px; tz = pz; sp = K.run * (c.runT > 0 ? 1.15 : 1); stopAt = K.bite * 0.7; }
+  else if (home > 14) { c.state = 'return'; tx = c.hx; tz = c.hz; sp = K.run * 0.6; }
+  else { c.state = 'roam'; if (c.t > c.nextT || Math.hypot(c.tx - c.x, c.tz - c.z) < 0.8) { c.tx = c.hx + (Math.random() - 0.5) * 16; c.tz = c.hz + (Math.random() - 0.5) * 16; c.nextT = c.t + 3 + Math.random() * 6; }
+    tx = c.tx; tz = c.tz; if (Math.random() < dt * 0.05) c.nextT = c.t + 8; }   // now and then it just sits down for a while
+  if (was === 'hunt' && c.state !== 'hunt') c.lostT = 1.6;   // lost you: confused for a moment
+  const dx = tx - c.x, dz = tz - c.z, d = Math.hypot(dx, dz);
+  if (d > 0.1 && sp > 0) { let da = Math.atan2(dx, dz) - c.a; da = Math.atan2(Math.sin(da), Math.cos(da)); c.a += Math.max(-K.turn * dt, Math.min(K.turn * dt, da)); }
+  const go = sp > 0 && d > stopAt ? sp : 0; c.speed += (go - c.speed) * Math.min(1, dt * 6);
+  c.x += Math.sin(c.a) * c.speed * dt; c.z += Math.cos(c.a) * c.speed * dt;
+  if (c.state === 'hunt' && dP < K.bite + 0.2 && c.biteCd <= 0) { c.biteCd = K.biteCd; c.bitT = 0.6; if (who === 'me') creepBite(c, dP); else { creepSound('bite', c); netSend({ t: 'cbt', k: c.kind, n: K.dmg, x: +c.x.toFixed(2), z: +c.z.toFixed(2) }); } }
+  if (walk.drive && utv.g) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 4 && dv < 1.4 && c.biteCd <= 0) { c.biteCd = 0.6; creepHurt(c, 9, V3(c.x, c.y + c.hitY, c.z)); } }   // run over
+}
+function nibFace(c, dt) {   // what it is doing picks its face (1-based numbers into NIB_FACES)
+  c.faceT -= dt; c.bitT = Math.max(0, c.bitT - dt); c.sadT = Math.max(0, c.sadT - dt); c.lostT = Math.max(0, c.lostT - dt); c.hurtFace = Math.max(0, c.hurtFace - dt);
+  if (c.hurtT > 0) c.hurtFace = Math.max(c.hurtFace, 1.6);
+  c.idleT = c.speed < 0.15 && c.state === 'roam' ? c.idleT + dt : 0;
+  if (c.state === 'dead') return c.deadT < 0.9 ? 19 : 20;                            // unconscious, then dead
+  if (c.hurtT > 0) return 17;                                                        // taking damage
+  if (c.burst > 0 || c.t < 0.9) return 10;                                           // shocked: just burst out
+  if (c.t < 2.6) return c.mood;                                                      // then crying for its stalker, or a wicked grin
+  if (c.state === 'flee') return 8;                                                  // terrified
+  if (c.hurtFace > 0) return c.hp < c.K.hp ? 16 : 15;                                // hurt / dazed
+  if (c.sadT > 0) return 6;                                                          // a friend went down
+  if (c.bitT > 0.3) return 13;                                                       // foaming as it bites
+  if (c.bitT > 0) return 5;                                                          // gleeful: got you
+  if (c.state === 'eat' || c.state === 'lure') return c.state === 'eat' ? 5 : 2;
+  if (c.state === 'hunt') { const dP = Math.min(walk.on ? Math.hypot(walk.x - c.x, walk.z - c.z) : 1e9, NET.rp && NET.rp.walk ? Math.hypot(NET.rp.x - c.x, NET.rp.z - c.z) : 1e9);
+    return dP < 2.5 ? 12 : dP < 7 ? 11 : 1; }                                        // enraged up close, angry, a wicked grin from afar
+  if (c.lostT > 0) return 9;                                                         // confused: where did you go
+  if (c.hp < c.K.hp) return 18;                                                      // exhausted
+  if (c.idleT > 5) return 14;                                                        // asleep
+  if (c.faceT <= 0) { c.faceT = 2 + Math.random() * 3; c.idleFace = [2, 3, 4][Math.random() * 3 | 0]; }   // happy / smug / sneaky while it potters about
+  return c.idleFace || 2;
+}
+const _nr = new T.Vector3();
+function nibPose(c, dt) {
+  const f = nibFace(c, dt); if (f !== c.face) { c.face = f; c.sp.material.map = nibTex(f); c.sp.material.needsUpdate = true; }
+  const K = c.K, moving = c.speed > 0.3 && c.state !== 'dead';
+  c.hop += dt * (moving ? 9 + c.speed * 1.5 : 2);
+  const hy = moving ? Math.abs(Math.sin(c.hop)) * 0.16 : 0, sq = moving ? 1 - 0.14 * Math.cos(c.hop * 2) : 1 + 0.03 * Math.sin(c.t * 2.2);   // hop, squash on landing / breathing
+  _nr.setFromMatrixColumn(camera.matrixWorld, 0); const side = Math.sin(c.a) * _nr.x + Math.cos(c.a) * _nr.z; if (Math.abs(side) > 0.2) c.flip = side > 0 ? 1 : -1;   // faces the way it goes, left or right on screen
+  const sz = K.size, dead = c.state === 'dead';
+  c.sp.scale.set(sz * c.flip * (dead ? 1 : 2 - sq), sz * (dead ? 1 : sq), 1);
+  c.sp.material.rotation = dead ? Math.min(1, c.deadT * 3) * 1.45 * c.flip : c.hurtT > 0 ? Math.sin(c.hurtT * 40) * 0.25 : moving ? Math.sin(c.hop) * 0.12 : 0;   // wobble / shake / keel over
+  if (dead) { c.sp.material.opacity = Math.max(0, 1 - Math.max(0, c.deadT - 4.5) / 2.5); c.sp.material.transparent = c.deadT > 4.5; }
+  const k = 0.35 + 0.65 * (typeof SKY !== 'undefined' ? SKY.k : 1); c.sp.material.color.setRGB(k, k, k);   // darker at night (sprites are unlit)
+  c.g.position.set(c.x, c.y + hy + (dead ? -0.05 : 0), c.z);
 }
 // pigeon coo, synthesized like the train: three soft hooting notes ("hoo-roo-coo") with a little warble, quieter with distance
 function pigeonCoo(vol, pos) {
@@ -14423,8 +14515,8 @@ function frameBody(now) {
     deathT = 4.2; document.body.classList.add('dead');
     try { if (window.Android && Android.vibrate) Android.vibrate(300); else if (navigator.vibrate) navigator.vibrate(300); } catch (e) {}
     if (P3.walking) toggleWalk();
-    const msg = hit === 'pond' ? 'Squeeg waded into the retention pond. Toxic water!' : hit === 'train' ? 'Squeeg got run over by the train.' : hit === 'fall' ? 'Fell too far.' : hit === 'paint' ? 'Squeeg got tagged by the other player!' : hit === 'mower' ? 'Squeeg got mowed down by the other player!' : hit === 'ammonia' ? 'Squeeg breathed in anhydrous ammonia. Stay upwind of a leak and shut that valve!' : hit === 'acid' ? 'Squeeg walked through sulfuric acid. Stay out of the containment when it leaks!' : hit === 'cob' ? 'Squeeg got eaten by the cob stalkers. Stay out of the north corn, or throw them an ear of corn.' : hit === 'daddy' ? 'Daddy Cob Legs got Squeeg.' : 'Squeeg got run over by a semi.';
-    { const f = $('fired'); const caps = hit === 'pond' ? ['POISONED', 'SLIMED OUT', 'MELTED', 'DISSOLVED', 'MUTATED'] : hit === 'acid' ? ['ACID BATH', 'BOOTS DISSOLVED', 'CHEMICAL BURN', 'READ THE SDS', 'SHOULD HAVE WORN RUBBER BOOTS'] : hit === 'ammonia' ? ['GASSED', 'LUNGS SEARED', 'NH3 EXPOSURE', 'SHOULD HAVE WORN A RESPIRATOR', 'EVACUATE UPWIND', 'IDLH EXCEEDED'] : hit === 'cob' || hit === 'daddy' ? ['HARVESTED', 'SHUCKED', 'EATEN ALIVE', 'CORNED', 'DON\'T GO IN THE CORN'] : ['FIRED', 'YOU HAVE BEEN LET GO', 'LAME!', 'INCIDENT REPORT FILED', 'OSHA HAS BEEN NOTIFIED', 'RECORDABLE INJURY'];
+    const msg = hit === 'pond' ? 'Squeeg waded into the retention pond. Toxic water!' : hit === 'train' ? 'Squeeg got run over by the train.' : hit === 'fall' ? 'Fell too far.' : hit === 'paint' ? 'Squeeg got tagged by the other player!' : hit === 'mower' ? 'Squeeg got mowed down by the other player!' : hit === 'ammonia' ? 'Squeeg breathed in anhydrous ammonia. Stay upwind of a leak and shut that valve!' : hit === 'acid' ? 'Squeeg walked through sulfuric acid. Stay out of the containment when it leaks!' : hit === 'cob' ? 'Squeeg got eaten by the cob stalkers. Stay out of the north corn, or throw them an ear of corn.' : hit === 'nibbler' ? 'Squeeg got nibbled to death by the nibblers. They are slower than you: run!' : hit === 'daddy' ? 'Daddy Cob Legs got Squeeg.' : 'Squeeg got run over by a semi.';
+    { const f = $('fired'); const caps = hit === 'pond' ? ['POISONED', 'SLIMED OUT', 'MELTED', 'DISSOLVED', 'MUTATED'] : hit === 'acid' ? ['ACID BATH', 'BOOTS DISSOLVED', 'CHEMICAL BURN', 'READ THE SDS', 'SHOULD HAVE WORN RUBBER BOOTS'] : hit === 'ammonia' ? ['GASSED', 'LUNGS SEARED', 'NH3 EXPOSURE', 'SHOULD HAVE WORN A RESPIRATOR', 'EVACUATE UPWIND', 'IDLH EXCEEDED'] : hit === 'cob' || hit === 'daddy' || hit === 'nibbler' ? ['HARVESTED', 'SHUCKED', 'EATEN ALIVE', 'CORNED', 'DON\'T GO IN THE CORN'] : ['FIRED', 'YOU HAVE BEEN LET GO', 'LAME!', 'INCIDENT REPORT FILED', 'OSHA HAS BEEN NOTIFIED', 'RECORDABLE INJURY'];
       f.textContent = caps[Math.random() * caps.length | 0]; f.classList.toggle('slime', hit === 'pond'); f.classList.toggle('gas', hit === 'ammonia'); setTimeout(() => f.classList.add('on'), 1300); setTimeout(() => f.classList.remove('on'), 4300); }   // GTA-style "WASTED"
     setTimeout(() => { $('squish').classList.add('on'); }, 4200);
     setTimeout(() => { document.body.classList.remove('dead'); P3.deathEnd(); deathT = 0; $('squish').classList.remove('on'); toast(msg); }, 4900);

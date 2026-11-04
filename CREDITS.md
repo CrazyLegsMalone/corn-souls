@@ -29,6 +29,7 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 
 - **"Turkey Vulture rig"** - made by the project owner, the model generated with ChatGPT and exported as a GLB; not obtained from a third-party marketplace. The buzzard that perches on the RTO stack (`assets/models/vulture_rig.glb`). Registered in [assets/registry.json](assets/registry.json).
 - **"Cob Stalker"** and **"Daddy Cob Legs"** - models provided by the project owner (exported as GLBs with THREE.GLTFExporter); not obtained from a third-party marketplace. The north corn field's creatures (`assets/models/cob_stalker.glb`, `assets/models/daddy_cob_legs.glb`). Registered in [assets/registry.json](assets/registry.json).
+- **Nibbler sprites (20 faces)** - provided by the project owner; not obtained from a third-party marketplace. The nibblers that burst out of dead cob stalkers (`assets/textures/nibbler/`). Registered in [assets/registry.json](assets/registry.json).
 - **PSX paintball impact decals (blue, lime, orange, pink)** - provided by the project owner; not obtained from a third-party marketplace. The paintball splats (`assets/textures/paintball/`). Registered in [assets/registry.json](assets/registry.json).
 - **Industrial motor pumps (small and large, teal)** - models provided by the project owner; not obtained from a third-party marketplace. The fermenter recirculation pumps and the beer well pump (`assets/models/small_teal_motor_pump.glb`, `assets/models/large_teal_motor_pump.glb`). Registered in [assets/registry.json](assets/registry.json).
 

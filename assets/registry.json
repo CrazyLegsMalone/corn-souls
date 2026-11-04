@@ -626,6 +626,42 @@
       "checked_on": "2026-11-04",
       "reviewer": "Owner",
       "evidence": "Added by the owner's request in the TEST channel (v1.97.118): use these for paintball splatter and match the paintball colours in flight and in the magazine."
+    },
+    {
+      "id": "first-party-nibbler-sprites",
+      "title": "Nibbler sprites (20 faces, 40 px)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided PNGs (nibbler-sprites.zip)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/textures/nibbler",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "None to the files. Drawn as camera-facing sprites (0.62 m, crisp nearest pixels), the face chosen from what each nibbler is doing.",
+      "files": [
+        "assets/textures/nibbler/nibbler-01-wicked-grin.png",
+        "assets/textures/nibbler/nibbler-02-happy.png",
+        "assets/textures/nibbler/nibbler-03-smug.png",
+        "assets/textures/nibbler/nibbler-04-sneaky.png",
+        "assets/textures/nibbler/nibbler-05-gleeful.png",
+        "assets/textures/nibbler/nibbler-06-sad.png",
+        "assets/textures/nibbler/nibbler-07-crying.png",
+        "assets/textures/nibbler/nibbler-08-terrified.png",
+        "assets/textures/nibbler/nibbler-09-confused.png",
+        "assets/textures/nibbler/nibbler-10-shocked.png",
+        "assets/textures/nibbler/nibbler-11-angry.png",
+        "assets/textures/nibbler/nibbler-12-enraged.png",
+        "assets/textures/nibbler/nibbler-13-foaming.png",
+        "assets/textures/nibbler/nibbler-14-asleep.png",
+        "assets/textures/nibbler/nibbler-15-dazed.png",
+        "assets/textures/nibbler/nibbler-16-hurt.png",
+        "assets/textures/nibbler/nibbler-17-taking-damage.png",
+        "assets/textures/nibbler/nibbler-18-exhausted.png",
+        "assets/textures/nibbler/nibbler-19-unconscious.png",
+        "assets/textures/nibbler/nibbler-20-dead.png"
+      ],
+      "checked_on": "2026-11-04",
+      "reviewer": "Owner",
+      "evidence": "Added by the owner's request in the TEST channel (v1.97.121): nibblers that spawn from dead cob stalkers, 20 faces, 2D sprites that always face you."
     }
   ]
 }
