@@ -1,3 +1,26 @@
+## TEST v1.97.131 — the "Cry & Dry" title screen (2026-11-04)
+- Owner pasted a Gemini "Claude Prompt Blueprint" for a *CORN SOULS: CRY & DRY* title screen (Abyssal Harvest Fire: a PS1 cob bonfire in a dark silo, left-aligned gothic title and menu, PRESS ANY KEY then a flash into the menu, a tuner with 6 toggles and 5 sliders, silhouettes, embers, CRT), then: *"when your done with this. add it to test"*.
+- Built first as a standalone page (sent to the owner), then **ported into the game's own splash** rather than bolted on beside it: the blueprint's Tailwind / three r128 / Tone.js are not loaded. The scene uses the game's bundled three (r170; light intensities scaled for physical units), the CSS is hand-written and scoped under `#splash`, and the existing WebAudio title music (drone, bells, crackle) and the boom stay.
+- **Scene** (`title3D(T)` inside the splash script): procedural canvas textures only, rendered at a low internal resolution and scaled up with `image-rendering: pixelated` (the PS1 look). A silo interior, ash bed, cob-pile bonfire with three flame rings that flicker, soul embers rising, the Daddy Cob Legs and pump silhouettes, and a camera that drifts with the mouse. It waits for `window.THREE`, and `stop()` cancels its frame loop, removes its listeners, disposes geometry, materials and textures, and forces the WebGL context loss 1.3 s after the splash fades.
+- **Menu**: themed names on the **same actions**: NEW HARVEST = 1 player, KINDLE A BONFIRE = 2P host, JOIN A BONFIRE = 2P join (the code box is unchanged), RITES & CONTROLS = the controls card. Keyboard, mouse, touch and controller navigation are unchanged, and the launcher anchors (`spVer`, `musicPlay`) still match.
+- **PRESS ANY KEY** (TAP TO BEGIN on touch) leads to a radial ember flash, a short screen shake, and the fire flaring up as the menu slides in.
+- **Tuner** (top right, folded by default): 3D PS1 Bonfire, Silhouettes, Soul Embers, PS1 Pixelation, CRT Scanlines and Audio (mutes the title music); Flame Intensity, Flame Color Hue (also tints the accent text and toggles), Cobfire Size, Pos X and Pos Z. It is saved per device in `localStorage.cs_title` (guarded), with RESTORE DEFAULTS. Keys typed or taps made in the tuner never start the game.
+- **Layout**: on landscape the title and menu sit on the left third with a dark lean; on portrait (aspect under 4:5) the fire sits on top and the menu below. It respects `prefers-reduced-motion`. The fonts are Cinzel and Cormorant Garamond from Google Fonts, falling back to Georgia offline.
+- **Two collisions caught in testing**:
+  - The game's global `.tb` (touch buttons: `display:none`, fixed) hid the tuner body, so it is now `.tbd`.
+  - The global `.reset` restyled the reset button, so it is now `.rst`.
+  - A mid-line `//` comment in `go()` briefly swallowed the body-class removal; it is fixed and now covered by a test.
+- New suite `test/validate-title.cjs` (added to CI) checks:
+  - the menu's six actions and the themed order;
+  - the 6 toggles and 5 sliders with defaults;
+  - guarded storage;
+  - the tuner guards on key, pointerdown and click;
+  - 3D start, flare and teardown;
+  - that every statement in `go()`'s line is live;
+  - that no splash class has a global game style.
+- Verified headless in the game at 1280x720 and 390x844: title, then menu with the flash, a hue change to 200, then the tuner opened with all 11 controls, then RESTORE DEFAULTS, then Enter. The splash leaves and the game is walking.
+- Bumped TEST to `1.97.131` / `corn-souls-test-shell-v158`.
+
 ## TEST v1.97.130 — a grain pile to jump the Ranger over the train (2026-11-04)
 - Owner (overhead screenshot with a box drawn north of the north corn field's west end, beside the rail loop): *"add a grain pile here. i want to be able to ramp the ranger on it to jump over the train"*.
 - **Where:** the box maps to x -210..-165, z -260..-355 in world space (my own top-down render with a 100 m grid, matched to the owner's view, which has north to the right). The rail loop runs north-south there along x -240, bending west north of z -296 (x ~ -243 at z -305, probed in the running game; a parked train sits on exactly this stretch). Nothing else tall in the area.
