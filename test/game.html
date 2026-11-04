@@ -11866,6 +11866,37 @@ function rangerSkinQueue(g, o, color) {
     for (const q of RANGER_GLB.wait.splice(0)) rangerSkinSafe(q);
   }, 'ranger');
 }
+// ---------- RANGER TYRES (v1.97.116, owner: "fix wheels"): the model's wheel is a 10-sided block with its tread texture wrapped
+// onto the sides too, so it read as a box of tread lugs with no wheel. Each wheel node gets a rounder tyre the same size (r 0.33,
+// 0.22 wide, axle along x so it spins and steers exactly as before): knobby tread round the outside, plain dark rubber sidewalls,
+// and on both faces a grey steel rim with a hub and five lug nuts. One geometry and set of materials shared by every Ranger.
+let RANGER_TIRE = null, RANGER_TIRE_HIDE = null;
+function rangerTire() {
+  if (RANGER_TIRE) return RANGER_TIRE;
+  let map = null;   // (no canvas outside a browser: plain rubber then)
+  if (typeof document !== 'undefined') { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 32; const c = cv.getContext('2d');
+    c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, 256, 32);
+    c.fillStyle = '#363636'; for (let i = 0; i < 16; i++) { const x = i * 16; c.beginPath(); c.moveTo(x + 2, 3); c.lineTo(x + 9, 3); c.lineTo(x + 14, 16); c.lineTo(x + 9, 29); c.lineTo(x + 2, 29); c.lineTo(x + 7, 16); c.closePath(); c.fill(); }   // chevron lugs
+    map = srgbTex(new T.CanvasTexture(cv)); }
+  const tread = new T.MeshLambertMaterial(map ? { map } : { color: 0x1d1d1d }), side = new T.MeshLambertMaterial({ color: 0x202020 });
+  const geo = new T.CylinderGeometry(0.33, 0.33, 0.22, 24, 1, true).rotateZ(Math.PI / 2);   // the tread band (open ends)
+  const sideG = new T.CircleGeometry(0.33, 24).rotateY(Math.PI / 2);   // a sidewall disc, facing +x (one material per mesh: lighting and damage code expect that)
+  const rim = new T.MeshLambertMaterial({ color: 0x8d9399 }), hub = new T.MeshLambertMaterial({ color: 0x3a3e43 });
+  const rimG = new T.CylinderGeometry(0.19, 0.19, 0.02, 18).rotateZ(Math.PI / 2), hubG = new T.CylinderGeometry(0.06, 0.06, 0.03, 10).rotateZ(Math.PI / 2), nutG = new T.CylinderGeometry(0.014, 0.014, 0.03, 6).rotateZ(Math.PI / 2);
+  return RANGER_TIRE = { geo, tread, sideG, side, rim, hub, rimG, hubG, nutG };
+}
+function rangerTireOn(w) {
+  const TT = rangerTire(), tyre = new T.Mesh(TT.geo, TT.tread); tyre.castShadow = true; tyre.name = 'tyre';
+  w.traverse(c => { if (c.isMesh) c.visible = false; });   // the model's own wheel mesh (kept, hidden)
+  if (w.isMesh) { w.visible = true; w.material = RANGER_TIRE_HIDE || (RANGER_TIRE_HIDE = new T.MeshBasicMaterial({ visible: false })); }   // (a mesh node: its children must still draw)
+  w.add(tyre);
+  for (const s of [-1, 1]) {   // a sidewall and a rim on each face, the rim standing 5 mm off the sidewall
+    const sd = new T.Mesh(TT.sideG, TT.side); sd.position.x = s * 0.11; if (s < 0) sd.rotation.y = Math.PI; w.add(sd);
+    const rm = new T.Mesh(TT.rimG, TT.rim); rm.position.x = s * 0.115; w.add(rm);
+    const hb = new T.Mesh(TT.hubG, TT.hub); hb.position.x = s * 0.125; w.add(hb);
+    for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5, n = new T.Mesh(TT.nutG, TT.hub); n.position.set(s * 0.125, Math.cos(a) * 0.11, Math.sin(a) * 0.11); w.add(n); }
+  }
+}
 function rangerSkinSafe(g) { try { rangerSkin(g); } catch (e) { console.warn('[ranger] model swap failed, the box Ranger stays:', e && e.message); } }
 function rangerSkin(g) {
   if (g.userData.skinned || !RANGER_GLB.root) return;
@@ -11892,6 +11923,7 @@ function rangerSkin(g) {
   for (const [n, front] of RANGER_WHEELS) {
     const w = by['wheel_' + n], pv = new T.Group();
     pv.position.copy(w.position); w.parent.add(pv); w.position.set(0, 0, 0); pv.add(w);
+    rangerTireOn(w);   // v1.97.116: a real tyre and rim in place of the model's 10-sided tread block
     w.traverse(c => { if (c.isMesh) c.userData.wheel = true; });   // a burnt-out Ranger keeps its tyres
     const sh = by['shock_' + n] || null;
     W.push({ pv, w, front: !!front, shock: sh, L0: 0.3138, x0: pv.position.x, y0: pv.position.y, z0: pv.position.z });

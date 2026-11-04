@@ -1,3 +1,9 @@
+## TEST v1.97.116 — the Ranger's wheels are real tyres with rims (2026-11-04)
+- Owner (screenshot of the Ranger's wheels at night): *"fix wheels"*.
+- **Cause:** the model's wheel (`wheel_L_mesh` / `wheel_R_mesh`) is a 10-sided block with the tread texture wrapped onto its sides as well, so each wheel read as a box of tread lugs with no rim.
+- **Fix** (`RANGER TYRES`, `rangerTireOn` from `rangerSkin`): each wheel node gets a 24-sided tyre the same size (r 0.33, 0.22 wide, axle along x, so it spins, steers and rides the springs exactly as before) with knobby chevron tread round the outside and plain dark rubber sidewall discs (one material per mesh, as the lighting and damage code expect), and on both faces a grey steel rim with a dark hub and five lug nuts. The model's own wheel mesh is kept but hidden. One geometry and set of materials shared by every Ranger (yours, the other player's); a burnt-out Ranger keeps them. Checked with a close-up screenshot.
+- `validate-ranger.cjs` checks the new tyres.
+
 ## TEST v1.97.115 — office door frames no longer flicker (2026-11-04)
 - Owner (screenshot of a doorway in the scale house office hallway, the inside face of the frame speckled): *"fix this in office"*.
 - **Cause:** z-fighting. The office `wall()` helper put each dark door jamb with its inside face exactly on the cut end of the wall beside the doorway (and the head's underside exactly on the underside of the wall above the door), so two surfaces drew at the same depth and flickered as you moved.

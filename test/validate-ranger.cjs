@@ -177,4 +177,8 @@ assert.ok(html.includes('if (fN < u.y - 0.8 && fN <= -5)') && !html.includes('fN
 assert.ok(html.includes('utv.vy = 0; utv.air = false;') && html.includes('bailing out mid-jump'), 'getting in resets the jump state; bailing out mid-air drops the vehicle to the ground');
 assert.ok(html.includes('if (o.air) { tP = o.sP - 0.02;') && html.includes('if (o.land) {'), 'the springs let the wheels hang in the air and take the landing');
 assert.ok(html.includes('if (Q.air && !air) Q.land = 4; Q.air = air;'), "the other player's jumps show their wheels hanging and the landing too");
+// v1.97.116: a real tyre and rim on every wheel (the model's 10-sided wheel had its tread texture on the sides too)
+assert.ok(html.includes('rangerTireOn(w);   // v1.97.116') && html.includes("new T.CylinderGeometry(0.33, 0.33, 0.22, 24, 1, true).rotateZ(Math.PI / 2)"), 'each wheel node gets a 24-sided tyre the same size as the model\'s (r 0.33, 0.22 wide), axle along x');
+assert.ok(html.includes('return RANGER_TIRE = { geo, tread, sideG, side, rim, hub, rimG, hubG, nutG };'), 'tread round the outside, plain sidewalls, a rim, hub and lug nuts');
+assert.ok(html.indexOf('rangerTireOn(w);') < html.indexOf("w.traverse(c => { if (c.isMesh) c.userData.wheel = true; });   // a burnt-out Ranger keeps its tyres"), 'added before the wheels are marked, so a burnt-out Ranger keeps these tyres too');
 console.log('validate-ranger: OK (' + tris + ' triangles, air + ' + 4 + ' dirt hills)');
