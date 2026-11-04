@@ -8078,7 +8078,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); buildDirtHills(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
+  buildBillboards(); buildDirtHills(); buildGrainPiles(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
@@ -12200,6 +12200,53 @@ function buildDirtHills() {
     g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
     g.computeVertexNormals();   // unindexed, so every face keeps its own flat normal
     const o = new T.Mesh(g, m); o.castShadow = true; o.receiveShadow = true; o.material.side = T.DoubleSide; o.name = 'dirtHill'; scene.add(o);
+  }
+}
+// ---------- GRAIN PILE JUMP (v1.97.130, owner, on the overhead map: "add a grain pile here. i want to be able to ramp the ranger
+// on it to jump over the train"): north of the north corn field's west end, where the rail loop runs north-south (track centre
+// x ~ -243 at z -305). You come at it from the open grass to the east, driving west:
+//  takeoff pile (x -232..-213)  - corn up at grain's natural slope (0.42, 23 degrees) to a 4.6 m crest at x -224 (19 m from the
+//                                 track), then the drop on the track side: the Ranger leaves the ground over the crest. 40 mph
+//                                 (18 m/s) or more clears a hopper car (5.1 m) on the track; flat out it goes ~10 m up.
+//  landing spill (x -311..-249) - the far side of the track: a 4.5 m bank 6 m past the track, nearly flat for 14 m, then falling
+//                                 west for 45 m, shaped against the jump arcs so 40-54 mph lands on a slope with no damage
+//                                 (flat out, a little; come up short of it and you hit its face).
+// Each is a profile of [x, height] points from east to west (a slope between two is a WALK_SURF ramp along x, two at the same x
+// a sheer face) with walls on its sides that only block below the top, like the dirt hills. Drawn in corn: kernel texture.
+const GRAIN_PILES = [
+  { z0: -313, z1: -297, p: [[-213, 0], [-224, 4.6], [-232, 1.2], [-232, 0]] },   // (a sharp crest: on a flat top the Ranger's climb would level off before the lip)
+  { z0: -314, z1: -296, p: [[-249, 0], [-252, 4.5], [-266, 4.2], [-286, 2.2], [-311, 0]] }   // (shaped against the jump arcs: 40-54 mph land on it unhurt)
+];
+function grainTex() {
+  if (typeof document === 'undefined') return null;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
+  c.fillStyle = '#d9a52c'; c.fillRect(0, 0, 64, 64);
+  let s = 7; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++) { const x = rnd() * 64, y = rnd() * 64, k = rnd(); c.fillStyle = k < 0.45 ? '#f2c94c' : k < 0.75 ? '#c2871c' : k < 0.92 ? '#f7dd84' : '#9c6a14';
+    c.beginPath(); c.ellipse(x, y, 1.6 + rnd() * 1.2, 1.1 + rnd() * 0.8, rnd() * 3.14, 0, 6.28); c.fill(); }   // kernels
+  const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(1 / 1.5, 1 / 1.5); return srgbTex(t);
+}
+function buildGrainPiles() {
+  const tx = grainTex(), m = new T.MeshLambertMaterial(tx ? { map: tx } : { color: 0xd9a52c }); m.side = T.DoubleSide;
+  for (const H of GRAIN_PILES) {
+    const pos = [], uv = [], q = (a, b, c, d, ua, ub, uc, ud) => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); uv.push(...ua, ...ub, ...uc, ...ua, ...uc, ...ud); };
+    const { z0, z1, p } = H;
+    for (let i = 0; i < p.length - 1; i++) {
+      const [xa, ya] = p[i], [xb, yb] = p[i + 1];
+      if (xa === xb) {   // sheer face (facing west, the way you drive off it)
+        const y = Math.max(ya, yb); q([xa, 0, z1], [xa, 0, z0], [xa, y, z0], [xa, y, z1], [z1, 0], [z0, 0], [z0, y], [z1, y]);
+        if (y > 0.6) wallSegs.push([xa, z0, xa, z1, -0.5, y]);
+        continue;
+      }
+      const xl = Math.min(xa, xb), xh = Math.max(xa, xb), yl = xa < xb ? ya : yb, yh = xa < xb ? yb : ya;
+      WALK_SURF.push({ x0: xl, x1: xh, z0, z1, y0: yl, y1: yh, ax: 'x' });
+      q([xa, ya, z0], [xb, yb, z0], [xb, yb, z1], [xa, ya, z1], [xa, z0], [xb, z0], [xb, z1], [xa, z1]);                          // top
+      q([xa, 0, z0], [xa, ya, z0], [xb, yb, z0], [xb, 0, z0], [xa, 0], [xa, ya], [xb, yb], [xb, 0]);                              // north side
+      q([xb, 0, z1], [xb, yb, z1], [xa, ya, z1], [xa, 0, z1], [xb, 0], [xb, yb], [xa, ya], [xa, 0]);                              // south side
+      const lo = Math.min(ya, yb); if (lo > 0.6) for (const z of [z0, z1]) wallSegs.push([xa, z, xb, z, -0.5, lo]);
+    }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.computeVertexNormals();
+    const o = new T.Mesh(geo, m); o.castShadow = true; o.receiveShadow = true; o.name = 'grainPile'; scene.add(o);
   }
 }
 // ---------- AIR (owner, v1.97.94: "we can get air on hills?"): the driven vehicle carries vertical speed. On the ground it

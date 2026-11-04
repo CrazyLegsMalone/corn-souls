@@ -28,7 +28,7 @@ assert.ok(!html.includes('function applyInteriorDark(') && !html.includes('dimme
 assert.ok(html.includes('scene = new T.Scene(); lightInstall();'), 'the shader patch is installed before anything compiles');
 assert.ok(!/new T\.SpotLight\(/.test(html.slice(html.indexOf('function init('), html.indexOf('function init(') + 8000)) && html.includes("headlamp = { intensity: 0, color: new T.Color(0xfff1d6) };"),
   'the headlamp is no longer a three.js SpotLight (that put a light loop on every pixel in the game)');
-assert.ok(html.includes('buildBillboards(); buildDirtHills(); lightBuild(); ribAll(); mergeStatic();'), 'lamps are collected before the static merge folds their meshes away');
+assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles(); lightBuild(); ribAll(); mergeStatic();'), 'lamps are collected before the static merge folds their meshes away');
 { const i = html.indexOf("stepSafe('lighting', () => lightUpdate(dt));"), j = html.indexOf('renderer.render(scene, camera);', i);
   assert.ok(i > 0 && j > i && j - i < 300, 'the lighting is updated every frame, after the camera and right before the render'); }
 assert.ok(html.includes('CSU.csG.value.w = 1; renderer.render(hudScene, hudCam); CSU.csG.value.w = 0;'), 'the first-person HUD pass bypasses the world lighting');
