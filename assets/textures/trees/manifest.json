@@ -1,0 +1,953 @@
+{
+  "frame_size_px": [
+    64,
+    64
+  ],
+  "anchor_px_from_top_left": [
+    32,
+    62
+  ],
+  "angle_convention": "0 = front; 90 = right; 180 = back; 270 = left",
+  "trees": [
+    {
+      "id": "01-broadleaf",
+      "atlas": "atlases/01-broadleaf-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/01-broadleaf/01-broadleaf-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/01-broadleaf/01-broadleaf-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/01-broadleaf/01-broadleaf-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/01-broadleaf/01-broadleaf-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/01-broadleaf/01-broadleaf-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/01-broadleaf/01-broadleaf-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/01-broadleaf/01-broadleaf-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/01-broadleaf/01-broadleaf-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02-leaning-pine",
+      "atlas": "atlases/02-leaning-pine-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/02-leaning-pine/02-leaning-pine-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03-silver-birch",
+      "atlas": "atlases/03-silver-birch-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/03-silver-birch/03-silver-birch-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/03-silver-birch/03-silver-birch-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/03-silver-birch/03-silver-birch-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/03-silver-birch/03-silver-birch-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/03-silver-birch/03-silver-birch-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/03-silver-birch/03-silver-birch-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/03-silver-birch/03-silver-birch-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/03-silver-birch/03-silver-birch-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04-weeping-willow",
+      "atlas": "atlases/04-weeping-willow-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/04-weeping-willow/04-weeping-willow-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "05-red-maple",
+      "atlas": "atlases/05-red-maple-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/05-red-maple/05-red-maple-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/05-red-maple/05-red-maple-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/05-red-maple/05-red-maple-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/05-red-maple/05-red-maple-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/05-red-maple/05-red-maple-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/05-red-maple/05-red-maple-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/05-red-maple/05-red-maple-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/05-red-maple/05-red-maple-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "06-dead-snag",
+      "atlas": "atlases/06-dead-snag-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/06-dead-snag/06-dead-snag-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/06-dead-snag/06-dead-snag-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/06-dead-snag/06-dead-snag-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/06-dead-snag/06-dead-snag-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/06-dead-snag/06-dead-snag-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/06-dead-snag/06-dead-snag-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/06-dead-snag/06-dead-snag-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/06-dead-snag/06-dead-snag-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "07-fan-palm",
+      "atlas": "atlases/07-fan-palm-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/07-fan-palm/07-fan-palm-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/07-fan-palm/07-fan-palm-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/07-fan-palm/07-fan-palm-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/07-fan-palm/07-fan-palm-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/07-fan-palm/07-fan-palm-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/07-fan-palm/07-fan-palm-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/07-fan-palm/07-fan-palm-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/07-fan-palm/07-fan-palm-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "08-cypress",
+      "atlas": "atlases/08-cypress-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/08-cypress/08-cypress-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/08-cypress/08-cypress-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/08-cypress/08-cypress-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/08-cypress/08-cypress-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/08-cypress/08-cypress-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/08-cypress/08-cypress-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/08-cypress/08-cypress-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/08-cypress/08-cypress-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "09-flowering-cherry",
+      "atlas": "atlases/09-flowering-cherry-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/09-flowering-cherry/09-flowering-cherry-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10-acacia",
+      "atlas": "atlases/10-acacia-atlas.png",
+      "frames": [
+        {
+          "angle_degrees": 0,
+          "view": "front",
+          "file": "sprites/10-acacia/10-acacia-000-front.png",
+          "atlas_rect_px": [
+            0,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 45,
+          "view": "front-right",
+          "file": "sprites/10-acacia/10-acacia-045-front-right.png",
+          "atlas_rect_px": [
+            64,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 90,
+          "view": "right",
+          "file": "sprites/10-acacia/10-acacia-090-right.png",
+          "atlas_rect_px": [
+            128,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 135,
+          "view": "back-right",
+          "file": "sprites/10-acacia/10-acacia-135-back-right.png",
+          "atlas_rect_px": [
+            192,
+            0,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 180,
+          "view": "back",
+          "file": "sprites/10-acacia/10-acacia-180-back.png",
+          "atlas_rect_px": [
+            0,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 225,
+          "view": "back-left",
+          "file": "sprites/10-acacia/10-acacia-225-back-left.png",
+          "atlas_rect_px": [
+            64,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 270,
+          "view": "left",
+          "file": "sprites/10-acacia/10-acacia-270-left.png",
+          "atlas_rect_px": [
+            128,
+            64,
+            64,
+            64
+          ]
+        },
+        {
+          "angle_degrees": 315,
+          "view": "front-left",
+          "file": "sprites/10-acacia/10-acacia-315-front-left.png",
+          "atlas_rect_px": [
+            192,
+            64,
+            64,
+            64
+          ]
+        }
+      ]
+    }
+  ]
+}

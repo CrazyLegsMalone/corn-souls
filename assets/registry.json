@@ -665,6 +665,33 @@
       "checked_on": "2026-11-04",
       "reviewer": "Owner",
       "evidence": "Added by the owner's request in the TEST channel (v1.97.121): nibblers that spawn from dead cob stalkers, 20 faces, 2D sprites that always face you."
+    },
+    {
+      "id": "first-party-psx-tree-sprites",
+      "title": "PSX tree sprites (10 species x 8 views, 64 px, plus 4x2 atlases)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided PNGs (tree_sprites_ten_8view.zip, Kernel Art/2D)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/textures/trees",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "None to the files. Drawn as 8 m square camera-facing cards with the pack's ground anchor (32, 62) on the ground, crisp nearest pixels, and the frame picked from the nearest 45 degrees of viewing angle. A proof of concept so far: 8 of the 56 scenery trees use the pack, the rest keep the code-painted spruce until the owner has looked.",
+      "files": [
+        "assets/textures/trees/01-broadleaf-atlas.png",
+        "assets/textures/trees/02-leaning-pine-atlas.png",
+        "assets/textures/trees/03-silver-birch-atlas.png",
+        "assets/textures/trees/04-weeping-willow-atlas.png",
+        "assets/textures/trees/05-red-maple-atlas.png",
+        "assets/textures/trees/06-dead-snag-atlas.png",
+        "assets/textures/trees/07-fan-palm-atlas.png",
+        "assets/textures/trees/08-cypress-atlas.png",
+        "assets/textures/trees/09-flowering-cherry-atlas.png",
+        "assets/textures/trees/10-acacia-atlas.png",
+        "assets/textures/trees/manifest.json"
+      ],
+      "checked_on": "2026-11-04",
+      "reviewer": "Owner",
+      "evidence": "Added by the owner's request in the TEST channel (v1.97.126): PSX tree cards for the scenery trees, 8 views per species."
     }
   ]
 }

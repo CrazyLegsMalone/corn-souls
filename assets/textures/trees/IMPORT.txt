@@ -1,0 +1,7 @@
+PSX tree pack
+
+80 individual RGBA PNGs, plus 10 atlases (4 columns by 2 rows).
+Frames are 64 x 64 pixels, with a ground anchor at x=32, y=62 from the top left.
+Angle order: front, front-right, right, back-right, back, back-left, left, front-left.
+Use nearest-neighbor filtering. Select the nearest 45-degree frame to the viewing angle.
+manifest.json maps all filenames and atlas rectangles.

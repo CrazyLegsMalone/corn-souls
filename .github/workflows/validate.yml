@@ -61,7 +61,7 @@ jobs:
                    validate-gun-magazine.cjs validate-frame-stability.cjs \
                    validate-ranger.cjs validate-water.cjs validate-pivot.cjs \
                    validate-game-clock.cjs validate-vehicle-cabins.cjs \
-                   validate-corn-creatures.cjs validate-two-player.cjs validate-corn-sync.cjs validate-critter-sync.cjs validate-critter-powers.cjs validate-siding.cjs validate-doors.cjs validate-nibblers.cjs; do
+                   validate-corn-creatures.cjs validate-two-player.cjs validate-corn-sync.cjs validate-critter-sync.cjs validate-critter-powers.cjs validate-siding.cjs validate-doors.cjs validate-nibblers.cjs validate-trees.cjs; do
             if node "$f"; then echo "::notice::PASS test/$f"; else echo "::warning::FAIL test/$f"; fail=1; fi
           done
           exit $fail
