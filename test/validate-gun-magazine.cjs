@@ -53,4 +53,14 @@ ctx.balls.forEach(b => { b.visible = true; });
 api.setRounds('water', 0);
 assert.equal(shown(), '111111', 'repeating the same call returns immediately instead of repainting the slit');
 
-console.log("PASS: the magazine feeds from the gun end - slot 0 (nearest the receiver) leaves first, the water level recedes from the same end, and the repeat guard still holds");
+// ---------------------------------------------------------------- v1.97.118: the colour you see is the colour that flies
+assert.ok(html.includes('const PAINT = [0x2389bc, 0xa6d227, 0xf57c1a, 0xe54189];'), "the owner's decal colours: blue, lime, orange, pink");
+assert.ok(html.includes('const slot = MAG - mags[ammo];   // the round leaving') && html.includes('const c = PAINT[slot % PAINT.length], m = new T.Mesh(ballGeo, ballMat(c));'), 'a shot takes the colour of the round leaving the magazine');
+{ const PAINT = [1, 2, 3, 4], MAG = 6, slotCol = i => PAINT[i % PAINT.length];   // the magazine paints slot i with M.paint[i % PAINT.length]
+  const fired = []; let n = MAG; while (n > 0) { const slot = MAG - n; fired.push(PAINT[slot % PAINT.length]); n--;
+    api.setRounds('paint', n); const nearest = ctx.balls.findIndex(b => b.visible); if (n) assert.equal(slotCol(nearest), PAINT[(MAG - n) % 4], 'the next round showing nearest the gun is the next colour to fly'); }
+  assert.deepEqual(fired, [1, 2, 3, 4, 1, 2], 'a full magazine fires its six rounds in the order they sit, gun end first'); }
+assert.ok(html.includes("const t = new T.TextureLoader().load('/corn-souls/assets/textures/paintball/' + key + '.png'); t.magFilter = T.NearestFilter;"), "splats use the owner's PSX decals, crisp pixels");
+assert.ok(html.includes('const dm = decalMat(c), s = dm ? new T.Mesh(decalGeo(), dm) : new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c));'), 'one decal per hit in the ball colour (any other colour still gets a cut-out splat)');
+{ const fs2 = require('fs'), path = require('path'); for (const c of ['blue', 'lime', 'orange', 'pink']) for (let k = 1; k <= 5; k++) assert.ok(fs2.existsSync(path.join(__dirname, '..', 'assets', 'textures', 'paintball', c + '-impact-0' + k + '.png')), 'decal file ' + c + ' ' + k); }
+console.log("PASS: the magazine feeds from the gun end - slot 0 (nearest the receiver) leaves first, the water level recedes from the same end, and the repeat guard still holds; shots fly in the colour of the round leaving; the owner's decals for splats");

@@ -12420,7 +12420,8 @@ function setPanel(px) { panelPx = px; resize(); }
 // ---------- PIGEONS + PAINTBALL GUN (Squeeg mode) ----------
 // 3 pigeons perch on roofs, tank tops and the ground; they flap off to a new spot when you walk up or a ball lands near them.
 // The paintball gun is always out in Squeeg mode; balls come in 4 colors, missed shots leave splats (capped), hits drop the bird and a new one shows up later.
-const PAINT = [0xff3b3b, 0x2f7bff, 0xffd21f, 0x34d058];
+const PAINT = [0x2389bc, 0xa6d227, 0xf57c1a, 0xe54189];   // v1.97.118: the owner's PSX paintball decal colours (blue, lime, orange, pink)
+const PAINT_NAME = ['blue', 'lime', 'orange', 'pink'];   // their decal files: assets/textures/paintball/<name>-impact-0<1-5>.png
 let birds = null, perches = null, solids = [], solidsT = 99, pigeonHits = 0, gun = null, gunKick = 0, ballGeo = null, splatGeos = null;
 const balls = [], splats = [], paintMats = {}, ballMats = {};
 const tv = new T.Vector3(), tv2 = new T.Vector3(), DOWN = new T.Vector3(0, -1, 0);
@@ -13306,6 +13307,7 @@ function fire() {
   if (!gun) gun = makeGun();
   if (pumpT > 0 || reloadT > 0) return true;                     // still racking the pump / changing the magazine
   if (mags[ammo] <= 0) { gunClick(380, 0.05, 0.05); startReload(ammo, true); return true; }   // empty: dry click, then a fresh magazine
+  const slot = MAG - mags[ammo];   // the round leaving: the one nearest the gun (slot 0 of a full magazine)
   mags[ammo]--; idleT = 0; pumpT = 1;
   if (ammo === 'water') { wash.t = 0.45; gunKick = 0.45; return true; }   // one shot of water = a short blast from the barrel
   if (!ballGeo) ballGeo = new T.SphereGeometry(0.07, 8, 6);
@@ -13316,12 +13318,26 @@ function fire() {
   const h = ray.intersectObjects(solids, false)[0]; ray.far = Infinity;
   const target = camera.position.clone().addScaledVector(dir, h ? Math.max(2, h.distance) : 60);   // balls converge where the crosshair points
   const muzzle = gunWorld(0, 0.016, -0.67);
-  const c = PAINT[Math.random() * 4 | 0], m = new T.Mesh(ballGeo, ballMat(c));
+  const c = PAINT[slot % PAINT.length], m = new T.Mesh(ballGeo, ballMat(c));   // the colour you see in the magazine is the colour that flies (v1.97.118)
   m.userData.noHit = true; m.position.copy(muzzle); scene.add(m);
   gunPop();
   const bv = target.sub(muzzle).normalize().multiplyScalar(65); balls.push({ m, v: bv, c, life: 0 });
   netSend({ t: 'shot', p: [muzzle.x, muzzle.y, muzzle.z], v: [bv.x, bv.y, bv.z], c });
   gunKick = 1; return true;
+}
+// ---------- PAINTBALL DECALS (v1.97.118): the owner's PSX splats, 32 px, five shapes in each paint colour. One material per
+// colour and shape, loaded the first time it is needed; crisp pixels (no smoothing) for the PS1 look, cut out on alpha so no
+// sorting, lit like the paint they replace (dark at night), and pushed toward the camera so they never flicker on the wall.
+const DECALS = { mats: {}, geo: null };
+function decalGeo() { return DECALS.geo || (DECALS.geo = new T.PlaneGeometry(0.75, 0.75)); }
+function decalMat(c) {
+  const k = PAINT.indexOf(c); if (k < 0) return null;
+  const key = PAINT_NAME[k] + '-impact-0' + (1 + (Math.random() * 5 | 0));
+  if (!DECALS.mats[key]) {
+    const t = new T.TextureLoader().load('/corn-souls/assets/textures/paintball/' + key + '.png'); t.magFilter = T.NearestFilter; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+    DECALS.mats[key] = new T.MeshLambertMaterial({ map: t, alphaTest: 0.5, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  }
+  return DECALS.mats[key];
 }
 function splatAt(hit, c, dir) {
   splatSnd(hit.point);
@@ -13332,7 +13348,7 @@ function splatAt(hit, c, dir) {
     return new T.ShapeGeometry(sh);
   });
   const nrm = hit.object ? upNormal(hit).clone() : V3(0, 1, 0); if (nrm.dot(dir) > 0) nrm.negate();
-  const s = new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c)); s.userData.noHit = true;
+  const dm = decalMat(c), s = dm ? new T.Mesh(decalGeo(), dm) : new T.Mesh(splatGeos[Math.random() * 3 | 0], paintMat(c)); s.userData.noHit = true;   // the owner's decal for the ball's colour (a shape cut in code for any other colour)
   s.position.copy(hit.point).addScaledVector(nrm, 0.02);
   s.quaternion.setFromUnitVectors(V3(0, 0, 1), nrm); s.rotateZ(Math.random() * 6.28); s.scale.setScalar(0.8 + Math.random() * 0.6);
   scene.add(s); if (hit.object) hit.object.attach(s);   // stays put on trucks and train cars too
