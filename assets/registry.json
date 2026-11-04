@@ -674,7 +674,7 @@
       "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/textures/trees",
       "license_name": "First-party work, project owner",
       "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
-      "status": "in-use",
+      "status": "approved",
       "modifications": "None to the files. Drawn as 8 m square camera-facing cards with the pack's ground anchor (32, 62) on the ground, crisp nearest pixels, and the frame picked from the nearest 45 degrees of viewing angle. A proof of concept so far: 8 of the 56 scenery trees use the pack, the rest keep the code-painted spruce until the owner has looked.",
       "files": [
         "assets/textures/trees/01-broadleaf-atlas.png",
@@ -691,7 +691,7 @@
       ],
       "checked_on": "2026-11-04",
       "reviewer": "Owner",
-      "evidence": "Added by the owner's request in the TEST channel (v1.97.126): PSX tree cards for the scenery trees, 8 views per species."
+      "evidence": "Added by the owner's request in the TEST channel (v1.97.126) and PARKED again in v1.97.129: the owner preferred the old code-painted spruce, so the game no longer loads these atlases. The files stay here, approved and unused, so bringing them back is a renderer change and nothing else."
     },
     {
       "id": "first-party-psx-grass-tufts",
