@@ -1,4 +1,4 @@
-## TEST v1.97.129 — the trees are the old code-painted spruce again (2026-11-01)
+## TEST v1.97.129 — the trees are the old code-painted spruce again (2026-11-04)
 - Owner: *"ok i like the grass but i hate the trees. put the trees back to the old trees"*.
 - **Reverted the card renderer.** The whole `PSX TREE SPRITES` block is gone: `TREE_SPR`, `treeAtlas`, `treeMesh`, `treeSpriteSetup`, `updateTreeSprites`, `treeView`, `TREE_SINK`, the `TREE_STANDS` list, the extra frame-loop tick and the `P3.spriteTrees`/`P3.treeInfo` getters. Nothing loads `assets/textures/trees/*-atlas.png` any more.
 - **The old trees are back**: every placed tree goes through `billboard('tree', x, z, s)` - the code-painted 5.6 x 9.0 m spruce, one instanced mesh for all of them, turning to face the camera, unchanged from before v1.97.126.
@@ -10,6 +10,7 @@
 - Bumped TEST to `1.97.129` / `corn-souls-test-shell-v156`.
 
 
+## TEST v1.97.128 — PSX grass tufts scattered over the grass and nowhere else (2026-11-04)
 - Owner dropped `psx-grass-cline-pack` (a brief plus a 128 x 64 atlas of six 32 px tufts and a manifest) and asked for it *"sporadically in grassy areas never on dirt or concrete"*.
 - **Assets**: the atlas + `grass-manifest.json` (+ the brief itself) in `assets/textures/grass/`, registered as `first-party-psx-grass-tufts`, credited and listed in `assets/textures/README.md`.
 - **"Never on dirt or concrete" is enforced by the ground itself**: `groundMat()` and `padMat()` now tag their materials with `userData.ground = 'grass' | 'dirt' | 'dirtroad' | 'asphalt' | 'pad'`, and `grassProbe()` casts down from 6 m and accepts a point **only** when the first thing it hits is the grass layer. Dirt, asphalt, concrete pads, building floors, the corn canopy strips and the pivot circle all come back as something else, so they are excluded by construction rather than by a list of rectangles that could drift.
@@ -23,6 +24,7 @@
 - Bumped TEST to `1.97.128` / `corn-souls-test-shell-v155`.
 
 
+## TEST v1.97.127 — all 56 trees on the pack, single-species stands, seeded fixed spots clear of corn, roads and rail (2026-11-04)
 - Owner: *"use them all but keep the similar types together in different areas. they should always be in the same spot every game none in the cornfields or on roads or railroads."*
 - **All 56.** `TREE_SPRITE_COUNT` is 999 now, so every scenery tree is a PSX card (the code-painted spruce stays in the file behind that one number, so an A/B is still a one-line change).
 - **The same spots every session.** Tree placement used `Math.random()` in three places, so the windbreak moved every reload. It now runs off a fixed-seed **mulberry32** (`TREE_SEED = 20261104`): sample a pool of clear ground round the plant, keep it in seeded order, and the layout is identical on every device and every load. Measured: 56 trees at radius 207-416 m, x -347..341, z -263..227.
@@ -34,6 +36,7 @@
 - Bumped TEST to `1.97.127` / `corn-souls-test-shell-v154`.
 
 
+## TEST v1.97.126 — PSX tree sprites from the owner's Kernel Art pack (8 of 56 trees, proof of concept) (2026-11-04)
 - Owner dropped `Kernel Art/2D`; asked for the trees first, on a handful, as a proof of concept before converting all 56.
 - **The pack** (`Kernel Art/2D/tree_sprites_ten_8view`): 10 species x 8 views at 45 degrees, 64 px RGBA frames, ground anchor **(32, 62)** from the top-left, angle order front / front-right / right / back-right / back / back-left / left / front-left, nearest-neighbour, "pick the nearest 45-degree frame to the viewing angle", plus a `manifest.json` of files and atlas rects. Only the **10 atlases** (256 x 128 = 4 x 2 tiles) and the manifest are shipped, in `assets/textures/trees/` (the 80 individual frames stay in the owner's drop folder).
 - **The game side** (`PSX TREE SPRITES`, after `updateBillboards`): `TREE_SPRITE_COUNT = 8` of the 56 scenery trees are drawn from the pack - the eight **nearest the plant**, so they are the easiest ones to walk up to - cycling through the seven species that suit the plains (broadleaf, leaning pine, silver birch, red maple, weeping willow, dead snag, cypress; the palm, cherry and acacia stay unused). Every other tree still goes through the old code-painted billboard, so the two can be compared side by side.
@@ -46,6 +49,7 @@
 - Bumped TEST to `1.97.126` / `corn-souls-test-shell-v153`.
 
 
+## TEST v1.97.125 — lizards spawn on walls and crawl along them instead of spawning on floors (2026-11-04)
 - Owner: *"lizards should spawn on walls instead of floors"*.
 - **How they spawn now** (`crWallSpot`, next to `crFloor`): a horizontal probe from a random spot in the critter area (cook / evap alley) at a random height 0.55–3.35 m looks up to 7 m for a face, and the lizard is placed **7 cm clear of it, facing out**, in a new `climb` state. A face counts only if its normal is horizontal (`|n.y| < 0.45`), so a floor, a roof or a dome is rejected - and a miss simply tries again next frame, using the existing one-probe-per-frame budget. After 8 frames without a wall it falls back to the old floor spawn, so a lizard can never fail to appear.
 - **They crawl** (`crWallStep`): along the face at 0.5 m/s with a slow up/down wander, re-probing every frame to stay hugging it; where the face ends (top, bottom, or the end of the wall) it **turns round** rather than crawling into the air. The sprite gets the same scuttle wiggle a running lizard has.
@@ -58,6 +62,7 @@
 - Bumped TEST to `1.97.125` / `corn-souls-test-shell-v152`.
 
 
+## TEST v1.97.124 — sprites darken indoors, roof map capped at 1024 cells / 1 m, its pass out of the fps readout (2026-11-04)
 - Owner: *"do all 3"* (the items I had listed as risks rather than defects in v1.97.123).
 - **1. Sprites take the indoor darkness.** v1.97.99 patched Lambert / Phong / Standard / Basic, so a **sprite was left out**: a dead critter carried into the dark shop, a pigeon that flew in, the scarecrows, the nibblers, the vulture - all full bright in a pitch-dark room. `csPatchSprite` now patches `SpriteMaterial` the same way: `sprite_vert` sets `mvPosition` from the model matrix (already view space), so `csVP` comes free in the vertex shader, and the existing `CS_BASIC` multiplier is injected right after `outgoingLight = diffuseColor.rgb;` (the sprite fragment shader writes its colour through `<opaque_fragment>`, so that is the anchor, not the `gl_FragColor` line the basic shader uses). Additive sprites - flames, steam, exit halos - are exempt through `csBasicOK`, exactly like additive `MeshBasicMaterial`, and the cache key keeps patched and unpatched sprites off one program.
 - **2. The roof map is capped.** It was up to 2048 cells an axis at no coarser than 0.5 m: one far-flung roof inflated it to **4.2 million cells** - a 17 MB `Float32Array` kept for the whole session, plus a 17 MB render target and a 17 MB read buffer allocated **twice** (first walk, then 12 s later for late models), each with a full `readRenderTargetPixels` GPU stall. It is now **1024 cells an axis with no cell finer than 1 m** (`maxTex` 1024, `cell = max(1.0, W/1024, D/1024)`), which caps the worst case at ~4 MB and a typical plant-sized box at ~0.8 MB. The grid only answers "which roof am I standing on", so 1 m quantisation is not visible in play.
@@ -67,6 +72,7 @@
 - Bumped TEST to `1.97.124` / `corn-souls-test-shell-v151`.
 
 
+## TEST v1.97.123 — four defects from the 1.97.122 audit (guard label, sRGB tag, silent roof map, network car indices) (2026-11-04)
 - Owner: *"search for bugs"*. Audited the current build (14,616 lines) for the classes the suites cannot see and found four real defects, plus three risks that are listed at the end rather than changed blind.
 - **1. Two different sub-updates shared one guard label.** `stepSafe('power', …)` wrapped both `powerUpdate(dt)` and `applyPowerOutage()`, so `FAILS['power']` mixed them: the fps badge read `!power×37` with no way to tell which was dying, and the 64× re-log named the wrong one. They are `powerSim` and `powerApply` now. (Every other label was already unique - I checked all of them.)
 - **2. One sRGB tag skipped the guard.** The vulture's chalk outline was `tex.colorSpace = T.SRGBColorSpace;` with no `if (T.SRGBColorSpace)` and no `srgbTex()` - the only such site in the file, and invisible to the rule test because the property name is still present. It goes through `srgbTex()` now.
@@ -78,6 +84,7 @@
 - Bumped TEST to `1.97.123` / `corn-souls-test-shell-v150`.
 
 
+## TEST v1.97.122 — nibbler rear views (2026-11-04)
 - Owner sent `nibbler-rear-views.zip`: `nibbler-back.png`, `nibbler-rear-quarter-left.png`, `nibbler-rear-quarter-right.png` (40 px), added to `assets/textures/nibbler/` and the `first-party-nibbler-sprites` registry entry.
 - `nibView`: a nibbler turned toward you (within ~100 degrees of the line to the camera) shows its face as before; turned away it shows its back (more than ~150 degrees off) or a rear quarter in between: the left one when you are behind it on its left, the right one on its right. The rear views are not mirrored; a dead one always shows its face. All 23 pictures load up front (texture numbers 21-23 for the rear views).
 - `validate-nibblers.cjs` checks the view for each angle, the no-mirroring and the files. Checked headless: nibblers walking away into the corn show their backs.
