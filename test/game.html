@@ -10583,7 +10583,7 @@ function treePlacement() {   // a pool of clear ground round the plant, spread e
 // probe by construction), and packs the rest into one InstancedMesh per atlas frame. Six shared materials for the whole
 // world, no per-tuft entity, no colliders, no per-frame matrix work: a chunk is built once and only toggled by distance.
 const GRASS = {
-  on: true, density: 0.0165, dist: 96, chunk: 64, ring: 1,   // tufts per m2 (v1.97.135, owner: "remove 90% of the grass tufts": was 0.16, 3 a cell), draw distance (m), chunk size (m), chunks out from the camera
+  on: true, density: 0.00825, dist: 96, chunk: 64, ring: 1,   // tufts per m2 (v1.97.154, owner: "there should be half as many tufts" - 0.0165 halved; that was itself the v1.97.135 90% cut from 0.16), draw distance (m), chunk size (m), chunks out from the camera
   atlas: null, mats: [], geo: null, chunks: new Map(), solids: [], solidsT: 99, made: 0, shown: 0
 };
 const GRASS_H = 0.42, GRASS_W = 0.5, GRASS_SINK = GRASS_H * 2 / 32;   // manifest anchor (16, 30): 2 px of 32 above the feet
@@ -10695,11 +10695,12 @@ function grassSet(o) {   // the knobs the debug menu and the tests use
   if (o.density !== undefined) GRASS.density = Math.max(0, Math.min(2, +o.density));
   if (o.dist !== undefined) GRASS.dist = Math.max(0, Math.min(300, +o.dist));
   if (o.density !== undefined || o.on === false) { for (const k of [...GRASS.chunks.keys()]) grassDrop(k); }
-  try { localStorage.setItem('cs_grass', JSON.stringify({ on: GRASS.on, density: GRASS.density, dist: GRASS.dist, v: 2 })); } catch (e) {}
+  try { localStorage.setItem('cs_grass', JSON.stringify({ on: GRASS.on, density: GRASS.density, dist: GRASS.dist, v: 3 })); } catch (e) {}
   updateGrass(0);
   return GRASS;
 }
-try { const g = JSON.parse(localStorage.getItem('cs_grass') || 'null'); if (g) { if (typeof g.on === 'boolean') GRASS.on = g.on; if (g.v === 2 && isFinite(g.density)) GRASS.density = Math.max(0, Math.min(2, g.density)); if (isFinite(g.dist)) GRASS.dist = Math.max(0, Math.min(300, g.dist)); } } catch (e) {}
+// v1.97.154: a stored density from before the halving is ignored (the v bump), so the new default lands; on / dist still carry over
+try { const g = JSON.parse(localStorage.getItem('cs_grass') || 'null'); if (g) { if (typeof g.on === 'boolean') GRASS.on = g.on; if (g.v === 3 && isFinite(g.density)) GRASS.density = Math.max(0, Math.min(2, g.density)); if (isFinite(g.dist)) GRASS.dist = Math.max(0, Math.min(300, g.dist)); } } catch (e) {}
 // ---------- performance: merge the thousands of small static parts (boxes, posts, rails, bands...) that share a plain color into a few big
 // meshes per 60 m patch of the map, so the GPU gets a few hundred draw calls instead of thousands. Only plain shared-color meshes standing
 // directly in the scene are merged; anything that moves, blinks, changes color or can be clicked keeps its own mesh.

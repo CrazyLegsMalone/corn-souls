@@ -92,9 +92,17 @@ const grassCtx = (probe = () => 0, density = GAME_DENSITY) => {
   const a = grassCtx(), b = grassCtx();
   a.grassChunk(0, 0); b.grassChunk(0, 0);
   assert.ok(a.GRASS.made > 0, 'a chunk on open grass grows tufts (' + a.GRASS.made + ')');
-  // v1.97.135, owner: "remove 90% of the grass tufts" - a tenth of what the old 0.16 default grew, still in clumps of 3
-  let old = 0, now = 0; for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) { const o = grassCtx(() => 0, 0.16), n = grassCtx(); o.grassChunk(cx, cz); n.grassChunk(cx, cz); old += o.GRASS.made; now += n.GRASS.made; }
-  console.log('  grass: ' + now + ' tufts vs ' + old + ' before (' + (100 * now / old).toFixed(1) + '%)'); assert.ok(now / old > 0.07 && now / old < 0.13, 'about a tenth of the old tufts (' + now + ' vs ' + old + ', ' + (100 * now / old).toFixed(1) + '%)');
+  // v1.97.135, owner: "remove 90% of the grass tufts" (a tenth of the old 0.16 default), then v1.97.154, owner: "there should be
+  // half as many tufts" - so about a twentieth of 0.16 now, and exactly half of the 0.0165 that release left behind.
+  let old = 0, prev = 0, now = 0;
+  for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) {
+    const o = grassCtx(() => 0, 0.16), p = grassCtx(() => 0, 0.0165), n = grassCtx();
+    o.grassChunk(cx, cz); p.grassChunk(cx, cz); n.grassChunk(cx, cz);
+    old += o.GRASS.made; prev += p.GRASS.made; now += n.GRASS.made;
+  }
+  console.log('  grass: ' + now + ' tufts vs ' + prev + ' before the halving and ' + old + ' at the old 0.16 (' + (100 * now / old).toFixed(1) + '%)');
+  assert.ok(now / old > 0.04 && now / old < 0.07, 'about a twentieth of the old tufts (' + now + ' vs ' + old + ', ' + (100 * now / old).toFixed(1) + '%)');
+  assert.ok(Math.abs(now / prev - 0.5) < 0.05, 'half as many as the 0.0165 default it replaced (' + now + ' vs ' + prev + ', ' + (100 * now / prev).toFixed(1) + '% - whole clumps of three, so not exactly 50.0)');
   assert.ok(now % 3 === 0, 'still in clumps of three, not lone blades');
   assert.equal(a.GRASS.made, b.GRASS.made, 'and the same chunk grows the same tufts every session (seeded)');
   assert.ok(a.GRASS.chunks.get('0:0').meshes.length <= 6, 'packed into at most one instanced mesh per frame');
