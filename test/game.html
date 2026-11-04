@@ -9982,6 +9982,7 @@ function netDrop() {
   NET.conn = null;
   if (O.cars) for (const c of O.cars) { if (c.passFig) c.passFig.visible = false; if (c.drvFig) c.drvFig.visible = false; }   // nobody else in the cars now
   if (walk.pass) passExit();
+  if (typeof cornNetDrop === 'function') cornNetDrop();   // corn they were carrying or had thrown falls where it is
   if (NET.rp) { scene.remove(NET.rp.av); NET.rp = null; }
   if (NET.rr) { scene.remove(NET.rr.g); NET.rr = null; }
 }
@@ -10032,6 +10033,7 @@ function wsApply(m) {   // guest: the host's world
 function wsClock() { return GT.real ? null : [Math.round(gameDate().getTime()), GT.rate]; }
 function netRecv(m) {
   if (!m || !m.t) return;
+  if (m.t === 'cp') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }   // corn ears and cubes the other player is moving (v1.97.111)
   if (m.t === 'p') {
     netRemote(); const R = NET.rp; R.walk = m.w; R.drive = m.d; R.ps = !!m.ps; R.tx = m.x; R.ty = m.y; R.tz = m.z; R.tyaw = m.yaw; R.aim = m.a || 0; if (m.am !== undefined) { R.am = m.am; R.sh = m.sh; }
     const mh = m.h === 'washer' ? 'gun' : m.h;   // water ammo is the same gun
@@ -12518,7 +12520,7 @@ function creepLure(c) {   // a corn ear lying on the ground within smelling rang
   let best = null, bd = c.K.lure;
   if (NET.rp && NET.rp.ears) for (const e of NET.rp.ears) { const d = Math.hypot(e[1] - c.x, e[2] - c.z); if (d < bd) { bd = d; best = { remote: true, idx: e[0], g: { position: { x: e[1], z: e[2] } } }; } }   // the guest's ears (its corn is its own)
   if (typeof CORN_PROPS_STATE === 'undefined' || !CORN_PROPS_STATE.items) return best;
-  for (const t of CORN_PROPS_STATE.items) { if (t.isCritter || t.type !== 'ear' || t.held || t.inCan || !t.g) continue;
+  for (const t of CORN_PROPS_STATE.items) { if (t.isCritter || t.type !== 'ear' || t.held || t.inCan || t.net === 'them' || !t.g) continue;
     if (!t.sleep && !(t.g.position.y < Math.max(0, floorAt(t.g.position.x, t.g.position.z, t.g.position.y + 0.5)) + 0.6 && (!t.v || t.v.lengthSq() < 1))) continue;   // still in the air (one jittering against a wall counts as landed)
     const d = Math.hypot(t.g.position.x - c.x, t.g.position.z - c.z); if (d < bd) { bd = d; best = t; } }
   return best;
@@ -12527,7 +12529,7 @@ function creepEat(t) {   // the ear is gone; a fresh one turns up back in the ne
   if (t.remote) { netSend({ t: 'cea', i: t.idx }); if (NET.rp && NET.rp.ears) NET.rp.ears = NET.rp.ears.filter(e => e[0] !== t.idx); return; }   // the guest's ear: it puts it back in its can
   const cans = (typeof CORN_PROPS_STATE !== 'undefined' && CORN_PROPS_STATE.cans) || []; let can = null, cd = 1e9;
   for (const k of cans) { const d = Math.hypot(k.position.x - t.g.position.x, k.position.z - t.g.position.z); if (d < cd) { cd = d; can = k; } }
-  if (can) { const a = Math.random() * 6.28; t.g.position.set(can.position.x + Math.cos(a) * 0.18, 1.05, can.position.z + Math.sin(a) * 0.18); t.inCan = true; t.sleep = true; t.v && t.v.set(0, 0, 0); }
+  if (can) { const a = Math.random() * 6.28; t.g.position.set(can.position.x + Math.cos(a) * 0.18, 1.05, can.position.z + Math.sin(a) * 0.18); t.inCan = true; t.sleep = true; t.v && t.v.set(0, 0, 0); if (typeof cornNetTake === 'function') cornNetTake(t); }   // (and the other player sees it go back)
   else if (t.g) t.g.visible = false;
 }
 function creepEars() {   // my corn ears lying on the ground (sent to the host so its creatures can smell them)
@@ -13073,7 +13075,7 @@ function updateBalls(dt) {
 function updateGun(dt) {
   if (!gun) gun = makeGun();
   if (!heldG.squeegee) { heldG.squeegee = makeSqueegee(); heldG.hand = makeHand(); heldG.washer = makeWasher(); for (const k in TOOLS) heldG[k] = makeTool(k); heldG.ext = makeExtHud(); }
-  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third;
+  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !heldDead;   // carrying a dead critter: both hands on it, no gun (v1.97.111)
   gun.visible = fp && held === 'gun'; heldG.squeegee.visible = fp && held === 'squeegee'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
   wash.t = Math.max(0, wash.t - dt); updateWasher(dt, show && held === 'gun' && wash.t > 0);
   if (!show) { aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
