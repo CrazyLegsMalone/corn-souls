@@ -9437,6 +9437,20 @@ function csPatchBasic(shader) {
   shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 csVP;\n' + CS_PARS)
     .replace('vec3 outgoingLight = reflectedLight.indirectDiffuse;', 'vec3 outgoingLight = reflectedLight.indirectDiffuse;\n' + CS_BASIC);
 }
+// Sprites (critters, the vulture, the scarecrows, the nibblers) are unlit billboards, so v1.97.99 left them out and a dead
+// critter carried into a dark shop glowed. sprite_vert sets mvPosition from the model matrix, which is already view
+// space, so csVP comes free and the same CS_BASIC multiplier applies. Additive sprites (flames, steam, halos) are
+// exempt through csBasicOK, exactly like additive MeshBasicMaterial.
+function csPatchSprite(shader) {
+  if (!csBasicOK(this)) return;
+  if (shader.fragmentShader.indexOf('outgoingLight = diffuseColor.rgb;') < 0) return;
+  if (shader.vertexShader.indexOf('mvPosition = modelViewMatrix[ 3 ];') < 0) return;
+  csUniforms(shader);
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 csVP;')
+    .replace('mvPosition = modelViewMatrix[ 3 ];', 'mvPosition = modelViewMatrix[ 3 ]; csVP = mvPosition.xyz;');
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 csVP;\n' + CS_PARS)
+    .replace('outgoingLight = diffuseColor.rgb;', 'outgoingLight = diffuseColor.rgb;\n' + CS_BASIC);
+}
 function lightInstall() {   // once, before the first frame: every lit material compiled from here on carries the patch
   for (const C of [T.MeshLambertMaterial, T.MeshPhongMaterial, T.MeshStandardMaterial]) {
     C.prototype.onBeforeCompile = csPatchLit;
@@ -9444,6 +9458,8 @@ function lightInstall() {   // once, before the first frame: every lit material 
   }
   T.MeshBasicMaterial.prototype.onBeforeCompile = csPatchBasic;
   T.MeshBasicMaterial.prototype.customProgramCacheKey = function () { return csBasicOK(this) ? 'cs1' : 'cs0'; };
+  T.SpriteMaterial.prototype.onBeforeCompile = csPatchSprite;
+  T.SpriteMaterial.prototype.customProgramCacheKey = function () { return csBasicOK(this) ? 'cs1' : 'cs0'; };
 }
 function enclAt(x, y, z) {   // the smallest roofed envelope holding a point (nested rooms win), or null outdoors
   let best = null;
@@ -11469,8 +11485,11 @@ function roofMapBuild() {
   for (const m of list) { b.setFromObject(m); if (b.max.y >= 2) box.union(b); }   // only things that could carry a roof decide the size of the map
   if (box.isEmpty()) return false;
   box.min.x = Math.max(box.min.x, -1300); box.max.x = Math.min(box.max.x, 1500); box.min.z = Math.max(box.min.z, -800); box.max.z = Math.min(box.max.z, 1300);
-  const W = box.max.x - box.min.x + 2, D = box.max.z - box.min.z + 2, maxTex = Math.min(2048, renderer.capabilities.maxTextureSize || 2048);
-  const cell = Math.max(0.5, W / maxTex, D / maxTex), nx = Math.ceil(W / cell), nz = Math.ceil(D / cell), x0 = box.min.x - 1, z0 = box.min.z - 1;
+  // 1024 cells per axis and no cell finer than 1 m: this grid only answers 'which roof am I standing on', and at 2048/0.5 m
+  // a far-flung roof inflated it to 4.2 million cells - 17 MB of Float32 kept for the session plus a 17 MB render target and
+  // a 17 MB read buffer allocated twice, with a full GPU readback stall each time. Capped, the worst case is ~4 MB.
+  const W = box.max.x - box.min.x + 2, D = box.max.z - box.min.z + 2, maxTex = Math.min(1024, renderer.capabilities.maxTextureSize || 1024);
+  const cell = Math.max(1.0, W / maxTex, D / maxTex), nx = Math.ceil(W / cell), nz = Math.ceil(D / cell), x0 = box.min.x - 1, z0 = box.min.z - 1;
   const cam = new T.OrthographicCamera(0, nx * cell, 0, -nz * cell, 1, 600);   // left/right in x, top/bottom in -z (screen up is -z)
   cam.position.set(x0, 400, z0); cam.up.set(0, 0, -1); cam.lookAt(x0, 0, z0); cam.updateMatrixWorld(true);
   cam.left = 0; cam.right = nx * cell; cam.top = 0; cam.bottom = -nz * cell; cam.updateProjectionMatrix();
@@ -11479,13 +11498,14 @@ function roofMapBuild() {
     vertexShader: 'varying float vY; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }',
     fragmentShader: 'varying float vY; void main(){ float v = floor(clamp((vY + 20.0) / 160.0, 0.0, 1.0) * 16777215.0); float r = floor(v / 65536.0); float g = floor((v - r * 65536.0) / 256.0); float b = v - r * 65536.0 - g * 256.0; gl_FragColor = vec4(r / 255.0, g / 255.0, b / 255.0, 1.0); }' });
   const rt = new T.WebGLRenderTarget(nx, nz, { depthBuffer: true }), px = new Uint8Array(nx * nz * 4);
-  const ov = scene.overrideMaterial, bg = scene.background, fog = scene.fog, cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(), sAU = renderer.shadowMap.autoUpdate, sNU = renderer.shadowMap.needsUpdate, prt = renderer.getRenderTarget();
+  const ov = scene.overrideMaterial, bg = scene.background, fog = scene.fog, cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(), sAU = renderer.shadowMap.autoUpdate, sNU = renderer.shadowMap.needsUpdate, prt = renderer.getRenderTarget(), iC = renderer.info.render.calls, iT = renderer.info.render.triangles;
   try {
     scene.overrideMaterial = mat; scene.background = null; scene.fog = null; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = false;
     renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, cam);
     renderer.readRenderTargetPixels(rt, 0, 0, nx, nz, px);
   } finally {
     scene.overrideMaterial = ov; scene.background = bg; scene.fog = fog; renderer.shadowMap.autoUpdate = sAU; renderer.shadowMap.needsUpdate = sNU;
+    renderer.info.render.calls = iC; renderer.info.render.triangles = iT;   // this pass is not the world: keep it out of the fps readout
     renderer.setRenderTarget(prt); renderer.setClearColor(cc, ca); for (const m of list) m.layers.disable(LAYER); rt.dispose(); mat.dispose();
   }
   // pixel (i, row) covers x = x0 + i*cell and, counting rows up from the bottom of the picture, z = z0 + (nz - 1 - row)*cell

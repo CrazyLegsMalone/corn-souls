@@ -91,6 +91,17 @@ ctx.lightInstall();
   }
   assert.equal(plate.customProgramCacheKey(), 'cs1', 'patched and unpatched unlit materials never share a program');
 }
+{ // Sprites (critters, the vulture, the scarecrows, the nibblers) are unlit billboards: they darken like a printed plate,
+  // while additive ones (flames, steam, halos) keep glowing.
+  const bug = new T.SpriteMaterial({}), flame = new T.SpriteMaterial({ blending: T.AdditiveBlending });
+  const sh = () => ({ fragmentShader: T.ShaderLib.sprite.fragmentShader, vertexShader: T.ShaderLib.sprite.vertexShader, uniforms: {} });
+  const s1 = sh(); bug.onBeforeCompile(s1);
+  assert.ok(s1.fragmentShader.includes('csLight(csVP, vec3(0.0), csIrr)') && s1.vertexShader.includes('csVP = mvPosition.xyz;'), 'a sprite is darkened indoors');
+  const s2 = sh(); flame.onBeforeCompile(s2);
+  assert.ok(!s2.fragmentShader.includes('csLight'), 'an additive sprite is left alone');
+  assert.equal(bug.customProgramCacheKey(), 'cs1', 'and they never share a program with the unpatched ones');
+  assert.equal(flame.customProgramCacheKey(), 'cs0');
+}
 
 // ---------------------------------------------------------------- a small world: two rooms (one with a cupboard inside), a yard
 const S = ctx.scene;

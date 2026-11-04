@@ -103,4 +103,9 @@ assert.ok(html.includes('const f = 42 + POWER.fov - 12 * aimK;'), 'the rat view 
 // a roof map that cannot build must say so: roof collision and the lizard climb silently never work without it
 assert.ok(html.includes("PERF.err = 'roofmap';"), 'a failed roof-map rebuild is reported on the fps line, not swallowed');
 
+// the roof map is a collision grid, not a picture: 1024 cells an axis and no cell under 1 m keeps it a few MB
+assert.ok(html.includes('maxTex = Math.min(1024, renderer.capabilities.maxTextureSize || 1024);'), 'the roof map is capped at 1024 cells an axis');
+assert.ok(html.includes('const cell = Math.max(1.0, W / maxTex, D / maxTex)'), 'and no cell is finer than 1 m, so a far-flung roof cannot inflate it');
+assert.ok(html.includes('renderer.info.render.calls = iC; renderer.info.render.triangles = iT;'), 'the roof map keeps its own pass out of the fps readout');
+
 console.log('PASS: critter powers (frog jump + safe landing, pigeon flaps / glide / safe falls, lizard climb onto the roof and gentle slide, rat speed + wider view; 45 s, counts on in a vehicle, swap, wear off, death) and roofs you can stand on (roof map in floorAt, walls stop at their tops)');
