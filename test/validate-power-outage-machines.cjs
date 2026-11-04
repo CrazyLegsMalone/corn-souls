@@ -597,7 +597,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
   // ---------------------------------------------------------------- the players wear the operator rig, tinted per player
   assert.ok(html.includes("const PLAYER_RIG = { url: '/corn-souls/assets/models/operator_vern_rig.glb'"), 'both players use the operator rig');
-  assert.equal((html.match(/dressPlayer\(/g) || []).length, 6, 'one definition + five avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat');
+  assert.equal((html.match(/dressPlayer\(/g) || []).length, 7, 'one definition + six avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, and the other player seated in a car (v1.97.109)');
   for (const call of ["dressPlayer(av, VEST_COL[other], {});", "dressPlayer(d, vest, { sit: true });", "dressPlayer(av, VEST_COL[me], { onRig: rig => {"])
 
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
@@ -674,9 +674,9 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('y: 0, vy: 0, pass: false }'), 'the walk state carries the ride-along flag');
   assert.ok(html.includes('else if (walk.pass) passUpdate(dt); else walkPhysics(dt);'), 'riding along replaces walking, so you are carried rather than walking inside the car');
   assert.ok(html.includes("return (out || V3()).set(0.34, 0.78, -0.02).applyMatrix4(g.matrixWorld);"), 'the seat position comes from the vehicle transform');
-  assert.ok(html.includes('if (!walk.on || walk.dead || !Q || !Q.g || !Q.drive) { passExit(); return; }'), 'if the driver gets out, the passenger steps out too');
+  assert.ok(html.includes('if (!walk.on || walk.dead || !V) { passExit(); return; }') && html.includes('const R = NET.rp; if (!R || !R.drive) return null;'), 'if the driver gets out, the passenger steps out too (v1.97.109: checks the other PLAYER is driving; the old check read a flag their Ranger never had and dropped you at once)');
   assert.ok(html.includes("if (walk.pass) { passExit(); return 'Stepped out of the passenger seat'; }"), 'X gets you out');
-  assert.ok(html.includes('NET.rp.drive && !walk.ride && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.4'), 'X beside their moving Ranger gets you in');
+  assert.ok(html.includes('if (V && !walk.ride && !walk.drive && Math.hypot(walk.x - V.x, walk.z - V.z) < (V.car ? 3.6 : 3.4))'), 'X beside their Ranger (or the car they drive) gets you in');
   assert.ok(html.includes("netSend({ t: 'ps', on: true });") && html.includes("netSend({ t: 'ps', on: false });"), 'the other PC is told both ways');
   assert.ok(html.includes('ps: !!walk.pass,'), 'the 15 Hz player message carries it');
   assert.ok(html.includes('R.ps = !!m.ps;'), 'and it is read back');

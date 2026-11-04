@@ -24,7 +24,7 @@ const notes = [], sounds = [], scene = new T.Scene(), walk = { on: true, dead: n
 const ears = [0, 1].map(i => { const g = new T.Group(); g.position.set(60, 1, -60); return { type: 'ear', g, held: false, inCan: true, sleep: true, v: new T.Vector3() }; });
 const ctx = { T, Math, NROAD: -134, scene, walk, camera: new T.PerspectiveCamera(), V3: (x, y, z) => new T.Vector3(x, y, z), tv: new T.Vector3(), tv2: new T.Vector3(),
   floorAt: () => 0, pushOut() {}, puff() {}, layBody(...a) { ctx.died = a; }, DMG_NOTIFY: m => notes.push(m), tsnd: { ctx: null }, kiaNoise() {}, utv: { g: null },
-  loadGlbModel: (url, cb) => cb(mkModel(/daddy/.test(url) ? 'Daddy_Cob_Torso' : 'Cob_Body')), CORN_PROPS_STATE: { items: ears, cans } };
+  loadGlbModel: (url, cb) => cb(mkModel(/daddy/.test(url) ? 'Daddy_Cob_Torso' : 'Cob_Body')), CORN_PROPS_STATE: { items: ears, cans }, NET: { conn: null, host: false, rp: null }, netSend() {} };   // single player
 vm.createContext(ctx);
 vm.runInContext(html.slice(a, b) + '\nthis.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.inCField = inCField; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepPaintHit = creepPaintHit; this.creepToolHit = creepToolHit; this.creepDebug = creepDebug; this.foldModel = foldModel;', ctx);
 const C = ctx.CREEP, F = ctx.CFIELD, run = (sec, dt = 0.05, each) => { for (let t = 0; t < sec; t += dt) { ctx.updateCreeps(dt); if (each) each(); } };

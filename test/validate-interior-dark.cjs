@@ -42,7 +42,7 @@ for (const m of ['const wm = selfLit(', 'const roofM = selfLit(', 'const ceilM =
 assert.equal((html.match(/lampLight\(gridLight\(/g) || []).length, 7, 'seven authored fixtures throw light: receiving ceiling lights, hallway lights, wall packs, the yard pole');
 assert.ok(html.includes("['💡 Lights: flicker'") && html.includes("['💡 Lights: blackout nearby (15 s)'") && html.includes("['🌑 Darkness everywhere (20 s)'"), 'the scare controls are on the debug menu');
 assert.ok(html.includes("['🔆 Brightness: ' + P3.lights.brightName"), 'the brightness floor is on the pause menu');
-assert.ok(html.includes('lights: { flicker: (s, r) => lightsFlicker(s, r), blackout: (s, r) => lightsBlackout(s, r), dark: (a, f, h) => lightsDark(a, f, h)'), 'and exported for scripted events');
+assert.ok(html.includes("lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk');") && html.includes("dark: (a, f, h) => { wsLock('dk'); netSend({ t: 'dk', a, f, h }); return lightsDark(a, f, h); },"), 'and exported for scripted events (shared with the other player, v1.97.109)');
 // v1.97.100: the headlamp's reach window is clamped (unclamped, (1 - q^2)^2 rose again past the reach and lit a wall 84 m
 // down the ferm alley white), and it falls off with the square of the distance like a real torch.
 { const fl = lightSrc.slice(lightSrc.indexOf('if (csFl2.r + csFl2.g > 0.0) {'), lightSrc.indexOf('return k;', lightSrc.indexOf('if (csFl2.r + csFl2.g > 0.0) {')));

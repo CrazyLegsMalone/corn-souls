@@ -39,7 +39,7 @@ const tm = html.slice(html.indexOf('function timeMenu(code) {'), html.indexOf('f
 for (const r of ["'⏱ Real time (device clock)'", "['🌅 Sunrise (8 AM)', 8]", "['☀️ Midday (2 PM)', 14]", "['🌇 Sunset (8 PM)', 20]", "['🌙 Night (11 PM)', 23]", "['🌑 Deep night (2 AM)', 2]", "'⏩ +1 hour'", "'⏪ −1 hour'", 'Fast cycle', "'Back to debug'"])
   assert.ok(tm.includes(r), 'time menu row ' + r);
 assert.ok(tm.includes('go({ rate: P3.time.fast ? 1 : 360 })'), 'fast cycle toggles');
-assert.ok(html.includes('time: { set: o => gameTimeSet(o), date: () => gameDate(),'), 'exported as Plant3D.time');
+assert.ok(html.includes("time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(),"), 'exported as Plant3D.time (and shared with the other player, v1.97.109)');
 // v1.97.103: eight looks, one every 3 hours, on the same hours as the sun/moon badge; night falls at 10 PM
 { const ls = html.slice(html.indexOf('const LOOKS = ['), html.indexOf('].map(', html.indexOf('const LOOKS = [')) + 1);
   const L = JSON.parse(JSON.stringify(vm.runInNewContext(ls.replace('const LOOKS = ', '(') + ')')));   // out of the vm realm
