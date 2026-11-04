@@ -1,3 +1,11 @@
+## TEST v1.97.150 — a hard landing costs a third of what it did (2026-11-04)
+- Owner, asked whether landings on the grain pile should be softer (18-34 HP per jump): *"lets try this"*.
+- **Where the damage came from:** not the pile itself - `vehVertical` charges the vehicle when it lands, `(hit - AIR.HURT) * 6` HP, and jumping the pile sends the Ranger off a 4.5-5 m peak and lands it on the grass past the track at 11-15 m/s, i.e. 2-6 m/s over the 9 m/s limit. That is the 18-34 the owner saw.
+- **The fix:** the 6 is now `AIR.HURT_K` and it is **2**, so the same jump off the same pile costs a third. Measured with the game's own `vehVertical` at 60 fps off the peak line: 31 mph 4 HP, 40 mph 6, 47 mph 8, 54 mph 9, 59 mph 11 - against 18-34 before, on a Ranger with 100. A hard landing still costs something at every speed, so the jump is not free, and the existing "one jump can never wreck the Ranger" bound still holds.
+- `validate-grain-pile.cjs` (which drives the pile) now pins the tuning: `HURT_K` is 2, the landing line uses it and not a literal 6, every speed down the pile costs under 15 HP, and 59 mph still costs more than 5.
+- Verified locally: the 44 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes. LIVE is untouched.
+- Bumped TEST to `1.97.150` / `corn-souls-test-shell-v177`.
+
 ## TEST v1.97.149 — the plant is not drawn while the title screen is up (2026-11-04)
 - Owner asked which of the audit's two performance items to do first; this is item 2, *"the world is rendered behind the title screen"*.
 - **What was wrong:** `frame()` has always run from the moment the page loads, and `update()` ends with the shadow refresh, the world render and the HUD pass - with no idea what is on screen. The "Cry & Dry" title is an **opaque** panel (`#splash{background:#070403}`) with its own 3D bonfire on its **own** WebGLRenderer and canvas (`title3D`), so every pixel of the plant drawn under it was thrown away: a full shadow pass, world pass and HUD pass every frame, on top of the bonfire's own context and rAF loop. The title screen was the most expensive moment in the game, and it is the first thing a player sees.

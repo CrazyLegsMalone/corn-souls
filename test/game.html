@@ -12676,7 +12676,7 @@ function buildGrainPiles() {
 // almost no bite and the tyres stop gripping sideways; the springs let the wheels hang and hold the body's tilt. Landing
 // slams the suspension (scaled by how hard you came down) with a thump; only a really big drop (> 9 m/s, a ~4 m fall)
 // hurts the vehicle. Dropping into a pond or a dug-out pit is still refused, like before.
-const AIR = { G: 9.8, SLOPE: 0.45, GAP: 0.03, HURT: 9 };
+const AIR = { G: 9.8, SLOPE: 0.45, GAP: 0.03, HURT: 9, HURT_K: 2 };   // v1.97.150: a hard landing costs HURT_K HP per m/s over HURT (it was 6, so a grain-pile jump took 18-34)
 function vehVertical(u, dt) {
   const fl = floorAt(u.x, u.z, u.y + 0.6), k = Math.min(dt, 0.05), sp = Math.hypot(u.vx, u.vz);
   if (u.air) {
@@ -12686,7 +12686,7 @@ function vehVertical(u, dt) {
       const gv = Math.max(-lim, Math.min(lim, ga2)), hit = Math.max(0, gv - u.vy);   // the hit is what the slope doesn't absorb
       u.y = fl; u.air = false; u.vy = gv; u.land = hit;
       if (hit > 2) utvBump(Math.min(4, 2.5 + hit * 0.15));   // the thump (capped below the bump code's damage line)
-      if (hit > AIR.HURT && walk.drive) dmgHit(dmgDrivingKey(), (hit - AIR.HURT) * 6, true);
+      if (hit > AIR.HURT && walk.drive) dmgHit(dmgDrivingKey(), (hit - AIR.HURT) * AIR.HURT_K, true);   // a landing has to hurt, it does not have to end the run (v1.97.150)
     }
     return;
   }

@@ -77,6 +77,13 @@ for (const z of [-305, -302, -308]) {
   assert.ok(res.filter(([v]) => v >= 18).every(([, r]) => r.landed.x < trackX(z) - 8), 'z ' + z + ': from 40 mph it comes down on the grass well past the track');
   assert.ok(res.every(([, r]) => r.hurt < 40), 'z ' + z + ': a hard landing on flat grass, but it never wrecks the Ranger in one jump');
 }
+// v1.97.150, owner: asked whether landings on the pile should be softer - yes: (hit - AIR.HURT) * 2 instead of * 6, so the same
+// jump costs a third of what it did. It still has to hurt, or the jump is free.
+assert.ok(html.includes('HURT: 9, HURT_K: 2 };'), 'a hard landing costs 2 HP per m/s over the limit (it was 6)');
+assert.ok(html.includes('(hit - AIR.HURT) * AIR.HURT_K') && !html.includes('(hit - AIR.HURT) * 6'), 'and the landing damage uses that number');
+{ const hard = [14, 18, 21, 24, 26.4].map(v => jump(v, -305));
+  assert.ok(hard.every(r => r.hurt < 15), 'every speed down the pile costs under 15 HP (18-34 before): ' + hard.map(r => r.hurt.toFixed(0)).join('/'));
+  assert.ok(hard[hard.length - 1].hurt > 5, 'and 59 mph still costs something (' + hard[hard.length - 1].hurt.toFixed(0) + ' HP), so it is not free'); }
 assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles();'), 'built with the world, before the static merge');
 assert.ok(html.includes("const h = s.hf ? s.hf(x, z) :"), 'floorAt reads heightfield surfaces');
 assert.ok(html.includes('o.userData.noRoof ||'), 'the roof map skips noRoof meshes');
