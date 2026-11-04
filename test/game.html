@@ -9752,6 +9752,12 @@ const boxDist = (e, x, z) => Math.hypot(Math.max(e.x0 - x, 0, x - e.x1), Math.ma
 //  - fixtures tagged with lampLight() where they are built (ceiling lights, wall packs, the yard pole)
 //  - EXIT signs (battery: a faint red pool, always on) and the egress strobes (battery: red flashes in an outage)
 //  - high-bay fixtures generated for every room that has no ceiling light of its own, drawn as ONE instanced mesh
+// v1.97.148, owner: "there is still too many light fixtures on ceiling looks bad". One high-bay every 15 m instead of
+// every 9 m: 18 in the 23 x 140 m hall instead of 48, 8 instead of 21 in the next, 3 instead of 10, 1 instead of 4 in a
+// 20 m shed. Each fixture that is left is exactly as strong as before (same k and reach, so it looks and pools the way it
+// did), and its room's even fill is topped up by the fixtures it lost - HB_REF is the 9 m grid this replaces, so
+// roomLampEven() still measures the floor light that grid used to give (within a few percent: 15 m alone was 2.5x darker).
+const HB_STEP = 15, HB_REF = 9;
 function lightBuild() {
   LIGHT.lamps.length = 0; LIGHT.faulty.length = 0;
   scene.updateMatrixWorld(true);
@@ -9774,12 +9780,13 @@ function lightBuild() {
   const pts = [];
   for (const e of ENCL) {
     if (lit.has(e) || e.top < 2.4) continue;
-    const w = e.x1 - e.x0, d = e.z1 - e.z0, nx = Math.max(1, Math.round(w / 9)), nz = Math.max(1, Math.round(d / 9)), y = e.top - 0.35;
+    const w = e.x1 - e.x0, d = e.z1 - e.z0, nx = Math.max(1, Math.round(w / HB_STEP)), nz = Math.max(1, Math.round(d / HB_STEP)), y = e.top - 0.35;
     const mine = [];
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const x = e.x0 + (i + 0.5) * w / nx, z = e.z0 + (j + 0.5) * d / nz;
       if (enclAt(x, y - 0.5, z) === e) mine.push([x, y, z, e]);   // a smaller room inside this one lights itself
     }
+    if (mine.length) e._boost = (Math.max(1, Math.round(w / HB_REF)) * Math.max(1, Math.round(d / HB_REF))) / mine.length;   // the high-bays this room lost, so its floor stays as bright
     pts.push(...mine);
   }
   if (pts.length) {
@@ -9815,11 +9822,13 @@ function lightBuild() {
 // throws on the floor with every fixture on (the same pool maths as the shader, over a 2 m grid). That average is the room's
 // even light, scaled each frame by how many of its fixtures are actually on (outage, warm-up, flicker); the pools near you keep
 // LAMP_POOL of their strength on top, so a hall is lit end to end and the bit round you is only a touch brighter.
+// v1.97.148: only mains fixtures count here (a battery EXIT sign is a pool, not a room light), and a room that lost high-bays
+// to the sparser 15 m grid gets its average topped up by e._boost, set where they are generated.
 const LAMP_POOL = 0.25, LAMP_EVEN = 1 - LAMP_POOL;
 function roomLampEven() {
   const fc = CSU.csFillC.value, fl = fc.r * 0.3 + fc.g * 0.59 + fc.b * 0.11;
   for (const e of ENCL) { e._lamps = []; e._arr = 0; }
-  for (const L of LIGHT.lamps) if (L.room && L.room._lamps) L.room._lamps.push(L);
+  for (const L of LIGHT.lamps) if (L.room && L.room._lamps && L.grid) L.room._lamps.push(L);   // mains fixtures only: a battery EXIT sign throws its own red pool, it does not fill the room evenly (v1.97.148 - with a sparser grid one battery lamp would otherwise stand in for the blacked-out ones)
   for (const e of ENCL) {
     if (!e._lamps.length) continue;
     const nx = Math.max(1, Math.round((e.x1 - e.x0) / 2)), nz = Math.max(1, Math.round((e.z1 - e.z0) / 2)); let sum = 0, n = 0;
@@ -9878,7 +9887,7 @@ function lightUpdate(dt) {
     const e = R[i]; e._slot = i; e._fill = 0;
     e.lvl = evLevel(e, Math.max(e.x0, Math.min(e.x1, rx)), Math.max(e.z0, Math.min(e.z1, rz)), t);   // the room's nearest point decides
     let on = 0; if (e._lamps && e._lamps.length) { let ws = 0; for (const L of e._lamps) { const dx = L.x - rx, dz = L.z - rz, w = 1 / (1 + (dx * dx + dz * dz) / 225); on += w * (L.lvl === undefined ? 1 : L.lvl); ws += w; } on /= ws; }   // how many of its fixtures are on, the ones near you counting most (a local blackout / flicker darkens round you)
-    e._fill = out ? 0 : LIGHT.fill * e.lvl * warmRoom + LAMP_EVEN * (e._arr || 0) * on * LIGHT.lampK;   // + the room's whole lamp array, evenly (v1.97.145)
+    e._fill = out ? 0 : LIGHT.fill * e.lvl * warmRoom + LAMP_EVEN * (e._arr || 0) * (e._boost || 1) * on * LIGHT.lampK;   // + the room's whole lamp array, evenly (v1.97.145), topped up by the high-bays it lost (v1.97.148)
     ux0 = Math.min(ux0, e.x0); uz0 = Math.min(uz0, e.z0); ux1 = Math.max(ux1, e.x1); uz1 = Math.max(uz1, e.z1);
   }
   for (const e of ENCL) if (R.indexOf(e) < 0) e._slot = -1;

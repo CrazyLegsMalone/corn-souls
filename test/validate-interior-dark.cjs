@@ -64,7 +64,7 @@ const ctx = { T, Math, console, performance: { now: () => 0 }, localStorage: { g
   EXIT_SIGN: { mat: null }, EGRESS: { lens: null }, SKY: { clouds: null }, gridLight: m => { m.userData.gridLight = true; return m; } };
 ctx.lampLight = (m, r, k) => { m.userData.lamp = { r, k }; return m; };
 vm.createContext(ctx);
-vm.runInContext(dataSrc + '\n' + lightSrc + '\nthis.ENCL = ENCL; this.LIGHT = LIGHT; this.CSU = CSU; this.CS_N = CS_N; this.CS_BRIGHT = CS_BRIGHT;', ctx);
+vm.runInContext(dataSrc + '\n' + lightSrc + '\nthis.ENCL = ENCL; this.LIGHT = LIGHT; this.CSU = CSU; this.CS_N = CS_N; this.CS_BRIGHT = CS_BRIGHT; this.roomLampEven = roomLampEven; this.HB_STEP = HB_STEP; this.HB_REF = HB_REF;', ctx);
 ctx.lightInstall();
 { // Lambert: the patch lands right after the light loops, with every uniform bound to the ONE shared object
   const m = new T.MeshLambertMaterial({ color: 0xffffff }), sh = { fragmentShader: T.ShaderLib.lambert.fragmentShader, vertexShader: T.ShaderLib.lambert.vertexShader, uniforms: {} };
@@ -118,10 +118,19 @@ const door = { x: 0, z: -10, h: 4, open: 0 }; ctx.O.rollDoors.push(door);   // a
 const n = ctx.lightBuild();
 const L = ctx.LIGHT;
 const gen = L.lamps.filter(l => l.inst >= 0);
-assert.equal(gen.filter(l => l.room === shed).length, 4, 'the windowless 20 m shed gets a 2 x 2 grid of ceiling high-bays');
+assert.equal(gen.filter(l => l.room === shed).length, 1, 'the windowless 20 m shed gets one ceiling high-bay (v1.97.148: the grid is 15 m, it was 4 at 9 m)');
 assert.equal(gen.filter(l => l.room === cup).length, 1, 'the cupboard has no light of its own, so it gets one too');
 assert.equal(gen.filter(l => l.room === office).length, 0, 'the office keeps its own ceiling light');
 assert.ok(gen.filter(l => l.room === shed).every(l => Math.abs(l.y - (6 - 0.35)) < 1e-9), 'hung just under the roof');
+// v1.97.148, owner: "there is still too many light fixtures on ceiling looks bad" - a coarser grid, and every room's
+// even fill is topped up by the high-bays it lost, so the floor still gets the light the 9 m grid gave it.
+assert.equal(ctx.HB_STEP + '/' + ctx.HB_REF, '15/9', 'one high-bay every 15 m, against the 9 m grid it replaced');
+assert.ok(html.includes('nx = Math.max(1, Math.round(w / HB_STEP))') && html.includes('(e._boost || 1) * on * LIGHT.lampK'), 'the grid uses it, and the room fill is scaled by the fixtures it lost');
+assert.ok(/if \(mine\.length\) e\._boost = \(Math\.max\(1, Math\.round\(w \/ HB_REF\)\) \* Math\.max\(1, Math\.round\(d \/ HB_REF\)\)\) \/ mine\.length;/.test(html), 'the top-up is the fraction of high-bays that room lost');
+{ const at = step => Math.max(1, Math.round(23 / step)) * Math.max(1, Math.round(140 / step));
+  assert.equal(at(ctx.HB_STEP) + '/' + at(ctx.HB_REF), '18/48', 'the 23 x 140 m hall drops from 48 high-bays to 18');
+  assert.equal(at(15) < at(9) / 2, true, 'and every room loses at least half of them'); }
+assert.equal(shed._boost, 4, 'the 20 m shed keeps 1 high-bay where 4 hung, so its fill is topped up x4');
 assert.equal(L.inst.count, gen.length, 'drawn as ONE instanced mesh');
 assert.equal(n, gen.length + 3, 'plus the office light, the wall pack and the EXIT sign');
 const pack = L.lamps.find(l => l.z === 10.4), exitL = L.lamps.find(l => l.grid === false);
@@ -132,7 +141,9 @@ assert.ok(ctx.enclAt(28, 1, 3) === cup && ctx.enclAt(22, 1, 0) === office && ctx
 // The shed's 'tired' lamp flickers on its own at random moments (random seed), which made the exact before/after
 // comparisons below fail about 1 run in 30. It is checked here, then held steady for the rest of the suite.
 { const tired = L.lamps.filter(l => l.faulty);
-  assert.ok(tired.length === 1 && tired[0].room === shed, 'the shed (the only room with 4+ lamps) gets one tired lamp'); tired.forEach(l => { l.faulty = false; }); }
+  assert.equal(tired.length, 0, 'no room in this small world has 4+ high-bays any more, so none gets a tired ballast');
+  assert.ok(html.includes('for (const list of perRoom.values()) if (list.length >= 4) { const L = list[(list.length * 7 + 3) % list.length]; L.faulty = true;'), 'a big room with 4+ high-bays still gets one tired lamp');
+  L.lamps.forEach(l => { l.faulty = false; }); }   // whatever it found, held steady: the before/after comparisons below must not race a flicker
 const frame = (dt = 0.1) => { ctx.clock += dt; ctx.lightUpdate(dt); };
 const at = (x, y, z) => ctx.lightSample(x, y, z);
 const day = () => { ctx.hemi.intensity = 1.18; }, night = () => { ctx.hemi.intensity = 0.66; };
@@ -172,8 +183,23 @@ day(); frame(); assert.equal(at(0, 0.5, 13).irr, 0, 'and it is off in the day');
 // (owner: "when inside lit buildings it seems like the building lights up as you walk through it" - only the nearest few lamps
 // made pools, so the far end of a big hall sat on the weak fill and the pools came on round you as you walked)
 assert.ok(html.includes('const LAMP_POOL = 0.25, LAMP_EVEN = 1 - LAMP_POOL;') && html.includes('  roomLampEven();\n  LIGHT.ready = true;'), 'each room\'s even lamp light is worked out once, at build');
-assert.ok(html.includes('+ LAMP_EVEN * (e._arr || 0) * on * LIGHT.lampK') && html.includes('(L.room ? LAMP_POOL : LIGHT.night)'), 'the even light is in the room fill; room pools are the small local touch on top');
+assert.ok(html.includes('+ LAMP_EVEN * (e._arr || 0) * (e._boost || 1) * on * LIGHT.lampK') && html.includes('(L.room ? LAMP_POOL : LIGHT.night)'), 'the even light is in the room fill (scaled by the high-bays the room lost), and room pools are the small local touch on top');
 assert.ok(/w = 1 \/ \(1 \+ \(dx \* dx \+ dz \* dz\) \/ 225\)/.test(html), 'how many fixtures are on counts the ones near you most (so a local blackout still darkens round you)');
+// v1.97.148: fewer fixtures must not mean a darker room. The 9 m grid this shed used to get is the reference, measured
+// by the game's own roomLampEven, and the shed's fill now has to land on it.
+{ const ref = { x0: -10, x1: 10, z0: -10, z1: 10, top: 6, area: 400, wins: [], _lamps: [], _arr: 0 };
+  const keep = L.lamps.length, col = shed._lamps[0].col;   // the colour the real high-bays are given (three.js converts it to linear), so the two sides compare like for like
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+    const x = -10 + (i + 0.5) * 20 / 2, z = -10 + (j + 0.5) * 20 / 2, y = 6 - 0.35;
+    L.lamps.push({ x, y, z, r: Math.max(9, (y + 0.6) * 1.6), k: 1.5, grid: true, col, ylo: -1, room: ref, inst: -1 });
+  }
+  ctx.ENCL.push(ref); ctx.roomLampEven();
+  const was = ref._arr;
+  ctx.ENCL.pop(); L.lamps.length = keep; ctx.roomLampEven();
+  const now = shed._arr * shed._boost;
+  console.log('  v1.97.148 high-bays: the shed keeps ' + shed._lamps.length + ' mains fixture with its fill topped up x' + shed._boost + '; even light ' + was.toFixed(4) + ' (the 9 m grid) -> ' + now.toFixed(4));
+  assert.ok(was > 0.1 && Math.abs(now / was - 1) < 0.15, 'the shed reads ' + (now / was).toFixed(2) + 'x the floor light the 9 m grid gave (' + was.toFixed(3) + ' -> ' + now.toFixed(3) + ')');
+}
 // ---------------------------------------------------------------- scare controls
 { const before = at(0, 1.5, 0).irr; ctx.lightsFlicker(3, 30); let lo = 1e9, hi = 0;
   for (let i = 0; i < 25; i++) { frame(0.1); const v = at(0, 1.5, 0).irr; lo = Math.min(lo, v); hi = Math.max(hi, v); }
@@ -181,7 +207,8 @@ assert.ok(/w = 1 \/ \(1 \+ \(dx \* dx \+ dz \* dz\) \/ 225\)/.test(html), 'how m
   for (let i = 0; i < 10; i++) frame(0.1);
   assert.equal(L.flick, null, 'it ends on its own'); assert.ok(Math.abs(at(0, 1.5, 0).irr - before) < 1e-6, 'and the lights are back exactly'); }
 { const before = at(0, 1.5, 0).irr; ctx.lightsBlackout(6, 45); for (let i = 0; i < 20; i++) frame(0.1);
-  assert.ok(at(0, 1.5, 0).irr < 0.05, 'a local blackout kills the fixtures nearby');
+  const dark = at(0, 1.5, 0).irr;
+  assert.ok(dark < 0.05, 'a local blackout kills the fixtures nearby (irr ' + dark.toFixed(3) + ')');
   assert.ok(at(-8.5, 1.5, 0).irr > 0.05, 'but not the battery EXIT sign');
   assert.ok(L.lamps.filter(l => l.inst >= 0).every(l => l.shown <= 0.07), 'and the fixtures themselves go dark with their pools');
   for (let i = 0; i < 45; i++) frame(0.1);
