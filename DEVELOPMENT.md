@@ -1,3 +1,21 @@
+## TEST v1.97.138 — door switch buttons: bigger, reordered, press to act (2026-11-04)
+- Owner: *"make the three buttons a little bigger on the rolling doors. green button on top(opens door and mesh), middle yellow button(mesh closed only), red button on bottom(both closed). dont pull up a toast to select simply do the action when the button is activated. maybe just show a Interact prompt with the west face button symbol"*.
+- **Buttons:** 3 cm → **4.8 cm**, 14 cm apart on a larger station (0.46 x 0.22 m).
+  - **Green on top:** open door + mesh.
+  - **Yellow in the middle:** close the mesh only.
+  - **Red at the bottom:** close both.
+- **No menu:** `rollSwitchMenu` is gone. `rollButtonAim()` picks the button under the crosshair (within 7.5 cm of the line of sight, so you don't have to be pixel-exact). The button must be within 2.2 m of Squeeg, so it works in 3rd person too. Interact (X / E / ✋) runs `rollButtonPress()`, which does that button's action at once, with a click. No toast, except "no power" in an outage.
+- **Interact prompt** (`#iprompt`, just under the crosshair) while a button is aimed at: the **west face button** symbol (a face-button diamond with the left one filled), "Interact" and what the button does, e.g. "· Close the mesh only". On a keyboard (not in controller mode) the symbol becomes an **E** key.
+- Verified in the running game at the energy center's east door: aimed at each button and pressed through the real controller path. Green → door + mesh up, yellow → mesh down with the door still up, red → both down. No menu or toast appeared, and the prompt showed for each. Screenshots taken.
+- `validate-mesh-doors.cjs` now also checks:
+  - three buttons per switch in the owner's order and colours, at the new size;
+  - aiming at each one picks it, and pressing does it with nothing to read;
+  - looking away or standing out of reach falls through;
+  - the outage line;
+  - the prompt markup and that the menu is gone.
+- Controls card updated.
+- Bumped TEST to `1.97.138` / `corn-souls-test-shell-v165`.
+
 ## TEST v1.97.137 — a mesh door inside every roll-up, with a switch (2026-11-04)
 - Owner: *"Do you remember the mesh door you made in the energy center"*, then *"Can we add a mesh door to all rolling doors. The mesh door should be on the interior. With an interactive switch next to the door with the option to open both close both or only close mesh."*
 - **Mesh doors** (`meshDoorsBuild()`, run with the world after `exitSignsForEgress()`, once the building envelopes in `ENCL` exist). Each of the **14 roll-ups** gets a high-speed mesh screen like the energy center's original (removed in v1.97.119 when the steel doors were made uniform):
