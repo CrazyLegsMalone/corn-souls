@@ -1,3 +1,21 @@
+## TEST v1.97.145 — lit buildings are lit end to end, not just round you (2026-11-04)
+- Owner: *"when inside lit buildings it seems like the building lights up as you walk through it"* (and: *"the building probably doesnt need so many lamps"*).
+- **Cause:** the lighting pass makes pools for only the nearest `CS_N.L` lamps (5 on low, 8 on medium / high), picked each frame by distance from you. The big rooms have far more fixtures: 52 in the 23 x 140 m hall, 38, 30, 22 and 20 in the next ones. A room's even fill was weak (0.35) next to its pools, so everything past the nearest few lamps sat dark, and pools came on ahead of you as you walked. Lamp count alone isn't the fix: even a few lamps across a 140 m hall would pop the same way, and the generated high-bays are one instanced mesh, so they cost almost nothing to draw.
+- **Fix** (`roomLampEven`, run once at the end of `lightBuild`):
+  - For each room, the average light its whole lamp array throws on the floor with every fixture on, using the shader's own pool maths over a 2 m grid. Stored as `e._arr` in fill units.
+  - Each frame, a room's fill adds `LAMP_EVEN` (0.75) x that x how many of its fixtures are on. That count is weighted toward the fixtures near you (1 / (1 + d² / 15²)), so outage, warm-up, flicker and a local blackout still darken around you.
+  - Room lamps' pools keep `LAMP_POOL` (0.25) of their strength, as a local touch. Outdoor lamps are unchanged.
+  - No shader change and nothing per pixel: it's the existing fill uniform.
+- **Measured in the running game** (floor light, standing 8% in from one end):
+
+  | Hall | Before (your end → rest) | After |
+  | --- | --- | --- |
+  | 140 m hall | 1.31 → 0.33 past ~15 m | 1.20 → 0.96 the whole way |
+  | 76 m hall | 1.71 → 0.33 | 1.59 → 1.24 |
+
+- `validate-interior-dark.cjs`: the existing checks pass (dark rooms, outage, windows, doors, flicker, local blackout, darkness levels), plus checks for the even-light wiring.
+- Bumped TEST to `1.97.145` / `corn-souls-test-shell-v172`.
+
 ## TEST v1.97.144 — title screen: the owner's settings, no tuner, pink, new menu names (2026-11-04)
 - Owner (screenshot of the tuner set up): *"set the menu the way the settings are in the menu tuner then remove the menu tuner. give Corn Souls the magenta pinkish color scheme matching the fire. remove the harvest rememebers from the start menu. remove rites and controls. new harvest should be solo harvest. kindle a bonfire should be Host Multiplayer. join a bonfire should be Join Multiplayer. remove a tale of the north field."*
 - **Settings fixed** at the screenshot's values (`var TS`):

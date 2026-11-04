@@ -9805,8 +9805,33 @@ function lightBuild() {
     if (near.length) for (const w of near) { w.door = d; w.shut = shut; }
     else { const w = [d.x, y, d.z, reach]; w.door = d; w.shut = shut; e.wins.push(w); }
   }
+  roomLampEven();
   LIGHT.ready = true;
   return LIGHT.lamps.length;
+}
+// v1.97.145, owner: "when inside lit buildings it seems like the building lights up as you walk through it". Only the nearest
+// CS_N.L lamps (5 / 8) make pools, and the big rooms have 20-52 fixtures, so the far end of a hall sat on a weak fill while the
+// pools around you came on as you walked. Now each room's whole lamp array is worked out once, here: the average light it
+// throws on the floor with every fixture on (the same pool maths as the shader, over a 2 m grid). That average is the room's
+// even light, scaled each frame by how many of its fixtures are actually on (outage, warm-up, flicker); the pools near you keep
+// LAMP_POOL of their strength on top, so a hall is lit end to end and the bit round you is only a touch brighter.
+const LAMP_POOL = 0.25, LAMP_EVEN = 1 - LAMP_POOL;
+function roomLampEven() {
+  const fc = CSU.csFillC.value, fl = fc.r * 0.3 + fc.g * 0.59 + fc.b * 0.11;
+  for (const e of ENCL) { e._lamps = []; e._arr = 0; }
+  for (const L of LIGHT.lamps) if (L.room && L.room._lamps) L.room._lamps.push(L);
+  for (const e of ENCL) {
+    if (!e._lamps.length) continue;
+    const nx = Math.max(1, Math.round((e.x1 - e.x0) / 2)), nz = Math.max(1, Math.round((e.z1 - e.z0) / 2)); let sum = 0, n = 0;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const x = e.x0 + (i + 0.5) * (e.x1 - e.x0) / nx, z = e.z0 + (j + 0.5) * (e.z1 - e.z0) / nz, y = 0.1; let s = 0;
+      for (const L of e._lamps) { if (y < L.ylo) continue; const dx = L.x - x, dy = L.y - y, dz = L.z - z, d2 = dx * dx + dy * dy + dz * dz, a = 1 - d2 / (L.r * L.r); if (a <= 0) continue;
+        const nl = Math.max(0, dy / Math.sqrt(d2 + 1e-4)), sm = Math.max(0, Math.min(1, (dy + 1.2) / 1.3));
+        s += (L.col.r * 0.3 + L.col.g * 0.59 + L.col.b * 0.11) * L.k * a * a * (0.3 + 0.7 * nl) * sm * sm * (3 - 2 * sm); }
+      sum += s; n++;
+    }
+    e._arr = n ? sum / n / fl : 0;   // in fill units (the fill colour's brightness)
+  }
 }
 // one switching pattern for flickers: mostly on, with stutters and the odd full drop-out, never in step between lamps
 function flickWave(t, seed) {
@@ -9852,7 +9877,8 @@ function lightUpdate(dt) {
   for (let i = 0; i < R.length; i++) {
     const e = R[i]; e._slot = i; e._fill = 0;
     e.lvl = evLevel(e, Math.max(e.x0, Math.min(e.x1, rx)), Math.max(e.z0, Math.min(e.z1, rz)), t);   // the room's nearest point decides
-    e._fill = out ? 0 : LIGHT.fill * e.lvl * warmRoom;
+    let on = 0; if (e._lamps && e._lamps.length) { let ws = 0; for (const L of e._lamps) { const dx = L.x - rx, dz = L.z - rz, w = 1 / (1 + (dx * dx + dz * dz) / 225); on += w * (L.lvl === undefined ? 1 : L.lvl); ws += w; } on /= ws; }   // how many of its fixtures are on, the ones near you counting most (a local blackout / flicker darkens round you)
+    e._fill = out ? 0 : LIGHT.fill * e.lvl * warmRoom + LAMP_EVEN * (e._arr || 0) * on * LIGHT.lampK;   // + the room's whole lamp array, evenly (v1.97.145)
     ux0 = Math.min(ux0, e.x0); uz0 = Math.min(uz0, e.z0); ux1 = Math.max(ux1, e.x1); uz1 = Math.max(uz1, e.z1);
   }
   for (const e of ENCL) if (R.indexOf(e) < 0) e._slot = -1;
@@ -9882,7 +9908,7 @@ function lightUpdate(dt) {
       if (lv > 0 && L.faulty) { const s = Math.sin(t * 0.37 + L.seed) + Math.sin(t * 0.91 + L.seed * 2); if (s > 1.55) lv *= flickWave(t * 1.4, L.seed); }
     } else if (L.strobe) lv = strobe ? 1 : 0;
     L.lvl = lv;
-    const I = L.k * lv * LIGHT.lampK * (L.room ? 1 : LIGHT.night);
+    const I = L.k * lv * LIGHT.lampK * (L.room ? LAMP_POOL : LIGHT.night);   // a room's pools are the local touch on top of its even light
     if (I < 0.01) continue;
     const slot = L.room ? L.room._slot : -1;
     if (L.room && slot < 0) continue;

@@ -168,6 +168,12 @@ assert.ok(at(0, 0.5, 13).irr > 0.3, 'at night the wall pack throws a pool on the
 assert.equal(at(0, 0.5, 9).irr > cShed.irr, false, 'that pool stays outside the wall (outdoor lamps light outdoor pixels only)');
 day(); frame(); assert.equal(at(0, 0.5, 13).irr, 0, 'and it is off in the day');
 
+// ---------------------------------------------------------------- v1.97.145: a room's whole lamp array lights it evenly
+// (owner: "when inside lit buildings it seems like the building lights up as you walk through it" - only the nearest few lamps
+// made pools, so the far end of a big hall sat on the weak fill and the pools came on round you as you walked)
+assert.ok(html.includes('const LAMP_POOL = 0.25, LAMP_EVEN = 1 - LAMP_POOL;') && html.includes('  roomLampEven();\n  LIGHT.ready = true;'), 'each room\'s even lamp light is worked out once, at build');
+assert.ok(html.includes('+ LAMP_EVEN * (e._arr || 0) * on * LIGHT.lampK') && html.includes('(L.room ? LAMP_POOL : LIGHT.night)'), 'the even light is in the room fill; room pools are the small local touch on top');
+assert.ok(/w = 1 \/ \(1 \+ \(dx \* dx \+ dz \* dz\) \/ 225\)/.test(html), 'how many fixtures are on counts the ones near you most (so a local blackout still darkens round you)');
 // ---------------------------------------------------------------- scare controls
 { const before = at(0, 1.5, 0).irr; ctx.lightsFlicker(3, 30); let lo = 1e9, hi = 0;
   for (let i = 0; i < 25; i++) { frame(0.1); const v = at(0, 1.5, 0).irr; lo = Math.min(lo, v); hi = Math.max(hi, v); }
