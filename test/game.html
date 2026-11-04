@@ -5165,11 +5165,11 @@ function rollUpDoor(cx, cz, alongX, w, h, opt) {
 // Built once the world is up (the building envelopes in ENCL say which face is inside): on that face of every roll-up, a
 // high-speed mesh screen like the energy center's old one (see-through gray wire, dark stiffeners, aluminum side tracks and a
 // head box it rolls up into), and beside the door a push-button station. X / E / the hand button at the station: open both, close
-// both, or close the mesh only. The doors follow the switch now (they no longer open on their own as you walk up); no power, no
+// both, or (yellow) the door open with the mesh closed. The doors follow the switch now (they no longer open on their own as you walk up); no power, no
 // hoist. A shut mesh blocks like the door does. 2 player: a press is sent at once, and the host's door states ride the world sync.
 let MESH_TEX = null;
 const ROLLBTN = [];   // every door switch button: { m: its mesh, i: the door, mode: 'open' | 'mesh' | 'close' }
-const ROLLBTN_LABEL = { open: 'Open door + mesh', mesh: 'Close the mesh only', close: 'Close door + mesh' };
+const ROLLBTN_LABEL = { open: 'Open door + mesh', mesh: 'Door open, mesh closed', close: 'Close door + mesh' };
 function meshTex() {
   if (MESH_TEX) return MESH_TEX;
   if (typeof document === 'undefined') return null;
@@ -5237,12 +5237,12 @@ function rollSwitchNear() {   // the index of the door whose switch is in reach,
   let best = -1, bd = 1.6; (O.rollDoors || []).forEach((d, i) => { if (!d.sw) return; const r = Math.hypot(walk.x - d.sw.x, walk.z - d.sw.z); if (r < bd && Math.abs((walk.y || 0) - (d.sw.y - 1.35)) < 1.5) { bd = r; best = i; } });
   return best;
 }
-function rollSwitchSet(i, mode, remote) {   // 'open' both, 'close' both, 'mesh' = close the mesh only
+function rollSwitchSet(i, mode, remote) {   // 'open' both, 'close' both, 'mesh' = the rolling door open with the mesh closed
   const d = (O.rollDoors || [])[i]; if (!d) return null;
   if (POWER_OUTAGE.on && !remote) return 'Nothing happens - no power to the door motors.';
-  if (mode === 'open') { d.ws = 1; d.wm = 1; } else if (mode === 'close') { d.ws = 0; d.wm = 0; } else if (mode === 'mesh') d.wm = 0; else return null;
+  if (mode === 'open') { d.ws = 1; d.wm = 1; } else if (mode === 'close') { d.ws = 0; d.wm = 0; } else if (mode === 'mesh') { d.ws = 1; d.wm = 0; } else return null;   // yellow (v1.97.141, owner): rolling door open, mesh closed - from any state
   if (!remote) { if (typeof wsLock === 'function') wsLock('rd'); if (NET.conn) netSend({ t: 'rd', i, s: d.ws, m: d.wm }); }
-  return mode === 'open' ? 'Door and mesh going up.' : mode === 'close' ? 'Door and mesh coming down.' : 'Mesh coming down.';
+  return mode === 'open' ? 'Door and mesh going up.' : mode === 'close' ? 'Door and mesh coming down.' : 'Door up, mesh down.';
 }
 function rollButtonAim() {   // the switch button under the crosshair, within reach (2.4 m), or null
   if (!walk.on || walk.dead || walk.drive || walk.mow || walk.ride || !ROLLBTN.length) return null;
@@ -14494,7 +14494,7 @@ function controlsMenu(code, fromTitle) {
     ['Walking (Squeeg mode)', [
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
-      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Roll-up door switch (inside, beside the door): look at a button and interact - green opens door + mesh, yellow closes the mesh, red closes both', 'E', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
+      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Roll-up door switch (inside, beside the door): look at a button and interact - green opens door + mesh, yellow opens the door with the mesh closed, red closes both', 'E', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
       ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],

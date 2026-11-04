@@ -49,11 +49,15 @@ ctx.walk.x = 50; assert.equal(ctx.rollSwitchNear(), -1, 'out of reach'); ctx.wal
 assert.match(ctx.rollSwitchSet(0, 'open'), /going up/); run(3);
 assert.ok(A.open === 1 && A.mo === 1 && !blocked(A.seg) && !blocked(A.mseg), 'open both: door and mesh up, the way is clear');
 assert.equal(B.open, 0, 'the other door does not move');
-assert.match(ctx.rollSwitchSet(0, 'mesh'), /Mesh coming down/); run(2);
-assert.ok(A.open === 1 && A.mo === 0 && !blocked(A.seg) && blocked(A.mseg), 'close the mesh only: the door stays up, the mesh shuts and blocks');
+assert.match(ctx.rollSwitchSet(0, 'mesh'), /Door up, mesh down/); run(2);
+assert.ok(A.open === 1 && A.mo === 0 && !blocked(A.seg) && blocked(A.mseg), 'yellow: the door stays up, the mesh shuts and blocks');
 assert.ok(A.mesh.visible && A.mesh.scale.y === 1, 'the mesh hangs full height');
 assert.match(ctx.rollSwitchSet(0, 'close'), /coming down/); run(3);
 assert.ok(A.open === 0 && A.mo === 0 && blocked(A.seg) && blocked(A.mseg), 'close both');
+// v1.97.141, owner: "pressing the yellow should open the door if the door is closed ... mesh closed rolling door open"
+ctx.rollSwitchSet(0, 'mesh'); run(3);
+assert.ok(A.open === 1 && A.mo === 0 && !blocked(A.seg) && blocked(A.mseg), 'yellow from both shut: the rolling door goes up, the mesh stays shut');
+ctx.rollSwitchSet(0, 'close'); run(3);
 // no power, no hoist
 ctx.POWER_OUTAGE.on = true; assert.match(ctx.rollSwitchSet(0, 'open'), /no power/); run(2); assert.equal(A.open, 0, 'dead plant: the switch does nothing');
 ctx.rollSwitchSet(0, 'open', true); ctx.POWER_OUTAGE.on = false; run(3); assert.equal(A.open, 1, 'power back: it finishes what it was told');
@@ -76,7 +80,7 @@ ctx.rollApply('00'); assert.ok(A.ws === 0 && A.wm === 0 && B.ws === 0, 'the host
   // stand 0.9 m inside the east door's switch and look at each button: interact does exactly that button, at once
   const cam = ctx.camera; ctx.walk.x = A.sw.x - 0.9; ctx.walk.z = A.sw.z; ctx.POWER_OUTAGE.on = false; ctx.rollApply('00'); ctx.NET.conn = null;
   const look = m => { const w = bt.find(b => b.mode === m).m.getWorldPosition(new T.Vector3()); cam.position.set(ctx.walk.x, 1.6, ctx.walk.z); cam.lookAt(w); cam.updateMatrixWorld(true); };
-  for (const [m, want] of [['open', [1, 1]], ['mesh', [1, 0]], ['close', [0, 0]], ['open', [1, 1]]]) {
+  for (const [m, want] of [['open', [1, 1]], ['mesh', [1, 0]], ['close', [0, 0]], ['mesh', [1, 0]], ['close', [0, 0]], ['open', [1, 1]]]) {
     look(m); const a = ctx.rollButtonAim(); assert.ok(a && a.i === 0 && a.mode === m, 'aiming at ' + m + ' picks it');
     assert.equal(ctx.rollButtonPress(), '', m + ': done at once, nothing to read'); assert.deepEqual([A.ws, A.wm], want, m + ': door / mesh targets'); }
   assert.ok(ctx.clicks >= 4, 'each press clicks');
@@ -91,4 +95,4 @@ assert.ok(!html.includes('function rollSwitchMenu'), 'no menu to pick from any m
 assert.ok(html.includes('<div id="iprompt">') && html.includes('<circle cx="4.5" cy="12" r="3.6" fill="#fff"/>') && html.includes('P3.rollButtonAim()'), 'an Interact prompt with the west face button (filled) shows while a button is under the crosshair');
 assert.ok(html.includes('<span>Interact</span></div>') && !html.includes("querySelector('small').textContent"), 'just "Interact" - no action text (v1.97.140, owner: the colours are enough)');
 assert.ok(html.includes("return { t: 'ws', rd: rollStates(),") && html.includes('if (L.rd <= 0 && m.rd) rollApply(m.rd);') && html.includes("} else if (m.t === 'rd') {"), 'synced in 2 player');
-console.log('PASS: every roll-up gets a mesh door on its inside face and a switch beside it: open both / close both / close the mesh only, collision follows, no power no hoist, synced in 2 player');
+console.log('PASS: every roll-up gets a mesh door on its inside face and a switch beside it: open both / close both / door open with the mesh closed, collision follows, no power no hoist, synced in 2 player');

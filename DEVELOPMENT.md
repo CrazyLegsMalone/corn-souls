@@ -1,3 +1,12 @@
+## TEST v1.97.141 — yellow = rolling door open, mesh closed (2026-11-04)
+- Owner: *"pressing the yellow should open the door if the door is closed. basically pressing the yellow should make the door be mesh closed rolling door open. right now if pressed when mesh and door are closed nothing happens"*.
+- **Yellow** now sets the steel door **open** and the mesh **closed** from any state. Before, it only closed the mesh, so with both already shut nothing happened.
+- **Green** (both open) and **red** (both closed) are unchanged.
+- The 2-player message and world sync already carry both targets, so nothing changed there.
+- `validate-mesh-doors.cjs` checks yellow from both shut: the door goes up, the mesh stays down and blocks. It does this on the switch directly and by aiming and pressing.
+- Controls card updated. All 40 suites pass.
+- Bumped TEST to `1.97.141` / `corn-souls-test-shell-v168`.
+
 ## TEST v1.97.140 — the door switch prompt just says "Interact" (2026-11-04)
 - Owner (screenshot, with the action text struck out): *"remove the part i crossed out. the interact prompt and the different colors is enough for player to understand function"*.
 - `#iprompt` is now just the west face button symbol (E on a keyboard) and **Interact**. The "· Close the mesh only" style action text and its styling are gone. Checked in the running game while aiming at the yellow button.
