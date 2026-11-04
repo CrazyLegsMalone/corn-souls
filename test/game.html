@@ -7096,9 +7096,10 @@ function init(container) {
       for (const [c, w, y0, y1] of (openings || []).slice().sort((q, r) => q[0] - r[0])) {
         piece(p, c - w / 2, 0, H, true);
         piece(c - w / 2, c + w / 2, 0, y0, y0 > 0); piece(c - w / 2, c + w / 2, y1, H, false);   // below a window still blocks walking
-        if (y0 === 0) { const fm = mat(0x3d4650), ft = th + 0.06;                                                      // dark door frame so doorways read against the walls
-          for (const e of [c - w / 2 - 0.04, c + w / 2 + 0.04]) add(new T.BoxGeometry(alongX ? 0.08 : ft, y1, alongX ? ft : 0.08), fm, alongX ? e : fixed, FY + y1 / 2, alongX ? fixed : e, null, true);
-          add(new T.BoxGeometry(alongX ? w + 0.16 : ft, 0.08, alongX ? ft : w + 0.16), fm, alongX ? c : fixed, FY + y1 + 0.04, alongX ? fixed : c, null, true); }
+        if (y0 === 0) { const fm = mat(0x3d4650), ft = th + 0.06, J = 0.012;                                           // dark door frame so doorways read against the walls
+          // (v1.97.115: the jambs and head stand 12 mm proud into the opening; their inside faces used to sit exactly on the wall's cut end and flickered against it)
+          for (const e of [c - w / 2 - 0.04 + J, c + w / 2 + 0.04 - J]) add(new T.BoxGeometry(alongX ? 0.08 : ft, y1 - J, alongX ? ft : 0.08), fm, alongX ? e : fixed, FY + (y1 - J) / 2, alongX ? fixed : e, null, true);
+          add(new T.BoxGeometry(alongX ? w + 0.16 : ft, 0.08, alongX ? ft : w + 0.16), fm, alongX ? c : fixed, FY + y1 + 0.04 - J, alongX ? fixed : c, null, true); }
         if (y0 > 0) add(new T.BoxGeometry(alongX ? w : 0.04, y1 - y0, alongX ? 0.04 : w), glassM, alongX ? c : fixed, FY + (y0 + y1) / 2, alongX ? fixed : c, null, true);   // glass
         p = c + w / 2;
       }
