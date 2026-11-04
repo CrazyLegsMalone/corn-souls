@@ -7544,8 +7544,9 @@ function init(container) {
   // ---------- STORAGE SHED (photos): wooden shed butted against the south side of the yeast cooler, west ends flush, 24 paces
   // (~7.3 m) long east-west, ~12 ft deep. Ridge runs east-west (gables on the east and west ends), eaves as tall as the cooler,
   // ridge ~2 ft higher. Floor ~10 in off the ground. East gable: 10 ft roll-up door (opens when Squeeg walks up) with a little
-  // ramp; south wall: man door at the SE corner (with a step) and a 2 ft x 4 ft window. Inside: U-shaped shelves in the west half,
-  // and the zero-turn mower parked in the east half (only drawn while Squeeg is inside).
+  // ramp; south wall: man door at the SE corner (with a step) and a 2 ft x 4 ft window. Inside: L-shaped shelves in the west half
+  // (west wall and north side; the south run was removed in v1.97.152), and the zero-turn mower parked in the east half (only drawn
+  // while Squeeg is inside).
   {
     const X0 = 37.4 + 8.7, X1 = X0 + 7.3, Z0 = 44, Z1 = 44 + 3.66, FL = 0.25, EAVE = 3.1, RIDGE = EAVE + 0.6, trim = mat(0x8a6f42);
     const cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2, W = X1 - X0, D = Z1 - Z0, T2 = 0.1;
@@ -7579,13 +7580,13 @@ function init(container) {
     { const g = new T.Group(); g.position.set(DX, FL, Z1 + 0.04); const d = new T.Mesh(new T.BoxGeometry(DW - 0.04, DH, 0.05), mat(0x8a6a45)); d.position.y = DH / 2; g.add(d); scene.add(g); (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x: DX, z: Z1, open: 0 }); }
     box(1.0, FL - 0.05, 0.45, mat(0x6e5a3e), DX, (FL - 0.05) / 2, Z1 + 0.25);
     WALK_SURF.push({ x0: DX - 0.5, x1: DX + 0.5, z0: Z1, z1: Z1 + 0.47, y0: FL / 2, y1: FL / 2 });
-    // U-shaped shelving in the west half: along the west wall and both side walls
+    // L-shaped shelving in the west half: along the west wall and the north side. v1.97.152, owner: "remove shelf on south wall
+    // of lawn mower shed" - the south run (4 boards on 4 posts) is gone, which clears the wall the man door and window are in.
     const shelfM = mat(0x7d6a4a), postM = mat(0x5a5f66), half = cx;
     const shelfRun = (x0, x1, z0, z1) => { for (const y of [0.45, 1.05, 1.65, 2.25]) box(Math.abs(x1 - x0), 0.04, Math.abs(z1 - z0), shelfM, (x0 + x1) / 2, FL + y, (z0 + z1) / 2);
       for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) box(0.05, 2.3, 0.05, postM, x, FL + 1.15, z); };
     shelfRun(X0 + 0.1, X0 + 0.7, Z0 + 0.1, Z1 - 0.1);                  // west wall
     shelfRun(X0 + 0.7, half - 0.2, Z0 + 0.1, Z0 + 0.6);                // north side
-    shelfRun(X0 + 0.7, half - 0.2, Z1 - 0.6, Z1 - 0.1);                // south side
     // zero-turn mower in the east half, low poly; only shown while Squeeg is inside the shed
     const mw = new T.Group(); mw.position.set(X1 - 1.6, FL, cz); mw.rotation.y = Math.PI;   // backed in: nose toward the roll-up door
     const red = mat(0xf2c200), blk = mat(0x1e1f22), gry = mat(0x6f7378), part = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); mw.add(o); return o; };

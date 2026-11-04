@@ -1,3 +1,11 @@
+## TEST v1.97.152 — the lawn mower shed's south wall shelf is gone (2026-11-04)
+- Owner: *"remove shelf on south wall of lawn mower shed"*.
+- The storage shed by the yeast cooler (the zero-turn mower parks in its east half, `O.shedMower`) had a U of shelves in its west half: a run along the west wall, one along the north side, and one along the south side (`shelfRun(X0 + 0.7, half - 0.2, Z1 - 0.6, Z1 - 0.1)` - four boards on four posts).
+- **The south run is removed**: the shed now has an L (west wall and north side). Nothing else about the shed changed - the man door at the SE corner, its step, the 2 ft x 4 ft window, the east roll-up and the parked mower are all untouched.
+- New `validate-mower-shed.cjs` (45th suite in CI) owns that block: exactly two `shelfRun` calls, the west and north ones named, no shelf left hugging `Z1`, no stale "U-shaped / both side walls" comment, and positive checks that the south wall's door and window, the mower and its roll-up are still there. Verified that it fails against the previous revision and passes now.
+- Verified locally: the 45 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes. LIVE is untouched.
+- Bumped TEST to `1.97.152` / `corn-souls-test-shell-v179`.
+
 ## TEST v1.97.151 — a phone Eat button, only while something edible is in your hands (2026-11-04)
 - Owner, on the audit's open question about a touch-screen eat button: *"yes add eat button only visible when holding something edible"*.
 - **The button:** `#eatBtn` (🍖) in the HUD next to the interact and jump buttons, `display:none` unless `body.walking:not(.pc):not(.driving).canEat`. So it is on phones and tablets, never on a desktop (`.pc`), never in a vehicle, never in pad mode, and only while it would do something.
