@@ -5155,8 +5155,86 @@ function rollUpDoor(cx, cz, alongX, w, h, opt) {
   const head = new T.Mesh(new T.BoxGeometry(0.42, 0.14, w + 0.16), mat(0x8a9097)); head.position.set(0, h + 0.03, 0); g.add(head);   // head strip (4 cm below the lintel: no flicker against it)
   const hood = new T.Mesh(new T.CylinderGeometry(0.34, 0.34, w + 0.3, 16).rotateX(Math.PI / 2), mat(0xc9ced3)); hood.position.set(side * 0.52, h + 0.42, 0); g.add(hood);   // coil hood
   const seg = alongX ? [cx - w / 2, cz, cx + w / 2, cz] : [cx, cz - w / 2, cx, cz + w / 2]; wallSegs.push(seg);
-  const d = { panel, seg, home: seg.slice(), x: cx, z: cz, h, open: 0, g }; (O.rollDoors = O.rollDoors || []).push(d); return d;
+  const d = { panel, seg, home: seg.slice(), x: cx, z: cz, h, w, open: 0, g, side, alongX, ws: 0, mo: 0, wm: 0, inside: opt.inside, swAt: opt.swAt }; (O.rollDoors = O.rollDoors || []).push(d); return d;   // ws / wm: the switch's targets for the steel door / the mesh (0 shut, 1 open)
 }
+// ---------- MESH DOORS + DOOR SWITCHES (v1.97.137, owner: "Can we add a mesh door to all rolling doors. The mesh door should be
+// on the interior. With an interactive switch next to the door with the option to open both close both or only close mesh").
+// Built once the world is up (the building envelopes in ENCL say which face is inside): on that face of every roll-up, a
+// high-speed mesh screen like the energy center's old one (see-through gray wire, dark stiffeners, aluminum side tracks and a
+// head box it rolls up into), and beside the door a push-button station. X / E / the hand button at the station: open both, close
+// both, or close the mesh only. The doors follow the switch now (they no longer open on their own as you walk up); no power, no
+// hoist. A shut mesh blocks like the door does. 2 player: a press is sent at once, and the host's door states ride the world sync.
+let MESH_TEX = null;
+function meshTex() {
+  if (MESH_TEX) return MESH_TEX;
+  if (typeof document === 'undefined') return null;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 32; const c = cv.getContext('2d'); c.strokeStyle = 'rgba(40,42,44,0.9)'; c.lineWidth = 1.2;
+  for (let i = 0; i <= 32; i += 4) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 32); c.moveTo(0, i); c.lineTo(32, i); c.stroke(); }
+  const t = srgbTex(new T.CanvasTexture(cv)); t.wrapS = t.wrapT = T.RepeatWrapping; t.minFilter = T.LinearFilter; return (MESH_TEX = t);
+}
+function rollInside(d) {   // +1 / -1: which face of the wall (local x) is inside a building; the hood's face if it can't tell
+  if (d.inside) return d.inside;   // a building with no envelope says so itself (the storage shed)
+  const ry = d.g.rotation.y, ax = Math.cos(ry), az = -Math.sin(ry), p = d.g.position, y = (d.g.position.y || 0) + 1.5;
+  const a = enclAt(p.x + ax * 1.3, y, p.z + az * 1.3), b = enclAt(p.x - ax * 1.3, y, p.z - az * 1.3);
+  if (a && !b) return 1; if (b && !a) return -1;
+  if (a && b && a !== b) return a.area < b.area ? 1 : -1;   // between two rooms: the smaller one's side
+  return d.side;
+}
+function meshDoorsBuild() {
+  const tx = meshTex(), frameM = mat(0xa9adb0), barM = mat(0x2a2c2e), boxM = mat(0x3d4247), btnG = mat(0x2e9e4a), btnR = mat(0xc8312a), btnY = mat(0xe0b020);
+  let n = 0;
+  for (const d of O.rollDoors || []) {
+    if (d.mesh) continue;
+    const s = d.in = rollInside(d), w = d.w, h = d.h, o = s === d.side ? 1.0 : 0.36;   // in front of the coil hood when it is on this face
+    const mg = new T.Group(); mg.position.x = s * o; d.g.add(mg);
+    const mp = new T.Group(); mp.position.y = h / 2; mg.add(mp);
+    const geo = new T.PlaneGeometry(w + 0.02, h); { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w + 0.02) / 0.12, uv.getY(i) * h / 0.12); }
+    const sc = new T.Mesh(geo, new T.MeshLambertMaterial({ map: tx, color: 0x9aa0a4, transparent: true, opacity: 0.55, depthWrite: false, side: T.DoubleSide })); sc.rotation.y = Math.PI / 2; sc.userData.noHit = true; mp.add(sc);
+    const hz = new T.Mesh(geo, new T.MeshLambertMaterial({ color: 0x3a3e42, transparent: true, opacity: 0.35, depthWrite: false, side: T.DoubleSide })); hz.rotation.y = Math.PI / 2; hz.position.x = 0.01; hz.renderOrder = 3; hz.userData.noHit = true; mp.add(hz);
+    for (let y = -h / 2 + 0.05; y <= h / 2; y += (h - 0.1) / 6) { const st = new T.Mesh(new T.BoxGeometry(0.05, 0.05, w), barM); st.position.y = y; mp.add(st); }   // stiffeners, the bottom one the weighted edge
+    const seam = new T.Mesh(new T.BoxGeometry(0.05, h, 0.03), barM); mp.add(seam);
+    for (const e of [-1, 1]) { const p = new T.Mesh(new T.BoxGeometry(0.12, h + 0.12, 0.12), frameM); p.position.set(0, (h + 0.12) / 2, e * (w / 2 + 0.07)); mg.add(p); }   // aluminum side tracks
+    const hb = new T.Mesh(new T.BoxGeometry(0.3, 0.36, w + 0.38), frameM); hb.position.set(0, h + 0.3, 0); mg.add(hb);   // head box it rolls up into
+    // the push-button station on the inside face, beside the door (the side away from any man door)
+    d.g.updateMatrixWorld(true);
+    const spot = e => d.g.localToWorld(V3(s * 0.2, 0, e * (w / 2 + 0.62)));
+    let e = 1; { const a = spot(1), b = spot(-1), clear = q => !(O.swingDoors || []).some(sd => Math.hypot(sd.x - q.x, sd.z - q.z) < 1.3); if (!clear(a) && clear(b)) e = -1; }
+    const sb = new T.Group(); sb.position.set(s * 0.2, 1.35, e * (w / 2 + 0.62)); d.g.add(sb);
+    if (d.swAt) { const [x, z, nx, nz] = d.swAt; d.g.remove(sb); sb.position.set(x, (d.g.position.y || 0) + 1.35, z); sb.rotation.y = Math.atan2(-s * nz, s * nx); scene.add(sb); sb.updateMatrixWorld(true); }   // its buttons face (nx, nz)   // no room beside the door: where the building says
+    const bx = new T.Mesh(new T.BoxGeometry(0.1, 0.34, 0.2), boxM); sb.add(bx);
+    [[btnG, 0.09], [btnR, 0], [btnY, -0.09]].forEach(([m, y]) => { const b = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.03, 8).rotateZ(Math.PI / 2), m); b.position.set(s * 0.06, y, 0); sb.add(b); });
+    d.g.updateMatrixWorld(true);
+    const sw = sb.getWorldPosition(V3()); d.sw = { x: sw.x, z: sw.z, y: sw.y };
+    const A = d.g.localToWorld(V3(s * o, 0, -w / 2)), B = d.g.localToWorld(V3(s * o, 0, w / 2));
+    d.mseg = [A.x, A.z, B.x, B.z]; d.mhome = d.mseg.slice(); wallSegs.push(d.mseg);
+    d.mesh = mp; d.mo = d.wm = 0; n++;
+  }
+  return n;
+}
+function rollDoorStep(d, dt) {   // the doors follow their switch (steel up 1.6/s, down 0.8/s; the high-speed mesh 2.5/s); a dead plant freezes them
+  if (!POWER_OUTAGE.on) {
+    d.open = d.ws ? Math.min(1, d.open + 1.6 * dt) : Math.max(0, d.open - 0.8 * dt);
+    if (d.mesh) d.mo = d.wm ? Math.min(1, d.mo + 2.5 * dt) : Math.max(0, d.mo - 2.5 * dt);
+  }
+  d.panel.scale.y = 1 - 0.92 * d.open; d.panel.position.y = d.h / 2 + d.h * 0.46 * d.open;
+  const shut = d.open < 0.55; for (let i = 0; i < 4; i++) d.seg[i] = shut ? d.home[i] : 1e5;
+  if (d.mesh) { d.mesh.scale.y = 1 - 0.95 * d.mo; d.mesh.position.y = d.h / 2 + d.h * 0.475 * d.mo; d.mesh.visible = d.mo < 0.995;
+    const ms = d.mo < 0.55; for (let i = 0; i < 4; i++) d.mseg[i] = ms ? d.mhome[i] : 1e5; }
+}
+function rollSwitchNear() {   // the index of the door whose switch is in reach, or -1
+  if (!walk.on || walk.dead || walk.drive || walk.mow || walk.ride) return -1;
+  let best = -1, bd = 1.6; (O.rollDoors || []).forEach((d, i) => { if (!d.sw) return; const r = Math.hypot(walk.x - d.sw.x, walk.z - d.sw.z); if (r < bd && Math.abs((walk.y || 0) - (d.sw.y - 1.35)) < 1.5) { bd = r; best = i; } });
+  return best;
+}
+function rollSwitchSet(i, mode, remote) {   // 'open' both, 'close' both, 'mesh' = close the mesh only
+  const d = (O.rollDoors || [])[i]; if (!d) return null;
+  if (POWER_OUTAGE.on && !remote) return 'Nothing happens - no power to the door motors.';
+  if (mode === 'open') { d.ws = 1; d.wm = 1; } else if (mode === 'close') { d.ws = 0; d.wm = 0; } else if (mode === 'mesh') d.wm = 0; else return null;
+  if (!remote) { if (typeof wsLock === 'function') wsLock('rd'); if (NET.conn) netSend({ t: 'rd', i, s: d.ws, m: d.wm }); }
+  return mode === 'open' ? 'Door and mesh going up.' : mode === 'close' ? 'Door and mesh coming down.' : 'Mesh coming down.';
+}
+function rollStates() { return (O.rollDoors || []).map(d => d.ws + 2 * d.wm).join(''); }
+function rollApply(str) { if (typeof str !== 'string') return; (O.rollDoors || []).forEach((d, i) => { const v = +str[i]; if (v >= 0 && v <= 3) { d.ws = v & 1; d.wm = (v >> 1) & 1; } }); }
 // a plain man door that vanishes as Squeeg walks up (like the other doors): center (x, z) on a wall running along x (alongX) or z, leaf color,
 // plus a concrete floor helper for the simple buildings
 function manDoor(x, z, alongX, col, inward) {   // inward: +1/-1 = which way is inside (exterior doors only)
@@ -7487,7 +7565,7 @@ function init(container) {
     const slope = Math.hypot(D / 2 + 0.25, RIDGE - EAVE), ang = Math.atan2(RIDGE - EAVE, D / 2 + 0.25);
     for (const sd of [-1, 1]) { const r = add(new T.BoxGeometry(W + 0.4, 0.06, slope), roofM, cx, (EAVE + RIDGE) / 2, cz + sd * (D / 4 + 0.06), null, true); r.rotation.x = sd * ang; }
     // roll-up door (white slats, opens when Squeeg walks up), header, ramp down to the yard
-    const shedDoor = rollUpDoor(X1, cz, false, RD, RH, { y0: FL, side: 1 });   // the plant's one roll-up design (v1.97.119), hood outside
+    const shedDoor = rollUpDoor(X1, cz, false, RD, RH, { y0: FL, side: 1, inside: -1, swAt: [X1 - 1.6, Z1 - 0.12, 0, -1] });   // the plant's one roll-up design (v1.97.119), hood outside; v1.97.137: mesh inside, its switch on the south wall by the man door (no wall beside this door)
     box(0.1, 0.2, 3.5, trim, X1 + 0.08, FL + RH + 0.1, cz);
     const rL = 1.2, ramp = add(new T.BoxGeometry(Math.hypot(rL, FL), 0.06, 3.2), mat(0x6e5a3e), X1 + rL / 2, FL / 2, cz, null); ramp.rotation.z = -Math.atan2(FL, rL);
     WALK_SURF.push({ x0: X1, x1: X1 + rL, z0: cz - 1.6, z1: cz + 1.6, y0: FL, y1: 0, ax: 'x' });
@@ -8291,7 +8369,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
+  buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
@@ -10128,12 +10206,7 @@ function update(sim, dt, events) {
     d.g.visible = d.open < 0.5;   // door just vanishes while Squeeg is near (cleaner than swinging)
   }
   coolerUpdate(dt);
-  for (const d of O.rollDoors || []) {
-    const near = !POWER_OUTAGE.on && walk.on && !walk.dead && Math.hypot(walk.x - d.x, walk.z - d.z) < 7;   // no power, no hoist
-    d.open = Math.max(0, Math.min(1, d.open + (near ? 1.6 : -0.8) * dt));
-    d.panel.scale.y = 1 - 0.92 * d.open; d.panel.position.y = d.h / 2 + d.h * 0.46 * d.open;
-    const shut = d.open < 0.55; for (let i = 0; i < 4; i++) d.seg[i] = shut ? d.home[i] : 1e5;
-  }
+  for (const d of O.rollDoors || []) rollDoorStep(d, dt);   // v1.97.137: they follow their wall switch (rollSwitchSet)
   if (walk.on) {
     if (walk.drive) utvUpdate(dt); else if (walk.ride) rideUpdate(); else if (walk.mow) mowUpdate(dt); else if (walk.pass) passUpdate(dt); else walkPhysics(dt);
     if (O.shedMower) { const m = O.shedMower; m.g.visible = m.out || walk.mow || m.door.open > 0.02 || (walk.x > m.X0 && walk.x < m.X1 && walk.z > m.Z0 && walk.z < m.Z1); }   // mower drawn from inside the shed or while the roll-up is open
@@ -10256,11 +10329,11 @@ const _lerpA = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k
 // own match. A change made on either side (debug menu, the substation breaker, the time controls) is also sent at once as an
 // event, and for 1.5 s after making one the guest ignores the host's (older) state for that thing, so nothing flips back.
 // The data channel is reliable now (one-off messages could be lost before), and the periodic state heals anything missed.
-const WSYNC = { lock: { po: 0, gt: 0, dk: 0 }, sendT: 0 };
+const WSYNC = { lock: { po: 0, gt: 0, dk: 0, rd: 0 }, sendT: 0 };
 function wsLock(k) { WSYNC.lock[k] = 1.5; }
 function wsState() {
   const ev = e => e ? [+e.t.toFixed(2), e.T, e.r, +e.x.toFixed(1), +e.z.toFixed(1)] : null;
-  return { t: 'ws', po: POWER_OUTAGE.on ? 1 : 0, gt: GT.real ? null : [Math.round(gameDate().getTime()), GT.rate], dk: [+LIGHT.darkTo.toFixed(3), +LIGHT.darkHold.toFixed(2), +LIGHT.darkRate.toFixed(3)], fl: ev(LIGHT.flick), kl: ev(LIGHT.kill), cr: creepSnapshot() };
+  return { t: 'ws', rd: rollStates(), po: POWER_OUTAGE.on ? 1 : 0, gt: GT.real ? null : [Math.round(gameDate().getTime()), GT.rate], dk: [+LIGHT.darkTo.toFixed(3), +LIGHT.darkHold.toFixed(2), +LIGHT.darkRate.toFixed(3)], fl: ev(LIGHT.flick), kl: ev(LIGHT.kill), cr: creepSnapshot() };
 }
 function wsGameClock(v) {   // [game ms, rate] from the other side, or null = real time
   if (!v) { if (!GT.real) gameTimeSet({ real: true }); return; }
@@ -10273,6 +10346,7 @@ function wsApply(m) {   // guest: the host's world
   if (L.gt <= 0) wsGameClock(m.gt);
   if (L.dk <= 0) { if (m.dk) { LIGHT.darkTo = m.dk[0]; LIGHT.darkHold = m.dk[1]; LIGHT.darkRate = m.dk[2]; } LIGHT.flick = ev(m.fl); LIGHT.kill = ev(m.kl); }
   if (m.cr) creepApplySnapshot(m.cr);
+  if (L.rd <= 0 && m.rd) rollApply(m.rd);   // roll-up doors + mesh doors (v1.97.137)
 }
 function wsClock() { return GT.real ? null : [Math.round(gameDate().getTime()), GT.rate]; }
 function netRecv(m) {
@@ -10291,6 +10365,7 @@ function netRecv(m) {
     if (NET.rr && NET.rr.flame) NET.rr.flame.visible = !!m.nb && m.d;
     if (m.u) { const Q = NET.rr; Q.tx = m.u[0]; Q.tz = m.u[1]; Q.ta = m.u[2]; Q.steer = m.u[3]; Q.ty = m.u[4]; }
     R.ears = m.ce || null;   // their corn ears lying on the ground (my creatures can smell them)
+  } else if (m.t === 'rd') { const d = (O.rollDoors || [])[m.i]; if (d) { d.ws = m.s ? 1 : 0; d.wm = m.m ? 1 : 0; } wsLock('rd');   // the other player pressed a door switch (v1.97.137)
   } else if (m.t === 'po') { setPowerOutage(!!m.on);   // the other player threw the main (or dropped it)
   } else if (m.t === 'ws') { if (!NET.host) wsApply(m);   // the host's world state
   } else if (m.t === 'le') { const e = { t: m.s, T: m.s, r: m.r, x: m.x, z: m.z }; if (m.k === 'kill') LIGHT.kill = e; else LIGHT.flick = e;   // a flicker / blackout the other player set off
@@ -14021,7 +14096,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -14380,6 +14455,14 @@ function vendX() {   // vending: pick up whatever is on the floor, or press the 
   if (r.water) toast('WATER: out of order - it never stocked water. Dispensing Milo-Rade anyway.');
   return true;
 }
+function rollSwitchMenu() {   // a roll-up door's push-button station: the steel door and the mesh screen inside it
+  unlockMouse();
+  const i = P3.rollSwitchNear(); if (i < 0) return; const st = P3.rollState(i), go = m => () => { const r = P3.rollSwitchSet(i, m); if (r) toast(r); };
+  const now = st.door && st.mesh ? 'Door and mesh are open.' : st.door ? 'Door is open, the mesh is shut.' : st.mesh ? 'Door is shut (mesh open).' : 'Door and mesh are shut.';
+  modal(`<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">Roll-up door · push-button station</div>
+    <div style="font-size:14px;line-height:1.45;color:#33404d">${now}${P3.powerOutage ? ' <b>No power</b> - the motors are dead.' : ''}</div>`,
+    [['⬆ Open both (door + mesh)', go('open')], ['⬇ Close both', go('close')], ['▦ Close the mesh only', go('mesh')], ['Close', () => {}]], true);
+}
 function powerResetMenu() {   // main substation: the master reset for a power outage
   unlockMouse();
   const dead = P3.powerOutage, rows = [];
@@ -14393,7 +14476,7 @@ function controlsMenu(code, fromTitle) {
     ['Walking (Squeeg mode)', [
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
-      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
+      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Roll-up doors: push-button station inside, beside the door (open both / close both / close the mesh only)', 'E at the switch', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
       ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
@@ -14862,6 +14945,7 @@ function press(n) {
     if (P3.railPhoneNear()) { railPhoneMenu(); return; }   // Road P dispatcher phone
     if (P3.pivotGenNear()) { pivotGenMenu(); return; }   // center-pivot diesel gen-set
     if (P3.powerResetNear()) { powerResetMenu(); return; }   // main substation breaker
+    if (P3.rollSwitchNear() >= 0) { rollSwitchMenu(); return; }   // a roll-up door's push-button station (door + mesh)
     if (vendX()) return;   // a dropped packet or a vending machine takes the X press first
     { const m = P3.critterPick(); if (m) { toast(m); return; } }   // a corpse: X picks it up, X again puts it down
     const r = P3.kiaToggle() || P3.radioToggle() || P3.takeTool() || P3.takeExtinguisher() || P3.pickChute() || P3.takeKey() || P3.carToggle() || P3.mowerToggle() || P3.coolerHandle() || P3.nh3Valve() || P3.throwSwitch() || P3.rideToggle(); if (r) { toast(r); return; } const id = P3.interactTarget(); if (id === 'BOARD') openBoard(); else if (id === 'BOARD_BUSY') toast('The Board Op is using this board — use the other one'); else if (id) selectUnit(id); else toast('Nothing to interact with here'); return; }

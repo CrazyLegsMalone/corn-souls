@@ -27,6 +27,7 @@ const make = host => {
     LIGHT: { darkTo: 0, darkHold: 0, darkRate: 2, flick: null, kill: null, ref: [0, 0, 0] }, O: {}, KIA: {}, q, notes };
   ctx.netSend = o => { try { if (ctx.NET.conn && ctx.NET.conn.open) ctx.NET.conn.send(o); } catch (e) {} };
   ctx.setPowerOutage = on => { ctx.POWER_OUTAGE.on = !!on; return on; };
+  ctx.rollStates = () => ctx.rd || ''; ctx.rollApply = s => { ctx.rdApplied = s; };   // roll-up / mesh door states ride the world sync (v1.97.137; validate-mesh-doors.cjs)
   ctx.lightsDark = (a, f, h) => { ctx.LIGHT.darkTo = a; ctx.LIGHT.darkRate = 3 / (f || 1.5); ctx.LIGHT.darkHold = h || 0; return a; };
   vm.createContext(ctx);
   vm.runInContext('let dayT = 0;\n' + clockSrc + '\n' + creepSrc + '\n' + syncSrc + '\n' + recvSrc + `

@@ -37,7 +37,7 @@ const at = (x, z) => signs.find(s => Math.hypot(s.position.x - x, s.position.z -
 { const s = at(50, -0.25), st = ctx.EGRESS.list[2]; assert.ok(s.position.y - 0.15 > 2.43, 'a taller door: the sign sits clear above it (' + s.position.y.toFixed(2) + ')');
   assert.ok(st.position.y - 0.085 > s.position.y + 0.15, 'and its strobe moved up to stay above the sign'); }
 // in the game: built with the world, before the lights are collected; the old one-off signs are gone (one was on blank wall)
-assert.ok(html.includes('buildGrainPiles(); exitSignsForEgress(); lightBuild();'), 'signs go up with the world, before lightBuild gives them their red glow');
+assert.ok(html.includes('buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild();'), 'signs go up with the world, before lightBuild gives them their red glow');
 assert.ok(!html.includes('exitSignMat(), MX1 - 0.25, DH0 + 0.35, 17.7'), 'the shop sign on blank wall (z 17.7, its door is at z -8) is gone');
 assert.equal((html.match(/exitSignMat\(\)/g) || []).length, 3, 'EXIT signs come from the pass (plus the lab door inside the building)');
 assert.ok(html.includes("['FERM MCC', null]") && html.includes('if (!text) return;'), 'the FERM MCC door: no OUTSIDE plate on the inside, where its EXIT sign goes');

@@ -1,3 +1,41 @@
+## TEST v1.97.137 — a mesh door inside every roll-up, with a switch (2026-11-04)
+- Owner: *"Do you remember the mesh door you made in the energy center"*, then *"Can we add a mesh door to all rolling doors. The mesh door should be on the interior. With an interactive switch next to the door with the option to open both close both or only close mesh."*
+- **Mesh doors** (`meshDoorsBuild()`, run with the world after `exitSignsForEgress()`, once the building envelopes in `ENCL` exist). Each of the **14 roll-ups** gets a high-speed mesh screen like the energy center's original (removed in v1.97.119 when the steel doors were made uniform):
+  - see-through gray wire (shared code-drawn grid texture), dark stiffeners and a centre seam;
+  - aluminum side tracks and a head box it rolls up into.
+- **Placement:** the mesh goes on the **inside** face. `rollInside()` checks which side of the wall is in a roofed envelope; for a door between two rooms it picks the smaller room's side. It sits 0.36 m in from the steel door, or 1.0 m when the coil hood is on that face, so it clears the hood.
+- **The storage shed** has no envelope and no wall beside its door. It declares `inside: -1`, and its switch goes on the south wall by its man door (`swAt`).
+- **Switches:** a push-button station (green / red / yellow) on the inside face beside each door, on the side away from any man door, at 1.35 m. Press X / E / ✋ there (`rollSwitchNear` → `rollSwitchMenu`) and pick:
+  - **Open both (door + mesh)**
+  - **Close both**
+  - **Close the mesh only** (the steel door stays where it is)
+- **Behaviour change:** roll-ups **no longer open on their own as you walk up**. They follow their switch (`rollDoorStep`):
+  - steel up at 1.6/s, down at 0.8/s; the mesh at 2.5/s;
+  - each blocks you while shut (the mesh has its own collision line);
+  - **no power, no hoist:** in an outage the doors freeze and the switch says so.
+  - Every building with a roll-up also has a man door into the same room (checked in the game), so you can always get in.
+- **2 player:** a press is sent at once (`rd`, with a 1.5 s lock like the other world events), and the host's door states ride the world sync (`ws.rd`, two bits a door), so both players see the same doors.
+- The controls card lists the switch.
+- Verified in the running game:
+  - all 14 doors' inside faces and switch spots;
+  - one switch end to end: open both, mesh only (door up, mesh down and blocking), close both, and the outage refusal;
+  - renders of the energy center's east door from inside (switch beside it, steel up, mesh down) and from outside (looking in through the mesh).
+- New suite `test/validate-mesh-doors.cjs` (added to CI) runs the game's own builders on test buildings. It checks:
+  - inside faces (including a hood on the inside face) and switch placement;
+  - no walk-up opening;
+  - all three modes, with their collision lines;
+  - the outage behaviour;
+  - net messages and the sync round trip;
+  - the shed's declared side and switch spot;
+  - the wiring.
+- **Updated tests:**
+  - `validate-doors.cjs`: the steel curtain is still the one design, and mesh screens come only from `meshDoorsBuild`.
+  - `validate-power-outage.cjs`: doors freeze in an outage.
+  - `validate-two-player.cjs`: sandbox hooks for the door states.
+  - `validate-exit-signs` / `interior-dark` / `ranger`: the new init line.
+- All 40 suites pass.
+- Bumped TEST to `1.97.137` / `corn-souls-test-shell-v164`.
+
 ## TEST v1.97.136 — a lit EXIT sign inside every door to the outside (2026-11-04)
 - Owner (photo: a lit EXIT sign over a man door, under its red egress strobe): *"make the personel doors that open to the outside like this. obviosly only from the inside"*.
 - Every exterior man door already had an egress strobe on its inside face (`egressStrobe`). The new world-build pass `exitSignsForEgress()` (run after the grain pile, before `lightBuild()` so the signs get their battery-backed red glow) gives each strobe the lit EXIT sign and halo under it. The sign goes on that same inside face, centred on the door at 2.47 m, between the head and the strobe as in the photo. From outside the wall hides it.

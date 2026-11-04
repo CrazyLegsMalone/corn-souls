@@ -28,7 +28,9 @@ for (const [w, h, alongX] of [[3.05, 3.5, false], [7.3, 7.3, true], [2.9, 3.0, t
 // every roll-up in the plant is this one design
 assert.equal((html.match(/\(O\.rollDoors = O\.rollDoors \|\| \[\]\)\.push/g) || []).length, 1, 'only rollUpDoor makes roll-ups');
 assert.equal((html.match(/rollUpDoor\(/g) || []).length, 8, 'the process building and shop (one helper), storage shed, DDG, energy center north, west bump-out and south (ecRoll), east, and turbine room all call it');
-assert.ok(!html.includes("style === 'mesh' ? new T.MeshLambertMaterial") && !html.includes('the mesh screen'), 'no mesh-curtain or screen variants left');
+assert.ok(!html.includes("style === 'mesh' ? new T.MeshLambertMaterial"), 'no mesh-curtain variant of the steel door left (one design)');
+// v1.97.137, owner: "add a mesh door to all rolling doors ... on the interior" - the mesh screens are a separate inside door, made only by meshDoorsBuild (validate-mesh-doors.cjs)
+assert.equal((html.match(/new T\.MeshLambertMaterial\(\{ map: tx, color: 0x9aa0a4, transparent: true, opacity: 0\.55/g) || []).length, 1, 'mesh screens come from one place: meshDoorsBuild');
 // swing doors fill their openings
 for (const [k, why] of [
   ["const leaf = new T.Mesh(new T.BoxGeometry(0.99, 2.15, 0.06), mat(col || 0x4a525c)); leaf.position.set(0, 1.075, 0); g.add(leaf);", 'manDoor: 0.99 x 2.15 in a 0.95 x 2.13 opening'],

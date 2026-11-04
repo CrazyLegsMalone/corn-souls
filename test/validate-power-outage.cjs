@@ -148,7 +148,7 @@ function makeCtx() {
   const shack = html.indexOf('{ g: dg, rot: 0, dir: 1, x: x + h, z, open: 0 }');   // ethanol load-out shack door
   assert.ok(shack > 0, 'found the ethanol load-out shack door');
   assert.ok(!html.slice(shack, shack + 200).includes('egressStrobe'), 'no strobe in the ethanol load-out shack');
-  assert.ok(html.includes('const near = !POWER_OUTAGE.on && walk.on && !walk.dead'), 'roll-up doors are dead in an outage');
+  assert.ok(html.includes('function rollDoorStep(d, dt) {') && html.includes('  if (!POWER_OUTAGE.on) {\n    d.open = d.ws') && html.includes("if (POWER_OUTAGE.on && !remote) return 'Nothing happens - no power to the door motors.';"), 'roll-up doors (and their mesh doors) are dead in an outage: they freeze, and the switch does nothing (v1.97.137)');
 
   // the old dimming is gone for good
   assert.ok(!src.includes('hemi') && !src.includes('multiplyScalar'), 'no ambient or sky scaling left in the module');
