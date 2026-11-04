@@ -6422,7 +6422,7 @@ function init(container) {
         for (const dy of [-1, 1]) box(alongX ? w + 0.1 : 0.3, 0.06, alongX ? 0.3 : w + 0.1, fr, x, y + dy * (h / 2 + 0.03), z);
         for (const d of [-1, 0, 1]) if (d || w > 1.6) box(alongX ? 0.06 : 0.3, h, alongX ? 0.3 : 0.06, fr, x + (alongX ? d * w / 2 : 0), y, z + (alongX ? 0 : d * w / 2)); };
       win(-32.8, OZN, true, 2.2); win(-32.0, OZS, true, 1.1); win(EW, OZN + 1.6, false, 2.0); win(EW, OZN + 4.9, false, 2.2); }
-    keyHook('cross', -56.4, OZN + 0.13, 0); keyHook('mustard', -52.3, OZN + 0.13, 0); keyHook('beaker', -51.8, OZN + 0.13, 0);   // vehicle keys: manager's office (Silverado), lab office (crossover, F-150)
+    keyHook('cross', -56.4, OZN + 0.13, 0); keyHook('mustard', -52.3, OZN + 0.13, 0);   // vehicle keys: manager's office (Silverado), lab office (crossover)
     // hallway north wall; the break room spans the full office-block depth (22 tiles, photo), so the hallway runs right through it
     wall(WW, OZH, X[3], OZH, OH, blockM, [[-72.6 - WW, 1.0, 0, ['MEN', 'HALLWAY']], [-69.7 - WW, 1.0, 0, ['WOMEN', 'HALLWAY']], [-66.2 - WW, 1.0, 0, ['UTILITY', 'HALLWAY']]], { th: 0.2 });
     wall(X[4], OZH, X[6], OZH, OH, blockM, [[X[4] + 0.95 - X[4], 0.95, 0, ['MANAGER', 'HALLWAY']], [-52.6 - X[4], 1.0, 0, ['LAB OFFICE', 'HALLWAY']]], { th: 0.2 });
@@ -7293,6 +7293,96 @@ function init(container) {
     const n = Math.floor((X1 - 0.5 - SX0) / 2.7) + 1, lines = new T.InstancedMesh(new T.BoxGeometry(0.12, 0.02, 5.5), markMat(0xffffff), rows.length * n);
     let k = 0; for (const rz of rows) for (let i = 0; i < n; i++) { dummy.position.set(SX0 + i * 2.7, GY('paint'), rz + 2.75); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); lines.setMatrixAt(k++, dummy.matrix); }
     lines.count = k; lines.userData.noHit = true; scene.add(lines);
+    // ---------- HOLLOW CABINS (v1.97.105): every vehicle's top half is a real cabin, so the windows are see-through.
+    // The old cars were one solid side-profile block with dark panels stuck on: tinted glass over solid paint is still paint,
+    // and from the driver's seat the camera sat inside that block and saw nothing of the car. Now the lower body is solid up
+    // to the belt line; above it there is a frame on each side (the pillars round the window openings), a roof slab, tinted
+    // glass in the openings, windshield and back glass, and a simple interior seen through the glass: a dark tub at the belt,
+    // the dash with a lit gauge strip, a steering wheel, front seats and (when the cabin is long enough) a rear bench.
+    // Profile coords as everywhere here: z forward (nose +z), y up, driver at +x.
+    //  s.W  body width         s.gh  greenhouse outline [F windshield base, A windshield top, ...roof..., R roof rear, D back glass base]
+    //  s.win  side window outlines (clipped into the frame; omitted = the frame opening inset)   s.bp  pillar positions (z) splitting the side glass
+    //  s.rg  share of the back (R -> D) that is glass (pickup cab backs ~0.5)   s.paint  body material   s.eye  driver's eye height
+    //  s.dy  y offset (a lowered truck)   s.rear  false: no rear seats
+    // Returns { eye: [x, y, z], sw } (also on g.userData): the driver's seat camera and the steering wheel that turns.
+    const VGLASS = new T.MeshPhongMaterial({ color: 0x1c2630, transparent: true, opacity: 0.5, shininess: 90, specular: 0x9fb0c0, depthWrite: false, side: T.DoubleSide });   // 0x1c2630 is in GLASS_COLS: crowbar + burn code know it
+    const CAB_GAUGE = batteryLight(new T.MeshBasicMaterial({ color: 0x3a8fae }));
+    const polyArea = P => { let a = 0; for (let i = 0; i < P.length; i++) { const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % P.length]; a += x1 * y2 - x2 * y1; } return a / 2; };
+    const insetPoly = (P, d) => {   // a convex outline pulled in by d on every edge
+      const s = polyArea(P) > 0 ? 1 : -1, n = P.length, L = [];
+      for (let i = 0; i < n; i++) { const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % n], ex = x2 - x1, ey = y2 - y1, l = Math.hypot(ex, ey) || 1; L.push([x1 - ey / l * s * d, y1 + ex / l * s * d, ex, ey]); }
+      return L.map((a, i) => { const b = L[(i + n - 1) % n], den = b[2] * a[3] - b[3] * a[2]; if (Math.abs(den) < 1e-9) return [a[0], a[1]];
+        const t = ((a[0] - b[0]) * a[3] - (a[1] - b[1]) * a[2]) / den; return [b[0] + b[2] * t, b[1] + b[3] * t]; });
+    };
+    const clipPoly = (S, C) => {   // Sutherland-Hodgman: the part of S inside the convex outline C
+      const s = polyArea(C) > 0 ? 1 : -1; let out = S;
+      for (let i = 0; i < C.length && out.length; i++) {
+        const [ax, ay] = C[i], [bx, by] = C[(i + 1) % C.length], side = p => s * ((bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax));
+        const inp = out; out = [];
+        for (let j = 0; j < inp.length; j++) { const p = inp[j], q = inp[(j + 1) % inp.length], dp = side(p), dq = side(q), cut = () => { const t = dp / (dp - dq); return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]; };
+          if (dp >= 0) { out.push(p); if (dq < 0) out.push(cut()); } else if (dq >= 0) out.push(cut()); }
+      }
+      return out;
+    };
+    const cabExt = (g, pts, depth, m, xc, holes) => {   // a profile pushed out across x, centred on xc
+      const sh = new T.Shape(pts.map(([a, b]) => new T.Vector2(a, b)));
+      for (const h of holes || []) sh.holes.push(new T.Path(h.map(([a, b]) => new T.Vector2(a, b))));
+      const geo = new T.ExtrudeGeometry(sh, { depth, bevelEnabled: false }); geo.translate(0, 0, -depth / 2); geo.rotateY(-Math.PI / 2); geo.translate(xc, 0, 0);
+      const o = new T.Mesh(geo, m); g.add(o); return o;
+    };
+    const cabin = (g, s) => {
+      const dy = s.dy || 0, sh = P => P.map(([z, y]) => [z, y + dy]), gh = sh(s.gh), n = gh.length, F = gh[0], A = gh[1], R = gh[n - 2], D = gh[n - 1];
+      const t = 0.06, hw = s.W / 2 - 0.05, xi = hw - t, paint = s.paint || mat(s.col);   // frames sit 5 cm in from the body sides (tumblehome)
+      const cz = gh.reduce((q, p) => q + p[0], 0) / n, cy = gh.reduce((q, p) => q + p[1], 0) / n;
+      const inN = (P, Q) => { let nz = -(Q[1] - P[1]), ny = Q[0] - P[0]; const l = Math.hypot(nz, ny) || 1; nz /= l; ny /= l; if (nz * (cz - P[0]) + ny * (cy - P[1]) < 0) { nz = -nz; ny = -ny; } return [nz, ny]; };
+      const beltAt = z => F[1] + (D[1] - F[1]) * (F[0] - z) / (F[0] - D[0]);
+      const roofAt = z => A[1] + (R[1] - A[1]) * (A[0] - z) / (A[0] - R[0]);
+      // side windows: the given outlines (or the opening) kept inside the frame, split at the pillars
+      const open = insetPoly(gh, 0.07);
+      let wins = (s.win ? s.win.map(sh) : [open]).map(w => clipPoly(w, open)).filter(w => w.length > 2);
+      for (const b of s.bp || []) wins = wins.flatMap(w => [clipPoly(w, [[b + 0.045, -9], [9, -9], [9, 9], [b + 0.045, 9]]), clipPoly(w, [[-9, -9], [b - 0.045, -9], [b - 0.045, 9], [-9, 9]])]).filter(w => w.length > 2 && Math.abs(polyArea(w)) > 0.01);
+      for (const sx of [-1, 1]) cabExt(g, gh, t, paint, sx * (hw - t / 2), wins);                         // the frames: pillars round the openings
+      const chain = gh.slice(1, n - 1);                                                                  // roof slab between the frames
+      cabExt(g, chain.concat(chain.slice().reverse().map(([z, y]) => [z, y - 0.06])), xi * 2, paint, 0);
+      const rg = s.rg == null ? 1 : s.rg, M = [R[0] + (D[0] - R[0]) * rg, R[1] + (D[1] - R[1]) * rg];
+      if (rg < 1) { const [nz, ny] = inN(R, D); cabExt(g, [M, D, [D[0] + nz * 0.04, D[1] + ny * 0.04], [M[0] + nz * 0.04, M[1] + ny * 0.04]], xi * 2, paint, 0); }   // painted cab back under the glass
+      // the glass: side windows, windshield and back glass in one mesh
+      const gp = [], tri = (a, b, c) => gp.push(...a, ...b, ...c);
+      for (const w of wins) for (const sx of [-1, 1]) { const x = sx * (hw - t / 2); for (let i = 1; i < w.length - 1; i++) tri([x, w[0][1], w[0][0]], [x, w[i][1], w[i][0]], [x, w[i + 1][1], w[i + 1][0]]); }
+      const pane = (P, Q) => { const [nz, ny] = inN(P, Q), p = [P[0] + nz * 0.015, P[1] + ny * 0.015], q = [Q[0] + nz * 0.015, Q[1] + ny * 0.015];
+        tri([-xi, p[1], p[0]], [xi, p[1], p[0]], [xi, q[1], q[0]]); tri([-xi, p[1], p[0]], [xi, q[1], q[0]], [-xi, q[1], q[0]]); };
+      pane(F, A); pane(R, M);
+      const geo = new T.BufferGeometry(), pos = new Float32Array(gp), uv = new Float32Array(pos.length / 3 * 2);
+      for (let i = 0, j = 0; i < pos.length; i += 3, j += 2) { uv[j] = (pos[i] + pos[i + 2]) * 0.6; uv[j + 1] = pos[i + 1] * 0.6; }
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.computeVertexNormals();
+      const glassMesh = new T.Mesh(geo, VGLASS); glassMesh.renderOrder = 1; g.add(glassMesh);
+      // the lower body, with a footwell: solid up to the belt everywhere but the cabin, which is a well with a floor, door
+      // panels down the sides, the dash at the front, front seats and (when there is room) a rear bench
+      const dark = mat(0x232528), seat = mat(0x2c2e33), B = (w, h, d, m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
+      const slope = (A[1] - F[1]) / Math.max(0.05, F[0] - A[0]), dz0 = Math.min(0.5, 0.1 / slope + 0.03);   // the dash stays clear of the windshield
+      const Fi = F[0] - dz0 - 0.36, Di = D[0] + 0.1, low = sh(s.low), iF = low.findIndex((p, i) => Math.abs(p[0] - F[0]) < 1e-6 && Math.abs(p[1] - F[1]) < 1e-6 && low[i + 1] && Math.abs(low[i + 1][0] - D[0]) < 1e-6);
+      const fy = Math.max(Math.min(...low.map(p => p[1])) + 0.12, Math.min(F[1], D[1]) - 0.45);           // floor height
+      const well = [[Fi, beltAt(Fi)], [Fi, fy], [Di, fy], [Di, beltAt(Di)]];
+      cabExt(g, iF >= 0 ? low.slice(0, iF + 1).concat(well, low.slice(iF + 1)) : low, s.W, paint, 0);    // body with the well cut out of its top
+      for (const sx of [-1, 1]) cabExt(g, well, 0.11, paint, sx * (s.W / 2 - 0.055));                     // door panels (the frames sit on them)
+      for (const sx of [-1, 1]) cabExt(g, well, 0.01, seat, sx * (s.W / 2 - 0.115));                     // door cards: trim gray inside, not body paint
+      B(s.W - 0.22, 0.02, Fi - Di, seat, 0, fy + 0.01, (Fi + Di) / 2);                                   // carpet (seat gray: one less material per car)
+      const zR = Math.max(Fi - 0.3, Math.min(Fi - 0.05, Di + 0.67)), zFw = F[0] - dz0, dTop = Math.max(beltAt(zR), beltAt(zFw)) + 0.07, dBot = fy + 0.3;   // dash: from up to 30 cm into the well (less in a short single cab) forward to under the windshield
+      B(s.W - 0.22, dTop - dBot, zFw - zR, dark, 0, (dTop + dBot) / 2, (zR + zFw) / 2);                   // (it covers the body's top there, and leaves leg room under it)
+      B(s.W - 0.22, dBot - fy, 0.02, dark, 0, (fy + dBot) / 2, Fi - 0.01); B(s.W - 0.22, beltAt(Di) - fy, 0.02, seat, 0, (fy + beltAt(Di)) / 2, Di + 0.01);   // footwell front (under the dash) and back walls
+      const eZ = Math.max(Di + 0.25, Math.min(Fi - 0.8, A[0] - 0.72)), eX = hw * 0.48;   // far enough back for the wheel, even behind an upright windshield
+      const eY = s.eye != null ? s.eye + dy : fy + Math.min(0.78, (roofAt(eZ) - 0.06 - fy) * 0.8);
+      B(0.36, 0.06, 0.16, dark, eX, dTop + 0.03, zR + 0.08); B(0.24, 0.035, 0.008, CAB_GAUGE, eX, dTop + 0.028, zR - 0.005);   // gauge hood and its lit dials
+      const swY = Math.max(fy + 0.32, eY - 0.33), swG = new T.Group(); swG.position.set(eX, swY, Math.min(zR - 0.07, eZ + 0.5)); swG.rotation.x = 0.45; g.add(swG);   // its top shows at the bottom of the driver's view
+      const sw = new T.Group(); sw.rotation.y = Math.PI; swG.add(sw);   // flipped so the shared 'rotation.z = -steer * 3' turns it the way you steer (the Ranger's wheel faces the other way)
+      sw.add(new T.Mesh(new T.TorusGeometry(0.15, 0.02, 6, 16), mat(0x0e0f10))); { const sp = new T.Mesh(new T.BoxGeometry(0.28, 0.035, 0.022), mat(0x0e0f10)); sw.add(sp); const hub = new T.Mesh(new T.BoxGeometry(0.09, 0.09, 0.05), mat(0x0e0f10)); sw.add(hub); }
+      { const wz = Math.min(zR - 0.07, eZ + 0.5); B(0.06, 0.06, Math.max(0.05, zR - wz), dark, eX, swY - 0.02, (zR + wz) / 2); }   // column
+      const seatRow = (z, xs, w) => { const cy2 = fy + Math.min(0.32, (eY - fy) * 0.42), top = Math.min(eY - 0.16, roofAt(z) - 0.3), h = Math.max(0.25, top - cy2);
+        for (const x of xs) { B(w, 0.12, 0.48, seat, x, cy2, z + 0.24); B(w, h, 0.1, seat, x, cy2 + h / 2, z).rotation.x = -0.12; B(0.25, 0.16, 0.08, seat, x, Math.min(eY, roofAt(z - 0.05) - 0.2), z - 0.05); } };
+      seatRow(eZ - 0.22, [eX, -eX], 0.46);                                                               // front seats: cushion, back, headrest
+      if (s.rear !== false && eZ - 1.0 > Di + 0.05 && eZ - 1.0 > R[0] - 0.3) seatRow(eZ - 1.0, [eX, -eX], 0.6);   // rear bench
+      const eye = [eX, eY, eZ]; g.userData.eye = eye; g.userData.sw = sw; return { eye, sw };
+    };
     // five employees' vehicles parked in stalls, very simple: body, cabin, windows, wheels (nose in toward the stall's back)
     const car = (kind, col, si, ri) => {
       const g = new T.Group(), x = SX0 + 1.35 + si * 2.7, z = rows[ri] + 2.75, flip = ri % 2 ? -1 : 1, P = (w, h, d, c, px, py, pz) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(px, py, pz); g.add(m); };
@@ -7310,11 +7400,9 @@ function init(container) {
     const jeep = (col, si, ri) => {
       const g = new T.Group(), x = SX0 + 1.35 + si * 2.7, z = rows[ri] + 2.75, f = ri % 2 ? -1 : 1, P = (w, h, d, c, px, py, pz) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(px, py, pz * f); g.add(m); return m; };
       const W = 1.9, L = 5.5, Y0 = 0.5, BH = 0.72, blk = 0x1b1c1e, top = Y0 + BH;
-      P(W, BH, L, col, 0, Y0 + BH / 2, 0);                                   // body (hood, doors, bed sides)
-      P(W - 0.06, 0.82, 2.0, col, 0, top + 0.41, 0.5);                      // crew cab
+      { const C = new T.Group(); C.rotation.y = f < 0 ? Math.PI : 0; g.add(C);   // hollow crew cab: upright windshield, square back
+        cabin(C, { W, low: [[L / 2, Y0], [L / 2, top], [1.5, top], [-0.5, top], [-L / 2, top], [-L / 2, Y0]], gh: [[1.5, top], [1.42, top + 0.82], [-0.5, top + 0.82], [-0.5, top]], bp: [0.45], rg: 0.55, col }); }   // body box (hood, doors, bed sides) + hollow crew cab
       P(W - 0.02, 0.1, 2.06, blk, 0, top + 0.86, 0.5);                      // black hardtop
-      P(W - 0.03, 0.5, 1.8, 0x34404c, 0, top + 0.45, 0.5);                  // side windows
-      P(W - 0.2, 0.52, 0.06, 0x34404c, 0, top + 0.46, 1.52);               // upright windshield
       P(W - 0.12, 0.1, 2.15, blk, 0, top + 0.05, -1.6);                    // bed liner / rails
       P(W + 0.04, 0.22, 0.25, blk, 0, Y0 + 0.08, 2.8); P(W + 0.04, 0.22, 0.2, blk, 0, Y0 + 0.08, -2.78);   // steel bumpers
       for (let i = 0; i < 7; i++) P(0.07, 0.36, 0.03, blk, (i - 3) * 0.13, Y0 + BH * 0.55, 2.76);   // the 7-slot grille
@@ -7330,10 +7418,7 @@ function init(container) {
       const g = new T.Group(), x = SX0 + 1.35 + si * 2.7, z = rows[ri] + 2.75, W = 1.84;
       const P = (w, h, d, c, px, py, pz) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); m.position.set(px, py, pz); g.add(m); return m; };
       const side = (pts, w, c) => { const sh = new T.Shape(pts.map(([a, b]) => new T.Vector2(a, b))); const geo = new T.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2); g.add(new T.Mesh(geo, mat(c))); };
-      side([[2.32, 0.3], [2.32, 0.78], [2.1, 0.9], [1.15, 1.04], [0.4, 1.56], [-1.65, 1.6], [-2.28, 1.12], [-2.32, 0.3]], W, col);   // body
-      side([[1.13, 1.08], [0.43, 1.53], [-1.63, 1.565], [-2.2, 1.14], [-2.2, 1.06], [1.1, 1.06]], W + 0.02, 0x4a6275);              // side glass band
-      side([[1.17, 1.05], [0.42, 1.565], [0.36, 1.565], [1.1, 1.05]], W - 0.14, 0x4a6275);                                           // windshield
-      side([[-1.66, 1.6], [-2.29, 1.12], [-2.24, 1.12], [-1.62, 1.6]], W - 0.18, 0x4a6275);                                          // rear hatch glass
+      cabin(g, { W, low: [[2.32, 0.3], [2.32, 0.78], [2.1, 0.9], [1.15, 1.04], [-2.28, 1.12], [-2.32, 0.3]], gh: [[1.15, 1.04], [0.4, 1.56], [-1.65, 1.6], [-2.28, 1.12]], win: [[[1.13, 1.08], [0.43, 1.53], [-1.63, 1.565], [-2.2, 1.14], [-2.2, 1.06], [1.1, 1.06]]], bp: [-0.25, -1.35], col });
       P(1.1, 0.16, 0.04, 0x15171a, 0, 0.82, 2.33); P(1.3, 0.22, 0.04, 0x15171a, 0, 0.52, 2.33);   // split grille (upper + lower)
       P(1.2, 0.05, 0.05, 0xd8dde2, 0, 0.7, 2.34); P(0.16, 0.07, 0.06, 0xd4a537, 0, 0.7, 2.35);   // chrome bar + gold bowtie
       for (const sx of [-1, 1]) { P(0.34, 0.1, 0.05, 0xe6e8ea, sx * 0.7, 0.83, 2.31).rotation.z = sx * 0.15;   // swept headlights
@@ -7358,10 +7443,7 @@ function init(container) {
     // a red modern Chevy Silverado crew cab: tall square nose, big grille with the chrome bar + gold bowtie, slim headlights, long bed
     const silverado = (col, si, ri, at, lift) => {
       const V = veh(si, ri, at), W = 2.06, glass = 0x4a6275, blk = 0x15171a, chrome = lift ? 0x1d1e20 : 0xd8dde2;   // lifted: blacked-out trim
-      V.side([[2.94, 0.42], [2.94, 1.22], [2.8, 1.3], [1.4, 1.34], [0.72, 1.98], [-1.45, 2.0], [-1.52, 1.3], [-2.94, 1.3], [-2.94, 0.42]], W, col);   // body + cab + bed sides
-      V.side([[1.36, 1.38], [0.76, 1.92], [-1.4, 1.94], [-1.44, 1.38]], W + 0.02, glass);                         // side windows
-      V.side([[1.42, 1.35], [0.74, 1.97], [0.68, 1.97], [1.34, 1.35]], W - 0.16, glass);                           // windshield
-      V.P(W - 0.26, 0.5, 0.03, glass, 0, 1.66, -1.53);                                                               // rear window
+      cabin(V.g, { W, low: [[2.94, 0.42], [2.94, 1.22], [2.8, 1.3], [1.4, 1.34], [-1.52, 1.3], [-2.94, 1.3], [-2.94, 0.42]], gh: [[1.4, 1.34], [0.72, 1.98], [-1.45, 2.0], [-1.52, 1.3]], win: [[[1.36, 1.38], [0.76, 1.92], [-1.4, 1.94], [-1.44, 1.38]]], bp: [-0.3], rg: 0.55, col, eye: 1.7 });   // crew cab
       V.P(W - 0.18, 0.06, 1.36, blk, 0, 1.28, -2.2);                                                                 // bed floor (dark liner)
       V.P(1.55, 0.5, 0.04, blk, 0, 0.95, 2.95); V.P(1.95, 0.08, 0.06, chrome, 0, 1.03, 2.96); V.P(0.22, 0.09, 0.07, 0xd4a537, 0, 1.03, 2.97);   // grille, chrome bar, bowtie
       V.P(W + 0.02, 0.22, 0.12, chrome, 0, 0.56, 2.95); V.P(W + 0.02, 0.2, 0.12, chrome, 0, 0.6, -2.95);          // bumpers
@@ -7369,7 +7451,7 @@ function init(container) {
         V.P(0.08, 0.42, 0.06, 0xb3141a, sx * (W / 2 - 0.05), 1.0, -2.94);                                         // tall tail lights
         V.P(0.1, 0.16, 0.2, blk, sx * (W / 2 + 0.07), 1.42, 1.22); }                                               // mirrors
       if (lift) {   // lift kit: everything but the wheels goes up, then big off-road tires, a roof light bar and red tow hooks
-        for (const o of V.g.children) o.position.y += lift;
+        for (const o of V.g.children) o.position.y += lift; V.g.userData.eye[1] += lift;   // the driver sits up there too
         for (const wz of [1.95, -1.85]) for (const sx of [-1, 1]) { V.wheel(sx * (W / 2 - 0.02), wz, 0.52, 0x2a2b2e); V.P(0.14, 0.1, 1.25, blk, sx * (W / 2 + 0.05), 0.9 + lift * 0.6, wz); }   // tires + flares
         V.P(1.35, 0.1, 0.14, blk, 0, 2.06 + lift, 0.58); V.P(1.27, 0.06, 0.02, 0xfff6d8, 0, 2.06 + lift, 0.66);   // light bar
         for (const sx of [-1, 1]) { const hk = new T.Mesh(new T.TorusGeometry(0.06, 0.022, 6, 10), mat(0xd01818)); hk.position.set(sx * 0.62, 0.48 + lift, 3.04); V.g.add(hk); V.P(0.05, 0.06, 0.1, 0xd01818, sx * 0.62, 0.5 + lift, 2.99); }   // red tow hooks
@@ -7377,29 +7459,10 @@ function init(container) {
       } else for (const wz of [1.95, -1.85]) for (const sx of [-1, 1]) V.wheel(sx * (W / 2 - 0.1), wz, 0.42, 0xc4c9ce);
       return V.done();
     };
-    // a silver 2010s Ford F-150 SuperCrew: big chrome three-bar grille with the blue oval, large square headlights, chrome bumpers
-    const f150 = (col, at) => {
-      const V = veh(0, 0, at), W = 2.0, glass = 0x4a6275, blk = 0x15171a, chrome = 0xd8dde2;
-      V.side([[2.9, 0.42], [2.9, 1.2], [2.78, 1.28], [1.45, 1.32], [0.78, 1.95], [-1.4, 1.96], [-1.48, 1.28], [-2.9, 1.28], [-2.9, 0.42]], W, col);
-      V.side([[1.41, 1.36], [0.82, 1.89], [-1.35, 1.9], [-1.4, 1.36]], W + 0.02, glass);
-      V.side([[1.47, 1.33], [0.8, 1.94], [0.74, 1.94], [1.39, 1.33]], W - 0.16, glass);
-      V.P(W - 0.26, 0.48, 0.03, glass, 0, 1.64, -1.49); V.P(W - 0.18, 0.06, 1.38, blk, 0, 1.26, -2.17);
-      V.P(1.2, 0.5, 0.05, chrome, 0, 0.95, 2.91); V.P(1.05, 0.38, 0.04, blk, 0, 0.95, 2.925);                            // chrome grille surround + dark insert
-      for (const y of [0.85, 1.05]) V.P(1.05, 0.06, 0.05, chrome, 0, y, 2.935);                                       // the bars
-      V.P(0.24, 0.1, 0.06, 0x1b3f8f, 0, 0.95, 2.95);                                                                  // blue oval
-      for (const sx of [-1, 1]) { V.P(0.32, 0.26, 0.04, 0xeef0f2, sx * 0.8, 1.02, 2.91); V.P(0.07, 0.38, 0.06, 0xb3141a, sx * (W / 2 - 0.05), 1.0, -2.9);
-        V.P(0.1, 0.18, 0.22, blk, sx * (W / 2 + 0.07), 1.42, 1.25); }
-      V.P(W + 0.02, 0.22, 0.12, chrome, 0, 0.56, 2.92); V.P(W + 0.02, 0.2, 0.12, chrome, 0, 0.6, -2.92);
-      for (const wz of [1.9, -1.8]) for (const sx of [-1, 1]) V.wheel(sx * (W / 2 - 0.1), wz, 0.41, 0xc9ced3);
-      return V.done();
-    };
     // a mustard yellow crossover SUV: generic modern shape, black trapezoid grille, thin headlights, roof rails, black cladding
     const crossover = (col, at) => {
       const V = veh(0, 0, at), W = 1.86, glass = 0x4a6275, blk = 0x15171a;
-      V.side([[2.3, 0.32], [2.3, 0.8], [2.12, 0.92], [1.15, 1.04], [0.45, 1.56], [-1.6, 1.58], [-2.25, 1.15], [-2.3, 0.32]], W, col);
-      V.side([[1.12, 1.08], [0.48, 1.52], [-1.58, 1.54], [-2.15, 1.14], [-2.15, 1.06], [1.1, 1.06]], W + 0.02, glass);
-      V.side([[1.17, 1.05], [0.46, 1.56], [0.4, 1.56], [1.1, 1.05]], W - 0.14, glass);
-      V.side([[-1.61, 1.58], [-2.26, 1.15], [-2.21, 1.15], [-1.57, 1.58]], W - 0.18, glass);
+      cabin(V.g, { W, low: [[2.3, 0.32], [2.3, 0.8], [2.12, 0.92], [1.15, 1.04], [-2.25, 1.15], [-2.3, 0.32]], gh: [[1.15, 1.04], [0.45, 1.56], [-1.6, 1.58], [-2.25, 1.15]], win: [[[1.12, 1.08], [0.48, 1.52], [-1.58, 1.54], [-2.15, 1.14], [-2.15, 1.06], [1.1, 1.06]]], bp: [-0.2, -1.3], col, eye: 1.36 });
       V.P(1.0, 0.3, 0.04, blk, 0, 0.6, 2.31);                                                                          // grille
       for (const sx of [-1, 1]) { V.P(0.36, 0.08, 0.04, 0xeef0f2, sx * 0.66, 0.84, 2.29).rotation.z = sx * 0.1; V.P(0.34, 0.08, 0.05, 0xb3141a, sx * 0.62, 1.02, -2.28);
         V.P(0.04, 0.05, 1.9, blk, sx * 0.72, 1.61, -0.55); }
@@ -7407,15 +7470,12 @@ function init(container) {
       for (const wz of [1.45, -1.45]) for (const sx of [-1, 1]) { V.P(0.06, 0.1, 0.95, blk, sx * (W / 2 + 0.01), 0.76, wz); V.wheel(sx * (W / 2 - 0.08), wz, 0.36); }
       return V.done();
     };
-    // three more parked in the dirt west of the process building's west roll-up door (noses toward the building, out of the door's path)
-    O.cars = [mkCar(silverado(0x111214, 0, 0, [-83, 13.5, Math.PI / 2], 0.32), 'black Silverado', 'cross'), mkCar(f150(0xb7bbbf, [-83, 17.8, Math.PI / 2]), 'silver F-150', 'beaker'), mkCar(crossover(0xc9a227, [-82.5, 21.8, Math.PI / 2]), 'yellow crossover', 'mustard')];   // drivable, with keys
+    // two more parked in the dirt west of the process building's west roll-up door (noses toward the building, out of the door's path); the silver F-150 that sat between them is gone
+    O.cars = [mkCar(silverado(0x111214, 0, 0, [-83, 13.5, Math.PI / 2], 0.32), 'black Silverado', 'cross'), mkCar(crossover(0xc9a227, [-82.5, 21.8, Math.PI / 2]), 'yellow crossover', 'mustard')];   // drivable, with keys
     // a white Jeep Renegade: small and boxy, black roof, 7-slot grille + round headlights, X-pattern tail lights, black cladding
     const renegade = (col, si, ri) => {
       const V = veh(si, ri), W = 1.8, glass = 0x4a6275, blk = 0x15171a;
-      V.side([[2.12, 0.32], [2.12, 0.95], [1.95, 1.04], [1.25, 1.1], [0.72, 1.6], [-1.95, 1.62], [-2.08, 1.42], [-2.12, 0.32]], W, col);   // body
-      V.side([[1.22, 1.13], [0.76, 1.55], [-1.9, 1.56], [-2.0, 1.4], [-2.0, 1.13]], W + 0.02, glass);             // side windows
-      V.side([[1.27, 1.11], [0.74, 1.6], [0.68, 1.6], [1.2, 1.11]], W - 0.14, glass);                              // windshield
-      V.P(W - 0.3, 0.32, 0.03, glass, 0, 1.42, -2.09);                                                              // rear window
+      cabin(V.g, { W, low: [[2.12, 0.32], [2.12, 0.95], [1.95, 1.04], [1.25, 1.1], [-2.09, 1.13], [-2.12, 0.32]], gh: [[1.25, 1.1], [0.72, 1.6], [-1.95, 1.62], [-2.09, 1.13]], win: [[[1.22, 1.13], [0.76, 1.55], [-1.9, 1.56], [-2.0, 1.4], [-2.0, 1.13]]], bp: [-0.3, -1.4], rg: 0.66, col });   // boxy: glass in the top of the tailgate
       V.P(W - 0.02, 0.06, 2.75, blk, 0, 1.65, -0.6);                                                                // black roof
       for (let i = 0; i < 7; i++) V.P(0.06, 0.2, 0.03, blk, (i - 3) * 0.11, 0.78, 2.13);                           // 7-slot grille
       for (const sx of [-1, 1]) { const h = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.04, 12).rotateX(Math.PI / 2), mat(0xeeeadb)); h.position.set(sx * 0.6, 0.8, 2.13); V.g.add(h);   // round headlights
@@ -7430,11 +7490,7 @@ function init(container) {
     // and the old A-pillar spotlight still on the driver's side (lamp outside by the windshield, handle through the pillar)
     const crownVic = (col, si, ri) => {
       const V = veh(si, ri), W = 1.98, glass = 0x4a6275, blk = 0x15171a, chrome = 0xd8dde2;
-      V.side([[2.7, 0.36], [2.7, 0.84], [2.55, 0.95], [1.15, 1.0], [0.55, 1.42], [-0.75, 1.44], [-1.45, 1.02], [-2.62, 0.99], [-2.7, 0.9], [-2.7, 0.36]], W, col);   // body
-      V.side([[1.1, 1.03], [0.58, 1.38], [-0.72, 1.4], [-1.36, 1.03]], W + 0.02, glass);                          // side windows
-      V.side([[1.18, 1.0], [0.56, 1.43], [0.5, 1.43], [1.1, 1.0]], W - 0.14, glass);                              // windshield
-      V.side([[-0.76, 1.44], [-1.47, 1.02], [-1.41, 1.02], [-0.72, 1.44]], W - 0.16, glass);                      // rear window
-      V.P(0.04, 0.42, 0.06, 0x2a2c30, W / 2 - 0.04, 1.22, 0.22);                                                   // B-pillar
+      cabin(V.g, { W, low: [[2.7, 0.36], [2.7, 0.84], [2.55, 0.95], [1.15, 1.0], [-1.45, 1.02], [-2.62, 0.99], [-2.7, 0.9], [-2.7, 0.36]], gh: [[1.15, 1.0], [0.55, 1.42], [-0.75, 1.44], [-1.45, 1.02]], win: [[[1.1, 1.03], [0.58, 1.38], [-0.72, 1.4], [-1.36, 1.03]]], bp: [0.22], col });   // three-box sedan, B-pillar at the old spot
       V.P(0.9, 0.2, 0.04, 0x26282c, 0, 0.72, 2.71); V.P(0.96, 0.03, 0.05, chrome, 0, 0.83, 2.71);                // grille + chrome top strip
       for (const sx of [-1, 1]) { V.P(0.62, 0.2, 0.03, 0x26282c, sx * 0.73, 0.73, 2.705); V.P(0.36, 0.14, 0.04, 0xfafaf2, sx * 0.64, 0.73, 2.715); V.P(0.08, 0.16, 0.04, 0xe8a23a, sx * 0.9, 0.73, 2.69);   // square headlights + amber corners
         V.P(0.36, 0.13, 0.04, 0xb3141a, sx * 0.62, 0.86, -2.71); }                                                // tail lights
@@ -7453,10 +7509,7 @@ function init(container) {
     // wheel arches, rockers and bed corners, steel wheels, chrome front bumper, a shifter poking up between the seats
     const ranger90 = (col, si, ri) => {
       const V = veh(si, ri), W = 1.72, glass = 0x4a6275, blk = 0x15171a, rust = 0x7a4122, rustD = 0x5a2e18;
-      V.side([[2.3, 0.4], [2.3, 0.86], [2.2, 0.93], [1.05, 0.97], [0.62, 1.48], [-0.22, 1.5], [-0.3, 0.97], [-2.3, 0.97], [-2.3, 0.4]], W, col);   // body: short hood, single cab, long bed
-      V.side([[1.0, 1.0], [0.64, 1.43], [-0.18, 1.45], [-0.24, 1.0]], W + 0.02, glass);                            // door glass
-      V.side([[1.06, 0.98], [0.63, 1.47], [0.57, 1.47], [0.99, 0.98]], W - 0.14, glass);                            // windshield
-      V.P(W - 0.26, 0.38, 0.03, glass, 0, 1.24, -0.27);                                                             // little back window
+      cabin(V.g, { W, low: [[2.3, 0.4], [2.3, 0.86], [2.2, 0.93], [1.05, 0.97], [-0.3, 0.97], [-2.3, 0.97], [-2.3, 0.4]], gh: [[1.05, 0.97], [0.62, 1.48], [-0.22, 1.5], [-0.3, 0.97]], win: [[[1.0, 1.0], [0.64, 1.43], [-0.18, 1.45], [-0.24, 1.0]]], rg: 0.5, rear: false, col });   // single cab, little back window
       V.P(W - 0.14, 0.05, 1.95, 0x2b2e31, 0, 0.94, -1.3);                                                           // bed floor
       for (const sx of [-1, 1]) V.P(0.012, 0.035, 4.4, 0x2f8a4c, sx * (W / 2 + 0.006), 0.74, 0);                   // thin green stripe, both sides
       V.P(1.0, 0.18, 0.04, blk, 0, 0.76, 2.31); for (const sx of [-1, 1]) V.P(0.3, 0.16, 0.04, 0xeef0f2, sx * 0.66, 0.77, 2.31);   // grille, square headlights
@@ -7476,13 +7529,10 @@ function init(container) {
     // chrome trim, polished chrome wheels
     const denali = (si, ri) => {
       const V = veh(si, ri), W = 2.06, LOW = -0.07, paint = new T.MeshPhongMaterial({ color: 0x0b0c0e, shininess: 120, specular: 0x8a929c }), chromeM = new T.MeshPhongMaterial({ color: 0xd9dde2, shininess: 140, specular: 0xffffff });
-      const glassM = new T.MeshPhongMaterial({ color: 0x1c2630, shininess: 110, specular: 0x9aa6b2 });
       const side = (pts, w, m) => { const sh = new T.Shape(pts.map(([a2, b2]) => new T.Vector2(a2, b2 + LOW))); const geo = new T.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2); V.g.add(new T.Mesh(geo, m)); };
       const B = (w, h, d, m, x, y, z) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y + LOW, z); V.g.add(o); return o; };
-      side([[2.95, 0.4], [2.95, 1.24], [2.8, 1.32], [1.4, 1.36], [0.72, 2.0], [-1.45, 2.02], [-1.52, 1.32], [-2.95, 1.32], [-2.95, 0.4]], W, paint);
-      side([[1.36, 1.4], [0.76, 1.94], [-1.4, 1.96], [-1.44, 1.4]], W + 0.02, glassM);
-      side([[1.42, 1.37], [0.74, 1.99], [0.68, 1.99], [1.34, 1.37]], W - 0.16, glassM);
-      B(W - 0.26, 0.5, 0.03, glassM, 0, 1.68, -1.53); B(W - 0.18, 0.06, 1.38, mat(0x15171a), 0, 1.3, -2.2);
+      cabin(V.g, { W, low: [[2.95, 0.4], [2.95, 1.24], [2.8, 1.32], [1.4, 1.36], [-1.52, 1.32], [-2.95, 1.32], [-2.95, 0.4]], gh: [[1.4, 1.36], [0.72, 2.0], [-1.45, 2.02], [-1.52, 1.32]], win: [[[1.36, 1.4], [0.76, 1.94], [-1.4, 1.96], [-1.44, 1.4]]], bp: [-0.3], rg: 0.55, paint, dy: LOW });
+      B(W - 0.18, 0.06, 1.38, mat(0x15171a), 0, 1.3, -2.2);
       B(1.75, 0.62, 0.05, chromeM, 0, 0.98, 2.96); for (let y = 0.76; y < 1.24; y += 0.1) B(1.6, 0.03, 0.055, mat(0x2a2d31), 0, y, 2.965);   // big chrome grille with dark slats
       B(0.3, 0.12, 0.07, mat(0xc8211c), 0, 1.0, 2.99);                                                                                    // red badge
       for (const sx of [-1, 1]) { B(0.36, 0.08, 0.04, batteryLight(new T.MeshBasicMaterial({ color: 0xf4f8ff })), sx * 0.9, 1.2, 2.96); B(0.05, 0.4, 0.04, batteryLight(new T.MeshBasicMaterial({ color: 0xf4f8ff })), sx * 1.02, 1.0, 2.96);   // slim LEDs + C-shaped light bars
@@ -7498,12 +7548,10 @@ function init(container) {
     silverado(0xb3161b, 2, 0); jeep(0x2c4a30, 5, 0); equinox(0x16181b, 9, 1); renegade(0xf2f3f1, 3, 2); crownVic(0xf1f2ef, 12, 1); ranger90(0xf2f2ee, 7, 2); denali(11, 0);
     // a brand-new pink Kia sedan (K5-style fastback): long low body, sloping roofline into a short deck, slim LED lights, the wide
     // "tiger nose" grille, full-width LED tail bar, black roof and two-tone wheels. X / E at it works the stereo: hip hop → Mexican → off.
-    { const V = veh(6, 1), W = 1.86, glass = 0x1c2630, blk = 0x111214;
+    { const V = veh(6, 1), W = 1.86, blk = 0x111214;
       const paint = new T.MeshPhongMaterial({ color: 0xf28ab8, shininess: 90, specular: 0xd8b0c4 });   // pink
       const side = (pts, w, m) => { const sh = new T.Shape(pts.map(([a2, b2]) => new T.Vector2(a2, b2))); const geo = new T.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2); V.g.add(new T.Mesh(geo, m)); };
-      side([[2.42, 0.28], [2.45, 0.66], [2.3, 0.78], [1.2, 0.88], [0.45, 1.42], [-0.6, 1.44], [-1.75, 1.0], [-2.38, 0.94], [-2.45, 0.7], [-2.42, 0.28]], W, paint);
-      side([[1.16, 0.91], [0.47, 1.38], [-0.58, 1.4], [-1.68, 1.0], [-1.62, 0.92]], W + 0.02, mat(glass));
-      side([[1.22, 0.89], [0.46, 1.43], [0.4, 1.43], [1.15, 0.89]], W - 0.14, mat(glass));
+      cabin(V.g, { W, low: [[2.42, 0.28], [2.45, 0.66], [2.3, 0.78], [1.2, 0.88], [-1.75, 1.0], [-2.38, 0.94], [-2.45, 0.7], [-2.42, 0.28]], gh: [[1.2, 0.88], [0.45, 1.42], [-0.6, 1.44], [-1.75, 1.0]], win: [[[1.16, 0.91], [0.47, 1.38], [-0.58, 1.4], [-1.68, 1.0], [-1.62, 0.92]]], bp: [-0.4], paint, eye: 1.17 });   // fastback: the long back glass is the rear window
       V.P(W - 0.1, 0.03, 1.15, blk, 0, 1.445, -0.07);                                                             // black roof
       V.P(1.3, 0.12, 0.04, blk, 0, 0.6, 2.44); V.P(1.5, 0.03, 0.05, mat(0x9aa1a8), 0, 0.68, 2.45);                 // wide tiger-nose grille
       for (const sx of [-1, 1]) { V.P(0.42, 0.04, 0.04, 0xf4f8ff, sx * 0.62, 0.72, 2.43); V.P(0.28, 0.06, 0.05, 0xf4f8ff, sx * 0.72, 0.5, 2.42);   // slim LED headlights + DRL hooks
@@ -11686,10 +11734,10 @@ function swapRangers() {
 function utvEnter() { utvIgnition(); walk.drive = true; walk.vy = 0; utv.vx = utv.vz = 0; utv.vy = 0; utv.air = false; utv.camYaw = utv.a; utv.look = utv.lookP = 0; }
 // ---------- DRIVABLE CARS (the three parked in the dirt behind the plant): same arcade handling as the Ranger, no NOS. Each one is locked
 // until you have its keys, which hang on hooks: the black Silverado's (holy cross keychain) in the production manager's office, the
-// yellow crossover's (mustard bottle keychain) and the silver F-150's (lab beaker keychain) in the lab office. X / E at a key takes it.
+// yellow crossover's (mustard bottle keychain) in the lab office. X / E at a key takes it.
 // Driving one swaps it in as "the vehicle" for the Ranger code; getting out swaps the Ranger back.
-const KEYS = new Set(), KEYHOOKS = [], KEYNAME = { cross: 'holy cross', mustard: 'mustard bottle', beaker: 'lab beaker', flower: 'flower' };
-const KEYCAR = { cross: 'black Silverado', mustard: 'yellow crossover', beaker: 'silver F-150', flower: 'Pink Sedan' };
+const KEYS = new Set(), KEYHOOKS = [], KEYNAME = { cross: 'holy cross', mustard: 'mustard bottle', flower: 'flower' };
+const KEYCAR = { cross: 'black Silverado', mustard: 'yellow crossover', flower: 'Pink Sedan' };
 function keyHook(kind, x, z, ry) {   // a little key ring on a wall hook (the wall faces +z at this spot), with its keychain charm
   const g = new T.Group(); g.position.set(x, 1.5, z); g.rotation.y = ry; scene.add(g);
   const P = (geo, c, px, py, pz) => { const m = new T.Mesh(geo, mat(c)); m.position.set(px, py, pz); g.add(m); return m; };
@@ -11707,7 +11755,6 @@ function keyHook(kind, x, z, ry) {   // a little key ring on a wall hook (the wa
   if (kind === 'cross') { Q(new T.BoxGeometry(0.006, 0.034, 0.003), 0xd4af37, 0, -0.017, 0); Q(new T.BoxGeometry(0.02, 0.006, 0.003), 0xd4af37, 0, -0.01, 0); }   // gold holy cross
   if (kind === 'mustard') { Q(new T.CylinderGeometry(0.0075, 0.0075, 0.026, 10), 0xe8c21a, 0, -0.021, 0); Q(new T.CylinderGeometry(0.003, 0.005, 0.008, 8), 0xc8211c, 0, -0.004, 0); }   // mustard bottle, red cap
   if (kind === 'flower') { for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; Q(new T.SphereGeometry(0.0065, 8, 6), 0xf06aa8, Math.cos(a) * 0.008, -0.014 + Math.sin(a) * 0.008, 0); } Q(new T.SphereGeometry(0.005, 8, 6), 0xf2d21a, 0, -0.014, 0.003); }   // pink flower, yellow center
-  if (kind === 'beaker') { Q(new T.ConeGeometry(0.011, 0.022, 10), 0xd6eef7, 0, -0.019, 0); Q(new T.CylinderGeometry(0.0035, 0.0035, 0.01, 8), 0xd6eef7, 0, -0.004, 0); Q(new T.CylinderGeometry(0.009, 0.0105, 0.007, 10), 0x4ab0e8, 0, -0.026, 0); }   // flask with blue liquid
   g.scale.setScalar(1.35);   // a touch bigger than life so you can spot it
   KEYHOOKS.push({ kind, g, x, z });
 }
@@ -11720,8 +11767,9 @@ function mkCar(g, name, key) {   // wrap a parked vehicle so the Ranger code can
   const outer = new T.Group(); outer.position.set(g.position.x, 0, g.position.z); outer.rotation.y = g.rotation.y + Math.PI; scene.remove(g);
   g.position.set(0, -0.13, 0); g.rotation.set(0, Math.PI, 0); outer.add(g); scene.add(outer);
   const wheels = []; for (const m of g.children.slice()) if (m.userData.wheel) { const pv = new T.Group(); pv.position.copy(m.position); g.remove(m); m.position.set(0, 0, 0); pv.add(m); g.add(pv); wheels.push({ pv, w: m, front: pv.position.z > 0, rev: true }); }
-  const CAM = { 'black Silverado': [12.5, 4.3, 2.0], 'silver F-150': [11.5, 3.9, 1.72], 'yellow crossover': [10, 3.4, 1.45], 'Pink Sedan': [9.5, 3.1, 1.18] }[name] || [11, 3.8, 1.6];   // chase distance, chase height, driver's eye height
-  return { g: outer, name, key, cam: CAM, cols: g.userData.cols, wheels, x: outer.position.x, z: outer.position.z, a: outer.rotation.y, y: 0 };
+  const CAM = { 'black Silverado': [12.5, 4.3, 2.0], 'yellow crossover': [10, 3.4, 1.45], 'Pink Sedan': [9.5, 3.1, 1.18] }[name] || [11, 3.8, 1.6];   // chase distance, chase height, driver's eye height
+  // eye / sw: the driver's seat and steering wheel from its hollow cabin (cabin()); the first-person view sits there
+  return { g: outer, inner: g, eye: g.userData.eye || null, sw: g.userData.sw || null, name, key, cam: CAM, cols: g.userData.cols, wheels, x: outer.position.x, z: outer.position.z, a: outer.rotation.y, y: 0 };
 }
 let CAR_ON = null, RANGER_SAVE = null;
 function carToggle() {
@@ -11734,13 +11782,13 @@ function carToggle() {
   RANGER_SAVE = { g: utv.g, x: utv.x, z: utv.z, a: utv.a, y: utv.y, wheels: utv.wheels, sw: utv.sw, driver: utv.driver, flame: utv.flame, nos: utv.nos, uc: _uc.map(q => q.slice()) };
   RANGER_SAVE.cols = [-0.9, 0.9].map(off => [utv.x - Math.sin(utv.a) * off, utv.z - Math.cos(utv.a) * off, 0.85]); colliders.push(...RANGER_SAVE.cols);   // the parked Ranger stays solid
   for (const c of best.cols) { c[0] = 1e5; c[1] = 1e5; }
-  Object.assign(utv, { g: best.g, x: best.x, z: best.z, a: best.a, y: best.y, wheels: best.wheels, sw: null, driver: null, flame: best.flame || null, noNos: !best.nos, nos: best.nos ? 1 : 0, vx: 0, vz: 0 });
+  Object.assign(utv, { g: best.g, x: best.x, z: best.z, a: best.a, y: best.y, wheels: best.wheels, sw: best.sw || null, driver: null, flame: best.flame || null, noNos: !best.nos, nos: best.nos ? 1 : 0, vx: 0, vz: 0 });
   _uc[0][0] = -1.9; _uc[0][1] = 1.0; _uc[1][0] = 1.9; _uc[1][1] = 1.0;
   CAR_ON = best; utvEnter();
   return 'The ' + best.name + ': RT gas · LT brake/reverse · left stick steer · A handbrake · Y view' + (best.nos ? ' · B turbo' : '') + ' · R / D-pad up / 📻: stereo';
 }
 function carRestore() {
-  const c = CAR_ON, S = RANGER_SAVE; c.x = utv.x; c.z = utv.z; c.a = utv.a; c.y = utv.y;
+  const c = CAR_ON, S = RANGER_SAVE; c.x = utv.x; c.z = utv.z; c.a = utv.a; c.y = utv.y; if (c.sw) c.sw.rotation.z = 0;   // parked with the wheel straight
   const fx = -Math.sin(c.a) * 1.2, fz = -Math.cos(c.a) * 1.2; c.cols[0][0] = c.x + fx; c.cols[0][1] = c.z + fz; c.cols[1][0] = c.x - fx; c.cols[1][1] = c.z - fz;
   netSend({ t: 'cp', i: c.i, p: [+c.x.toFixed(2), +c.z.toFixed(2), +c.a.toFixed(3), +c.y.toFixed(2)] });
   for (const q of S.cols) { const i = colliders.indexOf(q); if (i >= 0) colliders.splice(i, 1); }
@@ -11868,12 +11916,17 @@ function pivotGenSound() {   // the pivot's diesel: a low lope you only hear nea
   S.o.frequency.setTargetAtTime(f, t, 0.25); S.o2.frequency.setTargetAtTime(f * 0.5, t, 0.25);
   S.g.gain.setTargetAtTime(on ? 0.13 * near : 0, t, 0.25);   // a stationary diesel carries: louder up close, same 80 m falloff
 }
+const _eyeV = new T.Vector3();
 function utvCam(dt) {
   scene.fog.near = 120; scene.fog.far = 900;
   const u = utv;
   { const f = u.boosting ? 54 : 42; if (Math.abs(camera.fov - f) > 0.05) { camera.fov += (f - camera.fov) * Math.min(1, 5 * dt); camera.updateProjectionMatrix(); } }   // speed rush: wider view on NOS
   if (u.view) {   // driver's seat
-    const a = u.a + u.look, p = u.lookP - 0.2, cp = Math.cos(p), sx = u.x - Math.cos(u.a) * 0.3 + Math.sin(u.a) * 0.1, sz = u.z + Math.sin(u.a) * 0.3 + Math.cos(u.a) * 0.1, ey = u.y + (CAR_ON ? CAR_ON.cam[2] : 1.45) + (u.g.position.y - u.y);
+    let sx, ey, sz, p = u.lookP - 0.2;
+    if (CAR_ON && CAR_ON.eye) {   // a car: its driver's seat (left side, behind the wheel) rides with the body, bounce and tilt included
+      CAR_ON.g.updateMatrixWorld(true); _eyeV.set(CAR_ON.eye[0], CAR_ON.eye[1], CAR_ON.eye[2]).applyMatrix4(CAR_ON.inner.matrixWorld); sx = _eyeV.x; ey = _eyeV.y; sz = _eyeV.z; p = u.lookP - 0.06;
+    } else { sx = u.x - Math.cos(u.a) * 0.3 + Math.sin(u.a) * 0.1; sz = u.z + Math.sin(u.a) * 0.3 + Math.cos(u.a) * 0.1; ey = u.y + (CAR_ON ? CAR_ON.cam[2] : 1.45) + (u.g.position.y - u.y); }
+    const a = u.a + u.look, cp = Math.cos(p);
     camera.position.set(sx, ey, sz); camera.lookAt(sx - Math.sin(a) * cp, ey + Math.sin(p), sz - Math.cos(a) * cp); return;
   }
   let d = u.a - u.camYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); u.camYaw += d * Math.min(1, 4 * dt);   // chase camera swings around behind it

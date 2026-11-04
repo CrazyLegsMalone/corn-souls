@@ -60,7 +60,7 @@ jobs:
                    validate-performance.cjs validate-ground-layers.cjs \
                    validate-gun-magazine.cjs validate-frame-stability.cjs \
                    validate-ranger.cjs validate-water.cjs validate-pivot.cjs \
-                   validate-game-clock.cjs; do
+                   validate-game-clock.cjs validate-vehicle-cabins.cjs; do
             if node "$f"; then echo "::notice::PASS test/$f"; else echo "::warning::FAIL test/$f"; fail=1; fi
           done
           exit $fail
