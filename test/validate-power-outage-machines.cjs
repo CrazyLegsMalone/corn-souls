@@ -624,10 +624,10 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('function mergeModel(root, castShadow, skip) {') && html.includes('if (parts.length < 2) continue;'), 'merge keeps single-part materials as they are');
   assert.ok(html.includes('if (o !== root) o.matrixAutoUpdate = false; })'), 'and stops walking static matrices every frame');
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
-  // ---------------------------------------------------------------- the players wear the operator rig, tinted per player
-  assert.ok(html.includes("const PLAYER_RIG = { url: '/corn-souls/assets/models/operator_vern_rig.glb'"), 'both players use the operator rig');
-  assert.equal((html.match(/dressPlayer\(/g) || []).length, 7, 'one definition + six avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, and the other player seated in a car (v1.97.109)');
-  for (const call of ["dressPlayer(av, VEST_COL[other], {});", "dressPlayer(d, vest, { sit: true });", "dressPlayer(av, VEST_COL[me], { onRig: rig => {"])
+  // ---------------------------------------------------------------- the players wear their own wardrobe builds (v1.97.185)
+  assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("'/corn-souls/assets/models/squeeg1_2_0.glb'") && html.includes("'/corn-souls/assets/models/squeeg2_2_0.glb'"), 'Player 1 wears squeeg1, Player 2 wears squeeg2');
+  assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 7, 'one definition + six avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, and the other player seated in a car (v1.97.109)');
+  for (const call of ['dressPlayerSkin(av, VEST_COL[other], {});', 'dressPlayerSkin(d, vest, { sit: true });', 'dressPlayerSkin(av, VEST_COL[me], { onRig: () => {'])
 
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
   // ---------------------------------------------------------------- vending: the Shifty Food machine and the cans
@@ -712,51 +712,54 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('R.av.visible = R.walk && !R.drive && !R.mow && !R.ps;'), 'their standing body is hidden while they are seated in your car');
   assert.ok(html.includes('utv.passenger = seatPassenger(P0, VEST_COL[NET.host ? 1 : 0])'), 'and they are drawn in your passenger seat, in their own vest colour');
   assert.ok(html.includes('const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;'), 'your own third-person body is hidden while you ride');
-  assert.ok(html.includes("VIEW.legs = [rig.legL, rig.legR].filter(Boolean);"), 'the walk cycle drives the rig hips');
+  assert.ok(html.includes('VIEW.legs = []; VIEW.arms = [];'), 'no walk cycle yet: the skinned player stands still, so the box swing is cleared');
   assert.ok(html.includes('av.traverse(o => { if (o.isMesh) o.userData.body = true; });'), 'box parts are marked, so held items survive the hide');
   assert.ok(html.includes('for (const c of box) if (c.parent) c.parent.remove(c);'), 'and the box body is REMOVED, so nothing can reveal it again');
   assert.ok(html.includes('if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);'), 'a second dress replaces the rig instead of stacking one on top');
-  assert.ok(html.includes('for (const c of av.children.slice()) if (c !== g && !c.userData.item) c.visible = false;'), 'and nothing else on the avatar is left showing, even if a box part escaped the marker');
+  assert.ok(html.includes('for (const c of av.children.slice()) if (c !== R && !c.userData.item) c.visible = false;'), 'and nothing else on the avatar is left showing, even if a box part escaped the marker');
   assert.ok(html.includes('for (const o of scene.children.slice()) if (o.userData.selfAv) scene.remove(o);'), 'one self avatar, ever: a stray from a half-finished build is swept out of the scene');
   {
     const reader2 = html.slice(html.indexOf('const GLB_CT = {'), html.indexOf('function loadGlbModel('));
-    const rigSrc = html.slice(html.indexOf('function rigPivot('), html.indexOf('function loadCharacter('));
-    const playerSrc = html.slice(html.indexOf('const PLAYER_RIG = {'), html.indexOf('// ---------- PACKAGE BOILERS'));
-    assert.ok(rigSrc.includes('function characterRig(') && playerSrc.includes('function dressPlayer('), 'the player-model helpers are in the game');
+    const skinSrc = html.slice(html.indexOf('// ---------- SKINNED NPCs'), html.indexOf('function loadNpcModels() {'));
+    const playerSrc = html.slice(html.indexOf('const PLAYER_SKIN = {'), html.indexOf('// ---------- PACKAGE BOILERS'));
+    assert.ok(playerSrc.includes('function dressPlayerSkin(') && skinSrc.includes('function skinBone(') && skinSrc.includes('function skinBox('), 'the skinned player helpers are in the game');
     const lib4 = { window: {}, console };
     vm.runInNewContext(scripts.find(x => x.includes('window.THREE=eu')), lib4);
-    const T4 = lib4.window.THREE;
-    const buf4 = fs.readFileSync('assets/models/operator_vern_rig.glb');
-    const pctx = { T: T4, console, TextDecoder, VEST_COL: [0xff7a1a, 0xc6e41f] };
+    const T4 = Object.create(lib4.window.THREE, { TextureLoader: { value: class { load() { return new lib4.window.THREE.Texture(); } } } });   // no DOM images in node (both player builds have embedded maps)
+    const bytes = [fs.readFileSync('assets/models/squeeg1_2_0.glb'), fs.readFileSync('assets/models/squeeg2_2_0.glb')];
+    const buf = b => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+    const thenable = v => ({ then: cb => { const r = cb(v); return (r && r.then) ? r : thenable(r); }, catch: () => thenable(v) });
+    const pctx = { T: T4, console, TextDecoder, VEST_COL: [0xff7a1a, 0xc6e41f], Blob: class { constructor(p) { this.size = p && p[0] ? p[0].length : 0; } }, URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
+      fetch: url => thenable({ ok: true, arrayBuffer: () => thenable(buf(/squeeg1/.test(url) ? bytes[0] : bytes[1])) }) };
     vm.createContext(pctx);
-    Object.assign(pctx, { glbBuf: buf4.buffer.slice(buf4.byteOffset, buf4.byteOffset + buf4.byteLength) });
-    pctx.loadGlbModel = (url, cb) => cb(pctx.glbBuild(pctx.glbBuf));
-    vm.runInContext(reader2 + '\n' + rigSrc + '\n' + playerSrc, pctx);
+    vm.runInContext(reader2 + '\n' + skinSrc + '\n' + playerSrc + '\nthis.dressPlayerSkin = dressPlayerSkin; this.skinBox = skinBox;', pctx);
     const avatar = () => { const av = new T4.Group(); const box = new T4.Mesh(new T4.BoxGeometry(0.4, 0.6, 0.3), new T4.MeshLambertMaterial({ color: 0xffffff }));
       box.userData.body = true; av.add(box); return av; };
     const a1 = avatar(), a2 = avatar();
-    pctx.dressPlayer(a1, 0xff7a1a, {}); pctx.dressPlayer(a2, 0xc6e41f, {});
-    {   // a held item must survive the dressing; anything else on the avatar must not show through the rig
+    pctx.dressPlayerSkin(a1, 0xff7a1a, {});   // Player 1 (orange vest) -> squeeg1, 1.78 m
+    pctx.dressPlayerSkin(a2, 0xc6e41f, {});   // Player 2 (lime vest)   -> squeeg2, 1.65 m
+    {   // a held item must survive the dressing; anything else on the avatar must not show through the model
       const a3 = avatar(), held = new T4.Group(), stray = new T4.Group();
       held.userData.item = true; a3.add(held); a3.add(stray);
-      pctx.dressPlayer(a3, 0xff7a1a, {});
+      pctx.dressPlayerSkin(a3, 0xff7a1a, {});
       assert.equal(held.visible, true, 'a held item stays visible on a dressed avatar');
       assert.equal(stray.visible, false, 'and every other child of the avatar is switched off');
     }
-    const rigOf = av => av.children.find(c => c.type === 'Group');   // the box body is removed, so the rig is the only group
+    const rigOf = av => av.userData.rig;
     const g1 = rigOf(a1), g2 = rigOf(a2);
-    assert.ok(g1 && g2, 'a rig was added to each avatar');
-    assert.equal(a1.children.some(c => c.userData.body), false, 'the box body is gone, the rig stands in for it');
-    assert.ok(Math.abs(g1.scale.x - 1.8 / 1.64) < 1e-6, 'the rig is scaled to the box body height');
+    assert.ok(g1 && g2, 'a model was added to each avatar');
+    assert.equal(a1.children.some(c => c.userData.body), false, 'the box body is gone, the model stands in for it');
+    const H = g => pctx.skinBox(g).max.y - pctx.skinBox(g).min.y;
+    assert.ok(Math.abs(H(g1) - 1.78) < 0.04, 'Player 1 is 1.78 m tall (' + H(g1).toFixed(2) + ')');
+    assert.ok(Math.abs(H(g2) - 1.65) < 0.04, 'Player 2 is 1.65 m tall (' + H(g2).toFixed(2) + ')');
+    assert.ok(g1 !== g2, 'the two players are built from different files');
     assert.ok(Math.abs(g1.rotation.y - Math.PI) < 1e-6, 'and turned to face the way the box avatars face');
-    const jacket = g => { const n = g.getObjectByName('Torso_Jacket_Male');   // a glTF node is a group holding unnamed meshes
-      return n && (n.isMesh ? n.material : (n.children.find(c => c.isMesh) || {}).material); };
-    const j1 = jacket(g1), j2 = jacket(g2);
-    assert.ok(j1 && j2, "the rig carries the jacket that becomes the player's vest");
-    assert.notEqual(j1, j2, 'each player gets its own jacket material (a shared one would recolour both)');
-    assert.ok(j1.color.getHex() !== j2.color.getHex(), 'and the two players are different colours');
-    assert.ok(j1.color.r > j1.color.g * 2, 'Player 1 reads orange (' + j1.color.getHexString() + ')');
-    assert.ok(j2.color.b < 0.05 && j2.color.r > 0.4 && j2.color.g > 0.4, 'Player 2 reads lime (' + j2.color.getHexString() + ')');
+    let shadows = 0; g1.traverse(o => { if (o.isMesh && o.castShadow) shadows++; }); assert.equal(shadows, 0, 'no shadow casting on the skinned player');
+    {   // a seated player folds their legs: the head drops and the feet stay near the floor
+      const a4 = avatar(); pctx.dressPlayerSkin(a4, 0xff7a1a, { sit: true }); const g4 = rigOf(a4);
+      const bb4 = pctx.skinBox(g4); assert.ok(Math.abs(bb4.min.y) < 0.06, 'seated feet stay on the floor (' + bb4.min.y.toFixed(3) + ')');
+      assert.ok(H(g4) < 1.5, 'and the model is shorter once its legs are folded (' + H(g4).toFixed(2) + ' m)');
+    }
   }
   // cross-script wiring: the frame loop lives in a later script block than the renderer, so the HUD readout has to go
   // through the Plant3D bridge - reading `renderer` directly there threw a ReferenceError once a second (v1.97.60).

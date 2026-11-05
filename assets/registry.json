@@ -905,6 +905,48 @@
       "required_notice": "No endorsement by the creator is implied."
     },
     {
+      "id": "sketchfab-loves-art-low-poly-male-squeeg1-2-0",
+      "title": "Low Poly Male — squeeg1 2.0 (Corn Souls Crew Wardrobe build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3",
+      "evidence": "Embedded glTF asset.extras: title 'squeeg1_2.0 (Corn Souls character)', author Loves_Art (https://sketchfab.com/Loves_Art), license CC-BY-4.0, the source URL above, changes 'Recoloured, expression edited, accessories added in the Corn Souls Crew Wardrobe'. Exported by the owner's wardrobe tool (THREE.GLTFExporter r170); the drop also carried a CREDITS.txt with the same notice.",
+      "notes": "Worn by Player 1 (Squeeg) in the TEST channel since v1.97.185, in place of the rigid operator rig. 6,214 triangles in 16 parts: 15 skinned meshes on a 66-joint Mixamo skeleton split across 15 skins, plus a rigid hard_hat parented to the Head bone; 16 materials and 2 embedded colour maps. Its 'walking' clip is present but has no channels (unused: the player is posed standing, with no walk cycle yet).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Relative to the original Low Poly Male: recoloured (skin, clothing, shoes, hair, eyes), and accessories added (white hard hat, long hair). At runtime: scaled to 1.78 m, arms lowered from the T-pose, legs folded for a vehicle seat, and NOT recoloured — the wardrobe's colours are the file's own.",
+      "files": [
+        "assets/models/squeeg1_2_0.glb"
+      ],
+      "checked_on": "2026-11-05",
+      "reviewer": "Cline, from the GLB's embedded asset.extras and the CREDITS.txt in the owner's drop",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-female-squeeg2-2-0",
+      "title": "Low Poly Female — squeeg2 2.0 (Corn Souls Crew Wardrobe build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1",
+      "evidence": "Embedded glTF asset.extras: title 'squeeg2_2.0 (Corn Souls character)', author Loves_Art (https://sketchfab.com/Loves_Art), license CC-BY-4.0, the source URL above, changes 'Recoloured, expression edited, accessories added in the Corn Souls Crew Wardrobe'. Exported by the owner's wardrobe tool (THREE.GLTFExporter r170); the drop also carried a CREDITS.txt with the same notice.",
+      "notes": "Worn by Player 2 (Squeeg) in the TEST channel since v1.97.185, in place of the rigid operator rig. 7,516 triangles in 18 parts: 15 skinned meshes on a 71-joint Mixamo skeleton split across 15 skins, plus three rigid accessory meshes (hard_hat, earrings, and her bracelet on an unnamed left-forearm node) parented to bones; 16 materials and 3 embedded colour maps. Its 'walking' clip is present but has no channels (unused: the player is posed standing, with no walk cycle yet).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Relative to the original Low Poly Female: recoloured (skin, clothing, shoes, hair, eyes), facial expression edited (angry), and accessories added (white hard hat, silver stud earrings, pendant, bracelet, boots). At runtime: scaled to 1.65 m, arms lowered from the T-pose, legs folded for a vehicle seat, and NOT recoloured — the wardrobe's colours are the file's own.",
+      "files": [
+        "assets/models/squeeg2_2_0.glb"
+      ],
+      "checked_on": "2026-11-05",
+      "reviewer": "Cline, from the GLB's embedded asset.extras and the CREDITS.txt in the owner's drop",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
       "id": "sketchfab-loves-art-low-poly-male",
       "title": "Low Poly Male",
       "creator": "Loves_Art",

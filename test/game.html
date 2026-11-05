@@ -5748,53 +5748,64 @@ function loadSmokingArea() {
     g.add(root); scene.add(g); scene.updateMatrixWorld(true);
   }, 'smoking-area');
 }
-// ---------- PLAYER MODELS: both players wear the operator rig (the same rigid-part family as Vern), tinted to their
-// own vest colour so Player 1 is orange and Player 2 lime. One upload, cloned per avatar; the box body stays as the
-// fallback and keeps driving the walk cycle until the rig arrives, then the rig's own hip and shoulder pivots do.
-const PLAYER_RIG = { url: '/corn-souls/assets/models/operator_vern_rig.glb', root: null, loading: false, wait: [] };
-function loadPlayerRig(cb) {
-  if (PLAYER_RIG.root) return cb(PLAYER_RIG.root);
-  PLAYER_RIG.wait.push(cb);
-  if (PLAYER_RIG.loading) return;
-  PLAYER_RIG.loading = true;
-  loadGlbModel(PLAYER_RIG.url, ({ root }) => {
-    PLAYER_RIG.root = root; PLAYER_RIG.loading = false;
-    for (const f of PLAYER_RIG.wait.splice(0)) f(root);
-  }, 'players');
+// ---------- PLAYER MODELS: Player 1 wears squeeg1 (male), Player 2 wears squeeg2 (female) - the owner's Crew Wardrobe builds
+// of Loves_Art's Low Poly Male / Female (CC BY 4.0). One fresh build per avatar (a skinned model cannot be cloned without sharing
+// its skeleton, and two avatars of the same player must fold independently), so the raw bytes are cached and glbBuild() runs per
+// avatar. The box body stays as the fallback until the model lands.
+// v1.97.185: standing pose only - arms down, feet on the floor, no walk cycle yet (the hip/shoulder swing and the held-item arms
+// that drove the old rigid rig are gone for now); seated avatars fold their legs exactly like skinnedNpc() does.
+const PLAYER_SKIN = {
+  url: ['/corn-souls/assets/models/squeeg1_2_0.glb', '/corn-souls/assets/models/squeeg2_2_0.glb'],
+  h: [1.78, 1.65],
+  bytes: [null, null], loading: [false, false], wait: [[], []]
+};
+function loadPlayerSkin(slot, cb) {
+  const S = PLAYER_SKIN;
+  if (S.bytes[slot]) { try { return cb(glbBuild(S.bytes[slot])); } catch (e) { console.warn('[player skin] build failed:', e && e.message); } }
+  S.wait[slot].push(cb);
+  if (S.loading[slot]) return;
+  S.loading[slot] = true;
+  fetch(S.url[slot], { cache: 'force-cache' })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .then(buf => { S.bytes[slot] = buf; S.loading[slot] = false; for (const f of S.wait[slot].splice(0)) f(glbBuild(buf)); })
+    .catch(e => { S.loading[slot] = false; S.wait[slot].length = 0; console.warn('[player skin] ' + S.url[slot].split('/').pop() + ' not loaded:', e && e.message); });
 }
-// vest: the player's VEST_COL. opts.sit folds the legs for a vehicle seat; opts.onRig hands back the joint pivots so the
-// caller can animate them (the walk cycle drives VIEW.legs / VIEW.arms, which is exactly these).
-function dressPlayer(av, vest, opts) {
-  const o = opts || {};
-  loadPlayerRig(src => { try {
-    const g = src.clone(true), rig = characterRig(g, { hands: 'Hand_Glove' });
-    // the jacket is the vest: recolour it per player. glTF nodes become GROUPS holding unnamed meshes, so the jacket
-    // material is read off the meshes under that node, and the swap is by material identity - a fresh clone each time,
-    // so Player 1 and Player 2 never share (and never recolour) one material.
-    const jk = g.getObjectByName('Torso_Jacket_Male'), jmat = jk && (jk.isMesh ? jk.material : (jk.children.find(c => c.isMesh) || {}).material);
-    if (jmat) {
-      const tint = jmat.clone(); tint.color.lerp(new T.Color(vest), 0.72);
-      g.traverse(c => { if (c.isMesh && c.material === jmat) c.material = tint; });
+// vest: the player's VEST_COL (the slot). opts.sit folds the legs for a vehicle seat; opts.onRig hands back the model group so a
+// caller can animate it (unused for now: the players stand still).
+function dressPlayerSkin(av, vest, opts) {
+  const o = opts || {}, slot = vest === VEST_COL[1] ? 1 : 0;
+  loadPlayerSkin(slot, ({ root }) => { try {
+    const X = new T.Vector3(1, 0, 0), Z = new T.Vector3(0, 0, 1), P = SKIN_POSE, wp = b => b.getWorldPosition(new T.Vector3());
+    root.updateMatrixWorld(true);
+    const h0 = skinBox(root); root.scale.setScalar(PLAYER_SKIN.h[slot] / (h0.max.y - h0.min.y)); root.updateMatrixWorld(true);
+    for (const [s, sg] of [['Left', 1], ['Right', -1]]) {   // arms down, out to their own sides (the export is a T-pose)
+      const a = skinBone(root, s + 'Arm'), e = skinBone(root, s + 'ForeArm'); if (!a || !e) continue;
+      const d = wp(e).sub(wp(a)), now = Math.atan2(d.y, d.x * sg);
+      skinTurn(root, a, Z, sg * (-P.arm - now));
     }
-    if (o.sit) for (const s of ['L', 'R']) {
-      if (rig['leg' + s]) rig['leg' + s].rotation.x = -1.15;
-      if (rig['knee' + s]) rig['knee' + s].rotation.x = 1.15; }
-    g.scale.setScalar(1.8 / 1.64);                           // the box body is 1.8 m at local scale 1; this rig is 1.64 m
-    g.updateMatrixWorld(true);
-    const bb = new T.Box3().setFromObject(g);
-    g.position.y = o.seat === undefined ? -bb.min.y : o.seat - bb.min.y;   // feet on the avatar's floor
-    g.rotation.y = Math.PI;                                  // the rigs face +Z, the box avatars face -Z
-    g.traverse(c => { c.userData.noHit = true; if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; } });
-    // The box body is REMOVED, not just hidden: a stray visible=true anywhere else must never be able to resurrect it,
-    // and a left-over box under the rig is exactly how a player ends up looking like the old Squeeg with somebody
-    // standing inside them. Held items live in their own groups and are untouched.
+    const R = new T.Group(); R.add(root); R.rotation.y = Math.PI;   // the models face +Z, the box avatars face -Z
+    let base = -skinBox(R).min.y;                                   // standing: feet on the floor
+    if (o.sit) {                                                   // folded legs for a vehicle seat (the same fold as skinnedNpc)
+      const leg = ['Left', 'Right'].map(s => ({ up: skinBone(root, s + 'UpLeg'), kn: skinBone(root, s + 'Leg'), ft: skinBone(root, s + 'Foot') })).filter(l => l.up && l.kn && l.ft);
+      for (const l of leg) { l.shin = wp(l.kn).distanceTo(wp(l.ft)); skinTurn(root, l.up, X, -P.thigh); }
+      R.updateMatrixWorld(true);
+      const hip = leg.reduce((a, l) => a.add(wp(l.up)), new T.Vector3()).multiplyScalar(1 / Math.max(1, leg.length)), v = new T.Vector3(); let low = Infinity;
+      root.traverse(o2 => { if (o2.isSkinnedMesh) for (let i = 0, n = o2.geometry.attributes.position.count; i < n; i++) { o2.getVertexPosition(i, v); v.applyMatrix4(o2.matrixWorld); if (Math.hypot(v.x - hip.x, v.z - hip.z) < 0.16 && v.y < low) low = v.y; } });
+      base = P.seatTop - (isFinite(low) ? low : hip.y - 0.1);
+      for (const l of leg) { const kneeY = wp(l.kn).y + base, phi = Math.acos(Math.max(-1, Math.min(1, (kneeY - P.ankle) / l.shin))); skinTurn(root, l.kn, X, P.thigh - phi); }
+    }
+    R.position.set(0, base, 0);
+    root.traverse(o2 => { o2.userData.noHit = true; if (o2.isMesh) { o2.castShadow = false; o2.receiveShadow = false; } });
+    // The box body is REMOVED, not hidden: a stray visible=true anywhere else must never be able to resurrect it, and a
+    // left-over box under the model is exactly how a player ends up looking like the old Squeeg with somebody standing inside
+    // them. Held items live in their own groups and are untouched.
     const box = []; av.traverse(c => { if (c.userData.body) box.push(c); });
     for (const c of box) if (c.parent) c.parent.remove(c);
     if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);   // never dress twice
-    av.userData.rig = g; av.add(g);
-    for (const c of av.children.slice()) if (c !== g && !c.userData.item) c.visible = false;   // belt and braces: no box body shows through the rig
-    if (o.onRig) o.onRig(rig, g);
-  } catch (e) { console.warn('[player rig] dressing failed, the box avatar stays:', e && e.message); } });
+    av.userData.rig = R; av.add(R);
+    for (const c of av.children.slice()) if (c !== R && !c.userData.item) c.visible = false;   // belt and braces: no box body shows through
+    if (o.onRig) o.onRig(R, root);
+  } catch (e) { console.warn('[player skin] dressing failed, the box avatar stays:', e && e.message); } });
 }
 // ---------- PACKAGE BOILERS: the owner's ethanol_plant_steam_boiler_narrow_long.glb - 259 nodes, matrix transforms,
 // and its own stack, burner, blower, steam drum, gauges and ladder. One upload, one clone: both bays share the geometry.
@@ -10783,7 +10794,7 @@ function netRemote() {
   c.fillStyle = 'rgba(20,24,30,.75)'; c.fillRect(0, 0, 128, 40); c.fillStyle = '#ffb347'; c.font = 'bold 26px Arial'; c.textAlign = 'center'; c.fillText(NET.host ? 'PLAYER 2' : 'PLAYER 1', 64, 29);
   const tag = new T.Sprite(new T.SpriteMaterial({ map: srgbTex(new T.CanvasTexture(cv)), depthTest: false })); tag.scale.set(0.9, 0.28, 1); tag.position.y = 2.15; av.add(tag);
   av.visible = false; scene.add(av);
-  dressPlayer(av, VEST_COL[other], {});   // the other player wears the tinted operator rig too
+  dressPlayerSkin(av, VEST_COL[other], {});   // the other player wears their own wardrobe build (P1 squeeg1, P2 squeeg2)
   NET.rp = { av, items, sg, aim: 0, aimK: 0, am: 0, sh: MAG, held: null, x: 0, y: 0, z: 0, yaw: 0, tx: 0, ty: 0, tz: 0, tyaw: 0, walk: false, drive: false };
   const rr = { x: NET.host ? 58.6 : 55, z: 22, a: 0, y: 0, steer: 0, tx: 0, tz: 0, ta: 0, spin: 0 }; rr.tx = rr.x; rr.tz = rr.z;
   rr.g = makeRangerMesh(rr, RANGER_COL[other]); rr.driver = seatDriver(rr.g, VEST_COL[other]); rr.driver.visible = false; rr.flame = addFlame(rr.g); rr.g.traverse(o => { o.userData.noHit = true; }); rr.g.position.set(rr.x, 0.13, rr.z); scene.add(rr.g); NET.rr = rr;
@@ -10898,7 +10909,7 @@ function netUpdate(dt) {
     if (R.mow && O.shedMower) { const g = O.shedMower.g, M = R.mow, k = Math.min(1, rdt * 10), ox = g.position.x, oz = g.position.z;
       g.position.x += (M[0] - g.position.x) * k; g.position.y += (M[1] - g.position.y) * k; g.position.z += (M[2] - g.position.z) * k; g.rotation.y = _lerpA(g.rotation.y, M[3], k); g.visible = true;
       if (!O.shedMower.rider) { const d = makeCharacter(VEST_COL[NET.host ? 1 : 0], true); d.scale.setScalar(SQ_K); d.rotation.y = Math.PI / 2; d.position.set(0.22, 0.05, 0); g.add(d); O.shedMower.rider = d;
-        dressPlayer(d, VEST_COL[NET.host ? 1 : 0], { sit: true }); }
+        dressPlayerSkin(d, VEST_COL[NET.host ? 1 : 0], { sit: true }); }
       O.shedMower.rider.visible = true; const sp = Math.hypot(g.position.x - ox, g.position.z - oz) / Math.max(rdt, 1e-3);
       if (M[4]) cornCut(g.position.x, g.position.z, 1.2);   // their deck cuts the corn on my screen too
       if (M[4] && sp > 0.3 && Math.random() < rdt * 12) { const h = g.rotation.y, fx = -Math.cos(h), fz = Math.sin(h); puff(V3(g.position.x + fz * 0.85, g.position.y + 0.25, g.position.z - fx * 0.85), 0.07, 0x6aa84f); }
@@ -12810,9 +12821,9 @@ function npcAt() {
 const RANGER_COL = [0xc0221c, 0x1f63c8];   // Player 1 red, Player 2 blue
 const VEST_COL = [0xff7a1a, 0xc6e41f];     // Player 1 orange vest, Player 2 lime vest
 function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
-  dressPlayer(d, vest, { sit: true }); return d; }
+  dressPlayerSkin(d, vest, { sit: true }); return d; }
 function seatPassenger(g, vest) { const d = makeCharacter(vest, true); d.position.set(0.34, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
-  dressPlayer(d, vest, { sit: true }); return d; }
+  dressPlayerSkin(d, vest, { sit: true }); return d; }
 // ---------- RIDING ALONG: X beside the other player's moving Ranger and you hop into the passenger seat. Your own controls
 // go quiet, your body is pinned to that seat with the camera riding with it, and the other PC puts you in its own passenger
 // seat (they know from the `ps` flag). X again steps out. Only meaningful in 2 player, where there is somebody to ride with.
@@ -12851,7 +12862,7 @@ function passExit() {
 // the people you can see in a car: the other player at the wheel of a car they drive, and the other player riding with you
 function carFigure(c, key, side) {
   if (!c[key]) { const d = makeCharacter(VEST_COL[NET.host ? 1 : 0], true); d.scale.setScalar(0.95 * SQ_K); const e = c.eye || [0.42, 1.2, 0];
-    d.position.set(e[0] * side, e[1] - 1.12, e[2] + 0.05); d.rotation.y = Math.PI; c.inner.add(d); dressPlayer(d, VEST_COL[NET.host ? 1 : 0], { sit: true }); c[key] = d; }
+    d.position.set(e[0] * side, e[1] - 1.12, e[2] + 0.05); d.rotation.y = Math.PI; c.inner.add(d); dressPlayerSkin(d, VEST_COL[NET.host ? 1 : 0], { sit: true }); c[key] = d; }
   return c[key];
 }
 
@@ -13575,9 +13586,9 @@ function buildSelfAv() {
   av.traverse(o => { o.userData.noHit = true; if (o.isMesh) o.castShadow = true; }); av.visible = false; scene.add(av);
   VIEW.av = av; VIEW.key = key; VIEW.items = items;
   VIEW.pending = performance.now();
-  dressPlayer(av, VEST_COL[me], { onRig: rig => {   // the walk cycle drives the rig once it is on
+  dressPlayerSkin(av, VEST_COL[me], { onRig: () => {   // no walk cycle yet: clear the box swing so the (removed) box pivots are not animated
     VIEW.pending = 0;
-    VIEW.legs = [rig.legL, rig.legR].filter(Boolean); VIEW.arms = [rig.armL, rig.armR].filter(Boolean); } });
+    VIEW.legs = []; VIEW.arms = []; } });
 }
 function updateSelfAv() {
   const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;

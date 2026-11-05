@@ -3,7 +3,7 @@
 (async()=>{
  const status=document.getElementById('status');
  // One version constant drives TEST HUD, title screen and asset request.
- const TEST_VERSION='1.97.184';
+ const TEST_VERSION='1.97.185';
  try {
   // This test build has its own service worker and never unregisters the live game's worker.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -367,31 +367,6 @@
    .cs-inbox .row button{height:auto;min-height:44px;padding:8px}
    @media(max-height:500px){.cs-inbox-list,.cs-inbox-detail{max-height:30dvh}}
   </style></head>`);
-  // ---- Squeeg GLB character (TEST): swap the box avatar for models/*.glb ----
-  // The module is inlined at `function buildSelfAv()`, so it shares that scope
-  // (T, scene, mat, makeCharacter, VIEW, walk, held, SR). Any missing anchor or
-  // a failed model fetch leaves the original box character in place.
-  let squeegEngine = '';
-  try {
-    const sq = await fetch('./squeeg-model.js?t=' + Date.now(), { cache: 'no-store' });
-    if (sq.ok) squeegEngine = await sq.text();
-    else console.warn('[squeeg] engine HTTP ' + sq.status);
-  } catch (e) { console.warn('[squeeg] engine fetch failed:', e && e.message); }
-  if (!squeegEngine) console.warn('[squeeg] engine not injected - box character will be used');
-  if (squeegEngine) {
-    const sqHooks = [
-      'function buildSelfAv() {',
-      'const av = makeCharacter(VEST_COL[me], false);',
-      'for (const k in VIEW.items) VIEW.items[k].visible = k === held;',
-      'VIEW.av = av; VIEW.key = key; VIEW.items = items;'
-    ];
-    for (const h of sqHooks) if (!html.includes(h)) throw new Error('Squeeg model anchor missing: ' + h);
-    html = html.replace(sqHooks[0], () => squeegEngine + '\n' + sqHooks[0]);
-    html = html.replace(sqHooks[1], () => "const av = (typeof squeegAvatar === 'function' ? squeegAvatar(me, VEST_COL[me]) : makeCharacter(VEST_COL[me], false));");
-    html = html.replace(sqHooks[2], () => sqHooks[2] + " if (typeof squeegPose === 'function') squeegPose(av);");
-    html = html.replace(sqHooks[3], () => sqHooks[3] + " if (SQUEEG.ready && typeof squeegHold === 'function') squeegHold(items); if (typeof sg !== 'undefined' && items.gun) items.gun.__sg = sg;");
-  }
-
 
   // Third-person gun: the side magazine's water column reads as a blue line at
   // distance. `shadows` is true for the avatar copies and false for the
