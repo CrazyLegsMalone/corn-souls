@@ -1,3 +1,18 @@
+## TEST v1.97.161 — ducks swim bill first (and lizards, the vulture and nibblers face the way they go) (2026-11-04)
+- Owner: *"ducks swim backwards"*.
+- **Cause:** the ducks turn to face the way they swim with a negative sprite `scale.x`, but three.js ignores the sign. Its sprite vertex shader takes `length(modelMatrix[0].xyz)`, so no sprite ever mirrored. Every duck kept its picture's bill on the right, swimming backwards whenever it went left on screen. The wall lizards, the flying vulture and the nibblers use the same flip, so they were affected the same way.
+- **Fix:** one patch to `T.ShaderLib.sprite.vertexShader` at load (`SPRITE_MIRROR`), right after `#include <uv_vertex>`:
+  - a sprite whose matrix is mirrored (det < 0) reads its picture right to left (`1.0 - MAP_UV.x`);
+  - the quad isn't flipped, which would reverse its winding and cull it;
+  - non-mirrored sprites are unchanged;
+  - the patch applies only once.
+- Checked in real WebGL: a test card with an orange "bill" on the right renders it on the right at scale +1 and on the left at −1 (before the fix, on the right both times).
+- New `validate-sprite-mirror.cjs` checks:
+  - the patch lands where it should;
+  - the determinant test in the game's cases, including a flipped nibbler inside a turning group;
+  - the duck and lizard facing rules match their right-facing pictures.
+- Bumped TEST to `1.97.161` / `corn-souls-test-shell-v188`.
+
 ## TEST v1.97.160 — debug: spawn a cob stalker next to you (2026-11-04)
 - Owner: *"add a spawn cob walker to debug so we can spawn it nearby player"*. I took "cob walker" to mean the cob stalker.
 - **Debug → "🌽 Spawn a cob stalker next to me"** (`P3.creeps('near')` → `creepDebug('near')` → `creepNear`):

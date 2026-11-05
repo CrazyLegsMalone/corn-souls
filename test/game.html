@@ -8743,6 +8743,20 @@ function wfxUpdate(dt) {
 }
 const TOXIC_T = 20;   // seconds in the pond water before it kills
 const PONDS = [[-603, 429, 0x4f9a6a], [-451, 309, 0x3f9f8f]]; PONDS.phi = Math.atan(0.756); PONDS.half = 67.4; PONDS.hole = 70; PONDS.water = -0.35;   // water edge half-size, hole in the ground, water level (below grade)   // retention ponds (water half-size, m)
+// v1.97.161, owner: "ducks swim backwards". Every drawn sprite that faces the way it goes (the ducks, the flying vulture, the
+// nibblers) turns round with a negative scale.x - but three.js sprites ignore the sign: their shader takes the LENGTH of the scale,
+// so the mirror never happened and they all kept facing the way they were drawn (a duck's bill to the right), half of them going
+// backwards. Patched once for every sprite: a mirrored sprite (its matrix turned inside out, det < 0) reads its picture right to
+// left. The quad itself is not flipped (that would turn its winding round and cull it), only the picture on it.
+const SPRITE_MIRROR = (function () {
+  const L = T.ShaderLib && T.ShaderLib.sprite, A = '#include <uv_vertex>';
+  if (!L || typeof L.vertexShader !== 'string' || !L.vertexShader.includes(A)) return false;
+  if (!L.vertexShader.includes('SPRITE_MIRROR')) L.vertexShader = L.vertexShader.replace(A, A + `
+	#ifdef USE_MAP
+		if ( dot( cross( modelMatrix[ 0 ].xyz, modelMatrix[ 1 ].xyz ), modelMatrix[ 2 ].xyz ) < 0.0 ) vMapUv = ( mapTransform * vec3( 1.0 - MAP_UV.x, MAP_UV.y, 1.0 ) ).xy;   // SPRITE_MIRROR
+	#endif`);
+  return true;
+})();
 // ducks on the ponds: flat 2D sprites (billboards) that always turn to face the camera; only shown in Squeeg mode
 const ducks = []; let duckMats = null;
 function makeDuckMats() {
