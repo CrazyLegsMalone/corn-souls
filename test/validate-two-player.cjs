@@ -4,6 +4,9 @@
 // events and corn field creatures reach the guest (and the guest's changes reach the host without being flipped back),
 // creatures are run by the host for both players (the guest only mirrors them, its hits count on the host, the host's
 // creature biting the guest bites the guest, the guest's corn ears lure them), plus the ride-along wiring.
+// v1.97.181: the hunt-and-bite step no longer depends on where a stalker happened to wander: both it and the guest are put on
+// a fixed spot well inside the corn, so the suite cannot land the guest just outside the field (where a stalker shadows but
+// never bites) and time out. That was the one run in forty that failed on CI.
 const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
 const html = fs.readFileSync('game.html', 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
@@ -69,8 +72,15 @@ G.netSend({ t: 'le', k: 'flick', s: 4, r: 30, x: 1, z: 2 }); step(0.1); assert.o
 const c1 = H.CREEP.list[0], g1 = G.CREEP.list.find(q => q.id === c1.id), hp0 = c1.hp;
 G.creepHurt(g1, 3); assert.equal(g1.hp, hp0, 'the guest does not keep score itself'); step(0.4); assert.equal(c1.hp, hp0 - 3, 'the host takes the damage'); assert.equal(g1.hp, hp0 - 3, 'and the guest sees it');
 // the host's creature hunts the guest when the guest is in the corn, and bites the guest (not the host)
-H.NET.rp = { walk: true, drive: false, ps: false, x: c1.x, z: c1.z + 6, ears: null }; G.walk.x = c1.x; G.walk.z = c1.z + 6;
-for (let i = 0; i < 120 && !G.CREEP.bites; i++) { H.NET.rp.x = G.walk.x; H.NET.rp.z = G.walk.z; step(0.05); }
+// v1.97.181: stand both of them on a fixed point well inside the corn. The old line put the guest 6 m north of wherever the first
+// stalker had wandered to, and when it had drifted up to the field edge the guest landed 2 m outside the corn - where a stalker
+// only ever shadows you ('stalk') and never bites, so the loop below timed out about one run in forty (CI caught it, local runs
+// usually did not). Where the monster is put and where you are put are not what this assertion is about; the bite is.
+const fx = (H.CFIELD.x0 + H.CFIELD.x1) / 2, fz = (H.CFIELD.z0 + H.CFIELD.z1) / 2;
+assert.ok(H.CFIELD.z1 - fz > 12 && fz - H.CFIELD.z0 > 12, 'the corn field is deep enough to stand well inside it');
+c1.x = fx - 3; c1.z = fz + 6;   // 6.7 m away, both in the corn; the host himself is at 300, 300, out of it
+H.NET.rp = { walk: true, drive: false, ps: false, x: fx, z: fz, ears: null }; G.walk.x = fx; G.walk.z = fz;
+for (let i = 0; i < 200 && !G.CREEP.bites; i++) { H.NET.rp.x = G.walk.x; H.NET.rp.z = G.walk.z; step(0.05); }
 assert.ok(G.CREEP.bites >= 1, 'the guest got bitten by the host\'s creature'); assert.equal(H.CREEP.bites, 0, 'the host did not'); assert.equal(c1.state, 'hunt');
 assert.ok(G.notes.some(n => /A cob stalker bit you!/.test(n)), 'and the guest is told');
 // the guest's corn ear lures the host's creature; when it eats it, the guest puts the ear back in its can
