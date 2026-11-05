@@ -627,7 +627,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   // ---------------------------------------------------------------- the players wear their own wardrobe builds (v1.97.185)
   assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("'/corn-souls/assets/models/squeeg1_2_0.glb'") && html.includes("'/corn-souls/assets/models/squeeg2_2_0.glb'"), 'Player 1 wears squeeg1, Player 2 wears squeeg2');
   assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 7, 'one definition + six avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, and the other player seated in a car (v1.97.109)');
-  for (const call of ['dressPlayerSkin(av, VEST_COL[other], {});', 'dressPlayerSkin(d, vest, { sit: true });', 'dressPlayerSkin(av, VEST_COL[me], { onRig: () => {'])
+  for (const call of ['dressPlayerSkin(av, VEST_COL[other], {});', 'dressPlayerSkin(d, vest, { sit: true });', 'dressPlayerSkin(av, VEST_COL[me], { onRig: (R, root, swing) => {'])
 
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
   // ---------------------------------------------------------------- vending: the Shifty Food machine and the cans
@@ -712,7 +712,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('R.av.visible = R.walk && !R.drive && !R.mow && !R.ps;'), 'their standing body is hidden while they are seated in your car');
   assert.ok(html.includes('utv.passenger = seatPassenger(P0, VEST_COL[NET.host ? 1 : 0])'), 'and they are drawn in your passenger seat, in their own vest colour');
   assert.ok(html.includes('const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;'), 'your own third-person body is hidden while you ride');
-  assert.ok(html.includes('VIEW.legs = []; VIEW.arms = [];'), 'no walk cycle yet: the skinned player stands still, so the box swing is cleared');
+  assert.ok(html.includes('VIEW.legs = [swing.legL, swing.legR].filter(Boolean);'), 'the walk cycle drives the skinned hip bones once the model is on');
+  assert.ok(html.includes('function skinSwing(') && html.includes('skinSwing(l.root, l.b, l.rest, SKIN_X, l.cur)'), 'and swings each bone about the model X axis from its rest pose');
   assert.ok(html.includes('av.traverse(o => { if (o.isMesh) o.userData.body = true; });'), 'box parts are marked, so held items survive the hide');
   assert.ok(html.includes('for (const c of box) if (c.parent) c.parent.remove(c);'), 'and the box body is REMOVED, so nothing can reveal it again');
   assert.ok(html.includes('if (av.userData.rig && av.userData.rig.parent) av.userData.rig.parent.remove(av.userData.rig);'), 'a second dress replaces the rig instead of stacking one on top');
@@ -732,7 +733,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     const pctx = { T: T4, console, TextDecoder, VEST_COL: [0xff7a1a, 0xc6e41f], Blob: class { constructor(p) { this.size = p && p[0] ? p[0].length : 0; } }, URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
       fetch: url => thenable({ ok: true, arrayBuffer: () => thenable(buf(/squeeg1/.test(url) ? bytes[0] : bytes[1])) }) };
     vm.createContext(pctx);
-    vm.runInContext(reader2 + '\n' + skinSrc + '\n' + playerSrc + '\nthis.dressPlayerSkin = dressPlayerSkin; this.skinBox = skinBox;', pctx);
+    vm.runInContext(reader2 + '\n' + skinSrc + '\n' + playerSrc + '\nthis.dressPlayerSkin = dressPlayerSkin; this.skinBox = skinBox; this.skinSwing = skinSwing; this.skinBone = skinBone;', pctx);
     const avatar = () => { const av = new T4.Group(); const box = new T4.Mesh(new T4.BoxGeometry(0.4, 0.6, 0.3), new T4.MeshLambertMaterial({ color: 0xffffff }));
       box.userData.body = true; av.add(box); return av; };
     const a1 = avatar(), a2 = avatar();
@@ -759,6 +760,17 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
       const a4 = avatar(); pctx.dressPlayerSkin(a4, 0xff7a1a, { sit: true }); const g4 = rigOf(a4);
       const bb4 = pctx.skinBox(g4); assert.ok(Math.abs(bb4.min.y) < 0.06, 'seated feet stay on the floor (' + bb4.min.y.toFixed(3) + ')');
       assert.ok(H(g4) < 1.5, 'and the model is shorter once its legs are folded (' + H(g4).toFixed(2) + ' m)');
+    }
+    {   // the walk cycle: swinging the hip bones moves the feet in opposite directions (an alternating gait)
+      const a5 = avatar(); let cap = null;
+      pctx.dressPlayerSkin(a5, 0xff7a1a, { onRig: (R, root, swing) => { cap = { root, swing }; } });
+      const X = new T4.Vector3(1, 0, 0), footZ = n => { const v = new T4.Vector3(); pctx.skinBone(cap.root, n).getWorldPosition(v); return v.z; };
+      const zL0 = footZ('LeftFoot'), zR0 = footZ('RightFoot');
+      pctx.skinSwing(cap.root, cap.swing.legL.b, cap.swing.legL.rest, X, 0.5);   // left forward
+      pctx.skinSwing(cap.root, cap.swing.legR.b, cap.swing.legR.rest, X, -0.5);  // right back
+      const dzL = footZ('LeftFoot') - zL0, dzR = footZ('RightFoot') - zR0;
+      assert.ok(Math.abs(dzL) > 0.05 && Math.abs(dzR) > 0.05, 'swinging the hips moves the feet (' + dzL.toFixed(2) + ' / ' + dzR.toFixed(2) + ')');
+      assert.ok(Math.sign(dzL) !== Math.sign(dzR), 'left and right feet move in opposite directions');
     }
   }
   // cross-script wiring: the frame loop lives in a later script block than the renderer, so the HUD readout has to go

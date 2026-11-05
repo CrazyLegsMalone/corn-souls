@@ -1,3 +1,13 @@
+## TEST v1.97.186 — the players walk (2026-11-05)
+- Owner: *"animate"* — the walk cycle is back, now on the skinned skeletons instead of the old rigid pivots.
+- **`skinSwing(root, bone, rest, axis, ang)`** is the new primitive: it sets a bone to a stored rest orientation, then rotates it by `ang` about a model-space axis. `skinTurn()` (the one-shot pose helper) pre-multiplies the current orientation, which compounds every frame, so the per-frame swing needs an absolute-from-rest setter — this is it.
+- **`dressPlayerSkin()` now captures the walk bones at rest** — the two hip bones (`LeftUpLeg`/`RightUpLeg`) and the two shoulders (`LeftArm`/`RightArm`), each with its rest quaternion and an easing accumulator — and hands them back through `onRig(R, root, swing)`.
+- **`buildSelfAv()` wires `VIEW.legs`/`VIEW.arms` to those bones**, and `updateSelfAv()` swings them the same way it swung the old box/rig pivots: hips alternate `±sw` (eased 0.3), arms counter-swing and still take the two held-item poses — the right arm comes forward 0.9 rad with a gun or tool, the left arm lifts 2.6 rad when carrying the boom box. All of it runs through `skinSwing(…, SKIN_X, …)` (the model's left-right axis).
+- **Same as before, on purpose:** only your own third-person body walks; the other player glides (no per-frame leg data over the wire), and the seated avatars stay folded (they never get a swing).
+- `validate-power-outage-machines.cjs` now runs the swing in the vm: after `dressPlayerSkin` hands back the bones, swinging the left hip forward and the right hip back moves the two feet in **opposite** directions — the alternating gait is asserted, not just wired.
+- Verified locally: the 60 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.186` / `corn-souls-test-shell-v213`.
+
 ## TEST v1.97.185 — the players wear squeeg1 and squeeg2 (2026-11-05)
 - Owner: *"do player 1 and 2"* — Player 1 wears **squeeg1** (male), Player 2 wears **squeeg2** (female), their own Crew Wardrobe builds of Loves_Art's Low Poly Male / Female (CC BY 4.0), standing/posed only as agreed.
 - **The players stop wearing the rigid `operator_vern_rig.glb`.** `dressPlayer()` / `loadPlayerRig()` are gone, replaced by `dressPlayerSkin(av, vest, opts)`: the vest colour picks the slot (orange → squeeg1, lime → squeeg2), the raw bytes are cached per slot and **`glbBuild()` runs fresh per avatar** — a skinned model cannot be cloned without sharing its skeleton, and two avatars of the same player (standing + seated) must fold independently.
