@@ -361,6 +361,34 @@
       "notes": "The buzzard that perches on the RTO stack and carries bodies to the far pond, in the TEST channel."
     },
     {
+      "id": "first-party-grain-haulers",
+      "title": "Low-poly grain haulers (8 colours)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLBs (grain_hauler_<colour>.glb)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/tree/main/assets/models/grain_haulers",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "None to the files. Turned 90 degrees to drive along +x and centred; its rigged DumpBed_Pivot, Tailgate_Pivot, Hydraulic_Ram and Wheel_* nodes animated in code; a corn load and a pour stream added in code (v1.97.166).",
+      "files": [
+        "assets/models/grain_haulers/grain_hauler_black.glb",
+        "assets/models/grain_haulers/grain_hauler_blue.glb",
+        "assets/models/grain_haulers/grain_hauler_green.glb",
+        "assets/models/grain_haulers/grain_hauler_pink.glb",
+        "assets/models/grain_haulers/grain_hauler_red.glb",
+        "assets/models/grain_haulers/grain_hauler_white.glb",
+        "assets/models/grain_haulers/grain_hauler_yellow.glb",
+        "assets/models/grain_haulers/grain_hauler_yellpink.glb"
+      ],
+      "checked_on": "2026-11-04",
+      "reviewer": "Owner",
+      "evidence": "From the owner's folder Kernel Art/3D/Grain Haulers (v1.97.166). Each: 6 meshes (~240 triangles), one material painted with vertex colours (COLOR_0), rigged tractor + end-dump trailer, no textures, skins or animations. Not obtained from a third-party marketplace.",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-provided; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The corn delivery trucks (grain haulers) in the TEST channel."
+    },
+    {
       "id": "first-party-lopoly-hydrant",
       "title": "Low-poly fire hydrant",
       "creator": "CrazyLegsMalone (project owner)",

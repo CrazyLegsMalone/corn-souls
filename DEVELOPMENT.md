@@ -1,3 +1,28 @@
+## TEST v1.97.166 — the owner's grain haulers bring the corn in (2026-11-04)
+- Owner: pointed me to `Kernel Art/3D/Grain Haulers` (eight GLBs: black, blue, green, pink, red, white, yellow, yellpink).
+- **The models:** each is a tractor plus an end-dump trailer, about 240 triangles, painted with vertex colours and rigged (`DumpBed_Pivot`, `Tailgate_Pivot`, `Hydraulic_Ram`, `Steer_*`, `Wheel_*`). They are added under `assets/models/grain_haulers/`, registered and credited.
+- **Vertex colours:** the game's GLB reader (`glbBuild`) now reads `COLOR_0`, on a vertex-colour copy of the material made once per material. Without it every hauler came out white.
+- **Corn deliveries are now haulers** (`truck('corn', look)` → `haulerTruck`), in a random colour. The ethanol / oil tankers are unchanged, and the old box trucks are used only until the models have loaded.
+  - Turned from its +z to the game's +x and centred, 15.2 m long. It has its own collision box (`userData.vbox`, half length 7.6 instead of the 21 m truck's 10.6).
+  - **The dump** (`haulerPose`, same 2.6 s timing as before):
+    - the bed tips back 0.5 rad on its rear hinge;
+    - the hydraulic ram stretches from its foot on the chassis to the bed's front, blending in from its own rest pose;
+    - the tailgate swings out at the bottom;
+    - a stream of corn pours out the back;
+    - the heap in the bed is gone by 1.5 s, so the truck leaves empty.
+  - It stops 8.4 m further on (`DUMP_AHEAD`), so its tail is over the pit.
+  - Its wheels turn with the ground covered.
+- **Two-player:**
+  - the host now sends which hauler each truck is, as the 12th field of the launcher's `vt` truck sync, so the guest builds the same colour;
+  - the guest now also plays the host's dumps from the `dumping` flag and clock it already received (before, a guest never saw a truck dump).
+- Checked in the running game: all eight load in their own colours, and a pink and a yellow-pink hauler tip their beds with the rams up.
+- New `validate-haulers.cjs` loads the real files with the game's reader and checks:
+  - every part vertex-coloured;
+  - all eight colours, turned and centred, ten wheels;
+  - the bed on its rear hinge, the ram reaching the bed front, the gate, the pour, empty after, back to rest;
+  - wheel roll, the guest's dump, the sync field, the collision box and the dump stop.
+- Bumped TEST to `1.97.166` / `corn-souls-test-shell-v193`.
+
 ## TEST v1.97.165 — pushing through the corn (2026-11-04)
 - Owner: *"When running through the corn there should be an effect especially in first person"*.
 - **The stalks give way** (`cornBend`): clumps within 1.3 m of you lean away from you, tipped over at their foot. They spring back upright with a little swing once you're past, and settle to exactly how they stood.
