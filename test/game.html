@@ -8344,6 +8344,10 @@ function init(container) {
       box(67.6, 0.4, 24.6, mat(0xc9cdd1), (P0 + E1) / 2, 9.2, (PZ0 + PZ1) / 2);
       for (let x = P0; x <= E1 + 0.01; x += 67 / 6) for (const z of [PZ0, PZ1]) box(0.45, 9, 0.45, steel, x, 4.5, z);
       box(67, 2.2, 0.4, mat(0x9aa1a8), (P0 + E1) / 2, 1.1, PZ0 + 0.2);   // push wall on the north side
+      // v1.97.173, owner: "wetcake pads needs walls on the south and east side matching the north wall" - the same 2.2 m push
+      // wall, mirrored along the south side and turned along the east side, both inset 0.2 m like the north one.
+      box(67, 2.2, 0.4, mat(0x9aa1a8), (P0 + E1) / 2, 1.1, PZ1 - 0.2);   // push wall on the south side
+      box(0.4, 2.2, 24, mat(0x9aa1a8), E1 - 0.2, 1.1, (PZ0 + PZ1) / 2);  // push wall on the east side
       // wet cake truck scale (green): in the loading lane south of the pad
       box(21, 0.25, 3.6, mat(0x5a6066), -44.3, 0.2, PZ1 + 4);
       for (const dx of [-10.6, 10.6]) box(0.3, 0.3, 3.8, mat(0xf2c200), -44.3 + dx, 0.3, PZ1 + 4); }

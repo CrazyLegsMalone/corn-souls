@@ -1,3 +1,14 @@
+## TEST v1.97.173 — the wet cake pad has walls on its south and east sides too (2026-11-04)
+- Owner: *"wetcake pads needs walls on the south and east side matching the north wall"*.
+- The pad (67 x 24 m, under an open roof on steel posts, right south of the energy center) had a single **2.2 m push wall** on its north side. The same wall is now on the other two sides the owner named:
+  - **south**: `box(67, 2.2, 0.4, ..., PZ1 - 0.2)` - the north wall's twin, mirrored to the south edge;
+  - **east**: `box(0.4, 2.2, 24, ..., E1 - 0.2)` - the same wall turned along the 24 m end.
+  Both are inset 0.2 m like the north one, in the same concrete (`0x9aa1a8`), so the pad reads as a three-sided bay open to the west. Nothing else about the pad changed - slab, roof, posts and the truck scale in the lane south of it are untouched.
+- Worth knowing: the pad's south side is the loading lane (the 21 m truck scale sits 4 m south of it) and its east side faces the concrete apron along the energy center's east wall, so both approaches now stop at a 2.2 m wall. That is what was asked for; if the wet cake needs a way in from the lane, say where and it is a gap in that wall.
+- Tests: `validate-windsocks.cjs` already sliced the code right up to the pad, so its slice now runs the pad block too and asserts **three** 2.2 m walls in that concrete, the south one matching the north wall's size and centreline, the east one 0.4 x 2.2 x 24 on the end's centreline. It fails on the previous revision and passes now.
+- Verified locally: the 54 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes. LIVE is untouched.
+- Bumped TEST to `1.97.173` / `corn-souls-test-shell-v200`.
+
 ## TEST v1.97.172 — the ammonia cloud is bigger (2026-11-04)
 - Owner: *"ammonia cloud should be a little bigger"*.
 - The cloud is a pool of sprites (`nh3Puff`), and a puff's size is its world size: it starts at `size0`, then grows by `f * N` over its 14-20 s life. Both numbers went up about 30%:
