@@ -13990,14 +13990,35 @@ function creepBitten(kind, dmg, cx, cz) {   // me, bitten (by my own creature, o
   if (CREEP.bites >= 3) { CREEP.bites = 0; walk.dead = kind === 'daddy' ? 'daddy' : kind === 'nibbler' ? 'nibbler' : 'cob'; layBody(walk.x, walk.z, walk.yaw, nx * 2.5, 2, nz * 2.5, 4); walk.diedAt = { x: walk.x, z: walk.z }; }
   else if (DMG_NOTIFY) DMG_NOTIFY((kind === 'daddy' ? '🕷️ Daddy Cob Legs got you!' : kind === 'nibbler' ? '😬 A nibbler nibbled you!' : '🌽 A cob stalker bit you!') + ' (' + (CREEP.bites % 1 ? CREEP.bites.toFixed(1) : CREEP.bites) + '/3)' + (kind === 'nibbler' ? ' · outrun them' : ' · get out of the corn'));
 }
-function creepHurt(c, n, at, col) {
+// v1.97.176, owner: "when enemies are hit by vehicle they should be kicked back". A vehicle that hits one throws it: mostly the way
+// the vehicle is going, partly straight away from it, at a speed that grows with the vehicle's (a nibbler flies furthest, Daddy Cob
+// Legs barely shifts), then it slides to a stop. The hit that kills one throws the body too. The host moves them, so both players
+// see it; a guest's hit sends its kick to the host with the damage.
+const CREEP_KICK = { k: { nibbler: 1.2, stalker: 0.8, daddy: 0.25 }, drag: 3, max: 14 };
+function creepKick(c, vx, vz, ox, oz) {   // the kick velocity [x, z] for a vehicle at (ox, oz) moving (vx, vz), or null
+  const sp = Math.hypot(vx, vz); if (sp < 0.1) return null;
+  const ad = Math.hypot(c.x - ox, c.z - oz) || 1, dx = vx / sp * 0.7 + (c.x - ox) / ad * 0.3, dz = vz / sp * 0.7 + (c.z - oz) / ad * 0.3, dd = Math.hypot(dx, dz) || 1;
+  const m = Math.min(CREEP_KICK.max, sp * (CREEP_KICK.k[c.kind] || 0.8));
+  return [dx / dd * m, dz / dd * m];
+}
+function creepKickSet(c, k) {   // (the host) start a kick, capped
+  if (!k || !isFinite(k[0]) || !isFinite(k[1])) return;
+  const m = Math.hypot(k[0], k[1]), f = m > CREEP_KICK.max ? CREEP_KICK.max / m : 1; c.kvx = k[0] * f; c.kvz = k[1] * f;
+}
+function creepKickStep(c, dt) {   // (the host, every creature, alive or dead) slide along the kick, slowing to a stop
+  if (!c.kvx && !c.kvz) return;
+  c.x += c.kvx * dt; c.z += c.kvz * dt; const f = Math.exp(-CREEP_KICK.drag * dt); c.kvx *= f; c.kvz *= f;
+  if (Math.hypot(c.kvx, c.kvz) < 0.2) c.kvx = c.kvz = 0;
+}
+function creepHurt(c, n, at, col, kick) {
   if (c.hp <= 0 || c.rise > 0.3) return false;
   if (creepGuest()) {   // the host keeps score: tell it, show the hit here
-    netSend({ t: 'ch', i: c.id, n }); c.hurtT = 0.3;
+    netSend(kick ? { t: 'ch', i: c.id, n, k: [+kick[0].toFixed(2), +kick[1].toFixed(2)] } : { t: 'ch', i: c.id, n }); c.hurtT = 0.3;
     for (let i = 0; i < 3; i++) puff((at || c.g.position).clone().add(V3((Math.random() - 0.5) * 0.4, Math.random() * 0.3, (Math.random() - 0.5) * 0.4)), c.kind === 'daddy' ? 0.3 : 0.12, col != null ? col : 0xe8d27a);
     creepSound('hurt', c); return true;
   }
   c.hp -= n; c.hurtT = 0.3; c.runT = 4;   // angry: hunts at full speed for a bit
+  if (kick) creepKickSet(c, kick);
   for (let i = 0; i < 3; i++) puff((at || c.g.position).clone().add(V3((Math.random() - 0.5) * 0.4, Math.random() * 0.3, (Math.random() - 0.5) * 0.4)), c.kind === 'daddy' ? 0.3 : 0.12, col != null ? col : 0xe8d27a);
   if (c.hp <= 0) { c.state = 'dead'; c.deadT = 0; c.speed = 0; CREEP.kills++; creepSound('die', c); if (c.kind === 'stalker') nibBurst(c); else if (c.kind === 'nibbler') nibMourn(c); }
   else { creepSound('hurt', c); if (c.kind === 'nibbler') c.fleeT = 1.8; }   // a nibbler that survives a hit runs off for a moment
@@ -14062,7 +14083,7 @@ function creepAI(c, dt) {
   if (c.state === 'hunt' && me && dP < K.bite + 0.25 && c.biteCd <= 0) { c.biteCd = K.biteCd; if (who === 'me') creepBite(c, dP); else { creepSound('bite', c); netSend({ t: 'cbt', k: c.kind, n: K.dmg, x: +c.x.toFixed(2), z: +c.z.toFixed(2) }); } }   // the guest gets its own bite
   if (walk.drive && utv.g) {   // a vehicle driven into it
     const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z);
-    if (vs > 5 && dv < c.maxR * 0.55 + 1.2 && c.biteCd <= 0) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY)); if (c.hp > 0) { c.x -= (utv.x - c.x) / (dv || 1) * 1.5; c.z -= (utv.z - c.z) / (dv || 1) * 1.5; } }
+    if (vs > 5 && dv < c.maxR * 0.55 + 1.2 && c.biteCd <= 0) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY), null, creepKick(c, utv.vx, utv.vz, utv.x, utv.z)); }
   }
 }
 function updateCreeps(dt) {
@@ -14072,11 +14093,12 @@ function updateCreeps(dt) {
     CREEP.gclock = (CREEP.gclock || 0) + dt;
     for (const c of CREEP.list) { const k = Math.min(1, dt * 8); if (c.nx !== undefined) { c.x += (c.nx - c.x) * k; c.z += (c.nz - c.z) * k; c.a += Math.atan2(Math.sin(c.na - c.a), Math.cos(c.na - c.a)) * k; }
       c.t += dt; c.hurtT = Math.max(0, c.hurtT - dt); c.biteCd = Math.max(0, c.biteCd - dt); c.y = Math.max(0, floorAt(c.x, c.z, 2)); if (c.state === 'dead') c.deadT += dt; else if (c.rise > 0) c.rise = Math.max(0, c.rise - dt / 3.2); if (c.zRise > 0) c.zRise -= dt; if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
-      if (walk.drive && utv.g && c.hp > 0 && c.biteCd <= 0) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 5 && dv < c.maxR * 0.55 + 1.2) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY)); } } }   // I drove into one: the host takes the damage
+      if (walk.drive && utv.g && c.hp > 0 && c.biteCd <= 0) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 5 && dv < c.maxR * 0.55 + 1.2) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY), null, creepKick(c, utv.vx, utv.vz, utv.x, utv.z)); } } }   // I drove into one: the host takes the damage
     return;
   }
   for (let i = CREEP.list.length - 1; i >= 0; i--) {
     const c = CREEP.list[i];
+    creepKickStep(c, dt);
     if (c.state === 'dead') { c.deadT += dt;
       if (c.kind === 'nibbler') { if (c.zWait !== undefined && (c.zWait -= dt) <= 0) nibRevive(c); }   // (dead nibblers stay)
       else if (c.deadT > 30) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
@@ -14120,7 +14142,7 @@ function creepApplySnapshot(S) {   // guest: make my creatures the host's
   if (ph !== CREEP.phase && DMG_NOTIFY && walk.on && inCField(walk.x, walk.z, 60)) { if (ph === 'boss') DMG_NOTIFY('🌽 The corn is shaking...'); else if (ph === 'quiet') DMG_NOTIFY('🌽 The corn goes still.'); }
   CREEP.phase = ph;
 }
-function creepNetHit(m) { const c = CREEP.list.find(q => q.id === m.i); if (c && !creepGuest()) creepHurt(c, Math.max(1, Math.min(5, m.n | 0))); }
+function creepNetHit(m) { const c = CREEP.list.find(q => q.id === m.i); if (c && !creepGuest()) creepHurt(c, Math.max(1, Math.min(5, m.n | 0)), null, null, Array.isArray(m.k) ? m.k.map(Number) : null); }
 function creepPaintHit(p, dir, len, col) {   // a paintball step: did it pass through one of them
   for (const c of CREEP.list) { if (c.hp <= 0 || c.rise > 0.3) continue;
     const cc = tv.set(c.x, c.g.position.y + c.hitY, c.z), t = Math.max(0, Math.min(len, tv2.copy(cc).sub(p).dot(dir)));
@@ -14252,7 +14274,7 @@ function nibAI(c, dt) {
     const ex = c.x - o.x, ez = c.z - o.z, ed = Math.hypot(ex, ez); if (ed >= 0.85) continue;
     const k = (0.85 - ed) * 0.5, nx = ed > 1e-4 ? ex / ed : Math.cos(c.id * 2.4), nz = ed > 1e-4 ? ez / ed : Math.sin(c.id * 2.4); c.x += nx * k; c.z += nz * k; }
   if (c.state === 'hunt' && dP < K.bite + 0.2 && c.biteCd <= 0) { c.biteCd = K.biteCd; c.bitT = 0.6; if (who === 'me') creepBite(c, dP); else { creepSound('bite', c); netSend({ t: 'cbt', k: c.kind, n: K.dmg, x: +c.x.toFixed(2), z: +c.z.toFixed(2) }); } }
-  if (walk.drive && utv.g) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 4 && dv < 1.4 && c.biteCd <= 0) { c.biteCd = 0.6; creepHurt(c, 9, V3(c.x, c.y + c.hitY, c.z)); } }   // run over
+  if (walk.drive && utv.g) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 4 && dv < 1.4 && c.biteCd <= 0) { c.biteCd = 0.6; creepHurt(c, 9, V3(c.x, c.y + c.hitY, c.z), null, creepKick(c, utv.vx, utv.vz, utv.x, utv.z)); } }   // run over
 }
 function nibFace(c, dt) {   // what it is doing picks its face (1-based numbers into NIB_FACES)
   c.faceT -= dt; c.bitT = Math.max(0, c.bitT - dt); c.sadT = Math.max(0, c.sadT - dt); c.lostT = Math.max(0, c.lostT - dt); c.hurtFace = Math.max(0, c.hurtFace - dt);

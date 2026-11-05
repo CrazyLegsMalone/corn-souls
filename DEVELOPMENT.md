@@ -1,3 +1,13 @@
+## TEST v1.97.176 — creatures hit by a vehicle get kicked back (2026-11-04)
+- Owner: *"when enemies are hit by vehicle they should be kicked back"*.
+- Before: a cob stalker or Daddy Cob Legs that survived a vehicle hit was moved a flat **1.5 m** in one frame (a jump, not a throw), a killed one stayed where it was hit, and a **nibbler** was not moved at all.
+- Now every vehicle hit **throws** what it hits (`creepKick` / `creepKickSet` / `creepKickStep`): a kick velocity of **70% the way the vehicle is going, 30% straight away from it**, at the vehicle's speed times **1.2 for a nibbler, 0.8 for a stalker, 0.25 for Daddy** (capped at 14 m/s), which then slides to a stop (drag 3/s). At 15 m/s a stalker goes about 4 m; a nibbler at 10 m/s about 4 m; Daddy barely shifts.
+- **The killing hit throws the body too** - a run-over nibbler or stalker lands where it was thrown, not where it was hit.
+- **2 player:** the host moves the creatures, so both screens see the throw. A guest's vehicle hit sends its kick to the host with the damage (`ch` now carries `k: [x, z]`); the host caps it and ignores a garbled one. Paint hits send no kick, as before.
+- Reading I took: "enemies" = the corn creatures (cob stalkers, nibblers, zombie nibblers, Daddy Cob Legs) - the only things a vehicle damages. Critters (lizards, rats) and NPCs are not run over by vehicles today, so they are unchanged.
+- New `validate-creep-kick.cjs` (56th suite in CI) runs the game's creature code: a stalker hit at 15 m/s is thrown more than 3 m straight ahead and slides to a stop, a slower hit throws it less, a nibbler run over dies and its body is thrown further, a side-on hit goes mostly along the vehicle, Daddy < stalker < nibbler, the cap holds, the guest's kick reaches the host capped, and all three vehicle hits are wired. It fails on v1.97.175 and passes now.
+- Bumped TEST to `1.97.176` / `corn-souls-test-shell-v203`. LIVE is untouched.
+
 ## TEST v1.97.175 — roll-up doors open by themselves when you drive at them (2026-11-04)
 - Owner: answered **yes** to `HANDOFF_CLINE.md` section 7, *"Should roll-up doors open automatically for vehicles?"*, and on this build: *"do it"*. Built to the plan agreed in the v1.97.174 handoff.
 - New `rollAutoStep()` (next to the door switch code, run every frame in `stepSafe('rollAuto', ...)` right before the doors step). While you are **driving** (the Ranger, or any car - they all move through `utv`), a roll-up opens when:
