@@ -1,3 +1,12 @@
+## TEST v1.97.168 — no pigeon coos through the roof (2026-11-04)
+- Owner: *"shouldnt be able to hear the pigeons on the roof from inside the building"*.
+- The coo only knew distance (35 m), so a pigeon on the roof right over your head was the loudest thing in the room.
+- **Now** (`soundShutOut`, using the lighting's building envelopes `ENCL` / `enclAt`): when the camera is inside a building and the pigeon is not in that same room, you don't hear it. That covers a pigeon on the roof (above the envelope's top), one out in the yard, or one in the main shop while you're in an office inside it.
+- With you outside, up on the roof, or in the same room, you hear it as before.
+- Checked in the running game: none of the 122 perches counts as indoors; standing inside the biggest building, all 23 pigeons on its roof and the yard ones are shut out.
+- New `validate-indoor-sound.cjs` runs the game's own check and coo for each case.
+- Bumped TEST to `1.97.168` / `corn-souls-test-shell-v195`.
+
 ## TEST v1.97.167 — the shotgun no longer reloads when it doesn't need to (2026-11-04)
 - Owner: *"reloading seems to happen automatically when not necessary"*.
 - **Cause:** the gun topped up any part-used magazine by itself after ~2.2 s without shooting. One shot and a pause meant a full reload animation and a lost moment.
