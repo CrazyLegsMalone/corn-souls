@@ -106,4 +106,9 @@ assert.ok(html.includes("const labelsOn = !P3.walking && $('labels').offsetParen
 assert.ok(html.includes('const UNIT_PANEL = false;') && html.includes('function selectUnit(id, noCam) {\n  if (!UNIT_PANEL) return;'), 'the equipment panel is switched off at selectUnit (every way in goes through it)');
 assert.ok(html.includes("if (!P3.walking && $('labels').offsetParent) for (const id in labels) { const s = Sim."), 'the 5 Hz label refresh is skipped while walking too');
 
+// v1.97.157, owner: "yeast cooler temp display texture flickers" - the readout sat exactly on its housing's front face (z-fighting)
+{ const m = html.match(/scr\.position\.set\(cs\[3\], 2\.55, Z0 - ([\d.]+)\); scr\.rotation\.y = Math\.PI;[^\n]*\n\s*box\(0\.36, 0\.22, ([\d.]+), dark, cs\[3\], 2\.55, Z0 - ([\d.]+)\);/);
+  assert.ok(m, 'the yeast cooler readout and its housing');
+  const face = +m[3] + +m[2] / 2; assert.ok(+m[1] - face >= 0.005, 'the readout stands clear in front of its housing (' + (+m[1]).toFixed(3) + ' vs face ' + face.toFixed(3) + '), not on it'); }
+
 console.log('PASS: frame stability - shadows every frame with a cheaper pass, critter probes time-sliced and local, refresh-locked frame pacing, no per-frame garbage in vehicle contacts / roofs / hits / floorAt, no layout reads while walking');

@@ -7553,7 +7553,7 @@ function init(container) {
       return { g, seg, c, i, tote, ow: OW, want: 0, open: 0 };
     });
     { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 32; const tx = srgbTex(new T.CanvasTexture(cv));   // digital temperature readout beside door 4
-      const scr = new T.Mesh(new T.PlaneGeometry(0.3, 0.15), gridLight(new T.MeshBasicMaterial({ map: tx }))); scr.position.set(cs[3], 2.55, Z0 - 0.17); scr.rotation.y = Math.PI; scene.add(scr);
+      const scr = new T.Mesh(new T.PlaneGeometry(0.3, 0.15), gridLight(new T.MeshBasicMaterial({ map: tx }))); scr.position.set(cs[3], 2.55, Z0 - 0.18); scr.rotation.y = Math.PI; scene.add(scr);   // (v1.97.157: 1 cm proud of its housing's face at Z0 - 0.17 - on it, the two flickered)
       box(0.36, 0.22, 0.04, dark, cs[3], 2.55, Z0 - 0.15);
       const bea = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 0.14, 10), gridLight(new T.MeshBasicMaterial({ color: 0x5a1010 }))); bea.position.set(cs[3] + 0.4, 2.55, Z0 - 0.2); scene.add(bea);   // red alarm beacon
       O.cooler = { T: 38, alarm: false, scr, cv, tx, bea, shown: '', beepT: 0, x: (X0 + X1) / 2, z: (Z0 + Z1) / 2, X0, X1, Z0, Z1 }; }

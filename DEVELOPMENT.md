@@ -1,3 +1,9 @@
+## TEST v1.97.157 — the yeast cooler's temperature readout no longer flickers (2026-11-04)
+- Owner: *"yeast cooler temp display texture flickers over"*.
+- The readout plane sat at `Z0 - 0.17`, exactly on the front face of its dark housing box (centre `Z0 - 0.15`, 0.04 deep), so the two z-fought. The readout now sits 1 cm in front of the housing (`Z0 - 0.18`).
+- `validate-frame-stability.cjs` checks that the readout stands clear of its housing's face. It fails on the old position.
+- Bumped TEST to `1.97.157` / `corn-souls-test-shell-v184`.
+
 ## TEST v1.97.156 — you can no longer see the yard through the fermenters (2026-11-04)
 - Owner, screenshot from inside the process building: *"whin in process building looking out you shouldn't be able to see outside"* — a rectangle of sky, with the plant's outdoor rack in it, between the tanks.
 - **The cause was two things meeting.** `tank()` draws a fermenter's shell as **translucent glass** (`glass(0xdff4ff, 0.38)`) so the liquid level reads through it - and the ferm alley walls are built as **segments that stop at each tank's tangent point** (`wall(FXE, fz[0] - FR, FXE, fz[1] + FR, …)`, FR = 7.4 = the tank radius), on the assumption that the tank itself closes the gap. It does close it physically - but it is glass, so every tank slot was a window onto the yard.
