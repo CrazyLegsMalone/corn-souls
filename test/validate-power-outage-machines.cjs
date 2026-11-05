@@ -421,8 +421,11 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     }
     assert.ok(Math.abs((mx[1] - mn[1]) - h) < 0.12, file + ' is ' + (mx[1] - mn[1]).toFixed(2) + ' m tall');
     assert.ok(Math.abs(mn[1] + 0.19) < 0.05, file + ' hangs 0.19 m below its origin, so placement lifts it');
-    assert.ok(npcTable.includes(file), 'NPC_MODELS wires ' + id + ' to ' + file);
   }
+  // v1.97.177: the NPCs moved to the Loves_Art skinned models (validate-skinned-npcs.cjs); these rigid rigs stay in the repo - the
+  // players still wear operator_vern_rig.glb - and nothing in NPC_MODELS points at them any more
+  for (const [file] of chars) assert.ok(!npcTable.includes(file), 'NPC_MODELS no longer wires ' + file);
+  assert.ok(npcTable.includes('url: NPC_MALE') && npcTable.includes('url: NPC_FEMALE'), 'NPC_MODELS wires the skinned models');
   assert.ok(html.includes('function characterRig(') && html.includes('function rigPivot('), 'one shared rig builder');
   assert.ok(html.includes("rig['leg' + s].rotation.x = -1.15"), 'seated pose swings the thighs forward and slightly down');
   assert.ok(html.includes("rig['knee' + s].rotation.x = 1.15"), 'and the shins back down to the floor');

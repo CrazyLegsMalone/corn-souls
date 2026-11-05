@@ -1,3 +1,20 @@
+## TEST v1.97.177 — the NPCs wear Loves_Art's Low Poly Male / Female (2026-11-04)
+- Owner: *"lets tryt he models as is at first"*, then picked **the NPCs** (not the players) to wear them first.
+- **Vern** (standing, by the loop track) and **Rick** (seated, control room) wear **Low Poly Male**; **Brenda** and **Tammy** (seated, scale house) wear **Low Poly Female** - both by Loves_Art on Sketchfab, **CC BY 4.0**, now `in-use` in `assets/registry.json` and credited in `CREDITS.md` (`credits.html` reads the registry). The GLBs are stored byte-for-byte as `assets/models/low_poly_male_loves_art.glb` / `low_poly_female_loves_art.glb`.
+- **"As is"**: the files are not edited - not merged, not reduced, finger bones kept. In game they are only scaled (1.78 m / 1.65 m), posed and recoloured:
+  - arms brought down from the export's **T-pose** to the sides (`SKIN_POSE.arm`), measured from wherever the export left each arm;
+  - seated: thighs forward to near level, the underside of the seat set on the 0.47 m chair, and each shin tilted just enough that the ankle stops 9 cm above the floor - worked out from the model's own leg lengths, so the feet reach the floor for both sizes;
+  - each NPC keeps the colour it had: the **clothing** takes its old shirt colour (Vern khaki, Rick blue, Brenda purple, Tammy green) and the two women keep their **old hair colours** (Brenda brown, Tammy blonde), so they are not twins. Skin, faces and shoes are the models' own.
+- **The glTF reader learned skinning.** The bundle ships no GLTFLoader and `glbBuild` read only rigid parts, so it now also reads `JOINTS_0` / `WEIGHTS_0`, builds a `Skeleton` per glTF skin (bones from the joint nodes, inverse bind matrices from the file) and `SkinnedMesh` parts bound to it, and returns the file's animation clips; `glbPose(clip, t)` samples one into a pose. Rigid models read exactly as before.
+- Worth knowing / readings I took:
+  - The models come as they are: the women wear a **crop top and shorts**, the men a T-shirt and trousers, and nobody has a **hard hat** (Rick's camo hard hat went with the old rig). Say if you want work clothes or hats - they are add-ons.
+  - Arms hang straight; nobody is animated (the files' walk clips are read but unused - NPCs stand or sit still).
+  - Cost: 42 skinned parts for the four NPCs, no shadow casting; the old rigs were folded to one mesh per material. Merging is the planned next step if the draw calls show.
+  - The old rigid NPC rigs stay in the repo: the **players still wear `operator_vern_rig.glb`**.
+- Verified in a headless browser: the real TEST page loads all four (42 skinned meshes, 274 bones), with no frame errors.
+- New `validate-skinned-npcs.cjs` (57th suite in CI) runs the game's reader on both files (10 / 11 skinned parts on one 66 / 71-joint skeleton, the walk clip read and sampled; a rigid model unchanged) and the game's own `skinnedNpc()`: Vern 1.78 m with his feet on the floor, hands at his sides, facing -Z; Rick and the women sitting ON the seat with ankles just above the floor and knees under a desk top; per-NPC colours on separate materials; the four `NPC_MODELS` entries; registry `in-use` and the CREDITS.md lines. It fails on v1.97.176 and passes now. `validate-power-outage-machines.cjs` now checks that `NPC_MODELS` no longer points at the old rigs (on purpose; it still checks the rig files the players use).
+- Bumped TEST to `1.97.177` / `corn-souls-test-shell-v204`. LIVE is untouched.
+
 ## TEST v1.97.176 — creatures hit by a vehicle get kicked back (2026-11-04)
 - Owner: *"when enemies are hit by vehicle they should be kicked back"*.
 - Before: a cob stalker or Daddy Cob Legs that survived a vehicle hit was moved a flat **1.5 m** in one frame (a jump, not a throw), a killed one stayed where it was hit, and a **nibbler** was not moved at all.

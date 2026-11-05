@@ -5465,6 +5465,9 @@ function glbBuild(buf) {
     const g = new T.BufferGeometry();
     const at = (name, acc, size) => { if (acc !== undefined) g.setAttribute(name, new T.BufferAttribute(glbAccessor(d, bin, acc), size)); };
     at('position', pr.attributes.POSITION, 3); at('normal', pr.attributes.NORMAL, 3); at('uv', pr.attributes.TEXCOORD_0, 2);
+    // v1.97.177: skinned models (the Loves_Art NPCs) - which joints move each vertex, and how much
+    at('skinIndex', pr.attributes.JOINTS_0, 4);
+    if (pr.attributes.WEIGHTS_0 !== undefined) { const a = d.accessors[pr.attributes.WEIGHTS_0]; g.setAttribute('skinWeight', new T.BufferAttribute(glbAccessor(d, bin, pr.attributes.WEIGHTS_0), 4, a.componentType !== 5126)); }
     if (pr.indices !== undefined) g.setIndex(new T.BufferAttribute(glbAccessor(d, bin, pr.indices), 1));
     let mat = pr.material === undefined ? mats[0] : mats[pr.material];
     if (pr.attributes.COLOR_0 !== undefined) {   // v1.97.166: vertex colours (the owner's grain haulers are painted this way; without them they came out white)
@@ -5472,9 +5475,10 @@ function glbBuild(buf) {
       const base = mat || new T.MeshLambertMaterial({ side: T.DoubleSide }); mat = base.userData.vc || (base.userData.vc = Object.assign(base.clone(), { vertexColors: true })); }
     return { g, mat, mode: pr.mode === undefined ? 4 : pr.mode };
   }));
-  const byName = {};
+  const byName = {}, nodeObj = [], skinned = [], joints = new Set();
+  for (const sk of d.skins || []) for (const j of sk.joints) joints.add(j);
   const mk = i => {
-    const n = d.nodes[i], o = new T.Group(); o.name = n.name || ('node' + i); byName[o.name] = o;
+    const n = d.nodes[i], o = joints.has(i) ? new T.Bone() : new T.Group(); o.name = n.name || ('node' + i); byName[o.name] = o; nodeObj[i] = o;
     if (n.matrix) new T.Matrix4().fromArray(n.matrix).decompose(o.position, o.quaternion, o.scale);   // glTF column-major
     else {
       if (n.translation) o.position.fromArray(n.translation);
@@ -5483,14 +5487,41 @@ function glbBuild(buf) {
     }
     (n.children || []).forEach(c => o.add(mk(c)));
     if (n.mesh !== undefined) for (const q of (prims[n.mesh] || [])) {
-      const piece = q.mode === 1 ? new T.LineSegments(q.g, q.mat) : new T.Mesh(q.g, q.mat);
+      const skin = n.skin !== undefined && q.mode !== 1 && q.g.attributes.skinIndex && q.g.attributes.skinWeight;
+      const piece = q.mode === 1 ? new T.LineSegments(q.g, q.mat) : skin ? new T.SkinnedMesh(q.g, q.mat) : new T.Mesh(q.g, q.mat);
       piece.castShadow = q.mode !== 1; piece.receiveShadow = true; piece.userData.noHit = true; o.add(piece);
+      if (skin) skinned.push([piece, n.skin]);
     }
     return o;
   };
   const root = new T.Group();
   ((d.scenes[d.scene || 0] || {}).nodes || []).forEach(i => root.add(mk(i)));
-  return { root, byName };
+  // Skins: one skeleton per glTF skin, shared by every piece it moves. glTF puts the joints in world space and ignores the
+  // mesh node's own transform, which is what three's 'attached' bind mode with an identity bind matrix does.
+  const skels = (d.skins || []).map(sk => {
+    const inv = sk.inverseBindMatrices !== undefined ? glbAccessor(d, bin, sk.inverseBindMatrices) : null;
+    return new T.Skeleton(sk.joints.map(j => nodeObj[j]), sk.joints.map((j, k) => inv ? new T.Matrix4().fromArray(inv, k * 16) : new T.Matrix4()));
+  });
+  for (const [m, k] of skinned) m.bind(skels[k], new T.Matrix4());
+  // Animation clips, kept as raw keyframes on the node objects: glbPose() samples one into a pose
+  const anims = (d.animations || []).map(a => ({ name: a.name || '', channels: a.channels.map(c => {
+    const sm = a.samplers[c.sampler];
+    return { obj: nodeObj[c.target.node], path: c.target.path, times: glbAccessor(d, bin, sm.input), values: glbAccessor(d, bin, sm.output), step: sm.interpolation === 'STEP' };
+  }).filter(c => c.obj && (c.path === 'rotation' || c.path === 'translation' || c.path === 'scale')) }));
+  return { root, byName, anims };
+}
+// Set every animated node to where clip `a` has it at time t (seconds): linear between keyframes, slerp for rotations.
+// Returns the clip's length.
+function glbPose(a, t) {
+  let len = 0; const q0 = new T.Quaternion(), q1 = new T.Quaternion();
+  for (const c of a.channels) {
+    const ts = c.times, n = c.path === 'rotation' ? 4 : 3; len = Math.max(len, ts[ts.length - 1]);
+    let k = 0; while (k < ts.length - 2 && ts[k + 1] <= t) k++;
+    const f = c.step || ts.length < 2 ? 0 : Math.max(0, Math.min(1, (t - ts[k]) / ((ts[k + 1] - ts[k]) || 1))), k1 = Math.min(k + 1, ts.length - 1), v = c.values;
+    if (c.path === 'rotation') { q0.fromArray(v, k * 4); q1.fromArray(v, k1 * 4); c.obj.quaternion.copy(q0.slerp(q1, f)); }
+    else { const tgt = c.path === 'translation' ? c.obj.position : c.obj.scale; tgt.set(v[k * n] + (v[k1 * n] - v[k * n]) * f, v[k * n + 1] + (v[k1 * n + 1] - v[k * n + 1]) * f, v[k * n + 2] + (v[k1 * n + 2] - v[k * n + 2]) * f); }
+  }
+  return len;
 }
 // Shared model fetch: absolute URLs (the page carries <base href="../">), cached, and a failure only warns.
 function loadGlbModel(url, onReady, tag) {
@@ -5599,15 +5630,21 @@ function characterRig(av, opt) {
   return P;
 }
 // Who wears which model. Everything else about the NPC - position, facing, dialogue, chair - stays as it was.
+// v1.97.177, owner: "lets tryt he models as is at first" - the four NPCs wear Loves_Art's Low Poly Male / Low Poly Female (CC BY 4.0,
+// credited in CREDITS.md / credits.html): skinned meshes, loaded as they come. Each keeps the colour it already had: the clothing takes
+// the NPC's old shirt colour, and the two women keep their old hair colours, so Brenda and Tammy are not twins.
+// (The old rigid rigs stay in the repo - the players still wear operator_vern_rig.glb.)
+const NPC_MALE = '/corn-souls/assets/models/low_poly_male_loves_art.glb', NPC_FEMALE = '/corn-souls/assets/models/low_poly_female_loves_art.glb';
 const NPC_MODELS = {
-  vern:   { url: '/corn-souls/assets/models/operator_vern_rig.glb', hands: 'Hand_Glove', pose: 'stand', x: -232 },   // off the loop track (it runs at x -240)
-  op:     { url: '/corn-souls/assets/models/boardop_rick_rig.glb', pose: 'sit' },          // Rick, the board operator
-  brenda: { url: '/corn-souls/assets/models/brenda_scalehouse_rig.glb', pose: 'sit' },
-  tammy:  { url: '/corn-souls/assets/models/tammy_scalehouse_rig.glb', pose: 'sit' }
+  vern:   { url: NPC_MALE, skin: true, h: 1.78, pose: 'stand', x: -232, colors: { clothing: 0x665e48 } },   // off the loop track (it runs at x -240)
+  op:     { url: NPC_MALE, skin: true, h: 1.78, pose: 'sit', colors: { clothing: 0x3b6fb0 } },          // Rick, the board operator
+  brenda: { url: NPC_FEMALE, skin: true, h: 1.65, pose: 'sit', colors: { clothing: 0x8a5a9e, hair: 0x5a3a22 } },
+  tammy:  { url: NPC_FEMALE, skin: true, h: 1.65, pose: 'sit', colors: { clothing: 0x4f8f5a, hair: 0xc9a25a } }
 };
 function loadCharacter(id, cfg) {
   const npc = (NPCS || []).find(n => n.id === id);
   if (!npc || !npc.g) return;
+  if (cfg.skin) return loadGlbModel(cfg.url, m => skinnedNpc(npc, cfg, m), 'npc:' + id);
   loadGlbModel(cfg.url, ({ root }) => {
     const rig = characterRig(root, { hands: cfg.hands });
     if (cfg.pose === 'sit') for (const s of ['L', 'R']) {          // thighs forward but sloping down, shins down: a standing export sits
@@ -5642,6 +5679,59 @@ function loadCharacter(id, cfg) {
     else for (const c of npc.g.children) c.visible = false;
     npc.g.add(root); npc.model = root;                             // hidden only now: a failed load leaves the box
   }, 'npc:' + id);
+}
+// ---------- SKINNED NPCs (v1.97.177): a Mixamo-style skeleton, posed once where it is loaded and then left alone.
+function skinBone(root, name) { let b = null; const re = new RegExp('(^|:)' + name + '(_\\d+)?$'); root.traverse(o => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; }
+// turn a bone about an axis given in the MODEL's space (the root's), whatever its parents' rotations
+function skinTurn(root, bone, axis, ang) {
+  if (!bone) return; root.updateMatrixWorld(true);
+  const rq = root.getWorldQuaternion(new T.Quaternion()), ax = axis.clone().applyQuaternion(rq).normalize();
+  const w = bone.getWorldQuaternion(new T.Quaternion()), pw = bone.parent.getWorldQuaternion(new T.Quaternion());
+  bone.quaternion.copy(pw.invert().multiply(new T.Quaternion().setFromAxisAngle(ax, ang).multiply(w)));
+  root.updateMatrixWorld(true);
+}
+function skinBox(root) {   // the posed mesh's real extent (a skinned mesh's geometry bounds are its T-pose)
+  root.updateMatrixWorld(true); const bb = new T.Box3(), v = new T.Vector3();
+  root.traverse(o => { if (o.isSkinnedMesh) for (let i = 0, n = o.geometry.attributes.position.count; i < n; i++) { o.getVertexPosition(i, v); bb.expandByPoint(v.applyMatrix4(o.matrixWorld)); } });
+  return bb;
+}
+const SKIN_POSE = { arm: 1.45, thigh: 1.42, ankle: 0.09, seatTop: 0.47 };   // arm: how far below level the upper arm hangs (rad)
+// The models are exported in a T-pose, facing +Z, about 3.2 units tall. Arms come down to the sides; a seated one folds its
+// thighs forward to near-level and angles its shins so the ankles land just above the floor (measured from its own legs, so
+// a taller or shorter model still reaches the floor), and is lowered until the underside of its seat rests on the chair.
+function skinnedNpc(npc, cfg, { root }) {
+  const X = new T.Vector3(1, 0, 0), Z = new T.Vector3(0, 0, 1), P = SKIN_POSE, wp = b => b.getWorldPosition(new T.Vector3());
+  root.updateMatrixWorld(true);
+  const h0 = skinBox(root); root.scale.setScalar(cfg.h / (h0.max.y - h0.min.y)); root.updateMatrixWorld(true);
+  for (const [s, sg] of [['Left', 1], ['Right', -1]]) {   // each upper arm from wherever the export left it to P.arm below level, out to its own side
+    const a = skinBone(root, s + 'Arm'), e = skinBone(root, s + 'ForeArm'); if (!a || !e) continue;
+    const d = wp(e).sub(wp(a)), now = Math.atan2(d.y, d.x * sg);
+    skinTurn(root, a, Z, sg * (-P.arm - now));
+  }
+  const R = new T.Group(); R.add(root); R.rotation.y = cfg.face === undefined ? Math.PI : cfg.face;   // the models face +Z; the box avatars face -Z
+  let base = -skinBox(R).min.y;                                   // standing: feet on the floor
+  if (cfg.pose === 'sit') {
+    const leg = ['Left', 'Right'].map(s => ({ up: skinBone(root, s + 'UpLeg'), kn: skinBone(root, s + 'Leg'), ft: skinBone(root, s + 'Foot') })).filter(l => l.up && l.kn && l.ft);
+    for (const l of leg) { l.shin = wp(l.kn).distanceTo(wp(l.ft)); skinTurn(root, l.up, X, -P.thigh); }   // thighs forward, near level
+    // the underside of the seat (the lowest skin within the hips' reach) rests on the chair
+    R.updateMatrixWorld(true);
+    const hip = leg.reduce((a, l) => a.add(wp(l.up)), new T.Vector3()).multiplyScalar(1 / Math.max(1, leg.length)), v = new T.Vector3(); let low = Infinity;
+    root.traverse(o => { if (o.isSkinnedMesh) for (let i = 0, n = o.geometry.attributes.position.count; i < n; i++) { o.getVertexPosition(i, v); v.applyMatrix4(o.matrixWorld);
+      if (Math.hypot(v.x - hip.x, v.z - hip.z) < 0.16 && v.y < low) low = v.y; } });
+    base = P.seatTop - (isFinite(low) ? low : hip.y - 0.1);
+    // then each shin tilts forward just enough that its ankle stops P.ankle above the floor
+    for (const l of leg) { const kneeY = wp(l.kn).y + base, phi = Math.acos(Math.max(-1, Math.min(1, (kneeY - P.ankle) / l.shin))); skinTurn(root, l.kn, X, P.thigh - phi); }
+  }
+  R.position.set(cfg.dx || 0, base + (cfg.dy || 0), cfg.dz || 0);
+  for (const k in cfg.colors || {}) root.traverse(o => { if (o.isMesh && o.material && o.material.name === k) { o.material = o.material.clone(); o.material.color.set(cfg.colors[k]); } });
+  root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  if (cfg.pose !== 'sit') npc.g.position.y = 0;                    // drop the box avatar's own lift
+  if (cfg.x !== undefined) npc.g.position.x = cfg.x;
+  if (cfg.z !== undefined) npc.g.position.z = cfg.z;
+  const seated = npc.g.children.filter(c => c.isGroup);           // seatedPerson() = chair meshes + one body group
+  if (seated.length) for (const c of seated) c.visible = false; else for (const c of npc.g.children) c.visible = false;
+  npc.g.add(R); npc.model = R;                                     // hidden only now: a failed load leaves the box
+  return R;
 }
 function loadNpcModels() { for (const id in NPC_MODELS) loadCharacter(id, NPC_MODELS[id]); }
 // ---------- PLAYER MODELS: both players wear the operator rig (the same rigid-part family as Vern), tinted to their
