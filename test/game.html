@@ -9205,7 +9205,7 @@ function updateNH3(dt) {
   const to = (WIND.from + 180) * Math.PI / 180, ws = Math.max(0.6, WIND.mph * 0.447 * 0.7), wx = Math.sin(to) * ws, wz = -Math.cos(to) * ws;
   NH3.spawn = (NH3.spawn || 0) + dt * srcs.reduce((a, s) => a + s.k * 9, 0);
   while (NH3.spawn >= 1 && srcs.length) { NH3.spawn -= 1; const s = srcs[Math.random() * srcs.length | 0];
-    nh3Puff(s.p, s.n.clone().multiplyScalar(5 + Math.random() * 4).add(V3((Math.random() - 0.5) * 1.5, Math.random() * 0.8, (Math.random() - 0.5) * 1.5)), 1.0 + Math.random() * 0.6); }
+    nh3Puff(s.p, s.n.clone().multiplyScalar(5 + Math.random() * 4).add(V3((Math.random() - 0.5) * 1.5, Math.random() * 0.8, (Math.random() - 0.5) * 1.5)), 1.3 + Math.random() * 0.7); }   // v1.97.172, owner: "ammonia cloud should be a little bigger" (puffs were 1.0-1.6 m)
   if (!srcs.length) NH3.spawn = 0;
   // move puffs; add up how much of the cloud is at Squeeg's face
   const head = walk.on ? V3(walk.x, walk.y + 1.5, walk.z) : null; let conc = 0;
@@ -9213,7 +9213,7 @@ function updateNH3(dt) {
     q.age += dt; if (q.age > q.life) { q.alive = false; q.s.visible = false; continue; }
     const drag = Math.min(1, dt * 1.6); q.v.x += (wx - q.v.x) * drag; q.v.z += (wz - q.v.z) * drag; q.v.y += (0.12 - q.v.y) * drag;   // jet slows into the wind drift; cold NH3 hugs low, then lifts a little
     q.p.addScaledVector(q.v, dt); if (q.p.y < 0.4) { q.p.y = 0.4; q.v.y = Math.abs(q.v.y) * 0.3; }
-    const f = q.age / q.life, size = q.size0 + f * 9; q.s.position.copy(q.p); q.s.scale.set(size, size, 1); q.s.material.opacity = Math.min(1, q.age * 3) * (1 - f) * 0.55;
+    const f = q.age / q.life, size = q.size0 + f * 11.5; q.s.position.copy(q.p); q.s.scale.set(size, size, 1); q.s.material.opacity = Math.min(1, q.age * 3) * (1 - f) * 0.55;   // v1.97.172: grows to ~13 m (was ~10) - a bigger cloud
     if (head) { const d = Math.hypot(q.p.x - head.x, (q.p.y - head.y) * 0.5, q.p.z - head.z); if (d < size * 0.6) conc += (1 - d / (size * 0.6)) * (1 - f * 0.7); }
   }
   // exposure: burns fast in the thick of it, wears off slowly in clean air

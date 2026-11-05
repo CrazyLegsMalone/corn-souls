@@ -1,3 +1,13 @@
+## TEST v1.97.172 — the ammonia cloud is bigger (2026-11-04)
+- Owner: *"ammonia cloud should be a little bigger"*.
+- The cloud is a pool of sprites (`nh3Puff`), and a puff's size is its world size: it starts at `size0`, then grows by `f * N` over its 14-20 s life. Both numbers went up about 30%:
+  - start: `1.0 + random * 0.6` -> **`1.3 + random * 0.7`** (1.3-2.0 m puffs, was 1.0-1.6);
+  - growth: `q.size0 + f * 9` -> **`q.size0 + f * 11.5`**, so the oldest puffs reach ~13 m instead of ~10.6.
+- **The hazard moved with it, on purpose.** The exposure test uses the same size (`d < size * 0.6`) to decide whether the cloud is at Squeeg's face, so a visibly bigger cloud is also a slightly wider hazard - which is the honest coupling: the cloud looks like what it does to you. Nothing else changed: the spawn rate, the 150-puff ceiling, the wind drift, the drain/hole jets and the alarm are untouched.
+- New `validate-ammonia-cloud.cjs` (54th suite in CI) **runs `updateNH3` for real** over an open drain for 20 s: the puffs start 1.3-2.0 m across, the oldest grow past 11.6 m (proving the old 10.6 m ceiling is gone - measured 13.1-13.4 m), the cloud still sits downwind of the tank, standing in it builds exposure until it kills you, and out of it the exposure wears off. It fails on the previous revision and passes now.
+- Verified locally: the 54 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes. LIVE is untouched.
+- Bumped TEST to `1.97.172` / `corn-souls-test-shell-v199`.
+
 ## TEST v1.97.171 — the corn cubes have no green edge outline any more (2026-11-04)
 - Owner: *"remove the green outline from around the corn cubes"*.
 - **What it was:** the corn props come from the launcher's injected corn engine (`cornEngine` in `test/index.html`, not `game.html`). `cornVisual()` put the cube GLB on the prop and then drew a **dark-green box of edges** round it - `new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(.57,.57,.57)), new T.LineBasicMaterial({ color: 0x254b3d }))`, sized to the 0.57 m cube - "reinforced cube edges make this a playful CORN BLOCK". That outline is gone; the cube model itself (and the ear, which never had an outline) is untouched.
