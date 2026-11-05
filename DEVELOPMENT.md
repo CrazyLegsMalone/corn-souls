@@ -1,3 +1,27 @@
+## TEST v1.97.160 — debug: spawn a cob stalker next to you (2026-11-04)
+- Owner: *"add a spawn cob walker to debug so we can spawn it nearby player"*. I took "cob walker" to mean the cob stalker.
+- **Debug → "🌽 Spawn a cob stalker next to me"** (`P3.creeps('near')` → `creepDebug('near')` → `creepNear`):
+  - a full-health stalker comes out 9 m in front of you;
+  - if a wall line is in the way it comes out at 6 m or 3.5 m instead, so it lands on your side of the wall;
+  - it screeches on arrival;
+  - it only works while walking.
+- It is a **free** stalker (`c.free`), not tied to the corn field:
+  - it hunts whoever comes within its range anywhere;
+  - it wanders within ~15 m of where it was put;
+  - it never heads back to the corn, and the field edge doesn't wall it in;
+  - it doesn't count toward the field's cycle, so Daddy still comes when the field's own two are down;
+  - it still bites, takes paint and tool damage, and bursts into nibblers when it dies.
+- **2 player:** the guest's request goes to the host with the guest's position and facing, so it comes out in front of whoever asked.
+- Checked in the running game: it appeared 9 m ahead and went straight into its hunt.
+- `validate-corn-creatures.cjs` covers:
+  - placement, and the wall case;
+  - hunting outside the field without returning;
+  - wandering round its spot;
+  - the field cycle untouched;
+  - only while walking;
+  - the menu item, and the guest path.
+- Bumped TEST to `1.97.160` / `corn-souls-test-shell-v187`.
+
 ## TEST v1.97.159 — a mini map in the bottom-right corner (2026-11-04)
 - Owner: *"mini map to bottom right"*. There was no mini map, so I asked; the owner chose a new, real one.
 - **The widget:**

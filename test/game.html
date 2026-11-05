@@ -10559,7 +10559,7 @@ function netRecv(m) {
   } else if (m.t === 'ch') { creepNetHit(m);   // the guest hit one of my creatures
   } else if (m.t === 'cbt') { creepBitten(m.k, m.n, m.x, m.z);   // the host's creature bit me
   } else if (m.t === 'cea') { creepEatMine(m.i);   // the host's creature ate my corn ear
-  } else if (m.t === 'cdbg') { if (NET.host) creepDebug(m.w);
+  } else if (m.t === 'cdbg') { if (NET.host) creepDebug(m.w, m.x, m.z, m.a);
   } else if (m.t === 'swap') { if (!walk.drive) swapRangers();
   } else if (m.t === 'rp') { if (NET.host) railPhoneApply(m.a);   // a guest rang the dispatcher
   } else if (m.t === 'shot') {
@@ -13830,6 +13830,11 @@ function creepAI(c, dt) {
   if (lure) {   // corn: nothing else matters, even outside the field
     tx = lure.g.position.x; tz = lure.g.position.z; sp = K.run * 0.85; stopAt = c.hitR * 0.6 + 0.4;
     if (Math.hypot(tx - c.x, tz - c.z) < stopAt + 0.3) { c.state = 'eat'; sp = 0; if ((c.eatT += dt) > 3.5) { creepEat(lure); c.eatT = 0; } } else { c.state = 'lure'; c.eatT = 0; }
+  } else if (c.free) {   // a debug spawn: hunts anyone in range, anywhere; otherwise wanders round where it was put
+    if (me && dP < K.aggro + (c.runT > 0 ? 25 : 0)) { if (c.state !== 'hunt' && !c.yelled) { creepSound('screech', c); c.yelled = true; } c.state = 'hunt'; tx = px; tz = pz; sp = K.run; stopAt = K.bite * 0.75; }
+    else { c.state = 'roam'; c.yelled = false;
+      if (c.t > c.nextT || Math.hypot(c.tx - c.x, c.tz - c.z) < 1.5) { c.tx = c.hx + (Math.random() - 0.5) * 30; c.tz = c.hz + (Math.random() - 0.5) * 30; c.nextT = c.t + 6 + Math.random() * 9; }
+      tx = c.tx; tz = c.tz; }
   } else if (me && dP < K.aggro + (c.runT > 0 ? 25 : 0) && inCField(px, pz, 2)) {   // you are in its corn
     if (c.state !== 'hunt' && !c.yelled) { creepSound('screech', c); c.yelled = true; }
     c.state = 'hunt'; [tx, tz] = clampCField(px, pz, 0.4); sp = K.run; stopAt = K.bite * 0.75;
@@ -13845,7 +13850,7 @@ function creepAI(c, dt) {
   const go = sp > 0 && d > stopAt && !(Math.abs(da) > 1 && d < 4) ? sp * Math.max(0.15, Math.cos(Math.min(Math.PI / 2, Math.abs(da)))) : 0;   // close to what it wants: turns on the spot instead of circling it
   c.speed += (go - c.speed) * Math.min(1, dt * 4);
   const nx = c.x + Math.sin(c.a) * c.speed * dt, nz = c.z + Math.cos(c.a) * c.speed * dt;
-  if (c.state === 'lure' || c.state === 'eat' || c.state === 'return' || !inCField(c.x, c.z, 0) || inCField(nx, nz, 0)) { c.x = nx; c.z = nz; }   // the field edge is a wall from the inside, except for corn (once out it walks freely back in)
+  if (c.free || c.state === 'lure' || c.state === 'eat' || c.state === 'return' || !inCField(c.x, c.z, 0) || inCField(nx, nz, 0)) { c.x = nx; c.z = nz; }   // the field edge is a wall from the inside, except for corn (once out it walks freely back in)
   else { [c.x, c.z] = clampCField(nx, nz, 0.05); c.speed *= 0.5; }
   if (c.state === 'hunt' && me && dP < K.bite + 0.25 && c.biteCd <= 0) { c.biteCd = K.biteCd; if (who === 'me') creepBite(c, dP); else { creepSound('bite', c); netSend({ t: 'cbt', k: c.kind, n: K.dmg, x: +c.x.toFixed(2), z: +c.z.toFixed(2) }); } }   // the guest gets its own bite
   if (walk.drive && utv.g) {   // a vehicle driven into it
@@ -13869,7 +13874,7 @@ function updateCreeps(dt) {
     else creepAI(c, dt);
     if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
   }
-  const alive = CREEP.list.filter(c => c.hp > 0 && c.kind !== 'nibbler').length;   // (nibblers do not hold up Daddy)
+  const alive = CREEP.list.filter(c => c.hp > 0 && c.kind !== 'nibbler' && !c.free).length;   // (nibblers and debug spawns do not hold up Daddy)
   if (CREEP.phase === 'stalkers' && !alive) { CREEP.phase = 'boss-wait'; CREEP.t = 0; }
   else if (CREEP.phase === 'boss-wait' && (CREEP.t += dt) > 5) creepDaddy();
   else if (CREEP.phase === 'boss' && !alive) { CREEP.phase = 'quiet'; CREEP.t = 0; if (DMG_NOTIFY && walk.on) DMG_NOTIFY('🌽 The corn goes still.'); }
@@ -13910,9 +13915,26 @@ function creepToolHit(o, dir, dmg) {   // a swing: the nearest one in reach in f
     if (cc.distanceTo(o.clone().addScaledVector(dir, t)) < c.hitR + 0.35) { creepHurt(c, dmg, cc); return true; } }
   return false;
 }
-function creepDebug(what) {   // debug menu
+// v1.97.160, owner: "add a spawn cob walker to debug so we can spawn it nearby player". A cob stalker put down 9 m from you, not
+// tied to the corn field (c.free): it hunts whoever comes within its range anywhere, wanders round the spot it was put, never
+// heads back to the field, and does not hold up the field's own cycle (Daddy still comes when the field's two are down).
+function creepNear(x, z, yaw) {
+  const a0 = yaw !== undefined ? yaw : walk.on ? walk.yaw : Math.random() * 6.28;   // (in front of whoever asked)
+  let px = x, pz = z;
+  const cr = (ax, az, bx, bz, cx, cz) => (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+  const segHit = (ax, az, bx, bz, w) => cr(ax, az, bx, bz, w[0], w[1]) * cr(ax, az, bx, bz, w[2], w[3]) < 0 && cr(w[0], w[1], w[2], w[3], ax, az) * cr(w[0], w[1], w[2], w[3], bx, bz) < 0;   // (a wall line between you and the spot)
+  for (const r of [9, 6, 3.5]) {   // in front of you if there is room, else nearer
+    const cx = x - Math.sin(a0) * r, cz = z - Math.cos(a0) * r;
+    if (!wallSegs.some(w => segHit(x, z, cx, cz, w))) { px = cx; pz = cz; break; } }
+  const c = creepSpawn('stalker', px, pz, false); if (!c) return 'No cob stalker model yet';
+  c.free = true; c.hx = px; c.hz = pz; c.a = Math.atan2(x - px, z - pz); c.runT = 3; creepSound('screech', c);
+  return 'A cob stalker, right there 🌽';
+}
+function creepDebug(what, x, z, yaw) {   // debug menu
   if (!CREEP.ready) return 'The corn field creatures are still loading';
-  if (creepGuest()) { netSend({ t: 'cdbg', w: what }); return what === 'boss' ? 'Asked the host: stalkers down, Daddy Cob Legs comes in 5 s' : 'Asked the host to reset the corn field'; }
+  if (what === 'near' && x === undefined) { if (!walk.on) return 'Start walking (Squeeg) first: it comes out next to you'; x = walk.x; z = walk.z; yaw = walk.yaw; }
+  if (creepGuest()) { netSend({ t: 'cdbg', w: what, x, z, a: yaw }); return what === 'near' ? 'Asked the host for a cob stalker next to you' : what === 'boss' ? 'Asked the host: stalkers down, Daddy Cob Legs comes in 5 s' : 'Asked the host to reset the corn field'; }
+  if (what === 'near') return creepNear(x, z, yaw);
   if (what === 'boss') { for (const c of CREEP.list) if (c.hp > 0 && c.kind === 'stalker') creepHurt(c, 99); return 'Both stalkers down: Daddy Cob Legs comes in 5 s'; }
   for (const c of CREEP.list) scene.remove(c.g); CREEP.list.length = 0; CREEP.bites = 0; creepStalkers(); return 'Corn field reset: two cob stalkers';
 }
@@ -14801,7 +14823,7 @@ function debugMenu(code) {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }   // what the screen looked like when the menu was opened (for a bug note)
   const set = k => { wxForced = k; P3.setWeather(k || wxLive); if (!k) fetchWeather(); toast('Weather: ' + (k || 'live')); };   // back to live: real weather right away, then refresh
   modal('<h1>Debug</h1><p>Weather now: <b>' + P3.weather + '</b> (' + (wxForced ? 'forced' : 'live') + ')' + (code ? '<br>Button code: ' + code : '') + '</p>',
-    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.powerSet(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.powerSet(false); toast('Power restored'); }], ['💡 Lights: flicker', () => { P3.lights.flicker(4); }], ['💡 Lights: blackout nearby (15 s)', () => { P3.lights.blackout(15); }], ['🌑 Darkness everywhere (20 s)', () => { P3.lights.dark(0.88, 2.5, 20); }], ['🌑 Darkness: lift now', () => { P3.lights.dark(0, 1); }], ['🌽 Corn field: kill the stalkers (Daddy comes)', () => toast(P3.creeps('boss'))], ['🌽 Corn field: reset the creatures', () => toast(P3.creeps('reset'))], ['🕐 Time of day: ' + timeLabel(), () => timeMenu(code)], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
+    [['Close', null], ['📬 Read notes (' + notesLoad().length + ')', () => notesRead()], ['🎮 Controls', () => controlsMenu(code)], ['Weather: live', () => set(null)], ['Weather: sunny', () => set('sunny')], ['Weather: cloudy', () => set('cloudy')], ['Weather: rain', () => set('rain')], ['Weather: snow', () => set('snow')], ['Power outage: start', () => { P3.powerSet(true); toast('Power outage: all plant power is out - emergency lights and fires only'); }], ['Power outage: end', () => { P3.powerSet(false); toast('Power restored'); }], ['💡 Lights: flicker', () => { P3.lights.flicker(4); }], ['💡 Lights: blackout nearby (15 s)', () => { P3.lights.blackout(15); }], ['🌑 Darkness everywhere (20 s)', () => { P3.lights.dark(0.88, 2.5, 20); }], ['🌑 Darkness: lift now', () => { P3.lights.dark(0, 1); }], ['🌽 Corn field: kill the stalkers (Daddy comes)', () => toast(P3.creeps('boss'))], ['🌽 Corn field: reset the creatures', () => toast(P3.creeps('reset'))], ['🌽 Spawn a cob stalker next to me', () => toast(P3.creeps('near'))], ['🕐 Time of day: ' + timeLabel(), () => timeMenu(code)], ['Pivot engine: empty the day tank', () => { toast(P3.pivotGenAction('dump')); }]], true);
 }
 // every control in the game, grouped by what you're doing: keyboard + mouse · controller · phone
 function railPhoneMenu() {   // Road P dispatcher phone: what you can ask for depends on what the line is doing

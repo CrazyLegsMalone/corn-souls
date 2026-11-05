@@ -166,4 +166,23 @@ assert.ok(html.includes('P3.dmgNotify = m => toast(m);'), 'bite (and vehicle / a
   for (const f of ['cob_stalker.glb', 'daddy_cob_legs.glb', 'small_teal_motor_pump.glb', 'large_teal_motor_pump.glb']) {
     assert.ok(fs.existsSync('../assets/models/' + f), f + ' is in the repo');
     assert.ok(reg.assets.some(x => (x.files || []).includes('assets/models/' + f) && x.status === 'in-use'), f + ' is registered'); } }
+// v1.97.160, owner: "add a spawn cob walker to debug so we can spawn it nearby player" - a free cob stalker, put down next to you
+ctx.wallSegs = [];
+{ walk.on = false; assert.match(ctx.creepDebug('near'), /Start walking/, 'only while walking (it comes out next to you)'); walk.on = true; }
+walk.x = 300; walk.z = 300; walk.yaw = 0; walk.dead = null; run(0.2);
+const ph0 = C.phase, n0 = C.list.length;
+assert.match(ctx.creepDebug('near'), /cob stalker/); const FR = C.list[C.list.length - 1];
+assert.equal(C.list.length, n0 + 1); assert.ok(FR.kind === 'stalker' && FR.free && FR.hp === 10, 'a full-health stalker, not tied to the field');
+assert.ok(Math.abs(Math.hypot(FR.x - 300, FR.z - 300) - 9) < 1e-6 && FR.z < 300, '9 m in front of you (yaw 0 looks along -z)');
+ctx.wallSegs = [[290, 296, 310, 296]]; ctx.creepDebug('near'); const FR2 = C.list[C.list.length - 1]; assert.ok(Math.hypot(FR2.x - 300, FR2.z - 300) < 3.6, 'a wall in the way: it comes out on your side of it'); ctx.creepHurt(FR2, 99); ctx.wallSegs = [];
+assert.ok(!ctx.inCField(FR.x, FR.z, 30), 'well away from the corn field');
+{ let hunted = false, closest = 99; run(4, 0.05, () => { if (FR.state === 'hunt') hunted = true; closest = Math.min(closest, Math.hypot(FR.x - walk.x, FR.z - walk.z)); });
+  assert.ok(hunted && closest < 3, 'it hunts you where you are (out of the field), closing to ' + closest.toFixed(1) + ' m');
+  assert.ok(!ctx.inCField(FR.x, FR.z, 20), 'and never heads back to the corn'); }
+walk.x = 900; walk.z = 900; run(20); assert.ok(Math.hypot(FR.x - FR.hx, FR.z - FR.hz) < 30 && FR.state === 'roam', 'nobody near: it wanders round where it was put');
+assert.equal(C.phase, ph0, 'it does not hold up or move on the field\'s own cycle');
+ctx.creepHurt(FR, 99); assert.equal(FR.state, 'dead');
+assert.ok(html.includes("['🌽 Spawn a cob stalker next to me', () => toast(P3.creeps('near'))]"), 'in the debug menu');
+assert.ok(html.includes("} else if (m.t === 'cdbg') { if (NET.host) creepDebug(m.w, m.x, m.z, m.a);") && html.includes("netSend({ t: 'cdbg', w: what, x, z, a: yaw })"), '2 player: the guest asks the host, with where the guest stands and looks');
+{ const n1 = C.list.length; ctx.creepDebug('near', 50, 400, Math.PI / 2); const G = C.list[C.list.length - 1]; assert.ok(C.list.length === n1 + 1 && Math.abs(G.x - 41) < 1e-6 && Math.abs(G.z - 400) < 1e-6, 'the host puts it in front of the guest (at the guest\'s spot and facing)'); ctx.creepHurt(G, 99); }
 console.log('PASS: cob stalkers (field edge, hunt, bites, corn ear lure, damage), Daddy Cob Legs, quiet spell and respawn; teal pumps in the ferm alley and at the beer well');
