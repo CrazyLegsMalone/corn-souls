@@ -784,12 +784,12 @@
       "creator": "Loves_Art (embedded as Donte_Loves_Art)",
       "source_url": "https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1",
       "evidence": "Embedded glTF asset.extras: author Donte_Loves_Art (https://sketchfab.com/Donte_Loves_Art), source URL above, CC-BY-4.0. Page (owner screenshot 2026-11-04) shows Loves_Art, CC Attribution.",
-      "notes": "Worn by the NPCs Brenda and Tammy (seated, scale house) in the TEST channel since v1.97.177. 4,384 triangles in 11 skinned meshes / 9 flat-color materials, no textures; Mixamo-style skeleton (71 joints); one 'walking' clip (1.23 s), unused.",
+      "notes": "The base female model, kept in the repo as the file both Crew Wardrobe builds (Brenda 2.0 and Tammy 2.0) were made from. No NPC wears it since v1.97.182: Brenda and Tammy wear their own builds. 4,384 triangles in 11 skinned meshes / 9 flat-color materials, no textures; Mixamo-style skeleton (71 joints); one 'walking' clip (1.23 s), unused.",
       "source_platform": "Sketchfab",
       "license_name": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
       "status": "in-use",
-      "modifications": "None to the file (stored byte-for-byte). At runtime: scaled to 1.65 m, arms lowered from the T-pose, legs folded to sit, clothing and hair recoloured per NPC.",
+      "modifications": "None to the file (stored byte-for-byte). It was worn by Brenda and Tammy (seated) from v1.97.177 to v1.97.181, scaled to 1.65 m, arms lowered from the T-pose, legs folded to sit, clothing and hair recoloured per NPC; the game no longer loads it.",
       "files": [
         "assets/models/low_poly_female_loves_art.glb"
       ],
@@ -813,6 +813,27 @@
       "modifications": "Stored byte-for-byte as the owner exported it. Relative to the original Low Poly Female: recoloured (skin, clothing, shoes, hair, eyes), facial expression edited, accessories added (round glasses, earrings, necklace pendant, bracelet, ponytail hair tie, boots). At runtime: scaled to 1.65 m, arms lowered from the T-pose, legs folded to sit, and NOT recoloured — the wardrobe's colours are the file's own.",
       "files": [
         "assets/models/brenda_2_0.glb"
+      ],
+      "checked_on": "2026-11-05",
+      "reviewer": "Cline, from the GLB's embedded asset.extras and the CREDITS.txt in the owner's drop",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-female-tammy-2-0",
+      "title": "Low Poly Female — Tammy 2.0 (Corn Souls Crew Wardrobe build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1",
+      "evidence": "Embedded glTF asset.extras: title 'Tammy_2.0 (Corn Souls character)', author Loves_Art (https://sketchfab.com/Loves_Art), license CC-BY-4.0, the source URL above, changes 'Recoloured, expression edited, accessories added in the Corn Souls Crew Wardrobe'. Exported by the owner's wardrobe tool (THREE.GLTFExporter r170); the drop also carried a CREDITS.txt with the same notice.",
+      "notes": "Worn by the NPC Tammy (seated, in the scale house) in the TEST channel since v1.97.182, in place of the plain Low Poly Female. 7,196 triangles in 21 parts: 15 skinned meshes on a 71-joint Mixamo skeleton split across 15 skins, plus six rigid accessory meshes (bun, hair_tie, glasses, earrings, and her watch: two unnamed nodes on the left forearm) parented to bones; 19 materials and 2 embedded colour maps. Its 'walking' clip is present but has no channels (unused either way: the NPCs stand or sit still).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Relative to the original Low Poly Female: recoloured (skin, clothing, shoes, hair, eyes), facial expression edited (angry), and accessories added (grey bun and hair tie, square gold glasses, stud earrings, pendant necklace, wristwatch, boots, long-sleeve top). At runtime: scaled to 1.65 m, arms lowered from the T-pose, legs folded to sit, and NOT recoloured — the wardrobe's colours are the file's own.",
+      "files": [
+        "assets/models/tammy_2_0.glb"
       ],
       "checked_on": "2026-11-05",
       "reviewer": "Cline, from the GLB's embedded asset.extras and the CREDITS.txt in the owner's drop",
