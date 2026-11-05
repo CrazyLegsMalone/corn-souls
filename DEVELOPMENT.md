@@ -1,3 +1,30 @@
+## TEST v1.97.158 — Daddy Cob Legs weaker, a pixel/CRT title, and the green ground flicker's real cause (2026-11-04)
+- Owner: *"reduce the health of daddy cob legs. remove no kernel left unburnt from start menu, make version on start menu 10% bigger. add the crt shader and pixel effect from the bonfire onto the title and cry and dry. ground still flickers green especially when looking down at it from high places like the top of tin bin 4"*.
+- **Daddy Cob Legs:** health 60 → 30 (three stalkers' worth). The owner gave no number, so this is a halving.
+- **Title screen:**
+  - the "NO KERNEL LEFT UNBURNT" footer is gone;
+  - the version text is 12.1px instead of 11px;
+  - CORN SOULS and Cry & Dry are drawn into a new `#spTxt` canvas at the bonfire's own pixel size (screen ÷ 3.2, ÷ 2.5 on a phone), drawn back up with hard pixels. It sits in the CRT stack, under the rolling band and the scan lines, like the fire.
+  - Each letter is drawn exactly where the page laid it out (one `Range` per character), so the page still does the fonts and layout. It is redrawn only when the window, layout or fonts change.
+  - The page's own text goes to `opacity:0` once drawn, so it is still there for screen readers. If the canvas fails, the page text stays visible.
+- **Green ground flicker, the cause:** the grass under everything was one 16 km `ShapeGeometry` with holes (the ponds, the tank-farm pit, the receiving pits). Triangulated, that is a handful of sliver triangles kilometres long, several fanning into the grain yard round the bins. Depth across triangles that size is interpolated too coarsely (worst on phone GPUs) to stay under overlays a couple of centimetres up, whatever the layer table says. That is why the earlier layer and offset fixes never fully held.
+  - The grass is now a graded grid (`grassGeometry`): 25 m cells from -1600 to 1800 m, 400 m cells to the horizon. It is one tensor grid, so there are no T-junctions.
+  - Each hole sits in a small patch whose outline keeps every grid vertex. The patch triangles are refined by shared-midpoint edge splitting (`grassRefine`) until none is over 40 m; the pond patch had 355 m edges.
+  - The result is 57k triangles in one draw call, with the same area, holes, UVs and material.
+  - The grass gets a flat-plane raycast (`grassRaycast`). Tuft probes, shots and splats would otherwise test 57k triangles per ray (measured: ~2 s per 256 probes, against ~1–5 ms now). It gives the same hits as the triangle test at 410 sampled points.
+  - The other ground planes that use `groundMat` (dirt yard, lots, roads; 12 of them) are cut into ~30 m cells (`GSEG`). The 300 m dirt yard was two triangles.
+- Headless rendering is too exact to show the flicker itself, so the fix is verified on the geometry: the view down from Tin Bin 4 renders clean, with no cracks.
+- **Tests:** new `validate-grass-grid.cjs` checks the game's real holes:
+  - no edge over 40 m near the plant;
+  - the same area;
+  - watertight (only the border and hole sides open);
+  - flat raycast = triangle raycast;
+  - holes are still holes;
+  - all ground planes subdivided.
+
+  Also updated: `validate-title.cjs` (footer, version size, pixel layer) and `validate-corn-creatures.cjs` (HP 30).
+- Bumped TEST to `1.97.158` / `corn-souls-test-shell-v185`.
+
 ## TEST v1.97.157 — the yeast cooler's temperature readout no longer flickers (2026-11-04)
 - Owner: *"yeast cooler temp display texture flickers over"*.
 - The readout plane sat at `Z0 - 0.17`, exactly on the front face of its dark housing box (centre `Z0 - 0.15`, 0.04 deep), so the two z-fought. The readout now sits 1 cm in front of the housing (`Z0 - 0.18`).

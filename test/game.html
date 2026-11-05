@@ -136,6 +136,8 @@ body.driving #nosBar{display:block}body.nonos #nosBar,body.nonos #nosBtn{display
 #splash.out{opacity:0;pointer-events:none}
 #splash canvas#spEmb{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 #splash .crt{position:absolute;inset:0;pointer-events:none}
+#splash canvas#spTxt{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+#splash.pxt h1,#splash.pxt .sub{opacity:0}
 #splash .crt .lines{position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.28) 3px,rgba(0,0,0,0) 4px);mix-blend-mode:multiply;animation:spCrt .12s steps(2) infinite}
 #splash .crt .roll{position:absolute;left:0;right:0;height:22vh;background:linear-gradient(to bottom,rgba(255,170,90,0),rgba(255,170,90,.035),rgba(255,170,90,0));animation:spRoll 7s linear infinite}
 #splash .crt .vig{position:absolute;inset:0;background:radial-gradient(ellipse at 62% 55%,rgba(0,0,0,0) 32%,rgba(7,4,3,.55) 68%,rgba(7,4,3,.96) 100%)}
@@ -169,10 +171,9 @@ body.driving #nosBar{display:block}body.nonos #nosBar,body.nonos #nosBtn{display
 @keyframes spFlash{0%{opacity:0}8%{opacity:.95}100%{opacity:0}}
 #splash.shake canvas#spEmb{animation:spShake .45s steps(6)}
 @keyframes spShake{0%{transform:none}20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-3px,2px)}80%{transform:translate(2px,-1px)}100%{transform:none}}
-#splash .foot{position:absolute;left:clamp(20px,7vw,120px);bottom:22px;font:10px 'Cinzel',Georgia,serif;letter-spacing:.32em;color:rgba(138,115,87,.7)}
-#splash .sv{position:absolute;bottom:22px;right:3vw;font:11px 'Cinzel',Georgia,serif;color:rgba(138,115,87,.75);letter-spacing:.2em}
+#splash .sv{position:absolute;bottom:22px;right:3vw;font:12.1px 'Cinzel',Georgia,serif;color:rgba(138,115,87,.75);letter-spacing:.2em}
 @media (max-width:720px){#splash .col{margin-left:18px}}
-@media (max-aspect-ratio:4/5){#splash{align-items:flex-end;padding-bottom:58px}#splash .tap{margin-top:26px}#splash .menu{margin-top:16px}#splash .crt .lean{background:linear-gradient(0deg,rgba(7,4,3,.92) 0%,rgba(7,4,3,.6) 45%,rgba(7,4,3,0) 70%)}#splash .foot{bottom:14px}#splash .sv{bottom:14px}}
+@media (max-aspect-ratio:4/5){#splash{align-items:flex-end;padding-bottom:58px}#splash .tap{margin-top:26px}#splash .menu{margin-top:16px}#splash .crt .lean{background:linear-gradient(0deg,rgba(7,4,3,.92) 0%,rgba(7,4,3,.6) 45%,rgba(7,4,3,0) 70%)}#splash .sv{bottom:14px}}
 @media (prefers-reduced-motion:reduce){#splash .crt .lines,#splash .crt .roll,#splash .tap,#splash .menu button.sel::before{animation:none}}
 body.splash #modal{z-index:60}
 </style>
@@ -203,7 +204,7 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
 <div id="ver"></div>
 <div id="splash" role="button" aria-label="Start game">
 <canvas id="spEmb"></canvas>
-<div class="crt"><div class="lean"></div><div class="vig"></div><div class="roll"></div><div class="lines"></div></div>
+<div class="crt"><div class="lean"></div><div class="vig"></div><canvas id="spTxt"></canvas><div class="roll"></div><div class="lines"></div></div>
 <div class="col">
 <h1><span>CORN</span><span>SOULS</span></h1>
 <div class="rule"></div>
@@ -212,7 +213,6 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
 <div class="menu" id="spMain"><button data-a="one">SOLO HARVEST<small>1 player</small></button><button data-a="host">HOST MULTIPLAYER<small>2 player &middot; host</small></button><button data-a="join">JOIN MULTIPLAYER<small>2 player &middot; join with a code</small></button></div>
 <div class="menu" id="spJoin" style="display:none"><div class="hint">Type the 5-letter code shown on the host's screen</div><input id="spCode" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false"><button data-a="joingo">JOIN</button><button data-a="back">BACK</button></div>
 </div>
-<div class="foot">NO KERNEL LEFT UNBURNT</div>
 <div class="flash"></div>
 <div class="sv" id="spVer"></div>
 </div>
@@ -224,6 +224,47 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
   // 3D bonfire on, silhouettes off, soul embers on, PS1 pixelation on, CRT lines on, title music off, flame intensity 139, hue 0 (the
   // magenta-pink fire), size 100%, placed at x 4.0, z 2.8
   var TS = { bonfire: true, sil: false, embers: true, pixel: true, crt: true, audio: false, intensity: 139, hue: 0, size: 100, x: 4.0, z: 2.8 };
+  // v1.97.158, owner: "add the crt shader and pixel effect from the bonfire onto the title and cry and dry". CORN SOULS and Cry & Dry
+  // are drawn into #spTxt at the bonfire's own pixel size (the screen / 3.2, or / 2.5 on a phone, drawn back up with hard pixels) and
+  // sit in the CRT stack, under its rolling band and scan lines, like the fire. Every letter goes exactly where the page laid it out
+  // (one Range per character), so the page still does the layout, fonts and sizes; once drawn, the page's own text goes invisible
+  // (opacity, so it is still there for screen readers). Redrawn only when the window, the layout or the fonts change.
+  var TXT = (function () {
+    var c = document.getElementById('spTxt'), g = c && c.getContext && c.getContext('2d'), h1 = sp.querySelector('h1'), sub = sp.querySelector('.sub'), was = '', R = document.createRange();
+    if (!g || !h1 || !sub || !TS.pixel) return null;
+    function chars(el, out) {
+      var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n;
+      while ((n = w.nextNode())) { var cs = getComputedStyle(n.parentNode), font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        for (var i = 0; i < n.length; i++) { var ch = n.data[i]; if (!ch.trim()) continue; R.setStart(n, i); R.setEnd(n, i + 1); out.push({ ch: ch, b: R.getBoundingClientRect(), font: font, color: cs.color }); } }
+      return out;
+    }
+    function base(o) {   // the letter's baseline inside its box
+      g.font = o.font; var m = g.measureText(o.ch), a = m.fontBoundingBoxAscent, d = m.fontBoundingBoxDescent;
+      return a > 0 && d >= 0 ? o.b.top + (o.b.height - a - d) / 2 + a : o.b.top + o.b.height * 0.8;
+    }
+    function draw() {
+      var k = innerWidth < 720 ? 2.5 : 3.2, W = Math.max(160, Math.round(innerWidth / k)), H = Math.max(120, Math.round(innerHeight / k));
+      var hb = h1.getBoundingClientRect(), sb = sub.getBoundingClientRect(), fs = document.fonts ? document.fonts.status : '';
+      var now = [W, H, innerWidth, innerHeight, hb.left, hb.top, hb.width, hb.height, sb.left, sb.top, sb.width, fs].join();
+      if (now === was) return; was = now;
+      c.width = W; c.height = H;
+      var sx = W / innerWidth, sy = H / innerHeight; g.setTransform(sx, 0, 0, sy, 0, 0); g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+      var gr = g.createLinearGradient(0, hb.top, 0, hb.bottom);
+      [[0, '#ffe6f2'], [0.26, '#ff9fd0'], [0.52, '#ff4fa2'], [0.78, '#d81b6a'], [1, '#8c0d3f']].forEach(function (q) { gr.addColorStop(q[0], q[1]); });
+      var big = chars(h1, []), small = chars(sub, []);
+      big.forEach(function (o) { o.y = base(o); }); small.forEach(function (o) { o.y = base(o); });
+      // CORN SOULS: the hard dark drop under it, then the letters with their pink glow (as the page's two drop-shadows)
+      big.forEach(function (o) { g.font = o.font; g.fillStyle = 'rgba(0,0,0,.9)'; g.fillText(o.ch, o.b.left, o.y + 2); });
+      g.shadowColor = 'rgba(255,50,140,.32)'; g.shadowBlur = 18 * sx; g.fillStyle = gr;
+      big.forEach(function (o) { g.font = o.font; g.fillText(o.ch, o.b.left, o.y); });
+      g.shadowColor = 'rgba(0,0,0,0)'; g.shadowBlur = 0;
+      small.forEach(function (o) { g.font = o.font; g.fillStyle = o.color; g.fillText(o.ch, o.b.left, o.y); });
+      sp.classList.add('pxt');
+    }
+    function tick() { if (!live) return; try { draw(); } catch (e) { sp.classList.remove('pxt'); return; } requestAnimationFrame(tick); }   // (a failure leaves the page's own text showing)
+    return { start: tick };
+  })();
+  if (TXT) TXT.start();
   // ---------- the 3D cob bonfire (v1.97.131, the owner's "Cry & Dry" title screen): the game's own three.js, rendered at a
   // third of the screen size and drawn back up with hard pixels; a silo wall, ash, embers, Daddy Cob Legs and a pump in the fog.
   // It starts as soon as three.js is in (the splash shows before the engine loads) and is torn down when the game starts.
@@ -4953,6 +4994,80 @@ const GB = k => GLAYER[k][1];                 // and how far forward (-) or back
 // vanished (v1.97.96). One material per colour, shared by every marking of that colour.
 const MARK_MATS = {};
 const markMat = c => MARK_MATS[c] || (MARK_MATS[c] = new T.MeshLambertMaterial({ color: c, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB('paint') }));
+// v1.97.158, owner: "ground still flickers green especially when looking down at it from high places like the top of tin bin 4".
+// The grass under everything was ONE shape, 16 km square, with holes cut for the ponds, the tank-farm pit and the receiving pits:
+// triangulated, that is a handful of sliver triangles kilometres long, several of them fanning into the grain yard round the bins.
+// Depth across a triangle that size is interpolated too coarsely (worst on phone GPUs) to keep it under overlays a couple of
+// centimetres up, whatever the layer table says - so the green showed through in patches that shifted as you moved. It is now a
+// grid: 25 m cells across the plant, 400 m cells out to the horizon (one tensor grid, so no T-junction cracks), and each hole sits
+// in a small patch of its own whose edge keeps every grid vertex. Same plane, same UVs (metres), same material, one draw call.
+const GRASS_FINE = [-1600, 1800], GRASS_STEP = 25, GRASS_FAR = 400;
+function grassLines() {
+  const L = []; for (let x = -8000; x < GRASS_FINE[0]; x += GRASS_FAR) L.push(x);
+  for (let x = GRASS_FINE[0]; x < GRASS_FINE[1]; x += GRASS_STEP) L.push(x);
+  for (let x = GRASS_FINE[1]; x < 8000; x += GRASS_FAR) L.push(x); L.push(8000); return L;
+}
+function grassGeometry(holes) {   // holes: lists of Vector2 in the plane (x, -z); returns the plane in that space, facing +z (rotate -90 deg about x)
+  const L = grassLines(), n = L.length, at = v => { let i = 0; while (i < n - 2 && L[i + 1] <= v) i++; return i; };
+  // the cells each hole touches, grown into rectangles of whole cells, merged until none overlap or touch
+  let regs = holes.map(h => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const p of h) { a = Math.min(a, p.x); b = Math.max(b, p.x); c = Math.min(c, p.y); d = Math.max(d, p.y); }
+    return { i0: at(a), i1: at(b) + 1, j0: at(c), j1: at(d) + 1, holes: [h] }; });
+  for (let again = true; again;) { again = false;
+    for (let p = 0; p < regs.length && !again; p++) for (let q = p + 1; q < regs.length; q++) { const A = regs[p], B = regs[q];
+      if (A.i0 <= B.i1 && B.i0 <= A.i1 && A.j0 <= B.j1 && B.j0 <= A.j1) { regs[p] = { i0: Math.min(A.i0, B.i0), i1: Math.max(A.i1, B.i1), j0: Math.min(A.j0, B.j0), j1: Math.max(A.j1, B.j1), holes: A.holes.concat(B.holes) }; regs.splice(q, 1); again = true; break; } } }
+  const pos = [], uv = [], idx = [], vid = new Map();
+  const v = (i, j) => { const k = i * n + j; let id = vid.get(k); if (id === undefined) { id = pos.length / 3; vid.set(k, id); pos.push(L[i], L[j], 0); uv.push(L[i], L[j]); } return id; };
+  const inReg = (i, j) => regs.some(R => i >= R.i0 && i < R.i1 && j >= R.j0 && j < R.j1);
+  for (let i = 0; i < n - 1; i++) for (let j = 0; j < n - 1; j++) { if (inReg(i, j)) continue;
+    const a = v(i, j), b = v(i + 1, j), c = v(i + 1, j + 1), d = v(i, j + 1); idx.push(a, b, c, a, c, d); }
+  for (const R of regs) {   // the patch round each hole: its outline runs through every grid vertex on its edge
+    const ring = [];
+    for (let i = R.i0; i < R.i1; i++) ring.push(new T.Vector2(L[i], L[R.j0]));
+    for (let j = R.j0; j < R.j1; j++) ring.push(new T.Vector2(L[R.i1], L[j]));
+    for (let i = R.i1; i > R.i0; i--) ring.push(new T.Vector2(L[i], L[R.j1]));
+    for (let j = R.j1; j > R.j0; j--) ring.push(new T.Vector2(L[R.i0], L[j]));
+    const sh = new T.Shape(ring); for (const h of R.holes) sh.holes.push(new T.Path(h));
+    const sg = new T.ShapeGeometry(sh), P = sg.attributes.position, I = sg.index, base = pos.length / 3, V = [], F = [];
+    for (let k = 0; k < P.count; k++) V.push([P.getX(k), P.getY(k)]);
+    for (let k = 0; k < I.count; k += 3) F.push([I.getX(k), I.getX(k + 1), I.getX(k + 2)]); sg.dispose();
+    const RF = grassRefine(V, F, GRASS_STEP * 1.6);   // the pond patch came out of the triangulator with edges up to 355 m
+    for (const [x, y] of V) { pos.push(x, y, 0); uv.push(x, y); }
+    for (const t of RF) idx.push(base + t[0], base + t[1], base + t[2]);
+  }
+  const g = new T.BufferGeometry(), N = pos.length / 3, nor = new Float32Array(N * 3); for (let k = 0; k < N; k++) nor[k * 3 + 2] = 1;
+  g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new T.BufferAttribute(nor, 3));
+  g.setIndex(idx); g.computeBoundingSphere(); g.computeBoundingBox(); g.userData.patches = regs.length;
+  return g;
+}
+function grassRefine(V, F, maxL) {   // split every edge longer than maxL at its midpoint, the same midpoint for both triangles on it (no T-junction cracks), until none is left
+  for (let pass = 0; pass < 16; pass++) {
+    const mid = new Map(); let any = false;
+    const m = (a, b) => { if (Math.hypot(V[a][0] - V[b][0], V[a][1] - V[b][1]) <= maxL) return -1; const k = a < b ? a + ',' + b : b + ',' + a; let id = mid.get(k);
+      if (id === undefined) { id = V.length; V.push([(V[a][0] + V[b][0]) / 2, (V[a][1] + V[b][1]) / 2]); mid.set(k, id); } any = true; return id; };
+    const out = [];
+    for (const t of F) { const ab = m(t[0], t[1]), bc = m(t[1], t[2]), ca = m(t[2], t[0]), n = (ab >= 0) + (bc >= 0) + (ca >= 0);
+      if (n === 0) { out.push(t); continue; }
+      if (n === 3) { out.push([t[0], ab, ca], [ab, t[1], bc], [ca, bc, t[2]], [ab, bc, ca]); continue; }
+      if (n === 1) { if (ab >= 0) out.push([t[0], ab, t[2]], [ab, t[1], t[2]]); else if (bc >= 0) out.push([t[0], t[1], bc], [t[0], bc, t[2]]); else out.push([t[0], t[1], ca], [ca, t[1], t[2]]); continue; }
+      // two split: turn the triangle so the unsplit edge is the last one (c -> a), keeping the winding
+      const [a, b, c, p, q] = ca < 0 ? [t[0], t[1], t[2], ab, bc] : ab < 0 ? [t[1], t[2], t[0], bc, ca] : [t[2], t[0], t[1], ca, ab];
+      out.push([p, b, q], [a, p, q], [a, q, c]); }
+    F = out; if (!any) break;
+  }
+  return F;
+}
+function grassRaycast(mesh, holes) {   // the grass is flat at y 0: hit it exactly, instead of testing ~57,000 triangles per ray (tuft probes, shots)
+  const hw = holes.map(h => h.map(p => [p.x, -p.y]));
+  const inHole = (x, z) => hw.some(h => { let ins = false; for (let a = 0, b = h.length - 1; a < h.length; b = a++) { const [xa, za] = h[a], [xb, zb] = h[b]; if ((za > z) !== (zb > z) && x < (xb - xa) * (z - za) / (zb - za) + xa) ins = !ins; } return ins; });
+  mesh.raycast = function (rc, out) {
+    const r = rc.ray, dy = r.direction.y; if (dy > -1e-9 && this.material.side !== T.DoubleSide) return; if (Math.abs(dy) < 1e-9) return;
+    const t = (this.position.y - r.origin.y) / dy; if (t < 0 || t < rc.near || t > rc.far) return;
+    const x = r.origin.x + r.direction.x * t, z = r.origin.z + r.direction.z * t; if (Math.abs(x) > 8000 || Math.abs(z) > 8000 || inHole(x, z)) return;
+    out.push({ distance: t, point: new T.Vector3(x, this.position.y, z), object: this, face: { a: 0, b: 0, c: 0, normal: new T.Vector3(0, 0, 1), materialIndex: 0 }, faceIndex: 0, uv: new T.Vector2(x, -z) });
+  };
+}
+// the other big ground planes get cells of ~30 m too (a 300 m dirt yard was two triangles)
+const GSEG = len => Math.max(1, Math.min(48, Math.ceil(len / 30)));
 function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are already in meters (shapes/extrusions); else a box face of w x d meters
   const t = groundTex(kind).clone(); t.needsUpdate = true; if (worldUV) t.repeat.set(1 / 8, 1 / 8); else t.repeat.set(w / 8, d / 8);
   // Layering: grass is the base plane at y 0 (see GLAYER above for the rest) and the layers are separated with polygon
@@ -5705,7 +5820,7 @@ function loadCoolingTower() {
     mergeModel(root, true, o => { for (const f of TOWER.fans) { let q = o; while (q) { if (q === f) return true; q = q.parent; } } return false; });
     const bb = new T.Box3().setFromObject(g);                                   // the placed footprint, in world space
     const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, cz = (bb.min.z + bb.max.z) / 2;
-    add(new T.PlaneGeometry(w + 3, d + 3).rotateX(-Math.PI / 2), groundMat('asphalt', false, w + 3, d + 3), TOWER.x, GY('asphalt'), cz);   // hardstand
+    add(new T.PlaneGeometry(w + 3, d + 3, GSEG(w + 3), GSEG(d + 3)).rotateX(-Math.PI / 2), groundMat('asphalt', false, w + 3, d + 3), TOWER.x, GY('asphalt'), cz);   // hardstand
     for (const s2 of [-1, 1]) box(w + 3, 0.18, 0.35, mat(0xb5b0a6), TOWER.x, 0.09, cz + s2 * (d / 2 + 1.5));                        // curbs
     nameplate('COOLING TOWER|CELLS 1-4', TOWER.x, bb.max.y * 0.62, bb.min.z - 0.5, 0.2, 0, -1, 1.6);
     wallSegs.push([bb.min.x, bb.min.z, bb.max.x, bb.min.z], [bb.min.x, bb.max.z, bb.max.x, bb.max.z],
@@ -6015,12 +6130,12 @@ function init(container) {
 
   // ground and section pads
   { // ground reaches the horizon (fog blends it into the sky); two square holes where the retention ponds are dug in
-    const g = new T.Shape([new T.Vector2(-8000, -8000), new T.Vector2(8000, -8000), new T.Vector2(8000, 8000), new T.Vector2(-8000, 8000)]);
+    const holes = [];   // in the shape's own plane: (x, -z)
     const c = Math.cos(PONDS.phi), sn = Math.sin(PONDS.phi), H = PONDS.hole;
-    for (const [px, pz] of PONDS) g.holes.push(new T.Path([[-H, -H], [-H, H], [H, H], [H, -H]].map(([lx, lz]) => new T.Vector2(px + lx * c + lz * sn, -(pz - lx * sn + lz * c)))));
-    { const P = TPIT; g.holes.push(new T.Path([[P.x0, P.z0], [P.x0, P.z1], [P.x1, P.z1], [P.x1, P.z0]].map(([a, b]) => new T.Vector2(a, -b)))); }
-    for (const [x, z, w, d] of [...RPITS, RSTAIR]) { const X = x + GDX, Z = z + GDZ; g.holes.push(new T.Path([[X - w / 2, Z - d / 2], [X - w / 2, Z + d / 2], [X + w / 2, Z + d / 2], [X + w / 2, Z - d / 2]].map(([a, b]) => new T.Vector2(a, -b)))); }   // receiving pits go down to the basement
-    add(new T.ShapeGeometry(g), groundMat('grass', true), 0, 0, 0, null, true).rotation.x = -Math.PI / 2;
+    for (const [px, pz] of PONDS) holes.push([[-H, -H], [-H, H], [H, H], [H, -H]].map(([lx, lz]) => new T.Vector2(px + lx * c + lz * sn, -(pz - lx * sn + lz * c))));
+    { const P = TPIT; holes.push([[P.x0, P.z0], [P.x0, P.z1], [P.x1, P.z1], [P.x1, P.z0]].map(([a, b]) => new T.Vector2(a, -b))); }
+    for (const [x, z, w, d] of [...RPITS, RSTAIR]) { const X = x + GDX, Z = z + GDZ; holes.push([[X - w / 2, Z - d / 2], [X - w / 2, Z + d / 2], [X + w / 2, Z + d / 2], [X + w / 2, Z - d / 2]].map(([a, b]) => new T.Vector2(a, -b))); }   // receiving pits go down to the basement
+    const gp = add(grassGeometry(holes), groundMat('grass', true), 0, 0, 0, null, true); gp.rotation.x = -Math.PI / 2; grassRaycast(gp, holes);   // (v1.97.158: a grid, not 16 km slivers)
   }
   scene.children[scene.children.length - 1].receiveShadow = true;
   // These pads are plain shared materials with no polygon offset of their own, and a plane that close to the grass
@@ -6032,7 +6147,7 @@ function init(container) {
   const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; m.userData.ground = 'pad'; return m; };
   const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, GY('pad'), z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
-  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'), (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
+  { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD, GSEG(EXR - WXR), GSEG(SZR - NROAD)).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'), (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
   { const P = TPIT, p = add(holeySlab(TFX - TFW / 2, TFZ - TFD / 2, TFX + TFW / 2, TFZ + TFD / 2, GY('dirt'), [[(P.x0 + P.x1) / 2, (P.z0 + P.z1) / 2, P.x1 - P.x0, P.z1 - P.z0]]), groundMat('dirt', true), 0, 0, 0, null); p.castShadow = false; p.receiveShadow = true;
     // the pit itself: four sloped sides and a flat bottom, one mesh; walkable (ramps), and the ground over it is cut away
     const r = P.run, D = -P.d, O = [[P.x0, P.z0], [P.x1, P.z0], [P.x1, P.z1], [P.x0, P.z1]], I = [[P.x0 + r, P.z0 + r], [P.x1 - r, P.z0 + r], [P.x1 - r, P.z1 - r], [P.x0 + r, P.z1 - r]];
@@ -6065,7 +6180,7 @@ function init(container) {
     const asphalt = mat(0x50555c), dash = markMat(0xffffff), RW = 8, RC = 12, SRW = 10.7;
     const rd = (x0, z0, x1, z1, W = RW, kind = 'asphalt') => {
       const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-      const rw = alongX ? len : W, rd2 = alongX ? W : len, r = add(new T.PlaneGeometry(rw, rd2).rotateX(-Math.PI / 2), groundMat(kind, false, rw, rd2), (x0 + x1) / 2, GY(kind), (z0 + z1) / 2, null); r.castShadow = false;
+      const rw = alongX ? len : W, rd2 = alongX ? W : len, r = add(new T.PlaneGeometry(rw, rd2, GSEG(rw), GSEG(rd2)).rotateX(-Math.PI / 2), groundMat(kind, false, rw, rd2), (x0 + x1) / 2, GY(kind), (z0 + z1) / 2, null); r.castShadow = false;
       if (kind === 'asphalt') for (let t = 6; t < len - 6; t += 8) add(new T.PlaneGeometry(alongX ? 4 : 0.25, alongX ? 0.25 : 4).rotateX(-Math.PI / 2), dash, alongX ? Math.min(x0, x1) + t : x0, GY('paint'), alongX ? z0 : Math.min(z0, z1) + t, null, true);
     };
     rd(-235, NROAD, 245, NROAD);                              // north road, continuing east out the NE entrance (west end meets the grain yard roads)
@@ -6075,7 +6190,7 @@ function init(container) {
     // cross road: pavement, not gravel. It was a dirt road ('dirtroad') because the satellite shows loose surface there,
     // but the stretch between the process building and the energy center is the plant's service yard and it read as one
     // brown smear; every other road on the site is asphalt, so this one matches them (owner, v1.97.90).
-    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6).rotateX(-Math.PI / 2), groundMat('asphalt', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('asphalt'), CZR, null); r.castShadow = false; }
+    { const r = add(new T.PlaneGeometry(EXR - MXR, 7.6, GSEG(EXR - MXR), GSEG(7.6)).rotateX(-Math.PI / 2), groundMat('asphalt', false, EXR - MXR, 7.6), (MXR + EXR) / 2, GY('asphalt'), CZR, null); r.castShadow = false; }
     // the two bare-dirt strips left in that yard, paved: the road crosses the gap at CZR +/- 3.8, so these aprons stop
     // exactly at its edges. North one runs from the distillation pad's south curb (z 58.8, its 0.35 m curb included) to
     // the road; south one is the apron along the energy center's north wall (z 73, its roll-up door is at x -29.7).
@@ -6155,9 +6270,9 @@ function init(container) {
     for (const x of [-186, -178]) for (let z = NROAD + 6; z < SZR - 4; z += 5) if (Math.abs(z) > 4) add(new T.PlaneGeometry(0.3, 2.4).rotateX(-Math.PI / 2), markMat(0xffffff), x, GY('paint'), z, null, true);
   }
   // access roads: full trucks arrive from the east on the north road, empties leave south onto the main road
-  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.PlaneGeometry(18, z1 - z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 18, z1 - z0), -182, GY('asphalt'), (z0 + z1) / 2, null); r.castShadow = false; }
+  for (const [z0, z1] of [[NROAD - 4 - GDZ, -12], [12, SZR + 4 - GDZ]]) { const r = add(new T.PlaneGeometry(18, z1 - z0, GSEG(18), GSEG(z1 - z0)).rotateX(-Math.PI / 2), groundMat('asphalt', false, 18, z1 - z0), -182, GY('asphalt'), (z0 + z1) / 2, null); r.castShadow = false; }
   // north-south bypass road between the receiving elevators and the silos, so traffic can go around Pit 1 and Pit 2
-  { const r = add(new T.PlaneGeometry(8, SZR - NROAD).rotateX(-Math.PI / 2), groundMat('asphalt', false, 8, SZR - NROAD), WXR - GDX, GY('asphalt'), (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
+  { const r = add(new T.PlaneGeometry(8, SZR - NROAD, GSEG(8), GSEG(SZR - NROAD)).rotateX(-Math.PI / 2), groundMat('asphalt', false, 8, SZR - NROAD), WXR - GDX, GY('asphalt'), (SZR + NROAD) / 2 - GDZ, null); r.castShadow = false; }
   for (let z = NROAD + 6; z < SZR - 6; z += 6) add(new T.PlaneGeometry(0.3, 3).rotateX(-Math.PI / 2), markMat(0xffd84d), WXR - GDX, GY('paint'), z - GDZ, null, true);
 
   // bucket elevators: pit -> boot (in-floor drag conveyor) -> up the leg -> shared distributor head -> spout to Silo 1 or Silo 2
@@ -7419,7 +7534,7 @@ function init(container) {
   // unisex restroom, safety office, computer-training room. West end: open area with snack + soda machines and the glass entrance
   // doors facing west, with steps and a wheelchair ramp.
   {
-    const ew = 245 - (EXR - 4), er = add(new T.PlaneGeometry(ew, 8).rotateX(-Math.PI / 2), groundMat('asphalt', false, ew, 8), (245 + EXR - 4) / 2, GY('asphalt'), SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
+    const ew = 245 - (EXR - 4), er = add(new T.PlaneGeometry(ew, 8, GSEG(ew), GSEG(8)).rotateX(-Math.PI / 2), groundMat('asphalt', false, ew, 8), (245 + EXR - 4) / 2, GY('asphalt'), SCZ_OUT, null); er.castShadow = false;   // exit road, east road -> out
     for (let x = EXR + 8; x < 240; x += 10) add(new T.PlaneGeometry(3, 0.25).rotateX(-Math.PI / 2), markMat(0xffffff), x, GY('paint'), SCZ_OUT, null, true);                       // dashes
     for (const [x, z] of [[SCXI, SCZ_IN], [SCXO, SCZ_OUT_L]]) {   // each scale in the lane right beside the scale house, so the driver's window lines up with the drive-through window
       box(21.3, 0.08, 3.6, mat(0x7d838a), x, 0.04, z);                                                                 // 70 ft truck scale deck
@@ -7679,10 +7794,10 @@ function init(container) {
   // and from the east road (west side); curb all around, rows of painted stalls with drive aisles between them.
   {
     const X0 = 54 + SH_DX, X1 = 114 + SH_DX, Z0 = SCZ_OUT + 5, Z1 = -48, asph = mat(0x50555c), curb = mat(0xb5b0a6);
-    const lot = add(new T.PlaneGeometry(X1 - X0, Z1 - Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X1 - X0, Z1 - Z0), (X0 + X1) / 2, GY('asphalt'), (Z0 + Z1) / 2, null); lot.castShadow = false;
+    const lot = add(new T.PlaneGeometry(X1 - X0, Z1 - Z0, GSEG(X1 - X0), GSEG(Z1 - Z0)).rotateX(-Math.PI / 2), groundMat('asphalt', false, X1 - X0, Z1 - Z0), (X0 + X1) / 2, GY('asphalt'), (Z0 + Z1) / 2, null); lot.castShadow = false;
     const AX0 = 56 + SH_DX, AX1 = 63 + SH_DX, BZ0 = -66.3, BZ1 = -59.7;                                                      // driveway openings
-    const drA = add(new T.PlaneGeometry(AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2).rotateX(-Math.PI / 2), groundMat('asphalt', false, AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2), (AX0 + AX1) / 2, GY('asphalt'), (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
-    const drB = add(new T.PlaneGeometry(X0 - (EXR + 4) + 0.2, BZ1 - BZ0).rotateX(-Math.PI / 2), groundMat('asphalt', false, X0 - (EXR + 4) + 0.2, BZ1 - BZ0), (X0 + EXR + 4) / 2, GY('asphalt'), (BZ0 + BZ1) / 2, null); drB.castShadow = false;
+    const drA = add(new T.PlaneGeometry(AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2, GSEG(AX1 - AX0), GSEG(Z0 - (SCZ_OUT + 4) + 0.2)).rotateX(-Math.PI / 2), groundMat('asphalt', false, AX1 - AX0, Z0 - (SCZ_OUT + 4) + 0.2), (AX0 + AX1) / 2, GY('asphalt'), (Z0 + SCZ_OUT + 4) / 2, null); drA.castShadow = false;
+    const drB = add(new T.PlaneGeometry(X0 - (EXR + 4) + 0.2, BZ1 - BZ0, GSEG(X0 - (EXR + 4) + 0.2), GSEG(BZ1 - BZ0)).rotateX(-Math.PI / 2), groundMat('asphalt', false, X0 - (EXR + 4) + 0.2, BZ1 - BZ0), (X0 + EXR + 4) / 2, GY('asphalt'), (BZ0 + BZ1) / 2, null); drB.castShadow = false;
     const cb = (x0, z0, x1, z1) => { if (Math.abs(x1 - x0) > 0.01 || Math.abs(z1 - z0) > 0.01) box(Math.max(0.3, Math.abs(x1 - x0)), 0.1, Math.max(0.3, Math.abs(z1 - z0)), curb, (x0 + x1) / 2, 0.05, (z0 + z1) / 2); };
     cb(X0, Z0, AX0, Z0); cb(AX1, Z0, X1, Z0);                // north curb, gap for driveway A
     cb(X0, Z0, X0, BZ0); cb(X0, BZ1, X0, Z1);                // west curb, gap for driveway B
@@ -8268,7 +8383,7 @@ function init(container) {
   {
     const asph = mat(0x50555c), wht = markMat(0xffffff), ylw = markMat(0xffd84d);
     // Road P: a plain two-lane county road, two 12 ft lanes (7.3 m), no center line
-    const rp = add(new T.PlaneGeometry(7.3, RDP_Z1 - RDP_Z0).rotateX(-Math.PI / 2), groundMat('asphalt', false, 7.3, RDP_Z1 - RDP_Z0), RDPX, GY('asphalt'), (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
+    const rp = add(new T.PlaneGeometry(7.3, RDP_Z1 - RDP_Z0, GSEG(7.3), GSEG(RDP_Z1 - RDP_Z0)).rotateX(-Math.PI / 2), groundMat('asphalt', false, 7.3, RDP_Z1 - RDP_Z0), RDPX, GY('asphalt'), (RDP_Z0 + RDP_Z1) / 2, null); rp.castShadow = false;
     buildRail(); buildUTV();
     // divided highway built to real dimensions: per direction two 12 ft (3.66 m) lanes, a 4 ft inside shoulder and a 10 ft outside
     // shoulder; yellow edge line on the inside, white edge line outside, white 10 ft dashes every 40 ft between the lanes; grass median
@@ -8354,7 +8469,7 @@ function init(container) {
   // turned to face north, reached by the Ranger's dirt tracks. Its MAIN BREAKER is the master reset for a power outage.
   {
     for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w);
-    add(new T.PlaneGeometry(22, 16).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, GY('dirtroad'), 545);   // forecourt / turnaround
+    add(new T.PlaneGeometry(22, 16, GSEG(22), GSEG(16)).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, GY('dirtroad'), 545);   // forecourt / turnaround
     loadSubstation();
   }
 
@@ -13463,7 +13578,8 @@ const creepGuest = () => !!(NET.conn && NET.conn.open && !NET.host);
 const CREEP_ST = ['roam', 'stalk', 'hunt', 'lure', 'eat', 'return', 'dead', 'flee'], CREEP_PH = ['stalkers', 'boss-wait', 'boss', 'quiet'];
 const CREEP_K = {
   stalker: { url: '/corn-souls/assets/models/cob_stalker.glb', body: 'Cob_Body', scale: 0.42, hp: 10, roam: 1.5, run: 5.0, turn: 3.5, aggro: 30, bite: 1.6, biteCd: 1.1, dmg: 1, lure: 70, gait: 7, swing: 0.35, lift: 0.3 },
-  daddy: { url: '/corn-souls/assets/models/daddy_cob_legs.glb', body: 'Daddy_Cob_Torso', scale: 0.4, hp: 60, roam: 1.1, run: 4.2, turn: 1.6, aggro: 48, bite: 4.2, biteCd: 1.6, dmg: 2, lure: 90, gait: 3.2, swing: 0.25, lift: 0.22 },
+  daddy: { url: '/corn-souls/assets/models/daddy_cob_legs.glb', body: 'Daddy_Cob_Torso', scale: 0.4, hp: 30, roam: 1.1, run: 4.2, turn: 1.6, aggro: 48, bite: 4.2, biteCd: 1.6, dmg: 2, lure: 90, gait: 3.2, swing: 0.25, lift: 0.22 },
+  // (v1.97.158, owner: "reduce the health of daddy cob legs" - 60 -> 30, three stalkers' worth)
   // v1.97.121: NIBBLERS (the owner's 20-face sprite set): five burst out of every cob stalker that dies. Little 2D kernels that
   // always face you, hopping after whoever is near (not tied to the field: a 45 m leash round where they came out). Two paint
   // hits, a nibble is half a stalker bite, slower than you so you can outrun them. They burrow away after 3 minutes.

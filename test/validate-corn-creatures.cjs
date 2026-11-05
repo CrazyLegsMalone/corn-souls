@@ -88,7 +88,7 @@ run(4.5); const D = C.list.find(c => c.kind === 'daddy');
 assert.ok(D, '...and Daddy Cob Legs comes'); assert.equal(C.phase, 'boss'); assert.ok(notes.includes('🌽 The corn is shaking...'));
 assert.ok(ctx.inCField(D.x, D.z) && Math.abs(Math.abs(D.x - walk.x) - 30) < 8, 'it climbs out of the corn about 30 m from you along the rows');
 assert.ok(D.rise > 0 && D.g.position.y < -1, 'rising out of the ground');
-assert.equal(D.hp, 60, 'a lot tougher'); assert.equal(D.K.dmg, 2, 'and its bite counts double');
+assert.equal(D.hp, 30, 'tougher than a stalker (v1.97.158: owner asked for less health, 60 -> 30)'); assert.equal(D.K.dmg, 2, 'and its bite counts double');
 assert.equal(shoot(D), false, 'cannot be hurt while it climbs out');
 run(3.5); assert.equal(D.rise, 0, 'out'); assert.ok(D.g.position.y > -0.01, 'standing on the ground');
 // dead stalkers flip over and are cleared away after half a minute

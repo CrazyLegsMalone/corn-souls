@@ -43,6 +43,14 @@ const css = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).joi
 const classes = new Set([...mk.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/)));
 const clash = [...classes].filter(c => new RegExp('(^|[},])\\s*\\.' + c + '(?![-\\w])[^{]*\\{', 'm').test(css));
 assert.deepEqual(clash, [], 'splash classes with a global game style: ' + clash.join(', '));
+// v1.97.158, owner: "remove no kernel left unburnt from start menu, make version on start menu 10% bigger. add the crt shader and
+// pixel effect from the bonfire onto the title and cry and dry"
+assert.ok(!html.includes('NO KERNEL LEFT UNBURNT') && !mk.includes('class="foot"') && !css0.includes('#splash .foot'), 'no "No kernel left unburnt" footer');
+assert.ok(css0.includes("#splash .sv{position:absolute;bottom:22px;right:3vw;font:12.1px 'Cinzel'"), 'the version 10% bigger (11px -> 12.1px)');
+assert.ok(mk.includes('<div class="crt"><div class="lean"></div><div class="vig"></div><canvas id="spTxt"></canvas><div class="roll"></div><div class="lines"></div></div>'), 'the title text layer sits in the CRT stack: over the darkening, under the rolling band and the scan lines');
+assert.ok(css0.includes('#splash canvas#spTxt{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated') && css0.includes('#splash.pxt h1,#splash.pxt .sub{opacity:0}'), 'drawn back up with hard pixels; the page text hidden (still there for screen readers) once it is drawn');
+assert.ok(js.includes("var k = innerWidth < 720 ? 2.5 : 3.2,") && js.includes("function pixK() { return TS.pixel ? (innerWidth < 720 ? 2.5 : 3.2) : 1; }"), 'the same pixel size as the bonfire');
+assert.ok(js.includes("var c = document.getElementById('spTxt'), g = c && c.getContext && c.getContext('2d'), h1 = sp.querySelector('h1'), sub = sp.querySelector('.sub')") && js.includes('function tick() { if (!live) return;') && js.includes("catch (e) { sp.classList.remove('pxt'); return; }"), 'CORN SOULS and Cry & Dry, redrawn while the title is up; a failure leaves the page text showing');
 // the fonts, with a fallback offline
 assert.ok(html.includes('family=Cinzel') && /'Cinzel',Georgia/.test(css), 'Cinzel / Cormorant Garamond with Georgia fallback');
-console.log('PASS: Cry & Dry title screen (Solo Harvest / Host Multiplayer / Join Multiplayer on the real actions; the owner\'s settings fixed, tuner gone; magenta-pink title; 3D bonfire torn down with the splash; no class clashes)');
+console.log('PASS: Cry & Dry title screen (pixel + CRT title, no footer, bigger version; Solo Harvest / Host Multiplayer / Join Multiplayer on the real actions; the owner\'s settings fixed, tuner gone; magenta-pink title; 3D bonfire torn down with the splash; no class clashes)');
