@@ -5635,10 +5635,13 @@ function characterRig(av, opt) {
 // the NPC's old shirt colour, and the two women keep their old hair colours, so Brenda and Tammy are not twins.
 // (The old rigid rigs stay in the repo - the players still wear operator_vern_rig.glb.)
 const NPC_MALE = '/corn-souls/assets/models/low_poly_male_loves_art.glb', NPC_FEMALE = '/corn-souls/assets/models/low_poly_female_loves_art.glb';
+const NPC_BRENDA = '/corn-souls/assets/models/brenda_2_0.glb';   // v1.97.180: the owner's Crew Wardrobe build of her (Loves_Art female, CC BY 4.0, recoloured + accessorised)
 const NPC_MODELS = {
   vern:   { url: NPC_MALE, skin: true, h: 1.78, pose: 'stand', x: -232, colors: { clothing: 0x665e48 } },   // off the loop track (it runs at x -240)
   op:     { url: NPC_MALE, skin: true, h: 1.78, pose: 'sit', colors: { clothing: 0x3b6fb0 } },          // Rick, the board operator
-  brenda: { url: NPC_FEMALE, skin: true, h: 1.65, pose: 'sit', colors: { clothing: 0x8a5a9e, hair: 0x5a3a22 } },
+  // Brenda wears her own wardrobe build (v1.97.180): the model already carries her colours, glasses, hair and jewellery, so
+  // there is no `colors` entry to repaint her with (her material names are top / bottom / hair / skin / shoes ... now).
+  brenda: { url: NPC_BRENDA, skin: true, h: 1.65, pose: 'sit' },
   tammy:  { url: NPC_FEMALE, skin: true, h: 1.65, pose: 'sit', colors: { clothing: 0x4f8f5a, hair: 0xc9a25a } }
 };
 function loadCharacter(id, cfg) {
