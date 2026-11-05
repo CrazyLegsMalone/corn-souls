@@ -1,3 +1,22 @@
+## TEST v1.97.169 — headlights on whatever you drive (2026-11-04)
+- Owner: *"vehicles should have headlights when driving them especially after dark"*.
+- **A second spot in the lighting pass** (`csHl0/1/2`, beside the walker's headlamp `csFl*`), fed every frame by `vehLights`:
+  - from the nose of whatever you're driving (the Ranger, any car, the zero-turn mower), along its heading and a little down;
+  - 0.42 rad cone, 75 m reach;
+  - fades in when you get in, out when you get out (not for a dead driver).
+  - Battery/engine power like the headlamp: an outage doesn't touch it, a flicker event close by makes it stutter.
+- **Lighting the road ahead:** from 0.9 m up, the road ahead is lit at a grazing angle of a few degrees, and plain Lambert shading left it black past ~10 m.
+  - The beam gives faces turned toward it a floor (30%), so the road lights up into the distance; faces turned away get nothing.
+  - A `+25` in the falloff keeps it from whiting out at the bumper.
+- Checked in the running game at 11 PM in the Ranger: a cone of light down the yard ahead with the lights on, nothing with them off.
+- New `validate-headlights.cjs` checks:
+  - on foot, nothing;
+  - the Ranger's beam at its nose, along and turning with its heading;
+  - a car's nose, the mower's own heading;
+  - the fade in and out, the flicker stutter;
+  - the shader block and the frame hook.
+- Bumped TEST to `1.97.169` / `corn-souls-test-shell-v196`.
+
 ## TEST v1.97.168 — no pigeon coos through the roof (2026-11-04)
 - Owner: *"shouldnt be able to hear the pigeons on the roof from inside the building"*.
 - The coo only knew distance (35 m), so a pigeon on the roof right over your head was the loudest thing in the room.
