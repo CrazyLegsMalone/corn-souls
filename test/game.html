@@ -9946,6 +9946,9 @@ const CSU = {
   csHl0: { value: new T.Vector4(0, 0, 0, 75) },   // v1.97.169: the headlights of what you drive, camera space: position, reach
   csHl1: { value: new T.Vector4(0, 0, -1, Math.cos(0.42)) },   //   aim, outer cone
   csHl2: { value: new T.Vector4(0, 0, 0, Math.cos(0.22)) },   //   colour x intensity (0 = off), inner cone
+  csHl3: { value: new T.Vector4(0, 0, 0, 75) },   // v1.97.178: the OTHER player's headlights, the same three vectors again
+  csHl4: { value: new T.Vector4(0, 0, -1, Math.cos(0.42)) },   //   position, reach / aim, outer cone / colour x intensity, inner
+  csHl5: { value: new T.Vector4(0, 0, 0, Math.cos(0.22)) },
   csG: { value: new T.Vector4(0, 0, 0, 0) },        // rooms in use, outdoor lamps in use, -, 1 = bypass (the first-person HUD pass)
   csG2: { value: new T.Vector4(0.05, 0, 1, 0.03) }, // indoor daylight trickle, free-camera lift, global darkness, brightness floor
   csFillC: { value: new T.Color(1, 0.93, 0.82) }
@@ -9956,7 +9959,7 @@ const CS_PARS = `
 #define CS_NL ${CS_N.L}
 uniform vec4 csU; uniform vec4 csBoxA[CS_NB]; uniform vec4 csBoxB[CS_NB]; uniform vec4 csWin[CS_NW];
 uniform vec4 csLampP[CS_NL]; uniform vec4 csLampC[CS_NL];
-uniform vec4 csFl0; uniform vec4 csFl1; uniform vec4 csFl2; uniform vec4 csHl0; uniform vec4 csHl1; uniform vec4 csHl2; uniform vec4 csG; uniform vec4 csG2; uniform vec3 csFillC;
+uniform vec4 csFl0; uniform vec4 csFl1; uniform vec4 csFl2; uniform vec4 csHl0; uniform vec4 csHl1; uniform vec4 csHl2; uniform vec4 csHl3; uniform vec4 csHl4; uniform vec4 csHl5; uniform vec4 csG; uniform vec4 csG2; uniform vec3 csFillC;
 float csLight(vec3 pV, vec3 nV, out vec3 irr) {
   irr = vec3(0.0);
   if (csG.w > 0.5) return 1.0;
@@ -10020,6 +10023,13 @@ float csLight(vec3 pV, vec3 nV, out vec3 irr) {
     if (s > 0.0) { float q = d / csHl0.w; q = max(1.0 - q * q * q * q, 0.0);
       float nl = hasN ? dot(nV, l) : 1.0, w = nl > -0.05 ? 0.3 + 0.7 * max(nl, 0.0) : 0.0;   // (a floor: from 0.9 m up the road ahead is lit at a few degrees, and plain Lambert left it black past 10 m)
       irr += csHl2.rgb * (s * q * q / (d * d + 25.0) * w); }   // (+25: shaped like a headlight, not a bulb - no white-out at the bumper)
+  }
+  if (csHl5.r + csHl5.g > 0.0) {   // v1.97.178: the other player's headlights - the same beam, its own three vectors
+    vec3 L = csHl3.xyz - pV; float d = length(L); vec3 l = L / max(d, 1e-3);
+    float s = smoothstep(csHl4.w, csHl5.w, dot(-l, csHl4.xyz));
+    if (s > 0.0) { float q = d / csHl3.w; q = max(1.0 - q * q * q * q, 0.0);
+      float nl = hasN ? dot(nV, l) : 1.0, w = nl > -0.05 ? 0.3 + 0.7 * max(nl, 0.0) : 0.0;
+      irr += csHl5.rgb * (s * q * q / (d * d + 25.0) * w); }
   }
   return k;
 }
@@ -10214,6 +10224,7 @@ function evLevel(L, x, z, t) {   // what the timed events and a tired ballast do
 // a second spot in the lighting pass (csHl*, beside the headlamp's csFl*). On while you drive, faded in and out; like the headlamp
 // it is battery/engine power, so an outage doesn't touch it, but a flicker event close by makes it stutter.
 const VEHL = { k: 0, col: new T.Color(0xfff4e0), I: 600 };
+const VEHLr = { k: 0 };   // v1.97.178: the other player's beam, faded the same way
 const _vhp = new T.Vector3(), _vhd = new T.Vector3();
 function vehLightSource() {   // [x, y, z, forward x, forward z, nose distance, lamp height] of what you are driving, or null
   if (!walk.on || walk.dead) return null;
@@ -10229,6 +10240,31 @@ function vehLights(U, dt) {
   _vhd.set(S[3], -0.06, S[4]).normalize().transformDirection(V);
   U.csHl0.value.set(_vhp.x, _vhp.y, _vhp.z, U.csHl0.value.w); U.csHl1.value.set(_vhd.x, _vhd.y, _vhd.z, U.csHl1.value.w);
   const k = VEHL.I * VEHL.k * (LIGHT.flK || 1); U.csHl2.value.set(VEHL.col.r * k, VEHL.col.g * k, VEHL.col.b * k, U.csHl2.value.w);
+}
+// v1.97.178, owner: "sync headlights and pigeon coos" - the OTHER player's headlights, so their car lights the road on your screen
+// too. Nothing new goes over the wire: their pose is already sent (m.u for their Ranger, m.car for the car they got into), so this
+// only reads it. In solo NET.rp is null and the three uniforms stay 0, which the shader skips for free.
+const VEHL_SEE = 120;   // metres: past this the beam is not worth lighting the far side of the plant for
+const _vhp2 = new T.Vector3(), _vhd2 = new T.Vector3();
+function vehLightSourceRemote() {   // [x, y, z, forward x, forward z, nose distance, lamp height] of their vehicle, or null
+  if (typeof NET === 'undefined' || !NET.rp || !NET.rp.drive) return null;
+  const R = NET.rp;
+  if (R.car && O.cars) {   // they got into one of the drivable cars (the car's own group is where it actually is)
+    const c = O.cars[R.car[0]], g = c && c.g; if (g) { const a = g.rotation.y; return [g.position.x, g.position.y, g.position.z, -Math.sin(a), -Math.cos(a), 2.5, 0.75]; }
+  }
+  const Q = NET.rr; if (Q && Q.g) return [Q.x, Q.y, Q.z, -Math.sin(Q.a), -Math.cos(Q.a), 1.6, 0.9];   // their Ranger
+  return null;
+}
+function vehLightsRemote(U, dt) {
+  const S = vehLightSourceRemote(); VEHLr.k += ((S ? 1 : 0) - VEHLr.k) * Math.min(1, (dt || 0.016) * 8);
+  if (!S || VEHLr.k < 0.01) { U.csHl5.value.set(0, 0, 0, U.csHl5.value.w); return; }
+  const wx = S[0] + S[3] * S[5], wy = S[1] + S[6], wz = S[2] + S[4] * S[5];
+  if (Math.hypot(wx - camera.position.x, wy - camera.position.y, wz - camera.position.z) > VEHL_SEE) { U.csHl5.value.set(0, 0, 0, U.csHl5.value.w); return; }
+  camera.updateMatrixWorld(); const V = camera.matrixWorldInverse;
+  _vhp2.set(wx, wy, wz).applyMatrix4(V);
+  _vhd2.set(S[3], -0.06, S[4]).normalize().transformDirection(V);
+  U.csHl3.value.set(_vhp2.x, _vhp2.y, _vhp2.z, U.csHl3.value.w); U.csHl4.value.set(_vhd2.x, _vhd2.y, _vhd2.z, U.csHl4.value.w);
+  const k = VEHL.I * VEHLr.k * (LIGHT.flK || 1); U.csHl5.value.set(VEHL.col.r * k, VEHL.col.g * k, VEHL.col.b * k, U.csHl5.value.w);
 }
 function lightUpdate(dt) {
   if (!LIGHT.ready) return;
@@ -10325,6 +10361,7 @@ function lightUpdate(dt) {
   if (fl > 0) U.csFl2.value.set(headlamp.color.r * fk, headlamp.color.g * fk, headlamp.color.b * fk, U.csFl2.value.w);
   else U.csFl2.value.set(0, 0, 0, U.csFl2.value.w);
   vehLights(U, dt);   // v1.97.169
+  vehLightsRemote(U, dt);   // v1.97.178: and the other player's, when they are driving
   U.csG.value.set(R.length, nOut, 0, 0);
   const dk = (1 - 0.9 * dark) * (1 - 0.9 * dark);   // squared: light is linear, the eye is not
   U.csG2.value.set(LIGHT.indoor, walk.on ? 0 : out ? 0.25 : 0.6, dk, LIGHT.minK);
@@ -14454,9 +14491,19 @@ function rainSound() {
   if (!rsnd.g) { const s = C.createBufferSource(), f = C.createBiquadFilter(), g = C.createGain(); s.buffer = noiseBuf(C, 2); s.loop = true; f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = 0.5; g.gain.value = 0; s.connect(f); f.connect(g); g.connect(C.destination); s.start(); rsnd.g = g; }
   const want = weather.kind === 'rain' ? 0.12 : 0; if (rsnd.want !== want) { rsnd.want = want; rsnd.g.gain.setTargetAtTime(want, C.currentTime, 1.0); }
 }
+function birdCooTick(dt) {   // v1.97.178, owner: "sync headlights and pigeon coos" - the guest hears the host's pigeons. Same coo
+  // timer and the same pigeonCoo (so the v1.97.168 "not through the roof" rule comes with it), on the mirrored positions, and
+  // nothing else: no flight, no perching, no scaring. The host still runs the birds.
+  if (!birds) return;
+  for (const b of birds) {
+    if (b.state !== 'perch' || !b.g.visible) { b.cooT = null; continue; }
+    b.cooT = (b.cooT == null ? Math.random() * 6 : b.cooT) - dt;
+    if (b.cooT <= 0) { b.cooT = 4 + Math.random() * 6; const d = camera.position.distanceTo(b.g.position); if (d < 35) pigeonCoo(Math.min(1, 6 / (d + 2)), b.g.position); }
+  }
+}
 function updateBirds(dt) {
   if (!birds) { buildPerches(); birds = Array.from({ length: 10 }, () => { const b = makeBird(); perchAt(b, farPerch(null, 25)); return b; }); }
-  if (critNetGuest()) return;   // 2 player: the host's pigeons
+  if (critNetGuest()) { birdCooTick(dt); return; }   // 2 player: the host's pigeons - the guest only hears them (v1.97.178)
   for (const b of birds) {
     const g = b.g;
     if (b.state === 'perch') {

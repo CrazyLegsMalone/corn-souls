@@ -1,3 +1,17 @@
+## TEST v1.97.178 — the other player's headlights, and the guest hears the pigeons (2026-11-04)
+- Owner: *"sync headlights and pigeon coos"* — two of the four "unsynced niceties" left on the `HANDOFF_CLINE.md` §7 list.
+- **Nothing new goes over the wire.** The other player's vehicle pose is already sent every frame (`m.u` for their Ranger, `m.car` for the car they got into, `m.d` for "driving"), and the pigeons are already mirrored by the `crs` snapshot. Both changes only read what was arriving all along, so there is no extra traffic and no new failure mode.
+- **Headlights:** your beam is a spot in the lighting pass (`csHl0/1/2`, v1.97.169). The other player's is now a **second one** of its own (`csHl3/4/5`), fed by `vehLightSourceRemote()`:
+  - their **Ranger** at 1.6 m nose / 0.9 m lamps, or their **car** at 2.5 m / 0.75 m, read from the car's own group so it is wherever the car actually is;
+  - aimed along their heading, a little down, the same cone and the same `+25` shaping so it does not white out at their bumper;
+  - faded in and out on its own timer (`VEHLr.k`), stutters with a nearby flicker, lit in a power outage (engine, not grid);
+  - **dropped past 120 m** (`VEHL_SEE`) so the far side of the plant is not lit for nothing, and in solo `NET.rp` is null so the uniforms stay 0 and the shader skips the block.
+  - Two beams can light the same road at once; neither side draws its own beam twice (each side only ever reads the *other* player).
+- **Pigeon coos:** the guest's `updateBirds` used to return before the coo timer, so a guest heard nothing. It now runs `birdCooTick(dt)` — the same per-bird coo timer, the same `pigeonCoo()` (so **v1.97.168's "not through the roof" rule comes with it**) and the same volume curve, **on the mirrored perches only**. It moves nothing: no flight, no perching, no scaring — the host still owns the birds.
+- Tests: `validate-headlights.cjs` now runs `vehLightsRemote` with real three.js: no source in solo and nothing sent to the shader, their Ranger's nose at (10, 0.9, -21.6) heading -z, their car's nose from the car group, the beam turning with the car, a flicker stuttering it, **both beams on at once**, dropped at 590 m, off when they get out, and the shader's new uniforms + block. `validate-critter-sync.cjs` pins the guest branch and the coo ticker (no `flyTo`, no `perchAt`, no idle). Both fail on the previous revision (the critter one on a pinned string, the headlights one on `ReferenceError: vehLightsRemote is not defined`).
+- Verified locally: the 57 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.178` / `corn-souls-test-shell-v205`.
+
 ## TEST v1.97.177 — the NPCs wear Loves_Art's Low Poly Male / Female (2026-11-04)
 - Owner: *"lets tryt he models as is at first"*, then picked **the NPCs** (not the players) to wear them first.
 - **Vern** (standing, by the loop track) and **Rick** (seated, control room) wear **Low Poly Male**; **Brenda** and **Tammy** (seated, scale house) wear **Low Poly Female** - both by Loves_Art on Sketchfab, **CC BY 4.0**, now `in-use` in `assets/registry.json` and credited in `CREDITS.md` (`credits.html` reads the registry). The GLBs are stored byte-for-byte as `assets/models/low_poly_male_loves_art.glb` / `low_poly_female_loves_art.glb`.

@@ -83,7 +83,13 @@ G.critterEat(); step(1.5); assert.equal(H.pondFrogs[0].eaten, true); assert.equa
 H.birds[1].state = 'fly'; step(0.4); G.NET.conn = null; G.critNetDrop(); assert.ok(G.birds[1].from, 'a flying mirror gets a flight of its own');
 
 // wiring
-assert.ok(html.includes("  if (critNetGuest()) return;   // 2 player: the host's pigeons") && html.includes("  if (critNetGuest()) return;   // 2 player: the host's critters"), 'the guest runs no pigeon or critter AI of its own');
+assert.ok(html.includes("  if (critNetGuest()) { birdCooTick(dt); return; }   // 2 player: the host's pigeons") && html.includes("  if (critNetGuest()) return;   // 2 player: the host's critters"), 'the guest runs no pigeon or critter AI of its own');
+// v1.97.178, owner: "sync headlights and pigeon coos" - the guest does hear the host's pigeons: a coo-only ticker over the
+// mirrored birds, using the same pigeonCoo (which keeps the v1.97.168 "not through the roof" rule) and no AI at all.
+{ const coo = (html.match(/function birdCooTick\(dt\) \{[\s\S]*?\n\}/) || [''])[0];
+  assert.ok(coo.includes('b.state !== ') && coo.includes('pigeonCoo(Math.min(1, 6 / (d + 2)), b.g.position)'), 'the guest coos from the mirrored perches, same volume curve as the host');
+  assert.ok(!coo.includes('flyTo') && !coo.includes('perchAt') && !coo.includes('b.idle'), 'and moves nothing: the host owns the birds');
+  assert.ok(html.indexOf('function birdCooTick') < html.indexOf('function updateBirds(dt)'), 'it sits next to updateBirds'); }
 assert.ok(loader.includes("if(typeof critNetGuest==='function'&&critNetGuest())return;") && loader.includes("if(typeof critNetHit==='function')critNetHit(f,col);"), 'nor frog AI; a guest\'s frog hit goes to the host');
 assert.ok(loader.includes("const frog={group,g:group,"), 'frogs can be picked up (deadNear reads .g)');
 assert.ok(html.includes("stepSafe('eat', () => updateEat(dt));") && html.includes("stepSafe('critNet', () => critNetUpdate(dt));"), 'eating and critter sync run every frame');
