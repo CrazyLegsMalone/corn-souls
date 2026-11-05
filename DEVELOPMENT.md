@@ -1,3 +1,12 @@
+## TEST v1.97.171 — the corn cubes have no green edge outline any more (2026-11-04)
+- Owner: *"remove the green outline from around the corn cubes"*.
+- **What it was:** the corn props come from the launcher's injected corn engine (`cornEngine` in `test/index.html`, not `game.html`). `cornVisual()` put the cube GLB on the prop and then drew a **dark-green box of edges** round it - `new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(.57,.57,.57)), new T.LineBasicMaterial({ color: 0x254b3d }))`, sized to the 0.57 m cube - "reinforced cube edges make this a playful CORN BLOCK". That outline is gone; the cube model itself (and the ear, which never had an outline) is untouched.
+- One less draw call per cube on the ground, and no green lines to see through the corn.
+- Tests: `validate-corn-sync.cjs` (which already runs the launcher's corn engine for both players) now asserts the prop still shows the model and that **no** `EdgesGeometry` / `LineSegments` / `LineBasicMaterial` outline is drawn, and that the cube GLB is still loaded. It fails on the previous revision and passes now.
+- Checked separately that the launcher's injected engine is still **valid JS** after the edit (a stray `"` in an inserted comment broke the double-quoted `cornEngine` string on the first attempt - caught by parsing the launcher's script blocks, not by the suites).
+- Verified locally: the 53 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes. LIVE is untouched.
+- Bumped TEST to `1.97.171` / `corn-souls-test-shell-v198`.
+
 ## TEST v1.97.170 — four lizards instead of one (2026-11-04)
 - Owner: *"havent seen a single lizard"*, then *"increase lizard number to 4"*.
 - **Why he never saw one:** the whole plant had exactly **one** lizard and one rat - `critters = [makeCritter('rat'), makeCritter('lizard')]` is built once and nothing ever adds to it. That one lizard is a **0.30 x 0.11 m sprite** on a wall 0.55-3.35 m up, only in the cook and evap alleys (~2,000 m²), never within 6 m of you, it drops and runs when you come within 4 m, lives 60-150 s and then is gone for 8-43 s.

@@ -86,4 +86,10 @@ assert.ok(loader.includes("const hudVis='  const show = walk.on && !walk.dead &&
   run(); assert.equal(gc2.out[0], true, 'the gun shows normally');
   gc2.heldDead = { nm: 'rat' }; run(); assert.deepEqual(Array.from(gc2.out), [false, false, false], 'carrying a dead rat: no gun in your hands');
   gc2.heldDead = null; run(); assert.equal(gc2.out[0], true, 'put it down (or throw it): the gun is back'); }
-console.log('PASS: 2 player corn ears and cubes (carried along, cannot be grabbed from the other player, land in the same spot, late joiner, older snapshot ignored, falls when the other player leaves, single player silent); the gun is put away while carrying a dead critter');
+// v1.97.171, owner: remove the green outline from around the corn cubes. cornVisual still puts the cube GLB on the prop, and
+// nothing draws an edge box round it any more (the dark-green EdgesGeometry LinesSegments that used to).
+assert.ok(loader.includes('item.g.add(m.clone(true));'), 'the corn cube / ear model is still what the prop shows');
+assert.ok(!loader.includes('EdgesGeometry(') && !/new T\.LineSegments\(/.test(loader) && !loader.includes('LineBasicMaterial'),
+  'no edge outline is drawn around a corn cube any more');
+assert.ok(loader.includes("cornModel('cube','assets/models/corn_cube.glb')"), 'and the cube model is still loaded');
+console.log('PASS: 2 player corn ears and cubes (carried along, cannot be grabbed from the other player, land in the same spot, late joiner, older snapshot ignored, falls when the other player leaves, single player silent), the corn cube has no green edge outline (v1.97.171), and the gun is put away while carrying a dead critter');
