@@ -13698,7 +13698,7 @@ function hitBird(b, c) {
 // After Daddy dies the field stays quiet for 15 minutes, then two new stalkers move in (while you are not in it).
 // The owner's GLBs have no skins: each Leg_Hip_* node swings and lifts on an alternating gait. Local to this device.
 const CFIELD = { x0: -199, x1: 139, z0: NROAD - 97, z1: NROAD - 50 };
-const CREEP = { ready: false, list: [], phase: 'stalkers', t: 0, proto: {}, bites: 0, healT: 0, kills: 0, quiet: 900, nid: 0 };
+const CREEP = { ready: false, list: [], phase: 'stalkers', t: 0, proto: {}, bites: 0, healT: 0, kills: 0, quiet: 900, nid: 0, ngid: 0, ngrp: new Map() };
 // 2 player: the host runs the creatures for both players (targets either of you, bites go to whoever it bit) and sends a
 // snapshot 4x a second in its world state; the guest only mirrors them (no AI of its own) and sends its hits to the host.
 const creepGuest = () => !!(NET.conn && NET.conn.open && !NET.host);
@@ -13878,17 +13878,21 @@ function updateCreeps(dt) {
   if (CREEP.bites > 0 && (CREEP.healT += dt) > 25) { CREEP.bites = Math.max(0, CREEP.bites - 1); CREEP.healT = 0; }   // (nibbles are half bites)
   if (creepGuest()) {   // the host's creatures: glide to where it last said, legs walking at the speed it said
     for (const c of CREEP.list) { const k = Math.min(1, dt * 8); if (c.nx !== undefined) { c.x += (c.nx - c.x) * k; c.z += (c.nz - c.z) * k; c.a += Math.atan2(Math.sin(c.na - c.a), Math.cos(c.na - c.a)) * k; }
-      c.t += dt; c.hurtT = Math.max(0, c.hurtT - dt); c.biteCd = Math.max(0, c.biteCd - dt); c.y = Math.max(0, floorAt(c.x, c.z, 2)); if (c.state === 'dead') c.deadT += dt; else if (c.rise > 0) c.rise = Math.max(0, c.rise - dt / 3.2); if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
+      c.t += dt; c.hurtT = Math.max(0, c.hurtT - dt); c.biteCd = Math.max(0, c.biteCd - dt); c.y = Math.max(0, floorAt(c.x, c.z, 2)); if (c.state === 'dead') c.deadT += dt; else if (c.rise > 0) c.rise = Math.max(0, c.rise - dt / 3.2); if (c.zRise > 0) c.zRise -= dt; if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
       if (walk.drive && utv.g && c.hp > 0 && c.biteCd <= 0) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 5 && dv < c.maxR * 0.55 + 1.2) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY)); } } }   // I drove into one: the host takes the damage
     return;
   }
   for (let i = CREEP.list.length - 1; i >= 0; i--) {
     const c = CREEP.list[i];
-    if (c.state === 'dead') { c.deadT += dt; if (c.deadT > (c.kind === 'nibbler' ? 7 : 30)) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
+    if (c.state === 'dead') { c.deadT += dt;
+      if (c.kind === 'nibbler') { if (c.zWait !== undefined && (c.zWait -= dt) <= 0) nibRevive(c); }   // (dead nibblers stay)
+      else if (c.deadT > 30) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
     else if (c.kind === 'nibbler') { nibAI(c, dt); if (c.gone) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }
     else creepAI(c, dt);
     if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
   }
+  nibGroups(dt);
+  { const dead = CREEP.list.filter(c => c.kind === 'nibbler' && c.state === 'dead' && c.zWait === undefined); if (dead.length > NIB.maxDead) { dead.sort((p, q) => q.deadT - p.deadT); for (const c of dead.slice(0, dead.length - NIB.maxDead)) { scene.remove(c.g); CREEP.list.splice(CREEP.list.indexOf(c), 1); } } }
   const alive = CREEP.list.filter(c => c.hp > 0 && c.kind !== 'nibbler' && !c.free).length;   // (nibblers and debug spawns do not hold up Daddy)
   if (CREEP.phase === 'stalkers' && !alive) { CREEP.phase = 'boss-wait'; CREEP.t = 0; }
   else if (CREEP.phase === 'boss-wait' && (CREEP.t += dt) > 5) creepDaddy();
@@ -13897,16 +13901,18 @@ function updateCreeps(dt) {
 }
 function creepSnapshot() {   // host -> guest, in the world state
   if (!CREEP.ready) return null;
-  return { ph: CREEP_PH.indexOf(CREEP.phase), l: CREEP.list.map(c => [c.id, c.kind === 'daddy' ? 1 : c.kind === 'nibbler' ? 2 : 0, +c.x.toFixed(2), +c.z.toFixed(2), +c.a.toFixed(2), c.hp, CREEP_ST.indexOf(c.state), +c.rise.toFixed(2), +c.speed.toFixed(2)]) };
+  return { ph: CREEP_PH.indexOf(CREEP.phase), l: CREEP.list.map(c => [c.id, c.kind === 'daddy' ? 1 : c.kind === 'nibbler' ? (c.zombie ? 3 : 2) : 0, +c.x.toFixed(2), +c.z.toFixed(2), +c.a.toFixed(2), c.hp, CREEP_ST.indexOf(c.state), +c.rise.toFixed(2), +c.speed.toFixed(2)]) };
 }
 function creepApplySnapshot(S) {   // guest: make my creatures the host's
   if (!CREEP.ready || !S || !S.l) return;
   const seen = new Set();
   for (const [id, k, x, z, a, hp, st, rise, sp] of S.l) {
-    const kind = k === 2 ? 'nibbler' : k ? 'daddy' : 'stalker'; let c = CREEP.list.find(q => q.id === id);
+    const kind = k >= 2 ? 'nibbler' : k ? 'daddy' : 'stalker'; let c = CREEP.list.find(q => q.id === id);   // (3: a zombie nibbler)
     if (c && c.kind !== kind) { scene.remove(c.g); CREEP.list.splice(CREEP.list.indexOf(c), 1); c = null; }
     if (!c) { c = creepSpawn(kind, x, z, rise > 0, id); if (!c) continue; c.a = a; if (kind === 'daddy' && rise > 0.5) creepSound('roar', c); }
     const state = CREEP_ST[st] || 'roam';
+    if (k === 3 && !c.zombie) c.zombie = true;
+    if (c.kind === 'nibbler' && c.state === 'dead' && state !== 'dead') { c.zRise = 0.8; c.t = 0; c.mood = 13; c.deadT = 0; creepSound('screech', c); }   // back up as a zombie
     if (state === 'hunt' && c.state !== 'hunt') creepSound('screech', c);
     if (state === 'dead' && c.state !== 'dead') { c.deadT = 0; creepSound('die', c); }
     if (hp < c.hp && c.kind === 'nibbler') { c.hurtT = 0.3; c.hurtFace = 1.6; }   // (the guest's nibbler faces follow the host's hits)
@@ -13951,14 +13957,14 @@ function creepDebug(what, x, z, yaw) {   // debug menu
   if (creepGuest()) { netSend({ t: 'cdbg', w: what, x, z, a: yaw }); return what === 'near' ? 'Asked the host for a cob stalker next to you' : what === 'boss' ? 'Asked the host: stalkers down, Daddy Cob Legs comes in 5 s' : 'Asked the host to reset the corn field'; }
   if (what === 'near') return creepNear(x, z, yaw);
   if (what === 'boss') { for (const c of CREEP.list) if (c.hp > 0 && c.kind === 'stalker') creepHurt(c, 99); return 'Both stalkers down: Daddy Cob Legs comes in 5 s'; }
-  for (const c of CREEP.list) scene.remove(c.g); CREEP.list.length = 0; CREEP.bites = 0; creepStalkers(); return 'Corn field reset: two cob stalkers';
+  for (const c of CREEP.list) scene.remove(c.g); CREEP.list.length = 0; CREEP.ngrp.clear(); CREEP.bites = 0; creepStalkers(); return 'Corn field reset: two cob stalkers';
 }
 // ---------- NIBBLERS (v1.97.121): the owner's sprite set, 20 faces (assets/textures/nibbler/nibbler-NN-<face>.png, 40 px).
 // Each nibbler is a T.Sprite (it always faces you) standing on its feet (centre at the bottom), with its own sprite material so
 // its face can change: what it is doing picks the face, and a hop, a squash on landing, a wobble and a left/right flip animate it.
 const NIB_FACES = ['wicked-grin', 'happy', 'smug', 'sneaky', 'gleeful', 'sad', 'crying', 'terrified', 'confused', 'shocked', 'angry', 'enraged', 'foaming', 'asleep', 'dazed', 'hurt', 'taking-damage', 'exhausted', 'unconscious', 'dead'];
 const NIB_REAR = ['back', 'rear-quarter-left', 'rear-quarter-right'];   // v1.97.122: the owner's rear views, texture numbers 21-23 (nibbler-<name>.png)
-const NIB = { tex: null, per: 5 };
+const NIB = { tex: null, per: 5, zombieAfter: 20, maxDead: 30, ZOMBIE: [0.55, 0.95, 0.5] };   // v1.97.163: kill a burst's five within 20 s or its dead get back up (green); corpses stay (the oldest 30 kept)
 function nibTex(i) {   // 1-based face number
   if (!NIB.tex) NIB.tex = [];
   if (!NIB.tex[i] && typeof document === 'undefined') return null;   // (outside a browser: no pictures)
@@ -13970,19 +13976,63 @@ function nibSpawn(x, z, id) {
   const sm = new T.SpriteMaterial({ map: nibTex(2), alphaTest: 0.5 }), sp = new T.Sprite(sm); sp.center.set(0.5, 0); sp.scale.set(K.size, K.size, 1); sp.userData.noHit = true; s.add(sp); g.add(s);
   g.position.set(x, 0, z); g.userData.creep = true; scene.add(g);
   const c = { id: id || ++CREEP.nid, kind: 'nibbler', K, g, s, sp, hips: [], x, z, a: Math.random() * 6.28, hp: K.hp, state: 'roam', t: 0, nextT: 0, tx: x, tz: z, hx: x, hz: z, legT: Math.random() * 6, speed: 0, biteCd: 0.8, hurtT: 0, rise: 0, deadT: 0, eatT: 0, runT: 0, yelled: false,
-    hitY: K.size * 0.45, hitR: K.size * 0.55, maxR: K.size * 0.5, y: 0, hop: 0, face: 2, faceT: 0, idleT: 0, burst: 0, vx: 0, vz: 0, flip: 1, mood: Math.random() < 0.5 ? 7 : 1, bitT: 0, sadT: 0, lostT: 0, hurtFace: 0, fleeT: 0 };
+    hitY: K.size * 0.45, hitR: K.size * 0.55, maxR: K.size * 0.5, y: 0, hop: 0, face: 2, faceT: 0, idleT: 0, burst: 0, vx: 0, vz: 0, flip: 1, mood: Math.random() < 0.5 ? 7 : 1, bitT: 0, sadT: 0, lostT: 0, hurtFace: 0, fleeT: 0,
+    P: nibPersonality(), hopK: 0.8 + Math.random() * 0.45, pauseT: 0, nextPause: 1.5 + Math.random() * 4, orbitT: 1 + Math.random() * 2, zRise: 0, zombie: false, grp: 0 };
   CREEP.list.push(c); return c;
 }
+// v1.97.163, owner: "Nibbler behavior should be more varied sometimes after chasing you all the nibblers seem to stack up or chase
+// you single file in the same way". Every nibbler aimed straight at you at the same speed, so they lined up behind each other and
+// piled into one spot. Now each has its own way of coming at you, set when it is born: some come straight in, some swing round to
+// your side first, some circle you and dart in; each its own speed, a weave of its own, the odd hesitation, its own hop rhythm -
+// and they keep a little apart from each other instead of stacking.
+function nibPersonality() {
+  const r = Math.random(), style = r < 0.25 ? 'direct' : r < 0.7 ? 'flank' : 'circle';
+  return { style, ang: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 0.8), off: 1.8 + Math.random() * 2.6, spd: 0.82 + Math.random() * 0.36, weave: Math.random() < 0.4 ? 0 : 0.5 + Math.random() * 1.1, wf: 1.4 + Math.random() * 2.4, dir: Math.random() < 0.5 ? -1 : 1 };
+}
+function nibHuntAt(c, px, pz, dP, dt) {   // where it heads while hunting you: its own line in, not yours
+  const P = c.P; if (!P || dP < 2.6) return [px, pz];   // close enough: straight for the bite
+  const ux = (c.x - px) / (dP || 1), uz = (c.z - pz) / (dP || 1), rot = (a, r) => [px + (ux * Math.cos(a) - uz * Math.sin(a)) * r, pz + (ux * Math.sin(a) + uz * Math.cos(a)) * r];
+  let t;
+  if (P.style === 'circle') {   // round you at ~3 m for a few seconds, then a dart straight in, then round again
+    if (c.orbitT <= 0 && c.orbitT > -2.2) c.orbitT -= dt; else if (c.orbitT <= -2.2) c.orbitT = 2 + Math.random() * 3; else c.orbitT -= dt;
+    t = c.orbitT > 0 ? rot(P.dir * 0.75, Math.max(2.8, Math.min(dP - 0.4, 3.4))) : [px, pz];
+  } else if (P.style === 'flank') t = rot(P.ang * Math.min(1, (dP - 2.6) / 4), Math.min(dP - 0.5, P.off + 1));   // swings out to your side, closing as it comes
+  else t = [px, pz];
+  if (P.weave) { const w = Math.sin(c.t * P.wf + c.id) * P.weave * Math.min(1, dP / 6); t[0] += -uz * w; t[1] += ux * w; }   // a weave of its own
+  return t;
+}
 function nibBurst(st) {   // a cob stalker dies: its nibblers spill out of it in every direction (the host; the guest sees them in the snapshot)
+  const grp = ++CREEP.ngid; (CREEP.ngrp || (CREEP.ngrp = new Map())).set(grp, { t: 0 });   // (the 20 s to kill them all runs from here)
   for (let i = 0; i < NIB.per; i++) { const a = i / NIB.per * 6.283 + Math.random() * 0.6, c = nibSpawn(st.x + Math.sin(a) * 0.6, st.z + Math.cos(a) * 0.6); if (!c) continue;
-    c.burst = 0.7; c.vx = Math.sin(a) * (3 + Math.random() * 2); c.vz = Math.cos(a) * (3 + Math.random() * 2); c.a = a; c.hx = st.x; c.hz = st.z; }
+    c.grp = grp; c.burst = 0.7; c.vx = Math.sin(a) * (3 + Math.random() * 2); c.vz = Math.cos(a) * (3 + Math.random() * 2); c.a = a; c.hx = st.x; c.hz = st.z; }
   if (DMG_NOTIFY && walk.on && Math.hypot(walk.x - st.x, walk.z - st.z) < 60) DMG_NOTIFY('😈 Nibblers burst out of the cob stalker!');
+}
+// v1.97.163, owner: "dead ones should remain. And if you don't kill all the nibblers within 20 seconds the dead ones come back as
+// zombie nibblers. Maybe just a color swap for those." The five that burst from one stalker are a group: kill all five within 20 s
+// of the burst and they stay dead; leave any alive at 20 s and that group's dead get back up, one after another, green. A zombie
+// that goes down stays down. Dead nibblers no longer fade away (the oldest go once there are more than 30).
+function nibRevive(c) {
+  Object.assign(c, { zombie: true, hp: c.K.hp, state: 'roam', deadT: 0, zWait: undefined, t: 0, zRise: 0.8, mood: 13, runT: 6, hx: c.x, hz: c.z, burst: 0, speed: 0, fleeT: 0, hurtT: 0, hurtFace: 0, P: nibPersonality(), nextT: 0 });
+  c.sp.material.opacity = 1; c.sp.material.transparent = false;
+  for (let i = 0; i < 3; i++) puff(V3(c.x, c.y + 0.1, c.z), 0.12, 0x6a7a3a);
+  creepSound('screech', c);
+}
+function nibGroups(dt) {   // host: the 20 s rule for each burst
+  if (!CREEP.ngrp) return;
+  for (const [g, G] of CREEP.ngrp) {
+    G.t += dt; const m = CREEP.list.filter(c => c.kind === 'nibbler' && c.grp === g && !c.zombie);
+    if (!m.some(c => c.hp > 0)) { CREEP.ngrp.delete(g); continue; }   // all five down in time: they stay dead
+    if (G.t < NIB.zombieAfter) continue;
+    const dead = m.filter(c => c.state === 'dead'); dead.forEach((c, i) => { c.zWait = 0.3 + i * 0.45 + Math.random() * 0.3; }); CREEP.ngrp.delete(g);
+    if (dead.length && DMG_NOTIFY && walk.on && Math.hypot(walk.x - dead[0].x, walk.z - dead[0].z) < 60) DMG_NOTIFY('🧟 The dead nibblers are getting back up!');
+  }
 }
 function nibMourn(dead) { for (const c of CREEP.list) if (c !== dead && c.kind === 'nibbler' && c.hp > 0 && Math.hypot(c.x - dead.x, c.z - dead.z) < 6) { c.sadT = 1.4; c.runT = 6; } }   // its friends: sad, then furious
 function nibAI(c, dt) {
   const K = c.K; c.t += dt; c.biteCd = Math.max(0, c.biteCd - dt); c.hurtT = Math.max(0, c.hurtT - dt); c.runT = Math.max(0, c.runT - dt); c.fleeT = Math.max(0, c.fleeT - dt);
   c.y = Math.max(0, floorAt(c.x, c.z, 2));
   if (c.t > K.life) { c.gone = true; for (let i = 0; i < 3; i++) puff(V3(c.x, c.y + 0.1, c.z), 0.12, 0x8a6a3a); return; }   // burrows away
+  if (c.zRise > 0) { c.zRise -= dt; c.speed = 0; return; }   // a zombie getting back up
   if (c.burst > 0) { c.burst -= dt; c.x += c.vx * dt; c.z += c.vz * dt; c.vx *= 0.94; c.vz *= 0.94; c.speed = 2; return; }   // flung out of the stalker
   let me = walk.on && !walk.dead && !walk.drive && !walk.pass, px = walk.x, pz = walk.z, who = 'me', dP = me ? Math.hypot(px - c.x, pz - c.z) : 1e9;
   { const R = NET.rp; if (R && NET.conn && NET.conn.open && R.walk && !R.drive && !R.ps) { const d2 = Math.hypot(R.x - c.x, R.z - c.z); if (!me || d2 < dP) { me = true; px = R.x; pz = R.z; dP = d2; who = 'rp'; } } }
@@ -13990,7 +14040,9 @@ function nibAI(c, dt) {
   if (c.fleeT > 0 && me) { c.state = 'flee'; const d = dP || 1; tx = c.x - (px - c.x) / d * 6; tz = c.z - (pz - c.z) / d * 6; sp = K.run * 1.1; }   // hurt and scared: runs off for a moment
   else if (lure) { tx = lure.g.position.x; tz = lure.g.position.z; sp = K.run; stopAt = 0.4;
     if (Math.hypot(tx - c.x, tz - c.z) < 0.7) { c.state = 'eat'; sp = 0; if ((c.eatT += dt) > 2.5) { creepEat(lure); c.eatT = 0; } } else { c.state = 'lure'; c.eatT = 0; } }
-  else if (me && dP < K.aggro + (c.runT > 0 ? 12 : 0) && Math.hypot(px - c.hx, pz - c.hz) < K.leash) { c.state = 'hunt'; tx = px; tz = pz; sp = K.run * (c.runT > 0 ? 1.15 : 1); stopAt = K.bite * 0.7; }
+  else if (me && dP < K.aggro + (c.runT > 0 ? 12 : 0) && Math.hypot(px - c.hx, pz - c.hz) < K.leash) { c.state = 'hunt'; [tx, tz] = nibHuntAt(c, px, pz, dP, dt); sp = K.run * (c.runT > 0 ? 1.15 : 1) * (c.P ? c.P.spd : 1); stopAt = K.bite * 0.7;
+    if (dP > 4 && (c.nextPause -= dt) <= 0) { c.pauseT = 0.25 + Math.random() * 0.5; c.nextPause = 2 + Math.random() * 5; }   // the odd hesitation (never right on you)
+    if (c.pauseT > 0) { c.pauseT -= dt; sp = 0; } }
   else if (home > 14) { c.state = 'return'; tx = c.hx; tz = c.hz; sp = K.run * 0.6; }
   else { c.state = 'roam'; if (c.t > c.nextT || Math.hypot(c.tx - c.x, c.tz - c.z) < 0.8) { c.tx = c.hx + (Math.random() - 0.5) * 16; c.tz = c.hz + (Math.random() - 0.5) * 16; c.nextT = c.t + 3 + Math.random() * 6; }
     tx = c.tx; tz = c.tz; if (Math.random() < dt * 0.05) c.nextT = c.t + 8; }   // now and then it just sits down for a while
@@ -13999,6 +14051,9 @@ function nibAI(c, dt) {
   if (d > 0.1 && sp > 0) { let da = Math.atan2(dx, dz) - c.a; da = Math.atan2(Math.sin(da), Math.cos(da)); c.a += Math.max(-K.turn * dt, Math.min(K.turn * dt, da)); }
   const go = sp > 0 && d > stopAt ? sp : 0; c.speed += (go - c.speed) * Math.min(1, dt * 6);
   c.x += Math.sin(c.a) * c.speed * dt; c.z += Math.cos(c.a) * c.speed * dt;
+  for (const o of CREEP.list) { if (o === c || o.kind !== 'nibbler' || o.hp <= 0) continue;   // elbow room: no stacking up in one spot
+    const ex = c.x - o.x, ez = c.z - o.z, ed = Math.hypot(ex, ez); if (ed >= 0.85) continue;
+    const k = (0.85 - ed) * 0.5, nx = ed > 1e-4 ? ex / ed : Math.cos(c.id * 2.4), nz = ed > 1e-4 ? ez / ed : Math.sin(c.id * 2.4); c.x += nx * k; c.z += nz * k; }
   if (c.state === 'hunt' && dP < K.bite + 0.2 && c.biteCd <= 0) { c.biteCd = K.biteCd; c.bitT = 0.6; if (who === 'me') creepBite(c, dP); else { creepSound('bite', c); netSend({ t: 'cbt', k: c.kind, n: K.dmg, x: +c.x.toFixed(2), z: +c.z.toFixed(2) }); } }
   if (walk.drive && utv.g) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 4 && dv < 1.4 && c.biteCd <= 0) { c.biteCd = 0.6; creepHurt(c, 9, V3(c.x, c.y + c.hitY, c.z)); } }   // run over
 }
@@ -14036,14 +14091,13 @@ function nibPose(c, dt) {
   const f = nibFace(c, dt), rear = nibView(c, camera.position.x, camera.position.z), show = rear || f; c.face = f; c.rear = rear;
   if (show !== c.shown) { c.shown = show; c.sp.material.map = nibTex(show); c.sp.material.needsUpdate = true; }
   const K = c.K, moving = c.speed > 0.3 && c.state !== 'dead';
-  c.hop += dt * (moving ? 9 + c.speed * 1.5 : 2);
+  c.hop += dt * (moving ? 9 + c.speed * 1.5 : 2) * (c.hopK || 1);   // (each its own rhythm: they don't hop in step)
   const hy = moving ? Math.abs(Math.sin(c.hop)) * 0.16 : 0, sq = moving ? 1 - 0.14 * Math.cos(c.hop * 2) : 1 + 0.03 * Math.sin(c.t * 2.2);   // hop, squash on landing / breathing
   _nr.setFromMatrixColumn(camera.matrixWorld, 0); const side = Math.sin(c.a) * _nr.x + Math.cos(c.a) * _nr.z; if (Math.abs(side) > 0.2) c.flip = side > 0 ? 1 : -1;   // faces the way it goes, left or right on screen
   const sz = K.size, dead = c.state === 'dead';
   c.sp.scale.set(sz * (c.rear ? 1 : c.flip) * (dead ? 1 : 2 - sq), sz * (dead ? 1 : sq), 1);   // (the rear views are drawn for their side: not flipped)
-  c.sp.material.rotation = dead ? Math.min(1, c.deadT * 3) * 1.45 * c.flip : c.hurtT > 0 ? Math.sin(c.hurtT * 40) * 0.25 : moving ? Math.sin(c.hop) * 0.12 : 0;   // wobble / shake / keel over
-  if (dead) { c.sp.material.opacity = Math.max(0, 1 - Math.max(0, c.deadT - 4.5) / 2.5); c.sp.material.transparent = c.deadT > 4.5; }
-  const k = 0.35 + 0.65 * (typeof SKY !== 'undefined' ? SKY.k : 1); c.sp.material.color.setRGB(k, k, k);   // darker at night (sprites are unlit)
+  c.sp.material.rotation = c.zRise > 0 ? 1.45 * c.flip * c.zRise / 0.8 : dead ? Math.min(1, c.deadT * 3) * 1.45 * c.flip : c.hurtT > 0 ? Math.sin(c.hurtT * 40) * 0.25 : moving ? Math.sin(c.hop) * 0.12 : 0;   // wobble / shake / keel over
+  const k = 0.35 + 0.65 * (typeof SKY !== 'undefined' ? SKY.k : 1), Z = c.zombie ? NIB.ZOMBIE : null; c.sp.material.color.setRGB(k * (Z ? Z[0] : 1), k * (Z ? Z[1] : 1), k * (Z ? Z[2] : 1));   // darker at night (sprites are unlit); zombies green
   c.g.position.set(c.x, c.y + hy + (dead ? -0.05 : 0), c.z);
 }
 // pigeon coo, synthesized like the train: three soft hooting notes ("hoo-roo-coo") with a little warble, quieter with distance
@@ -14508,7 +14562,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, creepHurt, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },

@@ -45,7 +45,7 @@ walk.x = nb.x + 3; walk.z = nb.z; assert.equal(hit(), true, 'a paintball hits it
 const pal = live().filter(c => c !== nb); for (const p2 of pal) { p2.x = nb.x + 1; p2.z = nb.z + 1; }
 nb.rise = 0; assert.equal(hit(), true); assert.equal(nb.hp, 0); assert.equal(nb.state, 'dead', 'two hits and it is down');
 assert.ok(pal.some(p2 => p2.sadT > 0 && p2.runT > 0), 'its friends close by: sad, then furious');
-run(8); assert.ok(!C.list.includes(nb), 'a dead nibbler is cleared away after a few seconds');
+run(3); assert.ok(C.list.includes(nb) && nb.state === 'dead' && nb.sp.material.opacity === 1, 'a dead nibbler stays where it fell (v1.97.163: it used to fade away after 7 s)');
 // faces: from what it is doing
 const fc = (c, o) => { Object.assign(c, { burst: 0, t: 10, hurtT: 0, hurtFace: 0, sadT: 0, bitT: 0, lostT: 0, idleT: 0, speed: 1, state: 'roam', hp: 2, deadT: 0 }, o); return ctx.NIB_FACES[ctx.nibFace(c, 0) - 1]; };
 const c1 = live()[0]; walk.x = c1.x + 20; walk.z = c1.z;
@@ -61,11 +61,11 @@ assert.equal(fc(c1, { speed: 0, idleT: 6 }), 'asleep', 'sat still a while: aslee
 assert.equal(fc(c1, { state: 'dead', deadT: 0.3 }), 'unconscious', 'down: unconscious'); assert.equal(fc(c1, { state: 'dead', deadT: 2 }), 'dead', 'then dead');
 assert.ok(['happy', 'smug', 'sneaky'].includes(fc(c1, { faceT: 0 })), 'pottering about: happy, smug or sneaky');
 // they burrow away after 3 minutes
-walk.x = 900; walk.z = 900; run(181, 0.25); assert.equal(live().length, 0, 'gone after 3 minutes');
+walk.x = 900; walk.z = 900; { const was = live(); run(181, 0.25); assert.ok(was.length && was.every(c => !C.list.includes(c)), 'gone after 3 minutes'); }   // (zombies that got up meanwhile have their own 3 minutes)
 // 2 player: they travel in the creature snapshot as kind 2 and come back as nibblers on the guest
 { const c2 = vm.runInContext("nibSpawn(10, -200)", ctx); const S = ctx.creepSnapshot(); const row = S.l.find(r => r[0] === c2.id); assert.equal(row[1], 2, 'kind 2 in the snapshot');
   const g = { ...ctx }; }
-assert.ok(html.includes("const kind = k === 2 ? 'nibbler' : k ? 'daddy' : 'stalker';"), 'the guest makes it a nibbler');
+assert.ok(html.includes("const kind = k >= 2 ? 'nibbler' : k ? 'daddy' : 'stalker';"), 'the guest makes it a nibbler (3: a zombie one)');
 assert.ok(html.includes("if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);"), 'and animates it like the host');
 // v1.97.122: the rear views: its face when it is turned toward you, its back when it is turned away, a rear quarter in between
 { const v = (a, cx, cz, st) => { const r = ctx.nibView({ x: 0, z: 0, a, state: st || 'roam' }, cx, cz); return r ? ctx.NIB_REAR[r - 21] : 'face'; };
@@ -81,4 +81,51 @@ for (const r of ['back', 'rear-quarter-left', 'rear-quarter-right']) assert.ok(f
 // the files and the UI
 for (let i = 1; i <= 20; i++) { const f = 'nibbler-' + String(i).padStart(2, '0') + '-' + ctx.NIB_FACES[i - 1] + '.png'; assert.ok(fs.existsSync(path.join(__dirname, '..', 'assets', 'textures', 'nibbler', f)), f); }
 assert.ok(html.includes("hit === 'nibbler' ? 'Squeeg got nibbled to death by the nibblers."), 'a death message for being nibbled');
-console.log('PASS: nibblers (5 burst from each dead cob stalker, sprites facing you, hunt anywhere within their leash, half-bite nibbles, outrunnable, 2 paint hits with a flee, friends mourn, do not hold up Daddy, burrow after 3 min, 20 faces from what they do, rear views when turned away, 2 player kind)');
+
+// ---------- v1.97.163, owner: "Nibbler behavior should be more varied sometimes after chasing you all the nibblers seem to stack up
+// or chase you single file in the same way. Also dead ones should remain. And if you don't kill all the nibblers within 20 seconds
+// the dead ones come back as zombie nibblers. Maybe just a color swap for those."
+{ let seed = 12345; Math.random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;   // (a repeatable run)
+  const fresh = () => { for (const c of C.list) scene.remove(c.g); C.list.length = 0; C.ngrp.clear(); C.bites = 0; notes.length = 0; walk.dead = null; walk.on = true; };
+  const burst = (x, z) => { vm.runInContext('nibBurst({ x: ' + x + ', z: ' + z + ' })', ctx); return N().filter(c => c.grp === C.ngid); };
+  // their own ways in: three styles, their own speed, weave and hop
+  { const P = Array.from({ length: 400 }, () => vm.runInContext('nibPersonality()', ctx)), st = new Set(P.map(q => q.style));
+    assert.deepEqual([...st].sort(), ['circle', 'direct', 'flank'], 'three ways of coming at you');
+    assert.ok(P.every(q => q.spd >= 0.82 && q.spd <= 1.18) && new Set(P.map(q => q.spd.toFixed(2))).size > 20, 'each its own speed (82-118%)');
+    assert.ok(P.some(q => q.weave === 0) && P.some(q => q.weave > 1), 'some weave, some don\'t'); }
+  { const at = (style, d) => { const c = { x: d, z: 0, t: 1, id: 1, orbitT: 2, P: { style, ang: 1.2, off: 3, spd: 1, weave: 0, wf: 2, dir: 1 } }; return vm.runInContext('nibHuntAt', ctx)(c, 0, 0, d, 0.05); };
+    assert.equal(JSON.stringify(at('flank', 2)), '[0,0]', 'right on you: every style goes straight for the bite');
+    const f = at('flank', 10); assert.ok(Math.abs(f[1]) > 1.5, 'a flanker swings out to your side (' + f.map(v => v.toFixed(1)) + ')');
+    const o = at('circle', 6); assert.ok(Math.abs(Math.hypot(o[0], o[1]) - 3.4) < 0.01 && Math.abs(o[1]) > 1, 'a circler heads round you at ~3 m');
+    assert.equal(JSON.stringify(at('direct', 10)), '[0,0]', 'a direct one comes straight in'); }
+  // the chase: five out of a stalker after you - no pile-up, not single file
+  fresh(); walk.x = 0; walk.z = -290; const g1 = burst(0, -300); run(1.2);
+  let minGap = 99, bearSpread = 0, samples = 0;
+  for (let k = 0; k < 80; k++) { run(0.05); walk.x = 0; walk.z = -290; walk.dead = null; C.bites = 0; const L = live(); if (k < 20) continue;   // (you can't die in this one)
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) minGap = Math.min(minGap, Math.hypot(L[i].x - L[j].x, L[i].z - L[j].z));
+    const b = L.filter(c => Math.hypot(c.x - walk.x, c.z - walk.z) > 1.5).map(c => Math.atan2(c.x - walk.x, c.z - walk.z)); if (b.length > 2) { const m = Math.atan2(b.reduce((s2, v) => s2 + Math.sin(v), 0), b.reduce((s2, v) => s2 + Math.cos(v), 0)); bearSpread += Math.sqrt(b.reduce((s2, v) => s2 + Math.atan2(Math.sin(v - m), Math.cos(v - m)) ** 2, 0) / b.length); samples++; } }
+  assert.ok(g1.every(c => c.state === 'hunt' || c.state === 'flee' || c.state === 'dead'), 'all five after you');
+  assert.ok(minGap > 0.45, 'they keep apart: closest two ' + minGap.toFixed(2) + ' m (the old chase: 0.03 m, piled into one spot)');
+  assert.ok(samples && bearSpread / samples > 0.35, 'and come at you from around you, not in one line (spread ' + (bearSpread / samples).toFixed(2) + ' rad; the old chase: 0.23, single file)');
+  assert.ok(new Set(g1.map(c => c.hopK.toFixed(2))).size >= 4, 'hopping out of step');
+  // dead ones stay; kill all five in time and they stay dead
+  fresh(); walk.x = 900; walk.z = 900; const g2 = burst(0, -300); run(2); for (const c of g2) ctx.creepHurt(c, 99); run(40, 0.25);
+  assert.ok(g2.every(c => C.list.includes(c) && c.state === 'dead' && !c.zombie && c.sp.material.opacity === 1), 'all five down within 20 s: they stay down, and stay where they fell');
+  assert.ok(!notes.some(n => /getting back up/.test(n)) && C.ngrp.size === 0, 'no zombies');
+  // leave any alive past 20 s: that burst's dead get back up, green
+  fresh(); walk.x = 900; walk.z = 900; const g3 = burst(0, -300); run(2); ctx.creepHurt(g3[0], 99); ctx.creepHurt(g3[1], 99); run(15, 0.25);
+  assert.ok(g3[0].state === 'dead' && g3[1].state === 'dead', 'still down at 17 s'); walk.x = 0; walk.z = -310; run(5, 0.05); walk.dead = null;
+  assert.ok(g3[0].zombie && g3[1].zombie && g3[0].hp === 2 && g3[1].state !== 'dead', 'at 20 s the two dead ones are back up as zombies');
+  assert.ok(g3.slice(2).every(c => !c.zombie), 'the three that never died are still ordinary nibblers');
+  assert.ok(notes.some(n => /The dead nibblers are getting back up/.test(n)), 'and you are told');
+  { const col = g3[0].sp.material.color; assert.ok(col.g > col.r * 1.4 && col.g > col.b * 1.4, 'zombies are green (a colour swap)'); }
+  ctx.creepHurt(g3[0], 99); walk.x = 900; walk.z = 900; run(30, 0.25); assert.ok(g3[0].state === 'dead' && C.list.includes(g3[0]), 'a zombie that goes down stays down');
+  // the snapshot: zombies travel as kind 3, the guest makes them nibblers and greens them
+  assert.ok(ctx.creepSnapshot().l.some(r => r[0] === g3[1].id && r[1] === 3), 'zombie nibblers are kind 3 in the snapshot');
+  assert.ok(html.includes("if (k === 3 && !c.zombie) c.zombie = true;") && html.includes("if (c.kind === 'nibbler' && c.state === 'dead' && state !== 'dead') { c.zRise = 0.8;"), 'the guest sees them get up, green');
+  // corpses are kept, up to 30
+  fresh(); walk.x = 900; walk.z = 900; for (let k = 0; k < 8; k++) { const g = burst(k * 20, -300); run(0.8); for (const c of g) ctx.creepHurt(c, 99); } run(1);
+  assert.equal(N().filter(c => c.state === 'dead').length, 30, 'the 30 most recent dead are kept (8 bursts = 40 dead)');
+  assert.ok(html.includes('else if (c.deadT > 30) { scene.remove(c.g); CREEP.list.splice(i, 1); continue; } }'), 'dead stalkers and Daddy still clear away after 30 s');
+  fresh(); }
+console.log('PASS: nibblers (v1.97.163: each its own way in - straight, flanking, circling - spaced apart, out of step; corpses stay (30 kept); a burst not wiped out in 20 s gets its dead back up as green zombies, which stay down when killed. 5 burst from each dead cob stalker, sprites facing you, hunt anywhere within their leash, half-bite nibbles, outrunnable, 2 paint hits with a flee, friends mourn, do not hold up Daddy, burrow after 3 min, 20 faces from what they do, rear views when turned away, 2 player kind)');

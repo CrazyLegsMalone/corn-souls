@@ -1,3 +1,39 @@
+## TEST v1.97.163 — nibblers: varied chases, corpses that stay, zombie nibblers (2026-11-04)
+- Owner: *"Nibbler behavior should be more varied sometimes after chasing you all the nibblers seem to stack up or chase you single file in the same way. Also dead ones should remain. And if you don't kill all the nibblers within 20 seconds the dead ones come back as someone nimblers. Maybe just a color swap for those."* I read "someone nimblers" as zombie nibblers.
+- **Why they stacked and lined up:** every nibbler aimed straight at you at the same speed, so they followed each other in and piled into one spot.
+- **Varied chase:** each nibbler gets its own personality at birth (`nibPersonality`), and `nibHuntAt` picks where it heads:
+  - 25% come straight in, 45% swing out to your side first, 30% circle you at ~3 m and dart in;
+  - each has its own speed (82–118%) and its own weave (or none);
+  - the odd hesitation, never when right on you;
+  - its own hop rhythm, so they don't hop in step;
+  - within 2.6 m every one goes straight for the bite;
+  - they keep 0.85 m apart instead of stacking.
+- **Measured in the game's own code:** five nibblers bursting 10 m from a player who stands still, same seed.
+
+  | | Old | New |
+  |---|---|---|
+  | Closest two | 0.03 m | ≥ 0.66 m |
+  | Spread of their approach bearings | 0.23 rad | 0.42 rad (0.60–0.86 on five other seeds) |
+- **Dead ones stay:** nibbler corpses no longer fade after 7 s. The 30 most recent are kept. Dead stalkers and Daddy still clear after 30 s.
+- **Zombies:** the five from one stalker are a group (`CREEP.ngrp`).
+  - Kill all five within 20 s of the burst and they stay dead.
+  - Leave any alive at 20 s and that group's dead get back up one after another (`nibRevive`): a puff of dirt, a screech, the sprite swinging upright, then hunting, furious.
+  - Zombies are tinted green (`NIB.ZOMBIE`), with the same stats. A zombie that goes down stays down.
+  - You're told: "🧟 The dead nibblers are getting back up!"
+- **2 player:** zombies travel as kind 3 in the creature snapshot; the guest makes them nibblers, greens them and plays the get-up.
+- Checked in the running game: zombies get up green next to the normal yellow ones, and a corpse stays on the ground.
+- `validate-nibblers.cjs` covers:
+  - the three styles and their spreads;
+  - the hunt targets;
+  - the chase spacing and spread (fails on the old chase);
+  - out-of-step hops;
+  - all killed in time → they stay dead;
+  - partly killed → zombies at 20 s, green, the survivors unchanged;
+  - dead zombies stay dead;
+  - the 30-corpse cap;
+  - the snapshot.
+- Bumped TEST to `1.97.163` / `corn-souls-test-shell-v190`.
+
 ## TEST v1.97.162 — mini map: on/off in the pause menu, smaller, clear of the magazine (2026-11-04)
 - Owner: *"Mini map needs a on and off toggle in pause menu. Also minimal needs to me a little smaller and out of way of the gun magazine so you can keep track of ammo."*
 - **Pause menu → "🗺️ Mini map: on / off":** flips it, says so, and re-opens the menu showing the new state. It is remembered on this device (`cs_minimap`) and on by default. While it is off there is no bake and no drawing.
