@@ -83,6 +83,37 @@ assert.ok(out, 'drawn out of the field by the guest\'s ear'); assert.equal(G.COR
 for (const c of H.CREEP.list) if (c.kind === 'stalker') H.creepHurt(c, 99);
 step(6); assert.ok(H.CREEP.list.some(c => c.kind === 'daddy'), 'Daddy on the host'); step(0.5); assert.ok(G.CREEP.list.some(c => c.kind === 'daddy'), 'and on the guest'); assert.equal(G.CREEP.phase, 'boss');
 
+// v1.97.164, owner: "Make sure all the new features are synced with 2 player"
+{ for (const c of [H, G]) c.wallSegs = [];
+  const daddy = H.CREEP.list.find(c => c.kind === 'daddy'); if (daddy) H.creepHurt(daddy, 999); step(0.5);
+  // a debug stalker the GUEST asks for: put down in front of the guest, and it goes for the guest even with the host in the corn
+  H.walk.x = (H.CFIELD.x0 + H.CFIELD.x1) / 2; H.walk.z = (H.CFIELD.z0 + H.CFIELD.z1) / 2; G.walk.x = 400; G.walk.z = 400; G.walk.yaw = 0; G.CREEP.bites = 0; H.CREEP.bites = 0;
+  H.NET.rp = { walk: true, drive: false, ps: false, x: 400, z: 400, ears: null };
+  assert.match(vm.runInContext("creepDebug('near')", G), /Asked the host/); step(0.3);
+  const fs1 = H.CREEP.list.find(c => c.free && c.hp > 0); assert.ok(fs1 && Math.abs(fs1.x - 400) < 0.5 && Math.abs(fs1.z - 391) < 1, 'it comes out 9 m in front of the guest (host side)');
+  step(0.3); assert.ok(G.CREEP.list.some(c => c.id === fs1.id), 'and the guest sees it (next world update)');
+  for (let i = 0; i < 200 && !G.CREEP.bites; i++) { H.NET.rp.x = G.walk.x; H.NET.rp.z = G.walk.z; step(0.05); }
+  assert.ok(G.CREEP.bites >= 1 && fs1.state === 'hunt', 'it hunts and bites the guest, though the host is standing in the corn (it used to keep after the host)');
+  H.creepHurt(fs1, 99); step(0.3);
+  // nibblers: the guest sees them burst, sees the dead stay, sees zombies get up green - and is told, like the host
+  const fsNibs = H.CREEP.list.filter(c => c.kind === 'nibbler' && c.grp === H.CREEP.ngid); for (const c of fsNibs) H.creepHurt(c, 99);   // (the debug stalker's own five, out of the way)
+  H.walk.x = 900; H.walk.z = 900; H.NET.rp = { walk: false, drive: false, ps: false, x: 999, z: 999, ears: null }; G.walk.x = 0; G.walk.z = -320; G.notes.length = 0; step(0.3);
+  vm.runInContext('nibBurst({ x: 0, z: -300 })', H); const grp = H.CREEP.ngid, mine = H.CREEP.list.filter(c => c.grp === grp);
+  step(0.6); assert.ok(G.notes.some(n => /Nibblers burst out/.test(n)), 'the guest near a burst is told');
+  H.creepHurt(mine[0], 99); H.creepHurt(mine[1], 99); step(0.6);
+  const gd = G.CREEP.list.find(c => c.id === mine[0].id); assert.ok(gd && gd.state === 'dead', 'the guest sees the corpse'); step(10); assert.ok(G.CREEP.list.includes(gd) && gd.state === 'dead', 'and it stays');
+  H.CREEP.ngrp.get(grp).t = 19.95; step(2.5);
+  const gz = G.CREEP.list.find(c => c.id === mine[0].id); assert.ok(mine[0].zombie && gz.zombie && gz.state !== 'dead', 'the zombie gets up on both');
+  assert.ok(G.notes.some(n => /getting back up/.test(n)), 'and the guest is told');
+  // a guest joining with corpses already lying there: no death scream for each (they arrive already down)
+  H.creepHurt(mine[1], 99); step(1);   // (a zombie that goes down stays down: a corpse for the join)
+  const G2 = make(false); for (const n of ['makeRagdoll', 'dmgNet', 'smashNet', 'crackAt', 'kiaToggle', 'radioToggle', 'srNet', 'coolerHandle', 'nh3Valve', 'saHit', 'saPatch', 'nh3Hit', 'swapRangers', 'railPhoneApply', 'setWeather', 'netRemote']) G2[n] = () => {};
+  G2.loadCreeps(); G2.netRecv(H.wsState()); const c2 = G2.CREEP.list.find(c => c.id === mine[1].id);
+  assert.ok(c2 && c2.state === 'dead' && c2.deadT >= 5, 'a corpse that was already there arrives down and quiet');
+  assert.ok(!G2.notes.some(n => /Nibblers burst out/.test(n)), 'and joining is not news of a burst'); }
+// the mini map shows the other player wherever they are - on foot or driving
+assert.ok(html.includes("{ const R = NET.rp; if (R && NET.conn && NET.conn.open && (R.walk || R.drive || R.ps)) { g.fillStyle = '#ff4fa2';") && html.includes('g.arc(R.x, R.z, 4.5 * dpr / k'), 'mini map: the other player\'s dot follows their position, on foot or in a vehicle');
+
 // wiring
 assert.ok(html.includes("peer.connect(NET_PREFIX + code, { reliable: true, serialization: 'json' })"), 'reliable channel: one-off messages are no longer lost');
 assert.ok(html.includes("if (NET.host && (WSYNC.sendT += rdt) > 0.25) { WSYNC.sendT = 0; netSend(wsState()); }"), 'the host sends its world 4x a second');

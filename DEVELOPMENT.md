@@ -1,3 +1,21 @@
+## TEST v1.97.164 — two-player audit of the new features (2026-11-04)
+- Owner: *"Make sure all the new features are synced with 2 player well everything that needs to be synced"*.
+- **Audited, already synced:**
+  - roll-up + mesh door switches, including yellow (`rd` message + `ws.rd` door/mesh states, the power outage ignored for the other player's press);
+  - eating any picked-up critter (`cre`), and carrying one (critter snapshot);
+  - cob stalkers, Daddy's health (host-run, guest hits go to the host);
+  - nibbler personalities (host-run AI);
+  - zombie nibblers (snapshot kind 3), corpses (in the host's list, so in the snapshot);
+  - the debug stalker request from a guest (`cdbg` with the guest's spot and facing).
+- **Local by design (nothing to share):** title screen, grass, lighting, roof map, mini map bake and on/off, sprite mirror, fire art, hydrant, exit signs, grain pile, landing damage, eat button. The ducks on the ponds are ambient and each player's are their own.
+- **Fixed — three gaps:**
+  - **A debug stalker the guest spawned could ignore the guest.** If the host was standing in the corn, the field rule ("whoever is in its corn") made it keep after the host, hundreds of metres away. Free stalkers now go for whichever player is nearer.
+  - **The guest wasn't told about nibblers.** "😈 Nibblers burst out…" and "🧟 The dead nibblers are getting back up!" only showed on the host. The guest now gets both from the snapshot (within 60 m; the get-up message at most once every 5 s). A join is not news of a burst.
+  - **Joining guests heard a death scream for every corpse.** Since nibbler corpses now stay (up to 30), a guest joining made each one already lying there play a death scream. Corpses that arrive already down now arrive quiet.
+- **Mini map:** the other player's dot now follows their position on foot *or driving* (it used their on-foot body, which is hidden in a vehicle).
+- `validate-two-player.cjs` checks all of these with the real host and guest code; each check fails with its fix reverted.
+- Bumped TEST to `1.97.164` / `corn-souls-test-shell-v191`.
+
 ## TEST v1.97.163 — nibblers: varied chases, corpses that stay, zombie nibblers (2026-11-04)
 - Owner: *"Nibbler behavior should be more varied sometimes after chasing you all the nibblers seem to stack up or chase you single file in the same way. Also dead ones should remain. And if you don't kill all the nibblers within 20 seconds the dead ones come back as someone nimblers. Maybe just a color swap for those."* I read "someone nimblers" as zombie nibblers.
 - **Why they stacked and lined up:** every nibbler aimed straight at you at the same speed, so they followed each other in and piled into one spot.

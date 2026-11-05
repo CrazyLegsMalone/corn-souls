@@ -12311,7 +12311,7 @@ function minimapUpdate(dt) {
   g.fillStyle = '#76bd62'; g.fillRect(0, 0, n, n);
   g.translate(r, r); g.rotate(yaw); g.scale(k, k); g.translate(-pos.x, -pos.z);
   if (MMAP.cv) { g.imageSmoothingEnabled = false; g.drawImage(MMAP.cv, MMAP.x0, MMAP.z0, MMAP.W * MMAP.mpp, MMAP.H * MMAP.mpp); }
-  if (NET.rp && NET.rp.av && NET.rp.av.visible) { const q = NET.rp.av.position; g.fillStyle = '#ff4fa2'; g.strokeStyle = '#fff'; g.lineWidth = 1.5 * dpr / k; g.beginPath(); g.arc(q.x, q.z, 4.5 * dpr / k, 0, Math.PI * 2); g.fill(); g.stroke(); }
+  { const R = NET.rp; if (R && NET.conn && NET.conn.open && (R.walk || R.drive || R.ps)) { g.fillStyle = '#ff4fa2'; g.strokeStyle = '#fff'; g.lineWidth = 1.5 * dpr / k; g.beginPath(); g.arc(R.x, R.z, 4.5 * dpr / k, 0, Math.PI * 2); g.fill(); g.stroke(); } }   // the other player, on foot or driving (v1.97.164: was their on-foot body, hidden in a vehicle)
   g.restore();
   g.setTransform(1, 0, 0, 1, r, r);   // you: an arrow pointing up (the way you look)
   g.fillStyle = '#ffe14d'; g.strokeStyle = '#1d2a3a'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.moveTo(0, -9 * dpr); g.lineTo(6.5 * dpr, 7 * dpr); g.lineTo(0, 3.5 * dpr); g.lineTo(-6.5 * dpr, 7 * dpr); g.closePath(); g.fill(); g.stroke();
@@ -13840,7 +13840,7 @@ function creepAI(c, dt) {
   // its quarry: the nearer of the two players on foot (in 2 player the host runs the creatures for both)
   let me = walk.on && !walk.dead && !walk.drive && !walk.pass, px = walk.x, pz = walk.z, who = 'me', dP = me ? Math.hypot(px - c.x, pz - c.z) : 1e9;
   { const R = NET.rp; if (R && NET.conn && NET.conn.open && R.walk && !R.drive && !R.ps) { const d2 = Math.hypot(R.x - c.x, R.z - c.z), inMine = me && inCField(px, pz, 2), inTheirs = inCField(R.x, R.z, 2);
-      if (!me || (inTheirs && !inMine) || (inTheirs === inMine && d2 < dP)) { me = true; px = R.x; pz = R.z; dP = d2; who = 'rp'; } } }
+      if (!me || (!c.free && inTheirs && !inMine) || ((c.free || inTheirs === inMine) && d2 < dP)) { me = true; px = R.x; pz = R.z; dP = d2; who = 'rp'; } } }   // (v1.97.164: a debug stalker goes for the nearer of you, corn field or not)
   const lure = creepLure(c); let tx = c.tx, tz = c.tz, sp = K.roam, stopAt = 0.5;
   if (lure) {   // corn: nothing else matters, even outside the field
     tx = lure.g.position.x; tz = lure.g.position.z; sp = K.run * 0.85; stopAt = c.hitR * 0.6 + 0.4;
@@ -13877,6 +13877,7 @@ function updateCreeps(dt) {
   if (!CREEP.ready) return;
   if (CREEP.bites > 0 && (CREEP.healT += dt) > 25) { CREEP.bites = Math.max(0, CREEP.bites - 1); CREEP.healT = 0; }   // (nibbles are half bites)
   if (creepGuest()) {   // the host's creatures: glide to where it last said, legs walking at the speed it said
+    CREEP.gclock = (CREEP.gclock || 0) + dt;
     for (const c of CREEP.list) { const k = Math.min(1, dt * 8); if (c.nx !== undefined) { c.x += (c.nx - c.x) * k; c.z += (c.nz - c.z) * k; c.a += Math.atan2(Math.sin(c.na - c.a), Math.cos(c.na - c.a)) * k; }
       c.t += dt; c.hurtT = Math.max(0, c.hurtT - dt); c.biteCd = Math.max(0, c.biteCd - dt); c.y = Math.max(0, floorAt(c.x, c.z, 2)); if (c.state === 'dead') c.deadT += dt; else if (c.rise > 0) c.rise = Math.max(0, c.rise - dt / 3.2); if (c.zRise > 0) c.zRise -= dt; if (c.kind === 'nibbler') nibPose(c, dt); else creepPose(c, dt);
       if (walk.drive && utv.g && c.hp > 0 && c.biteCd <= 0) { const vs = Math.hypot(utv.vx || 0, utv.vz || 0), dv = Math.hypot(utv.x - c.x, utv.z - c.z); if (vs > 5 && dv < c.maxR * 0.55 + 1.2) { c.biteCd = 0.6; creepHurt(c, Math.round(vs / 3), c.g.position.clone().setY(c.y + c.hitY)); } } }   // I drove into one: the host takes the damage
@@ -13905,20 +13906,24 @@ function creepSnapshot() {   // host -> guest, in the world state
 }
 function creepApplySnapshot(S) {   // guest: make my creatures the host's
   if (!CREEP.ready || !S || !S.l) return;
-  const seen = new Set();
+  const seen = new Set(), first = !CREEP.snapSeen; let born = 0, risen = 0, nearNew = false; CREEP.snapSeen = true;
   for (const [id, k, x, z, a, hp, st, rise, sp] of S.l) {
     const kind = k >= 2 ? 'nibbler' : k ? 'daddy' : 'stalker'; let c = CREEP.list.find(q => q.id === id);   // (3: a zombie nibbler)
     if (c && c.kind !== kind) { scene.remove(c.g); CREEP.list.splice(CREEP.list.indexOf(c), 1); c = null; }
-    if (!c) { c = creepSpawn(kind, x, z, rise > 0, id); if (!c) continue; c.a = a; if (kind === 'daddy' && rise > 0.5) creepSound('roar', c); }
+    let fresh = false;
+    if (!c) { c = creepSpawn(kind, x, z, rise > 0, id); if (!c) continue; c.a = a; fresh = true; if (kind === 'daddy' && rise > 0.5) creepSound('roar', c); if (k === 2 && hp > 0) { born++; if (walk.on && Math.hypot(walk.x - x, walk.z - z) < 60) nearNew = true; } }
     const state = CREEP_ST[st] || 'roam';
     if (k === 3 && !c.zombie) c.zombie = true;
-    if (c.kind === 'nibbler' && c.state === 'dead' && state !== 'dead') { c.zRise = 0.8; c.t = 0; c.mood = 13; c.deadT = 0; creepSound('screech', c); }   // back up as a zombie
+    if (c.kind === 'nibbler' && c.state === 'dead' && state !== 'dead') { c.zRise = 0.8; c.t = 0; c.mood = 13; c.deadT = 0; creepSound('screech', c); if (walk.on && Math.hypot(walk.x - x, walk.z - z) < 60) risen++; }   // back up as a zombie
     if (state === 'hunt' && c.state !== 'hunt') creepSound('screech', c);
-    if (state === 'dead' && c.state !== 'dead') { c.deadT = 0; creepSound('die', c); }
+    if (state === 'dead' && c.state !== 'dead') { if (fresh) c.deadT = 5; else { c.deadT = 0; creepSound('die', c); } }   // (v1.97.164: a corpse already lying there when you join stays quiet - nibblers' corpses stay now)
     if (hp < c.hp && c.kind === 'nibbler') { c.hurtT = 0.3; c.hurtFace = 1.6; }   // (the guest's nibbler faces follow the host's hits)
     c.nx = x; c.nz = z; c.na = a; c.hp = hp; c.state = state; c.speed = sp; if (rise < c.rise || rise === 0) c.rise = rise; seen.add(id);
   }
   for (let i = CREEP.list.length - 1; i >= 0; i--) if (!seen.has(CREEP.list[i].id)) { scene.remove(CREEP.list[i].g); CREEP.list.splice(i, 1); }
+  if (DMG_NOTIFY && walk.on && !first) {   // v1.97.164: the guest gets the host's nibbler news too
+    if (born >= 3 && nearNew) DMG_NOTIFY('😈 Nibblers burst out of the cob stalker!');
+    if (risen && (CREEP.gclock || 0) - (CREEP.zNoteAt == null ? -99 : CREEP.zNoteAt) > 5) { CREEP.zNoteAt = CREEP.gclock || 0; DMG_NOTIFY('🧟 The dead nibblers are getting back up!'); } }
   const ph = CREEP_PH[S.ph] || CREEP.phase;
   if (ph !== CREEP.phase && DMG_NOTIFY && walk.on && inCField(walk.x, walk.z, 60)) { if (ph === 'boss') DMG_NOTIFY('🌽 The corn is shaking...'); else if (ph === 'quiet') DMG_NOTIFY('🌽 The corn goes still.'); }
   CREEP.phase = ph;
