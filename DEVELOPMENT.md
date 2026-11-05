@@ -1,3 +1,25 @@
+## TEST v1.97.165 — pushing through the corn (2026-11-04)
+- Owner: *"When running through the corn there should be an effect especially in first person"*.
+- **The stalks give way** (`cornBend`): clumps within 1.3 m of you lean away from you, tipped over at their foot. They spring back upright with a little swing once you're past, and settle to exactly how they stood.
+  - It works for you on foot, for you driving (2.2 m), and for the other player.
+  - It shows in third person and on the other player's screen without any network traffic.
+  - Only the bent clumps' slots in the instance buffer are re-sent (`addUpdateRange`), never the pivot field's 14,000.
+  - A clump mown while it leans stays mown.
+  - A strongly pushed clump sometimes puffs tassel pollen.
+- **First person, on foot, moving in the corn:**
+  - corn leaves (drawn in code) sweep from in front of you out past the side of your face, more often the faster you go;
+  - the rows close in: a dark-green ring round the view (`#cornVig`) that fades in among the rows and clears when you step out.
+  - Standing still among the rows, the ring stays but no leaves come. Not shown in third person, while driving, mowing or riding.
+- **Sound:** a dry rustle (soft-edged filtered noise) that comes faster and louder with your speed, on foot or driving.
+- Checked in the running game: the rows close in round the view, a leaf swipes past, and the corn bends as you go.
+- New `validate-corn-brush.cjs` checks:
+  - only the clumps round you are pushed, away from you, and spring back exactly;
+  - only their buffer slots are sent;
+  - leaves, closing-in and rustle in the right cases only;
+  - third person, the other player and vehicles;
+  - mown stays mown.
+- Bumped TEST to `1.97.165` / `corn-souls-test-shell-v192`.
+
 ## TEST v1.97.164 — two-player audit of the new features (2026-11-04)
 - Owner: *"Make sure all the new features are synced with 2 player well everything that needs to be synced"*.
 - **Audited, already synced:**
