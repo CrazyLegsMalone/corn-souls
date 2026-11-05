@@ -22,6 +22,7 @@ Shipped 3D GLB models in `assets/models/`:
 - `small_teal_motor_pump.glb`, `large_teal_motor_pump.glb` - industrial motor pumps - first-party (project owner), the fermenter recirculation pumps and the beer well pump in the TEST channel.
 - `grain_haulers/grain_hauler_<colour>.glb` (black, blue, green, pink, red, white, yellow, yellpink) - low-poly grain haulers, rigged end-dump trailer, vertex-coloured - first-party (project owner), the corn delivery trucks in the TEST channel.
 - `lopoly_hydrant.glb` - low-poly fire hydrant - first-party (project owner), by the ethanol load-out shack in the TEST channel.
+- `smoking_area_lopoly.glb` - low-poly smoking area shelter - first-party (project owner), on the grass by the employee parking lot in the TEST channel.
 - `pallet.glb` — "Pallet" by Thingits — CC BY 4.0.
 
 See `../../assets/registry.json`, `../../CREDITS.md`, `../../credits.html`, and `../../ASSET_POLICY.md` for full creator attribution, source URLs, license links, and modification notes.

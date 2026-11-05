@@ -410,6 +410,27 @@
       "notes": "The fire hydrant by the ethanol load-out shack, in the TEST channel."
     },
     {
+      "id": "first-party-smoking-area-lowpoly",
+      "title": "Smoking area shelter (low poly)",
+      "creator": "CrazyLegsMalone (project owner)",
+      "source_platform": "Owner-provided GLB (smoking_area_lopoly.glb, exported with THREE.GLTFExporter)",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/smoking_area_lopoly.glb",
+      "license_name": "First-party work, project owner",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "modifications": "None to the file (stored byte-for-byte). Placed on the grass just east of the employee parking lot's east curb (x 145, z -80, lifted 0.1 m so its concrete pad sits on the grass), so it is by the parking lot and away from the plant (west of the east road). Decorative: no collision, no interaction; the reader marks it noHit and it casts/receives shadows.",
+      "files": [
+        "assets/models/smoking_area_lopoly.glb"
+      ],
+      "checked_on": "2026-11-05",
+      "reviewer": "Cline (owner-provided; the file carries no license metadata and is treated as first-party)",
+      "evidence": "21,932 bytes, 17 nodes, 10 meshes, 8 flat-colour materials, no skins/textures/animations, 174 triangles, 8 x 6 x 3 m bounds (a concrete pad, a painted boundary line, a mat, a bench, an ashtray and a sign, plus four corner posts).",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-provided; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "notes": "The smoking area by the employee parking lot, in the TEST channel. Note: the four corner posts all export at the origin (the exporter dropped their corner offsets), so they render clustered at the centre until the owner re-exports with the post positions."
+    },
+    {
       "id": "first-party-ps1-utv-ranger",
       "title": "PS1 UTV Ranger",
       "creator": "CrazyLegsMalone (project owner) - model generated with Gemini",

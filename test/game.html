@@ -5741,6 +5741,16 @@ function skinnedNpc(npc, cfg, { root }) {
   return R;
 }
 function loadNpcModels() { for (const id in NPC_MODELS) loadCharacter(id, NPC_MODELS[id]); }
+// ---------- SMOKING AREA: the owner's low-poly shelter, set on the grass just east of the employee parking lot's east curb
+// (x 145, z -80). The plant is west of the east road (x 72) and the lot ends at its east curb (x 140), so this sits by the
+// parking lot and away from the plant. Decorative: the reader already marks every part noHit and gives it shadows; there is
+// no collision and no interaction. Its concrete pad is modelled around y 0, so the group is lifted 0.1 m to sit on the grass.
+function loadSmokingArea() {
+  loadGlbModel('/corn-souls/assets/models/smoking_area_lopoly.glb', ({ root }) => {
+    const g = new T.Group(); g.position.set(145, 0.1, -80);
+    g.add(root); scene.add(g); scene.updateMatrixWorld(true);
+  }, 'smoking-area');
+}
 // ---------- PLAYER MODELS: both players wear the operator rig (the same rigid-part family as Vern), tinted to their
 // own vest colour so Player 1 is orange and Player 2 lime. One upload, cloned per avatar; the box body stays as the
 // fallback and keeps driving the walk cycle until the rig arrives, then the rig's own hip and shoulder pivots do.
@@ -7920,6 +7930,7 @@ function init(container) {
   for (const s2 of DRINK_SPOTS) VEND.machines.push({ g: null, byName: null, spot: { x: s2.x, y: s2.y, z: s2.z, yaw: s2.yaw || 0, kind: 'drink' }, flap: null, flapT: 0, busy: 0, ready: true });   // the cans come out of these
   // ---------- the NPC character models (Vern, Rick at the board, Brenda + Tammy in the scale house)
   loadNpcModels();
+  loadSmokingArea();   // the smoking-area shelter east of the employee parking lot
   makeTote(EXR - 22, SZR - 12, 0.15);                                  // a liquid tote sitting in the dirt north of the cooling tower, across the south road                 // south of the south road
   mark('FIRE &\nPROCESS\nWATER', -62, SZR + 30, 24, 40);
   // ---------- EMPLOYEE PARKING: east of the east road, south of the exit road. Driveways in from the exit road (NW corner)
