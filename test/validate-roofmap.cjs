@@ -81,7 +81,7 @@ const frame = async (gpuDone = true) => { rendersThisFrame = 0; ctx.roofMapGuard
   // in the game
   assert.ok(html.includes('if (ROOFMAP.again > 0 && (ROOFMAP.again -= dt) <= 0) roofMapGuard(roofMapRebuildStart);') && html.includes('if (ROOFMAP.job) roofMapGuard(roofMapStep);'), 'the 12 s rebuild runs sliced, a step each frame');
   assert.ok(!/ROOFMAP\.again[^\n]*roofMapBuild\(\)/.test(html), 'not the old one-shot');
-  const rm = code(cut('function roofMapMeshes() {', 'const out = [], sp'));
+  const rm = code(cut('function roofMapSkip() {', 'return skip;'));   // (v1.97.159: the list is shared with the mini map)
   for (const k of ['vehicles', 'train.cars', 'THRUS', 'NPCS', 'birds', 'critters', 'pondFrogs', 'CORN_PROPS_STATE', 'O.cars', 'O.pivot.g', 'CREEP.list', 'utv.g', 'O.shedMower', 'NET.rp', 'NET.rr', 'SKY.dome', 'VULT.s', 'bodies'])
     assert.ok(rm.includes(k), 'the roof map leaves out what moves (in code, not a comment): ' + k);
   console.log('PASS: roof map rebuild (' + nTiles + ' tiles, one drawn a frame, two in flight, swapped in whole; every cell right across the seams; snapped grid; the old map kept on failure, reported; through trains, critters, the irrigation pivot left out)');

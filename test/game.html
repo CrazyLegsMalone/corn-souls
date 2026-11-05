@@ -93,6 +93,10 @@ body.walking #lampBtn{display:block}
 body.pc:not(.padmode) #iprompt svg{display:none}body.pc:not(.padmode) #iprompt .k{display:flex}
 #toast{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);background:rgba(29,42,58,.9);color:#fff;border-radius:12px;padding:8px 14px;font-size:13px;z-index:8;max-width:80vw;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
+#mmap{display:none;position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;width:150px;height:150px;border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none}
+body.walking #mmap{display:block}
+body.walking:not(.pc):not(.padmode) #mmap{width:116px;height:116px;bottom:calc(214px + env(safe-area-inset-bottom,0px));right:calc(18px + env(safe-area-inset-right,0px))}
+@media (max-height:520px){body.walking:not(.pc):not(.padmode) #mmap{bottom:auto;top:calc(58px + env(safe-area-inset-top,0px));width:96px;height:96px}}
 #fps{position:fixed;left:50%;top:4px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.45);border-radius:6px;padding:1px 6px;font:11px monospace;z-index:9;pointer-events:none}
 #modal{position:fixed;inset:0;background:rgba(10,20,35,.45);z-index:10;display:none;align-items:center;justify-content:center}
 #modal.open{display:flex}
@@ -196,6 +200,7 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
 <div id="panel"><div id="ph"><button id="pprev">◀</button><h2 id="pname"></h2><button id="pnext">▶</button><button id="pclose">✕</button></div><div id="pb"></div></div>
 <div id="toast"></div><div id="iprompt"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="19.5" cy="12" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="12" cy="19.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="4.5" cy="12" r="3.6" fill="#fff"/></svg><span class="k">E</span><span>Interact</span></div>
 <div id="fps"></div>
+<canvas id="mmap" aria-hidden="true"></canvas>
 <div id="squish"></div><div id="fired"></div><div id="toxic"></div><div id="nh3"></div><button id="fireBtn" aria-label="Use item">🎯</button><button id="swapBtn" aria-label="Switch item">🔄</button><button id="actBtn" aria-label="Interact">✋</button><button id="eatBtn" aria-label="Eat what you are carrying">🍖</button><button id="jumpBtn" aria-label="Jump">⤴</button><button id="aimBtn" aria-label="Aim down sights">AIM</button><button id="ammoBtn" aria-label="Switch ammo">🎨</button><button id="carBtn" class="tb" aria-label="Get in / out">🚙</button><button id="gasBtn" class="tb">GAS</button><button id="brakeBtn" class="tb">BRAKE</button><button id="hbBtn" class="tb">DRIFT</button><button id="camBtn" class="tb" aria-label="Camera">🎥</button><button id="radioBtn" class="tb" aria-label="Stereo">📻</button><button id="nosBtn" class="tb">NOS</button><div id="nosBar"><i></i></div><div id="xhair"></div>
 <audio id="music" loop preload="auto"></audio>
 <div id="tl"><span id="sky" aria-hidden="true"></span><span id="wx" style="display:none"></span><span id="clock"></span><span id="birdCount">🐦 0</span></div>
@@ -10343,7 +10348,7 @@ function update(sim, dt, events) {
   updatePuffs(dt); updateWeather(dt);
   // every cosmetic / gameplay sub-update in the frame tail is guarded: one throw must not take the render, the
   // first-person gun and the paintball pump cooldown down with it (see stepSafe)
-  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt));
+  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt));
   stepSafe('vehTops', () => updateVehTops());
   stepSafe('deadDrop', () => { if (heldDead && (walk.dead || walk.drive)) deadDrop(); });   // dying or getting in puts the corpse down
   stepSafe('ducks', () => updateDucks(dt)); stepSafe('windsock', () => updateWindsock(dt)); stepSafe('pivot', () => updatePivot(dt));
@@ -12093,13 +12098,7 @@ function lizardClimb(fx, fz, want, got, dt) {   // pushing forward but held back
 // asynchronously (roofMapRebuildStart / roofMapStep), and swapped in whole when the last tile lands.
 function roofAt(x, z) { const R = ROOFMAP; if (!R.h) return -99; const i = Math.floor((x - R.x0) / R.cell), j = Math.floor((z - R.z0) / R.cell); return i >= 0 && j >= 0 && i < R.nx && j < R.nz ? R.h[j * R.nx + i] : -99; }
 function roofMapMeshes() {
-  const skip = new Set(), add = o => { if (o) skip.add(o); };
-  for (const v of vehicles) add(v.g); for (const c of train.cars) add(c.g); for (const R of THRUS) for (const c of R.cars) add(c.g); for (const n of NPCS) add(n.g);   // (v1.97.147: the main-line through trains too)
-  if (typeof birds !== 'undefined' && birds) for (const o of birds) add(o.g); if (typeof critters !== 'undefined' && critters) for (const o of critters) add(o.g);   // v1.97.147: and everything small that wanders: pigeons (a flying one
-  if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const o of pondFrogs) add(o.g || o.group); if (typeof CORN_PROPS_STATE !== 'undefined' && CORN_PROPS_STATE) for (const o of CORN_PROPS_STATE.items || []) add(o.g);   // stretched the map's extent), rats, wall-climbing lizards, frogs, thrown corn
-  if (O.cars) for (const c of O.cars) add(c.g); if (O.pivot) add(O.pivot.g);   // (v1.97.147: the irrigation pivot sweeps its 345 m arm round the field - a map of it is wrong a minute later)
-  if (typeof CREEP !== 'undefined') for (const c of CREEP.list) add(c.g); add(utv.g); if (O.shedMower) add(O.shedMower.g); if (NET.rp) add(NET.rp.av); if (NET.rr) add(NET.rr.g);
-  add(SKY.dome); add(SKY.clouds); add(SKY.stars); add(VIEW.av); add(VULT.s); add(VULT.sprite); for (const b of bodies) add(b.g || b.group || b);
+  const skip = roofMapSkip();
   const out = [], sp = new T.Sphere(), wsc = new T.Vector3();
   (function walk_(o) {
     if (!o.visible || o.userData.noHit || o.userData.noRoof || skip.has(o)) return;
@@ -12120,6 +12119,16 @@ function roofMapMeshes() {
 // swapped in (with the wall tops) when every tile is in. The first build when you start walking is still the one-shot
 // roofMapBuild (it is part of loading). Same picture, same numbers: each tile is the full build's camera cut down to its cells.
 const ROOFMAP_TILE = 128;
+function roofMapSkip() {   // everything that moves or isn't the plant (shared by the roof map and the mini map)
+  const skip = new Set(), add = o => { if (o) skip.add(o); };
+  for (const v of vehicles) add(v.g); for (const c of train.cars) add(c.g); for (const R of THRUS) for (const c of R.cars) add(c.g); for (const n of NPCS) add(n.g);   // (v1.97.147: the main-line through trains too)
+  if (typeof birds !== 'undefined' && birds) for (const o of birds) add(o.g); if (typeof critters !== 'undefined' && critters) for (const o of critters) add(o.g);   // v1.97.147: and everything small that wanders: pigeons (a flying one
+  if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const o of pondFrogs) add(o.g || o.group); if (typeof CORN_PROPS_STATE !== 'undefined' && CORN_PROPS_STATE) for (const o of CORN_PROPS_STATE.items || []) add(o.g);   // stretched the map's extent), rats, wall-climbing lizards, frogs, thrown corn
+  if (O.cars) for (const c of O.cars) add(c.g); if (O.pivot) add(O.pivot.g);   // (v1.97.147: the irrigation pivot sweeps its 345 m arm round the field - a map of it is wrong a minute later)
+  if (typeof CREEP !== 'undefined') for (const c of CREEP.list) add(c.g); add(utv.g); if (O.shedMower) add(O.shedMower.g); if (NET.rp) add(NET.rp.av); if (NET.rr) add(NET.rr.g);
+  add(SKY.dome); add(SKY.clouds); add(SKY.stars); add(VIEW.av); add(VULT.s); add(VULT.sprite); for (const b of bodies) add(b.g || b.group || b);
+  return skip;
+}
 function roofMapGuard(f) { try { f(); } catch (e) { roofMapAbort(); PERF.errs++; PERF.err = 'roofmap'; PERF.msg = (e && e.message) || String(e); try { console.error('[roofmap] rebuild failed', e); } catch (err) {} } }
 function roofMapShader() { return new T.ShaderMaterial({ side: T.DoubleSide,
     vertexShader: 'varying float vY; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }',
@@ -12192,6 +12201,109 @@ function roofMapTops(cell) {   // each wall line stops at the top of its wall: t
     for (let t = 0; t <= L; t += Math.max(0.5, cell)) for (const o of [-0.45, 0, 0.45]) { const v = roofAt(ax + (bx - ax) * t / L + nxv * o, az + (bz - az) * t / L + nzv * o); if (v > top) top = v; }
     tops[wi] = top >= 2 ? top : Infinity; });
   return tops;
+}
+// ---------- MINI MAP (v1.97.159, owner: "mini map to bottom right"). A round map in the bottom-right corner while you walk or drive:
+// centred on you and turned with your view (what is ahead is up), your arrow in the middle, the other player as a dot, N on the rim.
+// The map itself is a picture of the plant from straight above, baked once - drawn a 256 x 256 tile a frame into a render target
+// and read back asynchronously (like the roof map rebuild, so no hitch), unlit so it reads the same by day or night, without the
+// things that move (roofMapSkip). Baked when you first start walking and once more when the late models are in.
+const MMAP = { cv: null, x0: 0, z0: 0, mpp: 1, W: 0, H: 0, job: null, again: -1, bakes: 0, t: 0, R: 90 };
+const MMAP_TILE = 256, MMAP_BOX = [-1200, -500, 500, 800];   // (x0, z0, x1, z1)
+function mmapMeshes() {
+  const skip = roofMapSkip(), out = [];
+  (function walk_(o) {
+    if (!o.visible || skip.has(o) || o.isSprite || o.isPoints || o.isLine) return;
+    if (o.isMesh && o.geometry) { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); out.push(o); }
+    for (const c of o.children) walk_(c);
+  })(scene);
+  return out;
+}
+function mmapFlat(m) {   // the unlit stand-in for a material: its colour and texture, nothing else (shader materials keep their own)
+  if (!m || m.isShaderMaterial || m.isMeshBasicMaterial) return m;
+  const b = new T.MeshBasicMaterial({ color: m.color ? m.color.getHex() : 0xffffff, map: m.map || null, transparent: !!m.transparent, opacity: m.opacity == null ? 1 : m.opacity, side: T.DoubleSide, vertexColors: !!m.vertexColors, alphaTest: m.alphaTest || 0, depthWrite: m.depthWrite !== false });
+  if (m.color) b.color.copy(m.color); return b;
+}
+function mmapBakeStart() {
+  if (!renderer || !scene || MMAP.job || typeof document === 'undefined') return false;
+  scene.updateMatrixWorld(true);
+  const list = mmapMeshes(), box = new T.Box3(), b = new T.Box3();
+  for (const m of list) { if (m.geometry.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) > 900) continue; b.setFromObject(m); box.union(b); }   // (not the 16 km grass or the highway loop)
+  if (box.isEmpty()) return false;
+  // the ground you can get to round the plant (the rail and highway run on for kilometres): ~0.8 m a pixel instead of ~1.4
+  box.min.x = Math.max(box.min.x - 60, MMAP_BOX[0]); box.max.x = Math.min(box.max.x + 60, MMAP_BOX[2]); box.min.z = Math.max(box.min.z - 60, MMAP_BOX[1]); box.max.z = Math.min(box.max.z + 60, MMAP_BOX[3]);
+  const maxPx = Math.min(2048, renderer.capabilities.maxTextureSize || 2048), mpp = Math.max(0.75, (box.max.x - box.min.x) / maxPx, (box.max.z - box.min.z) / maxPx);
+  const x0 = Math.floor(box.min.x / mpp) * mpp, z0 = Math.floor(box.min.z / mpp) * mpp, W = Math.ceil((box.max.x - x0) / mpp), H = Math.ceil((box.max.z - z0) / mpp);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d'); g.fillStyle = '#76bd62'; g.fillRect(0, 0, W, H);   // (grass colour where nothing is drawn)
+  const LAYER = 29; for (const m of list) m.layers.enable(LAYER);
+  const flat = MMAP.flat || (MMAP.flat = new Map()); for (const m of list) for (const q of (Array.isArray(m.material) ? m.material : [m.material])) if (q && !flat.has(q)) flat.set(q, mmapFlat(q));   // (kept between bakes: new materials are the slow part)
+  const tiles = []; for (let j = 0; j < H; j += MMAP_TILE) for (let i = 0; i < W; i += MMAP_TILE) tiles.push([i, j]);
+  const cam = new T.OrthographicCamera(0, 1, 0, -1, 1, 1200); cam.position.set(x0, 600, z0); cam.up.set(0, 0, -1); cam.lookAt(x0, 0, z0); cam.layers.set(LAYER); cam.updateMatrixWorld(true);
+  const rts = [0, 1].map(() => { const rt = new T.WebGLRenderTarget(MMAP_TILE, MMAP_TILE, { depthBuffer: true }); if (T.SRGBColorSpace) rt.texture.colorSpace = T.SRGBColorSpace; return { rt, px: new Uint8Array(MMAP_TILE * MMAP_TILE * 4), busy: false }; });
+  MMAP.job = { list, flat, LAYER, tiles, next: 0, done: 0, cam, rts, cv, g, x0, z0, mpp, W, H, img: g.createImageData(MMAP_TILE, MMAP_TILE) };
+  return true;
+}
+function mmapTile(J, slot, i0, j0) {
+  const S = MMAP_TILE, c = J.mpp, cam = J.cam;
+  cam.left = i0 * c; cam.right = (i0 + S) * c; cam.top = -j0 * c; cam.bottom = -(j0 + S) * c; cam.updateProjectionMatrix();
+  const bg = scene.background, fog = scene.fog, cc = renderer.getClearColor(new T.Color()), ca = renderer.getClearAlpha(), sAU = renderer.shadowMap.autoUpdate, sNU = renderer.shadowMap.needsUpdate, prt = renderer.getRenderTarget(), iC = renderer.info.render.calls, iT = renderer.info.render.triangles, keep = new Map();
+  try {
+    for (const m of J.list) { keep.set(m, m.material); m.material = Array.isArray(m.material) ? m.material.map(q => J.flat.get(q) || q) : (J.flat.get(m.material) || m.material); }
+    scene.background = null; scene.fog = null; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = false;
+    renderer.setRenderTarget(slot.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, cam);
+  } finally {
+    for (const [m, q] of keep) m.material = q;
+    scene.background = bg; scene.fog = fog; renderer.shadowMap.autoUpdate = sAU; renderer.shadowMap.needsUpdate = sNU;
+    renderer.info.render.calls = iC; renderer.info.render.triangles = iT;   // not the world: keep it out of the fps readout
+    renderer.setRenderTarget(prt); renderer.setClearColor(cc, ca);
+  }
+  const put = () => {   // the read-back rows run bottom-up; the picture runs north (-z) at the top
+    const d = J.img.data, px = slot.px;
+    for (let row = 0; row < S; row++) { const o = (S - 1 - row) * S * 4, k0 = row * S * 4; for (let k = 0; k < S * 4; k += 4) { const a = px[k0 + k + 3];
+      if (a < 8) { d[o + k + 3] = 0; continue; } d[o + k] = px[k0 + k]; d[o + k + 1] = px[k0 + k + 1]; d[o + k + 2] = px[k0 + k + 2]; d[o + k + 3] = 255; } }
+    const tmp = J.tmp || (J.tmp = Object.assign(document.createElement('canvas'), { width: S, height: S }));
+    tmp.getContext('2d').putImageData(J.img, 0, 0); J.g.drawImage(tmp, i0, j0);   // (drawn over the grass fill: empty pixels keep it)
+    slot.busy = false; J.done++;
+  };
+  slot.busy = true;
+  if (renderer.readRenderTargetPixelsAsync) renderer.readRenderTargetPixelsAsync(slot.rt, 0, 0, S, S, slot.px).then(() => { if (MMAP.job === J) put(); }, () => { if (MMAP.job === J) mmapAbort(); });
+  else { renderer.readRenderTargetPixels(slot.rt, 0, 0, S, S, slot.px); put(); }
+}
+function mmapStep() {
+  const J = MMAP.job; if (!J) return;
+  if (J.next < J.tiles.length) { const slot = J.rts.find(s => !s.busy); if (slot) { const [i, j] = J.tiles[J.next++]; mmapTile(J, slot, i, j); } return; }
+  if (J.done < J.tiles.length) return;
+  Object.assign(MMAP, { cv: J.cv, x0: J.x0, z0: J.z0, mpp: J.mpp, W: J.W, H: J.H }); MMAP.bakes++;
+  mmapAbort();
+}
+function mmapAbort() {
+  const J = MMAP.job; if (!J) return; MMAP.job = null;
+  for (const m of J.list) m.layers.disable(J.LAYER);
+  for (const s of J.rts) s.rt.dispose();
+}
+function mmapGuard(f) { try { f(); } catch (e) { mmapAbort(); PERF.errs++; PERF.err = 'minimap'; PERF.msg = (e && e.message) || String(e); } }
+function minimapUpdate(dt) {
+  if (!walk.on) return;
+  if (!MMAP.cv && !MMAP.job && MMAP.again < 0) { mmapGuard(mmapBakeStart); MMAP.again = 14; }   // first walk: bake now, and once more for the late models
+  else if (MMAP.again > 0 && !MMAP.job && (MMAP.again -= dt) <= 0) mmapGuard(mmapBakeStart);
+  if (MMAP.job) mmapGuard(mmapStep);
+  if ((MMAP.t -= dt) > 0) return; MMAP.t = 1 / 15;   // the widget redraws 15 times a second
+  const el = typeof document !== 'undefined' && document.getElementById('mmap'); if (!el || !el.getClientRects().length) return;   // (offsetParent is always null on a fixed element)
+  const dpr = Math.min(2, window.devicePixelRatio || 1), css = el.clientWidth, n = Math.round(css * dpr); if (el.width !== n) { el.width = n; el.height = n; }
+  const g = el.getContext('2d'), r = n / 2, k = r / MMAP.R;   // pixels per metre
+  const pos = walk.drive && utv.g ? utv.g.position : walk, dir = camera.getWorldDirection(tv), yaw = Math.atan2(-dir.x, -dir.z);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, n, n);
+  g.save(); g.beginPath(); g.arc(r, r, r - dpr, 0, Math.PI * 2); g.clip();
+  g.fillStyle = '#76bd62'; g.fillRect(0, 0, n, n);
+  g.translate(r, r); g.rotate(yaw); g.scale(k, k); g.translate(-pos.x, -pos.z);
+  if (MMAP.cv) { g.imageSmoothingEnabled = false; g.drawImage(MMAP.cv, MMAP.x0, MMAP.z0, MMAP.W * MMAP.mpp, MMAP.H * MMAP.mpp); }
+  if (NET.rp && NET.rp.av && NET.rp.av.visible) { const q = NET.rp.av.position; g.fillStyle = '#ff4fa2'; g.strokeStyle = '#fff'; g.lineWidth = 1.5 * dpr / k; g.beginPath(); g.arc(q.x, q.z, 4.5 * dpr / k, 0, Math.PI * 2); g.fill(); g.stroke(); }
+  g.restore();
+  g.setTransform(1, 0, 0, 1, r, r);   // you: an arrow pointing up (the way you look)
+  g.fillStyle = '#ffe14d'; g.strokeStyle = '#1d2a3a'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.moveTo(0, -9 * dpr); g.lineTo(6.5 * dpr, 7 * dpr); g.lineTo(0, 3.5 * dpr); g.lineTo(-6.5 * dpr, 7 * dpr); g.closePath(); g.fill(); g.stroke();
+  const na = yaw - Math.PI / 2, nr = r - 10 * dpr;   // N on the rim, where north (-z) is
+  g.setTransform(1, 0, 0, 1, 0, 0); g.font = 'bold ' + Math.round(11 * dpr) + 'px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const nx = r + Math.cos(na) * nr, ny = r + Math.sin(na) * nr; g.fillStyle = 'rgba(29,42,58,.75)'; g.beginPath(); g.arc(nx, ny, 8 * dpr, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff'; g.fillText('N', nx, ny + 0.5 * dpr);
+  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(r, r, r - dpr, 0, Math.PI * 2); g.stroke();
 }
 function roofMapBuild() {
   if (!renderer || !scene) return false;
@@ -14359,7 +14471,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },

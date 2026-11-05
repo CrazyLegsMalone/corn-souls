@@ -1,3 +1,29 @@
+## TEST v1.97.159 — a mini map in the bottom-right corner (2026-11-04)
+- Owner: *"mini map to bottom right"*. There was no mini map, so I asked; the owner chose a new, real one.
+- **The widget:**
+  - a round map, bottom right while walking or driving (150 px);
+  - centred on you and turned with your view, so what is ahead is up;
+  - a yellow arrow for you, a pink dot for the other player, N on the rim;
+  - redrawn 15 times a second; drawing is skipped while it is hidden.
+  - On a touch screen it is 116 px and sits above the fire / swap / eat / aim buttons. On a short landscape phone it moves up under the pause button.
+- **The map picture:** baked from straight above in 256 × 256 tiles, one a frame, read back asynchronously, the same way as the roof map rebuild.
+  - It is unlit: each mesh is drawn with a flat stand-in of its own colour and texture, so it reads the same by day or night.
+  - It leaves out what moves (`roofMapSkip`, now shared with the roof map).
+  - It covers the play area round the plant (x -1200..500, z -500..800) at about 0.83 m a pixel.
+  - It is baked when you first walk, and once more 14 s later for the late models. The flat stand-ins are kept between bakes; creating them was the slow part.
+- **Measured headless (SwiftShader):** the second bake runs 63 tiles at about 6–9 ms each. One tile, over the corn field's 14,000 clumps, takes ~60 ms; that is vertex work a real GPU does far faster. The first bake's first tile (~150 ms) builds the stand-ins at spawn, next to the roof map's one-time build.
+- **Tests:** new `validate-minimap.cjs` runs the bake against a stand-in renderer that paints each pixel from its world position, and checks:
+  - every pixel is in place (it fails on a flipped tile);
+  - one tile a frame;
+  - materials are swapped back;
+  - the fps readout is untouched;
+  - moving things are left out;
+  - the stand-ins are reused;
+  - the widget's placement, and that the map turns the right way.
+
+  `validate-roofmap.cjs` now reads the shared skip list.
+- Bumped TEST to `1.97.159` / `corn-souls-test-shell-v186`.
+
 ## TEST v1.97.158 — Daddy Cob Legs weaker, a pixel/CRT title, and the green ground flicker's real cause (2026-11-04)
 - Owner: *"reduce the health of daddy cob legs. remove no kernel left unburnt from start menu, make version on start menu 10% bigger. add the crt shader and pixel effect from the bonfire onto the title and cry and dry. ground still flickers green especially when looking down at it from high places like the top of tin bin 4"*.
 - **Daddy Cob Legs:** health 60 → 30 (three stalkers' worth). The owner gave no number, so this is a halving.
