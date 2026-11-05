@@ -8951,6 +8951,15 @@ function quack(vol, pan) {   // a nasal duck quack (or two or three): buzzy sawt
     o.connect(bp); bp.connect(g); g.connect(out); o.start(t); o.stop(t + 0.16);
   }
 }
+// v1.97.179, owner: "only duck sync" - the host swims the ducks and sends where they are 4 times a second; the guest glides to
+// that. Three numbers a duck (its offset inside the pond and its heading), in the order both sides build them (PONDS, 6 a pond),
+// so an index is stable. The bob, the facing mirror and the quack stay local on both sides (they are cosmetic and camera-relative).
+function duckRows() { const a = []; for (const d of ducks) a.push(+d.lx.toFixed(2), +d.lz.toFixed(2), +d.a.toFixed(2)); return a; }
+function duckApply(a) {
+  if (!ducks.length || !a) return;
+  for (let i = 0; i < ducks.length && i * 3 + 2 < a.length; i++) { const d = ducks[i]; if (!d.tl) d.tl = [0, 0, 0]; d.tl[0] = a[i * 3]; d.tl[1] = a[i * 3 + 1]; d.tl[2] = a[i * 3 + 2]; }
+}
+let duckNetT = 0;
 function updateDucks(dt) {
   const show = walk.on;
   if (show && ducks.length && (quackT -= dt) <= 0) {   // now and then one of the nearer ducks quacks; louder the closer you are, panned left/right
@@ -8969,19 +8978,25 @@ function updateDucks(dt) {
     }
   }
   const c = Math.cos(PONDS.phi), sn = Math.sin(PONDS.phi), right = V3().setFromMatrixColumn(camera.matrixWorld, 0);
+  const guest = critNetGuest();   // 2 player: the host owns the ducks, the guest only follows them (v1.97.179)
   for (const d of ducks) {
     d.s.visible = true;
-    if ((d.t -= dt) <= 0) { d.t = 3 + Math.random() * 6; d.a += (Math.random() - 0.5) * 2.5; }    // paddle off in a new direction now and then
-    d.lx += Math.cos(d.a) * 0.6 * dt; d.lz += Math.sin(d.a) * 0.6 * dt;
-    const E = PONDS.half - 2.5;                                                                    // stay a couple of meters off the bank
-    if (Math.abs(d.lx) > E) { d.lx = Math.sign(d.lx) * E; d.a = Math.PI - d.a; }
-    if (Math.abs(d.lz) > E) { d.lz = Math.sign(d.lz) * E; d.a = -d.a; }
-    if (Math.max(Math.abs(d.lx), Math.abs(d.lz)) < E - 12) d.a = Math.atan2(d.lz, d.lx) + (Math.random() - 0.5) * 0.6;   // drifted out to the middle: head back toward the edge
+    if (guest) {
+      if (d.tl) { const k = Math.min(1, dt * 6); d.lx += (d.tl[0] - d.lx) * k; d.lz += (d.tl[1] - d.lz) * k; d.a += Math.atan2(Math.sin(d.tl[2] - d.a), Math.cos(d.tl[2] - d.a)) * k; }
+    } else {
+      if ((d.t -= dt) <= 0) { d.t = 3 + Math.random() * 6; d.a += (Math.random() - 0.5) * 2.5; }    // paddle off in a new direction now and then
+      d.lx += Math.cos(d.a) * 0.6 * dt; d.lz += Math.sin(d.a) * 0.6 * dt;
+      const E = PONDS.half - 2.5;                                                                    // stay a couple of meters off the bank
+      if (Math.abs(d.lx) > E) { d.lx = Math.sign(d.lx) * E; d.a = Math.PI - d.a; }
+      if (Math.abs(d.lz) > E) { d.lz = Math.sign(d.lz) * E; d.a = -d.a; }
+      if (Math.max(Math.abs(d.lx), Math.abs(d.lz)) < E - 12) d.a = Math.atan2(d.lz, d.lx) + (Math.random() - 0.5) * 0.6;   // drifted out to the middle: head back toward the edge
+    }
     const x = d.px + d.lx * c + d.lz * sn, z = d.pz - d.lx * sn + d.lz * c;
     d.s.position.set(x, PONDS.water + 0.24 + 0.03 * Math.sin(clock * 2 + d.ph), z);              // floating, bobbing a little
     const wx = Math.cos(d.a) * c + Math.sin(d.a) * sn, wz = -Math.cos(d.a) * sn + Math.sin(d.a) * c; // swim direction in the world
     d.s.scale.x = (wx * right.x + wz * right.z >= 0 ? 1 : -1) * 0.75;                             // face left or right the way it's swimming
   }
+  if (!guest) { duckNetT += dt; if (duckNetT >= 0.25) { duckNetT = 0; if (typeof NET !== 'undefined' && NET.conn && NET.conn.open) netSend({ t: 'du', a: duckRows() }); } }   // 4 a second, host only
 }
 let WIND = { mph: 8, from: 180 };   // live wind from the weather fetch (speed, direction it blows FROM, degrees from north)
 function updateWindsock(dt) {
@@ -10787,6 +10802,7 @@ function wsClock() { return GT.real ? null : [Math.round(gameDate().getTime()), 
 function netRecv(m) {
   if (!m || !m.t) return;
   if (m.t === 'cp') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }
+  if (m.t === 'du') { if (!NET.host) duckApply(m.a); return; }   // the host's ducks (v1.97.179)
   if (m.t === 'crs') { if (!NET.host) critApply(m); return; }   // critters (v1.97.112)
   if (m.t === 'crh') { if (NET.host) critRecvHit(m); return; }
   if (m.t === 'crp') { if (NET.host) critRecvP(m); return; }

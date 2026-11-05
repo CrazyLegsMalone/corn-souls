@@ -1,3 +1,14 @@
+## TEST v1.97.179 — the ducks are synced, and nothing else (2026-11-04)
+- Owner: *"only duck sync no phone reload"* — so the ducks, and no phone reload button.
+- **The ducks were the last thing each machine ran for itself.** Twelve of them (six a pond) paddled about on their own random seeds, so the host and the guest saw the same two ponds with different ducks in them.
+- **Now the host owns them** (`updateDucks`): it swims the twelve as before and sends **3 numbers a duck** — its offset inside the pond and its heading, to 2 dp — **4 times a second** (`{ t: 'du', a: [...] }`, 36 numbers a packet). The order is stable because both sides build them the same way (`for (const [px, pz] of PONDS) for 6`), so an index means the same duck on both machines.
+- **The guest runs no duck AI at all**: `duckApply()` stores the three numbers per duck and the guest glides to them (6/s easing, heading turning the short way round). The bank clamp, the turn timers and the "drifted to the middle, head back" rule stay host-only.
+- **Left local on both sides, on purpose:** the bob (`clock`), the facing mirror (camera-relative) and the quack (a random timer, panned against your own camera) — none of them is state, and syncing them would cost a packet for nothing.
+- **Solo is untouched:** `critNetGuest()` is false, so the host path runs and the packet is only sent when a connection is open. A guest that joins before its ducks exist drops early packets (`duckApply` returns).
+- New `validate-duck-sync.cjs` (58th suite in CI) runs the game's own `updateDucks` / `duckRows` / `duckApply` on a host and a guest: about 4 packets a second carrying 36 numbers, twelve ducks never leaving their pond, the guest not moving before a packet and running no turn timers (so it sends nothing), then landing within 0.35 m of the host after 2 s and turning its heading the short way round; plus both sides still drawing and mirroring them, and the wiring (guest applies, host sends, solo runs the host path). It fails on the previous revision (`ReferenceError: duckRows is not defined`) and passes now.
+- Verified locally: the 58 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.179` / `corn-souls-test-shell-v206`.
+
 ## TEST v1.97.178 — the other player's headlights, and the guest hears the pigeons (2026-11-04)
 - Owner: *"sync headlights and pigeon coos"* — two of the four "unsynced niceties" left on the `HANDOFF_CLINE.md` §7 list.
 - **Nothing new goes over the wire.** The other player's vehicle pose is already sent every frame (`m.u` for their Ranger, `m.car` for the car they got into, `m.d` for "driving"), and the pigeons are already mirrored by the `crs` snapshot. Both changes only read what was arriving all along, so there is no extra traffic and no new failure mode.
