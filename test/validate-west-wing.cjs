@@ -82,4 +82,25 @@ sc.siloClimb(-171,12.5,9.5,22);sc.siloClimb(-171,-12.5,9.5,22);sc.siloClimb(-164
 const siloWalks=sc.WALK_SURF.slice(-4);assert.equal(siloWalks.length,4);
 for(const w of siloWalks){assert.equal(w.y0,22.15);assert.equal(w.y1,22.15);}
 assert.ok(html.includes("groundMat('asphalt'")&&html.includes("groundMat('dirtroad'"),'flat textured asphalt and dirtroad materials used for roads');
-console.log('PASS: real Three.js construction, roof footprint, populated rooms centered between cook alley & evaps, Rick relocation, trench drains, doors/collision, straight east wall, flat silo roofs, flat textured roads, and all eight full-size evaporators with aisle clearance; all scripts parse');
+// v1.97.156, owner: "when in process building looking out you shouldn't be able to see outside". The fermenter and beer well
+// shells are translucent glass (tank() draws them at 38%), and the walls used to stop at each tank's tangent point, so a tank
+// was a window onto the yard. Every tank slot now carries the wall across it - so the ferm alley's two exterior walls have no
+// gaps: none between the north end and the south end of the west wall, and none south of the open walkway on the east wall.
+{ const wm = (next.wallMats || []).find(m => m.userData && m.userData.ribbed && m.opacity === 0.5);
+  assert.ok(wm, 'the ribbed siding material is in the build');
+  const panels = next.scene.children.filter(o => o.material === wm && o.geometry && o.geometry.type === 'BoxGeometry');
+  const gaps = (x, z0, z1) => {
+    const iv = panels.filter(o => Math.abs(o.position.x - x) < 0.6 && o.geometry.parameters.depth > o.geometry.parameters.width)
+      .map(o => [Math.max(z0, o.position.z - o.geometry.parameters.depth / 2), Math.min(z1, o.position.z + o.geometry.parameters.depth / 2)])
+      .filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0]);
+    let at = z0; const out = [];
+    for (const [a, b] of iv) { if (b <= at) continue; if (a - at > 0.3) out.push([at, a]); at = Math.max(at, b); }
+    if (z1 - at > 0.3) out.push([at, z1]);
+    return out;
+  };
+  const west = gaps(-31, -96.3, -12.5), east = gaps(-7.6, -96.3, -23.7);
+  assert.deepEqual(west, [], 'the west wall of the ferm alley has no gap for the tanks to be seen through (' + JSON.stringify(west) + ')');
+  assert.deepEqual(east, [], 'nor the east wall, north of the open walkway (' + JSON.stringify(east) + ')');
+  assert.ok(panels.filter(o => Math.abs(o.position.x + 7.6) < 0.6 && Math.abs(o.position.z - -47.1) < 0.6 && o.geometry.parameters.depth > 14).length === 1,
+    'the wall is carried across Ferm 1\'s slot, behind the tank'); }
+console.log('PASS: real Three.js construction, roof footprint, populated rooms centered between cook alley & evaps, Rick relocation, trench drains, doors/collision, straight east wall, flat silo roofs, flat textured roads, and all eight full-size evaporators with aisle clearance; the ferm alley walls are closed across every tank slot; all scripts parse');

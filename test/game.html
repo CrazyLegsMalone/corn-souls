@@ -6747,6 +6747,13 @@ function init(container) {
     // ferm alley walls on the tank column lines (tanks half in, half out)
     wall(FXW, BWZ - BWR, FXW, fz[0] + FR, PH, wm, [], { trim: true }); wall(FXW, fz[0] - FR, FXW, fz[1] + FR, PH, wm, [], { trim: true }); wall(FXW, fz[1] - FR, FXW, fz[2] + FR, PH, wm, [], { trim: true });
     wall(FXE, Z1 - FR, FXE, fz[0] + FR, PH, wm, [], { trim: true }); wall(FXE, fz[0] - FR, FXE, fz[1] + FR, PH, wm, [], { trim: true }); wall(FXE, fz[1] - FR, FXE, fz[2] + FR, PH, wm, [], { trim: true });
+    // v1.97.156, owner: "when in process building looking out you shouldn't be able to see outside". The fermenter shells are
+    // translucent glass (tank() draws them at 38%), and the wall above stops at each tank's tangent point - so looking at a tank
+    // you were looking straight through it at the yard. The wall is now carried across every tank slot on both walls, behind the
+    // tank: it reads as half-embedded in the wall (which it is), from inside and from the yard. That is 7 fermenters plus the
+    // beer well, whose 19 m slot was open in the same way (measured: the west wall had a -54.5 .. -35.5 gap).
+    for (const [sx, sz, sr] of [[FXE, Z1, FR], [FXE, fz[0], FR], [FXE, fz[1], FR], [FXE, fz[2], FR], [FXW, fz[0], FR], [FXW, fz[1], FR], [FXW, fz[2], FR], [FXW, BWZ, BWR]])
+      wall(sx, sz - sr + 0.02, sx, sz + sr - 0.02, PH, wm, [], {});   // 2 cm inside the tank's tangent line, so the panel meets the wall ends without a sliver
     wall(FXW + FR - 0.3, ZN, FXE - FR + 0.3, ZN, PH, wm, [[AC - 1.0 - (FXW + FR - 0.3), 2.95, 3.05], [AC + 2.2 - (FXW + FR - 0.3), 0.95]], { trim: true, leaf: 1 });   // north end of the ferm alley: roll-up door (west) + man door (east)
       egressStrobe(AC + 2.2, ZN, 0, 1);   // north-end man door of the ferm alley, strobe inside
     rollDoor(AC - 1.0, ZN + 0.05, true, 2.9, 3.0, -1, 'slat', 1);                                   // housing inside (south), bollards outside

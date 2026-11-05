@@ -1,3 +1,12 @@
+## TEST v1.97.156 — you can no longer see the yard through the fermenters (2026-11-04)
+- Owner, screenshot from inside the process building: *"whin in process building looking out you shouldn't be able to see outside"* — a rectangle of sky, with the plant's outdoor rack in it, between the tanks.
+- **The cause was two things meeting.** `tank()` draws a fermenter's shell as **translucent glass** (`glass(0xdff4ff, 0.38)`) so the liquid level reads through it - and the ferm alley walls are built as **segments that stop at each tank's tangent point** (`wall(FXE, fz[0] - FR, FXE, fz[1] + FR, …)`, FR = 7.4 = the tank radius), on the assumption that the tank itself closes the gap. It does close it physically - but it is glass, so every tank slot was a window onto the yard.
+- **The fix:** the wall is carried **across every tank slot**, 2 cm inside the tangent line, so the panels meet the wall ends with no sliver: 4 slots on the east wall (Ferm 1-4), 3 on the west (Ferm 5-7) and the beer well's 19 m slot, which was open in exactly the same way. The tanks now read as half-embedded in a continuous wall - which is what "half in, half out" means - from inside and from the yard. No collision is added: the new segments sit inside the tanks that were already solid.
+- **Measured in the headless build** (`validate-west-wing.cjs` runs the real construction): before, the east wall had four 14.80 m gaps and the west wall three 14.80 m plus one 19.00 m; now every wall line from the north end to the south end is continuous (west: 10 panels, no gap; east: 9 panels, the only opening left is the open walkway to the shop at -23.7 .. 16.2, which is indoors).
+- Tests: `validate-west-wing.cjs` (which owns this building) now measures the siding panels along both wall lines and requires no gap, plus that one panel is drawn across Ferm 1's slot behind the tank. It fails on the previous revision and passes now.
+- Verified locally: the 46 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes. LIVE is untouched.
+- Bumped TEST to `1.97.156` / `corn-souls-test-shell-v183`.
+
 ## TEST v1.97.155 — a cooling tower plume off every fan, not one out of the middle (2026-11-04)
 - Owner: *"cooling tower clouds should come from each cooling fan that is running not just a single point"*.
 - **What it was:** one `STACKS` entry at the tower's centre (`x: TOWER.x, z: TOWER.z`, rate 8, radius `max(2.6, w * 0.12)`), so a single column rose out of the middle of a 47 m deck while four fan rotors turned on top of it.
