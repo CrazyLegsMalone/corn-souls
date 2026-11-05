@@ -863,17 +863,59 @@
       "required_notice": "No endorsement by the creator is implied."
     },
     {
+      "id": "sketchfab-loves-art-low-poly-male-rick-2-0",
+      "title": "Low Poly Male — Rick 2.0 (Corn Souls Crew Wardrobe build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3",
+      "evidence": "Embedded glTF asset.extras: title 'Rick_2.0 (Corn Souls character)', author Loves_Art (https://sketchfab.com/Loves_Art), license CC-BY-4.0, the source URL above, changes 'Recoloured, expression edited, accessories added in the Corn Souls Crew Wardrobe'. Exported by the owner's wardrobe tool (THREE.GLTFExporter r170); the drop also carried a CREDITS.txt with the same notice.",
+      "notes": "Worn by the NPC Rick (seated, in the control room) in the TEST channel since v1.97.184, in place of the plain Low Poly Male. 6,650 triangles in 19 parts: 14 skinned meshes on a 66-joint Mixamo skeleton split across 14 skins, plus five rigid accessory meshes (cowboy_hat, hat_band, glasses, lens, and his mustache on an unnamed head node) parented to bones; 19 materials and 2 embedded colour maps. Its 'walking' clip is present but has no channels (unused either way: the NPCs stand or sit still).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Relative to the original Low Poly Male: recoloured (skin, clothing, shoes, hair, eyes), facial expression edited (angry), and accessories added (cowboy hat and band, sunglasses, mustache, boots). At runtime: scaled to 1.78 m, arms lowered from the T-pose, legs folded to sit, and NOT recoloured — the wardrobe's colours are the file's own.",
+      "files": [
+        "assets/models/rick_2_0.glb"
+      ],
+      "checked_on": "2026-11-05",
+      "reviewer": "Cline, from the GLB's embedded asset.extras and the CREDITS.txt in the owner's drop",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-male-vern-2-0",
+      "title": "Low Poly Male — Vern 2.0 (Corn Souls Crew Wardrobe build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3",
+      "evidence": "Embedded glTF asset.extras: title 'Vern_2.0 (Corn Souls character)', author Loves_Art (https://sketchfab.com/Loves_Art), license CC-BY-4.0, the source URL above, changes 'Recoloured, expression edited, accessories added in the Corn Souls Crew Wardrobe'. Exported by the owner's wardrobe tool (THREE.GLTFExporter r170); the drop also carried a CREDITS.txt with the same notice.",
+      "notes": "Worn by the NPC Vern (standing, by the loop track) in the TEST channel since v1.97.184, in place of the plain Low Poly Male. 5,974 triangles in 18 parts: 14 skinned meshes on a 66-joint Mixamo skeleton split across 14 skins, plus four rigid accessory meshes (beard, hard_hat, glasses, safety_lens) parented to the Head bone; 18 materials and 3 embedded colour maps. Its 'walking' clip is present but has no channels (unused either way: the NPCs stand or sit still).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Relative to the original Low Poly Male: recoloured (skin, clothing, shoes, hair, eyes), facial expression edited (angry), and accessories added (white hard hat, yellow safety glasses, full beard, boots). At runtime: scaled to 1.78 m, arms lowered from the T-pose, and NOT recoloured — the wardrobe's colours are the file's own.",
+      "files": [
+        "assets/models/vern_2_0.glb"
+      ],
+      "checked_on": "2026-11-05",
+      "reviewer": "Cline, from the GLB's embedded asset.extras and the CREDITS.txt in the owner's drop",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
       "id": "sketchfab-loves-art-low-poly-male",
       "title": "Low Poly Male",
       "creator": "Loves_Art",
       "source_url": "https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3",
       "evidence": "Embedded glTF asset.extras: author Loves_Art (https://sketchfab.com/Loves_Art), source URL above, CC-BY-4.0. Page (owner screenshot 2026-11-04) shows CC Attribution.",
-      "notes": "Worn by the NPCs Vern (standing) and Rick (seated) in the TEST channel since v1.97.177. 4,090 triangles in 10 skinned meshes / 9 flat-color materials, no textures; Mixamo-style skeleton (66 joints); one 'walking' clip (2.07 s), unused.",
+      "notes": "The base male model, kept in the repo as the file both Crew Wardrobe builds (Vern 2.0 and Rick 2.0) were made from. No NPC wears it since v1.97.184: Vern and Rick wear their own builds. 4,090 triangles in 10 skinned meshes / 9 flat-color materials, no textures; Mixamo-style skeleton (66 joints); one 'walking' clip (2.07 s), unused.",
       "source_platform": "Sketchfab",
       "license_name": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
       "status": "in-use",
-      "modifications": "None to the file (stored byte-for-byte). At runtime: scaled to 1.78 m, arms lowered from the T-pose, legs folded for the seated NPC, clothing (and hair where set) recoloured per NPC.",
+      "modifications": "None to the file (stored byte-for-byte). It was worn by Vern (standing) and Rick (seated) from v1.97.177 to v1.97.183, scaled to 1.78 m, arms lowered from the T-pose, legs folded for the seated NPC, clothing (and hair where set) recoloured per NPC; the game no longer loads it.",
       "files": [
         "assets/models/low_poly_male_loves_art.glb"
       ],

@@ -5631,20 +5631,17 @@ function characterRig(av, opt) {
 }
 // Who wears which model. Everything else about the NPC - position, facing, dialogue, chair - stays as it was.
 // v1.97.177, owner: "lets tryt he models as is at first" - the four NPCs wear Loves_Art's Low Poly Male / Low Poly Female (CC BY 4.0,
-// credited in CREDITS.md / credits.html): skinned meshes, loaded as they come. Vern and Rick wear the plain male, and each keeps the
-// shirt colour it already had (the `colors` entry).
-// v1.97.180/182: the two women wear their own Crew Wardrobe builds of that female model instead (brenda_2_0 / tammy_2_0, v1.97.180 and
-// v1.97.182): every colour, hair shape and accessory is already in the file, so neither has a `colors` entry to repaint her with.
-// (The old rigid rigs stay in the repo - the players still wear operator_vern_rig.glb - and so does the plain female, the base file
-// both builds were made from; no NPC wears it now.)
-const NPC_MALE = '/corn-souls/assets/models/low_poly_male_loves_art.glb';
-const NPC_BRENDA = '/corn-souls/assets/models/brenda_2_0.glb';   // the owner's Crew Wardrobe build of her (Loves_Art female, CC BY 4.0, recoloured + accessorised)
+// credited in CREDITS.md / credits.html): skinned meshes, loaded as they come.
+// v1.97.180-184: all four now wear their own Crew Wardrobe builds of those models (brenda_2_0 / tammy_2_0 / vern_2_0 / rick_2_0):
+// every colour, hair shape and accessory is already in each file, so none of them has a `colors` entry to repaint it with. The
+// plain male and female files stay in the repo as the base files the builds were made from; no NPC wears either of them now.
+const NPC_VERN = '/corn-souls/assets/models/vern_2_0.glb';       // the owner's Crew Wardrobe build of him (Loves_Art male, CC BY 4.0, recoloured + accessorised)
+const NPC_RICK = '/corn-souls/assets/models/rick_2_0.glb';       // and Rick's (same base model, his own wardrobe build)
+const NPC_BRENDA = '/corn-souls/assets/models/brenda_2_0.glb';   // Brenda's (Loves_Art female)
 const NPC_TAMMY = '/corn-souls/assets/models/tammy_2_0.glb';     // and Tammy's (same base model, her own wardrobe build)
 const NPC_MODELS = {
-  vern:   { url: NPC_MALE, skin: true, h: 1.78, pose: 'stand', x: -232, colors: { clothing: 0x665e48 } },   // off the loop track (it runs at x -240)
-  op:     { url: NPC_MALE, skin: true, h: 1.78, pose: 'sit', colors: { clothing: 0x3b6fb0 } },          // Rick, the board operator
-  // The women's wardrobe builds already carry their colours, glasses, hair and jewellery, so there is no `colors` entry for them
-  // (their material names are top / bottom / hair / skin / shoes ... now, not the plain model's clothing / hair).
+  vern:   { url: NPC_VERN, skin: true, h: 1.78, pose: 'stand', x: -232 },   // off the loop track (it runs at x -240)
+  op:     { url: NPC_RICK, skin: true, h: 1.78, pose: 'sit' },              // Rick, the board operator
   brenda: { url: NPC_BRENDA, skin: true, h: 1.65, pose: 'sit' },
   tammy:  { url: NPC_TAMMY, skin: true, h: 1.65, pose: 'sit' }
 };
