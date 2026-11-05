@@ -14675,9 +14675,11 @@ function updateGun(dt) {
   // pump: racks back and forward after every shot (chk ... chk)
   if (pumpT > 0) { const was = pumpT; pumpT = Math.max(0, pumpT - dt * 2.4); if (was > 0.72 && pumpT <= 0.72) gunClick(900, 0.03, 0.06); if (was > 0.22 && pumpT <= 0.22) gunClick(650, 0.045, 0.07); }
   // magazine change: the old one slides out of the right side and drops away, the next one slides in and clicks home.
-  // Happens when the magazine is empty, after ~2 s of not shooting with a part-used magazine, on R, or when you switch ammo.
+  // Happens when the magazine is empty, on R / D-pad down, or when you switch ammo (on a phone, also after ~2 s without shooting). (v1.97.167, owner: "reloading seems to happen automatically when
+  // not necessary" - it used to top up a part-used magazine by itself after ~2 s without shooting, even after one shot.)
   idleT += dt;
-  if (reloadT <= 0 && held === 'gun' && pumpT <= 0 && mags[ammo] < MAG && (mags[ammo] === 0 ? idleT > 0.25 : idleT > 2.2)) startReload(ammo, true);
+  const touchOnly = typeof document !== 'undefined' && document.body && !document.body.classList.contains('pc') && !document.body.classList.contains('padmode');   // a phone has no reload control: it keeps the top-up after a pause
+  if (reloadT <= 0 && held === 'gun' && pumpT <= 0 && mags[ammo] < MAG && (mags[ammo] === 0 ? idleT > 0.25 : touchOnly && idleT > 2.2)) startReload(ammo, true);
   let out = 0, kind = ammo, n = mags[ammo], tilt = 0;
   if (reloadT > 0) {
     reloadT += dt; const t = reloadT;
@@ -15083,7 +15085,7 @@ function controlsMenu(code, fromTitle) {
       ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
-      ['Switch ammo (paint / water)', 'Q or 4', 'D-pad up', '🎨 / 💦'], ['Reload (fresh magazine)', 'R', 'auto when empty / idle', 'auto when empty / idle']]],
+      ['Switch ammo (paint / water)', 'Q or 4', 'D-pad up', '🎨 / 💦'], ['Reload (fresh magazine)', 'R (auto when empty)', 'D-pad down (auto when empty)', 'auto when empty or after a pause']]],
     ['Ranger + cars (key needed for the cars)', [
       ['Get in / out', 'E', 'X', 'In: ✋ · out: 🚙'], ['Gas', 'W', 'R2', 'GAS'], ['Brake / reverse', 'S', 'L2', 'BRAKE'], ['Steer', 'A D', 'Left stick', 'Left thumb'],
       ['Handbrake (slide)', 'Space', 'A', 'DRIFT'], ['NOS / turbo (Ranger, Pink Sedan)', 'Shift', 'B', 'NOS'], ['Chase / driver view', 'Y', 'Y', '🎥'], ['Look around', 'Mouse', 'Right stick', 'Right thumb'],
@@ -15565,6 +15567,7 @@ function press(n) {
     if (n === 'SELECT' || n[0] === 'K') { debugMenu(n[0] === 'K' ? n.slice(1) : null); return; }
     if (n === 'R1' || n === 'L1') { P3.cycleItem(n === 'R1' ? 1 : -1); showHeld(); return; }
     if (n === 'UP' && P3.driving && P3.inKia) { const r = P3.kiaRadio(); if (r) toast(r); return; }   // D-pad up in any car: stereo
+    if (n === 'DOWN' && !cur && !P3.driving) { P3.reload(); return; }   // D-pad down: a fresh magazine (v1.97.167: it no longer tops up by itself)
     if (n === 'UP' && !cur && !P3.driving) { swapAmmo(); return; }   // D-pad up: paintballs <-> water   // switch gun / squeegee / empty hand
   }
   if ($('modal').classList.contains('open')) {

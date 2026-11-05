@@ -75,4 +75,18 @@ assert.ok(html.includes('const cosI = Math.abs(nrm.dot(dir)), glance = cosI < SP
     const spray = new T.Vector3(-1, 0, 0).applyQuaternion(s.quaternion); assert.ok(spray.dot(tv3.normalize()) > 0.999, 'spray along the path on a ' + nrm + ' surface'); } }
 
 { const fs2 = require('fs'), path = require('path'); for (const c of ['blue', 'lime', 'orange', 'pink']) for (let k = 1; k <= 5; k++) assert.ok(fs2.existsSync(path.join(__dirname, '..', 'assets', 'textures', 'paintball', c + '-impact-0' + k + '.png')), 'decal file ' + c + ' ' + k); }
+// v1.97.167, owner: "reloading seems to happen automatically when not necessary" - it topped up a part-used magazine by itself
+// after ~2 s without shooting (even after one shot). Now: by itself only when empty; R / D-pad down any time; a phone (no reload
+// control) keeps the top-up after a pause. Runs the game's own rule for each case.
+{ const src = html.match(/  const touchOnly = [^\n]*\n  if \(reloadT <= 0 && held === 'gun'[^\n]*\n/); assert.ok(src, 'the auto-reload rule');
+  const rule = new Function('document', 'reloadT', 'held', 'pumpT', 'mags', 'ammo', 'MAG', 'idleT', 'startReload', src[0]);
+  const run = (cls, left, idle) => { let r = false; rule({ body: { classList: { contains: c => cls.includes(c) } } }, 0, 'gun', 0, { paint: left }, 'paint', 6, idle, () => { r = true; }); return r; };
+  assert.equal(run(['pc'], 5, 10), false, 'PC: one shot fired, a long pause - no reload');
+  assert.equal(run(['pc', 'padmode'], 2, 30), false, 'controller: part-used, no reload by itself');
+  assert.equal(run(['pc'], 0, 0.3), true, 'empty: reloads by itself');
+  assert.equal(run(['pc'], 0, 0.1), false, '(after a moment)');
+  assert.equal(run([], 3, 2.5), true, 'a phone, which has no reload control: still tops up after a pause');
+  assert.equal(run([], 3, 1), false, '(not straight away)'); }
+assert.ok(html.includes("    if (n === 'DOWN' && !cur && !P3.driving) { P3.reload(); return; }   // D-pad down: a fresh magazine"), 'D-pad down reloads on a controller');
+assert.ok(html.includes("['Reload (fresh magazine)', 'R (auto when empty)', 'D-pad down (auto when empty)', 'auto when empty or after a pause']"), 'and the controls card says so');
 console.log("PASS: the magazine feeds from the gun end - slot 0 (nearest the receiver) leaves first, the water level recedes from the same end, and the repeat guard still holds; shots fly in the colour of the round leaving; the owner's decals for splats");

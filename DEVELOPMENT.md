@@ -1,3 +1,14 @@
+## TEST v1.97.167 — the shotgun no longer reloads when it doesn't need to (2026-11-04)
+- Owner: *"reloading seems to happen automatically when not necessary"*.
+- **Cause:** the gun topped up any part-used magazine by itself after ~2.2 s without shooting. One shot and a pause meant a full reload animation and a lost moment.
+- **Now:**
+  - it reloads by itself only when the magazine is **empty**;
+  - otherwise reload is on **R** (keyboard) or the new **D-pad down** (controller; it was unused while walking);
+  - a **phone**, which has no reload control, keeps the top-up after a pause (no `pc` / `padmode` class on the page).
+- The controls card says so.
+- `validate-gun-magazine.cjs` runs the game's own reload rule for PC, controller and phone, part-used and empty (it fails on the old rule), and checks D-pad down and the controls card.
+- Bumped TEST to `1.97.167` / `corn-souls-test-shell-v194`.
+
 ## TEST v1.97.166 — the owner's grain haulers bring the corn in (2026-11-04)
 - Owner: pointed me to `Kernel Art/3D/Grain Haulers` (eight GLBs: black, blue, green, pink, red, white, yellow, yellpink).
 - **The models:** each is a tractor plus an end-dump trailer, about 240 triangles, painted with vertex colours and rigged (`DumpBed_Pivot`, `Tailgate_Pivot`, `Hydraulic_Ram`, `Steer_*`, `Wheel_*`). They are added under `assets/models/grain_haulers/`, registered and credited.
