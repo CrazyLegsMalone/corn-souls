@@ -5350,6 +5350,28 @@ function rollButtonPress() {   // interact on a switch button: do it at once (no
   return POWER_OUTAGE.on ? r : '';
 }
 function rollStates() { return (O.rollDoors || []).map(d => d.ws + 2 * d.wm).join(''); }
+// v1.97.175, owner (HANDOFF_CLINE.md section 7, "roll-up doors open automatically for vehicles?" - answered yes): while you drive,
+// a roll-up you are heading for from its OUTSIDE face, within 12 m, goes up exactly as if its green button were pressed -
+// rollSwitchSet(i, 'open'), so the other player sees it and the host stays in charge. Same rule as the switch: no power, nothing happens.
+// 'Heading for' = pointed within 60 degrees of it AND moving in through the wall, so driving along the wall past it does nothing.
+// It never closes on its own; the red button still does that. Returns the index of the door it opened this step, or -1.
+const ROLL_AUTO = { R: 12, minV: 1, cone: 0.5, into: 0.3 };
+function rollAutoStep() {
+  if (!walk.on || walk.dead || !walk.drive || POWER_OUTAGE.on) return -1;
+  const sp = Math.hypot(utv.vx || 0, utv.vz || 0); if (sp < ROLL_AUTO.minV) return -1;
+  let hit = -1;
+  (O.rollDoors || []).forEach((d, i) => {
+    if (d.ws && (d.wm || !d.mesh)) return;
+    const p = d.g.position, dx = p.x - utv.x, dz = p.z - utv.z, r = Math.hypot(dx, dz);
+    if (r > ROLL_AUTO.R || r < 1e-6 || Math.abs((utv.y || 0) - (p.y || 0)) > 3) return;
+    const ry = d.g.rotation.y, c = Math.cos(ry), sn = Math.sin(ry), s = d.in || d.inside || d.side;
+    if (-(dx * c - dz * sn) * s >= 0) return;
+    if ((utv.vx * dx + utv.vz * dz) / (sp * r) < ROLL_AUTO.cone) return;
+    if ((utv.vx * c - utv.vz * sn) * s < ROLL_AUTO.into * sp) return;
+    if (rollSwitchSet(i, 'open') !== null) hit = i;
+  });
+  return hit;
+}
 function rollApply(str) { if (typeof str !== 'string') return; (O.rollDoors || []).forEach((d, i) => { const v = +str[i]; if (v >= 0 && v <= 3) { d.ws = v & 1; d.wm = (v >> 1) & 1; } }); }
 // a plain man door that vanishes as Squeeg walks up (like the other doors): center (x, z) on a wall running along x (alongX) or z, leaf color,
 // plus a concrete floor helper for the simple buildings
@@ -10487,6 +10509,7 @@ function update(sim, dt, events) {
     d.g.visible = d.open < 0.5;   // door just vanishes while Squeeg is near (cleaner than swinging)
   }
   coolerUpdate(dt);
+  stepSafe('rollAuto', rollAutoStep);
   for (const d of O.rollDoors || []) rollDoorStep(d, dt);   // v1.97.137: they follow their wall switch (rollSwitchSet)
   if (walk.on) {
     if (walk.drive) utvUpdate(dt); else if (walk.ride) rideUpdate(); else if (walk.mow) mowUpdate(dt); else if (walk.pass) passUpdate(dt); else walkPhysics(dt);

@@ -1,3 +1,16 @@
+## TEST v1.97.175 — roll-up doors open by themselves when you drive at them (2026-11-04)
+- Owner: answered **yes** to `HANDOFF_CLINE.md` section 7, *"Should roll-up doors open automatically for vehicles?"*, and on this build: *"do it"*. Built to the plan agreed in the v1.97.174 handoff.
+- New `rollAutoStep()` (next to the door switch code, run every frame in `stepSafe('rollAuto', ...)` right before the doors step). While you are **driving** (the Ranger, or any car - they all move through `utv`), a roll-up opens when:
+  - you are on its **outside** face (the opposite side from its mesh door and switch station - `d.in`),
+  - within **12 m** of it and within 3 m of its floor height,
+  - moving faster than **1 m/s**, pointed within **60°** of it **and** moving in through the wall (at least 30% of your speed across it) - so driving along the wall past a door does nothing.
+- It opens through **`rollSwitchSet(i, 'open')`** - exactly the green button: steel door and mesh both go up, the guest/host gets the same `rd` message and world-sync lock, and the host stays in charge. One message per opening, not one per frame (an open door is skipped).
+- **Power outage: nothing happens**, the same rule as the switch. When the power comes back and you are still driving at it, it opens.
+- **It never closes on its own.** The red button is still how it comes down. A door left on yellow (steel up, mesh down) gets its mesh raised when you drive at it, so you can get through.
+- Readings I took: from the **inside** nothing opens automatically (the plan said outside face only - you have the switch station in there); the **mower** and on foot do not trigger it (the plan said "only while driving"). Either is a one-line change if you want it.
+- New `validate-roll-auto.cjs` (55th suite in CI) runs the game's own `rollUpDoor`, `meshDoorsBuild`, `rollDoorStep`, `rollSwitchSet` and `rollAutoStep` on a two-door building: opens from outside (straight on and at an angle), sends exactly the switch's `rd` message once, really stops blocking, never closes; stays shut on foot, from inside, driving away, driving past, beyond 12 m, creeping, on another level, while dead, and in an outage. It also checks the call sits in the engine block (no cross-block reference). It fails on v1.97.174 and passes now.
+- Bumped TEST to `1.97.175` / `corn-souls-test-shell-v202`. LIVE is untouched.
+
 ## TEST v1.97.174 — the squeegee is gone; you start with the shotgun, wrench and crowbar (2026-11-04)
 - Owner: *"remove the squegee instead you should start with the shotgun, wrench, and crowbar"*.
 - **The squeegee item is removed outright** - not just parked: `makeSqueegee()` (the yellow-handled, black-bladed viewmodel), its `heldG.squeegee` entry, its swipe branch in `fire()`, its push-forward animation in `updateGun()`, its two third-person hand meshes, its HUD label and its line in the controls card are all gone. Nothing else could reach it: it was only ever in `ITEMS`.
