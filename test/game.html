@@ -93,10 +93,11 @@ body.walking #lampBtn{display:block}
 body.pc:not(.padmode) #iprompt svg{display:none}body.pc:not(.padmode) #iprompt .k{display:flex}
 #toast{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);background:rgba(29,42,58,.9);color:#fff;border-radius:12px;padding:8px 14px;font-size:13px;z-index:8;max-width:80vw;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #toast.show{opacity:1}
-#mmap{display:none;position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;width:150px;height:150px;border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none}
+#mmap{display:none;position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(24vh + 8px + env(safe-area-inset-bottom,0px));z-index:5;width:118px;height:118px;border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none}
 body.walking #mmap{display:block}
-body.walking:not(.pc):not(.padmode) #mmap{width:116px;height:116px;bottom:calc(214px + env(safe-area-inset-bottom,0px));right:calc(18px + env(safe-area-inset-right,0px))}
-@media (max-height:520px){body.walking:not(.pc):not(.padmode) #mmap{bottom:auto;top:calc(58px + env(safe-area-inset-top,0px));width:96px;height:96px}}
+body.walking.nomap #mmap{display:none}
+body.walking:not(.pc):not(.padmode) #mmap{width:100px;height:100px;bottom:calc(214px + env(safe-area-inset-bottom,0px));right:calc(18px + env(safe-area-inset-right,0px))}
+@media (max-height:520px){body.walking:not(.pc):not(.padmode) #mmap{bottom:auto;top:calc(58px + env(safe-area-inset-top,0px));width:84px;height:84px}}
 #fps{position:fixed;left:50%;top:4px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.45);border-radius:6px;padding:1px 6px;font:11px monospace;z-index:9;pointer-events:none}
 #modal{position:fixed;inset:0;background:rgba(10,20,35,.45);z-index:10;display:none;align-items:center;justify-content:center}
 #modal.open{display:flex}
@@ -12297,11 +12298,11 @@ function mmapAbort() {
 function mmapGuard(f) { try { f(); } catch (e) { mmapAbort(); PERF.errs++; PERF.err = 'minimap'; PERF.msg = (e && e.message) || String(e); } }
 function minimapUpdate(dt) {
   if (!walk.on) return;
+  const el = typeof document !== 'undefined' && document.getElementById('mmap'); if (!el || !el.getClientRects().length) return;   // off (pause menu) or hidden: no bake, no drawing (offsetParent is always null on a fixed element)
   if (!MMAP.cv && !MMAP.job && MMAP.again < 0) { mmapGuard(mmapBakeStart); MMAP.again = 14; }   // first walk: bake now, and once more for the late models
   else if (MMAP.again > 0 && !MMAP.job && (MMAP.again -= dt) <= 0) mmapGuard(mmapBakeStart);
   if (MMAP.job) mmapGuard(mmapStep);
   if ((MMAP.t -= dt) > 0) return; MMAP.t = 1 / 15;   // the widget redraws 15 times a second
-  const el = typeof document !== 'undefined' && document.getElementById('mmap'); if (!el || !el.getClientRects().length) return;   // (offsetParent is always null on a fixed element)
   const dpr = Math.min(2, window.devicePixelRatio || 1), css = el.clientWidth, n = Math.round(css * dpr); if (el.width !== n) { el.width = n; el.height = n; }
   const g = el.getContext('2d'), r = n / 2, k = r / MMAP.R;   // pixels per metre
   const pos = walk.drive && utv.g ? utv.g.position : walk, dir = camera.getWorldDirection(tv), yaw = Math.atan2(-dir.x, -dir.z);
@@ -15215,9 +15216,13 @@ function openBoard() {
   const iv = setInterval(draw, 500); draw();
 }
 P3.netNotify = m => { toast('👥 ' + m); if (m.startsWith('Hosting')) twoPlayer(); };
+// v1.97.162, owner: "Mini map needs a on and off toggle in pause menu" - remembered on this device
+let mapOn = true; try { mapOn = localStorage.getItem('cs_minimap') !== 'off'; } catch (e) {}
+function mapSet(on) { mapOn = !!on; document.body.classList.toggle('nomap', !mapOn); try { localStorage.setItem('cs_minimap', mapOn ? 'on' : 'off'); } catch (e) {} }
+mapSet(mapOn);
 function menu() {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }
-  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['Reset all setpoints', resetAll]];
+  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['Reset all setpoints', resetAll]];
   if (window.Android) b.push(['Quit', () => { try { Android.quit(); } catch (e) {} }]);
   modal('<h1>Corn Souls</h1>', b);
 }

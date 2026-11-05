@@ -62,14 +62,26 @@ const M = ctx.MMAP, tick = () => new Promise(r => setImmediate(r));
 
   // the widget: bottom right, only while walking, lifted over the touch buttons; turned so what is ahead is up
   const css = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
-  assert.ok(html.includes('<canvas id="mmap" aria-hidden="true"></canvas>') && /#mmap\{display:none;position:fixed;right:calc\(14px[^}]*bottom:calc\(16px/.test(css) && css.includes('body.walking #mmap{display:block}'), 'bottom right, shown while walking');
-  assert.ok(/body\.walking:not\(\.pc\):not\(\.padmode\) #mmap\{[^}]*bottom:calc\(214px/.test(css), 'on a touch screen it sits above the fire / swap / eat / aim buttons');
+  assert.ok(html.includes('<canvas id="mmap" aria-hidden="true"></canvas>') && css.includes('body.walking #mmap{display:block}'), 'bottom right, shown while walking');
+  // v1.97.162, owner: "minimal needs to me a little smaller and out of way of the gun magazine so you can keep track of ammo"
+  assert.ok(/#mmap\{display:none;position:fixed;right:calc\(16px[^}]*bottom:calc\(24vh \+ 8px[^}]*width:118px;height:118px/.test(css), 'smaller (150 -> 118 px) and lifted a quarter of the screen up, over the gun\'s magazine (which scales with the window height)');
+  assert.ok(/body\.walking:not\(\.pc\):not\(\.padmode\) #mmap\{width:100px;height:100px;bottom:calc\(214px/.test(css) && css.includes('#mmap{bottom:auto;top:calc(58px + env(safe-area-inset-top,0px));width:84px;height:84px}'), 'touch: 100 px above the buttons, 84 px under the pause button on a short landscape phone');
+  // v1.97.162, owner: "Mini map needs a on and off toggle in pause menu"
+  assert.ok(css.includes('body.walking.nomap #mmap{display:none}'), 'off: hidden');
+  assert.ok(html.includes("['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }]"), 'a pause-menu item that flips it and shows the new state');
+  assert.ok(html.includes("let mapOn = true; try { mapOn = localStorage.getItem('cs_minimap') !== 'off'; } catch (e) {}") && html.includes("function mapSet(on) { mapOn = !!on; document.body.classList.toggle('nomap', !mapOn); try { localStorage.setItem('cs_minimap', mapOn ? 'on' : 'off'); } catch (e) {} }\nmapSet(mapOn);"), 'remembered on this device (on by default)');
+  { const cls = new Set(), store = {}; const doc = { body: { classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c) } } };
+    const m = html.match(/let mapOn = true;[^\n]*\nfunction mapSet\(on\) \{[^\n]*\}\nmapSet\(mapOn\);/)[0];
+    const c2 = { document: doc, localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } } }; vm.createContext(c2); vm.runInContext(m + '\nthis.get = () => mapOn; this.mapSet = mapSet;', c2);
+    assert.equal(c2.get(), true); assert.ok(!cls.has('nomap'), 'on by default');
+    c2.mapSet(false); assert.ok(cls.has('nomap') && store.cs_minimap === 'off', 'off: hidden, remembered');
+    const c3 = { document: doc, localStorage: c2.localStorage }; vm.createContext(c3); vm.runInContext(m + '\nthis.get = () => mapOn;', c3); assert.equal(c3.get(), false, 'still off next time'); }
   assert.ok(html.includes("stepSafe('minimap', () => minimapUpdate(dt));"), 'updated every frame under its own guard');
   const up = cut('function minimapUpdate(dt) {', '\n}\n');
   assert.ok(up.includes('yaw = Math.atan2(-dir.x, -dir.z)') && up.includes('g.rotate(yaw)') && up.includes('g.translate(-pos.x, -pos.z)'), 'the map turns with the view');
   // turning sense: canvas rotate(yaw) must carry the way you face to "up" on the screen
   for (const yaw of [0, Math.PI / 2, -2.2, 3]) { const fx = -Math.sin(yaw), fz = -Math.cos(yaw), sx = fx * Math.cos(yaw) - fz * Math.sin(yaw), sy = fx * Math.sin(yaw) + fz * Math.cos(yaw); assert.ok(Math.abs(sx) < 1e-9 && Math.abs(sy + 1) < 1e-9, 'ahead is up (yaw ' + yaw + ')'); }
-  assert.ok(up.includes('if (!el || !el.getClientRects().length) return;'), 'skips drawing when hidden (offsetParent is always null on a fixed element)');
+  assert.ok(up.indexOf('if (!el || !el.getClientRects().length) return;') < up.indexOf('mmapBakeStart'), 'off or hidden: no bake and no drawing (offsetParent is always null on a fixed element)');
   assert.ok(up.includes('MMAP.again = 14'), 'baked on the first walk and once more for the late models');
-  console.log('PASS: mini map (bottom right while walking, above the touch buttons; ' + J.tiles.length + ' tiles a frame each, every pixel in place, materials swapped back, moving things left out, flat materials kept; turns with the view)');
+  console.log('PASS: mini map (bottom right while walking, clear of the gun magazine and the touch buttons; on/off in the pause menu, remembered; ' + J.tiles.length + ' tiles a frame each, every pixel in place, materials swapped back, moving things left out, flat materials kept; turns with the view)');
 })().catch(e => { console.error(e); process.exit(1); });

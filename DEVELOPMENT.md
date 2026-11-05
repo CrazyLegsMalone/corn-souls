@@ -1,3 +1,13 @@
+## TEST v1.97.162 — mini map: on/off in the pause menu, smaller, clear of the magazine (2026-11-04)
+- Owner: *"Mini map needs a on and off toggle in pause menu. Also minimal needs to me a little smaller and out of way of the gun magazine so you can keep track of ammo."*
+- **Pause menu → "🗺️ Mini map: on / off":** flips it, says so, and re-opens the menu showing the new state. It is remembered on this device (`cs_minimap`) and on by default. While it is off there is no bake and no drawing.
+- **Smaller and clear of the magazine:**
+  - desktop / controller: 150 → 118 px, lifted to `24vh + 8px` from the bottom. The first-person gun scales with the window height, so this keeps it over the magazine at any size (checked at 960×540, 1920×1080 and 1280×1024);
+  - touch: 116 → 100 px, still above the fire / swap / eat / aim buttons;
+  - short landscape phone: 96 → 84 px, under the pause button (checked at 844×390 and 390×844).
+- `validate-minimap.cjs` covers the new size and placement, the menu item, and the toggle (on by default, off hides it and is remembered).
+- Bumped TEST to `1.97.162` / `corn-souls-test-shell-v189`.
+
 ## TEST v1.97.161 — ducks swim bill first (and lizards, the vulture and nibblers face the way they go) (2026-11-04)
 - Owner: *"ducks swim backwards"*.
 - **Cause:** the ducks turn to face the way they swim with a negative sprite `scale.x`, but three.js ignores the sign. Its sprite vertex shader takes `length(modelMatrix[0].xyz)`, so no sprite ever mirrored. Every duck kept its picture's bill on the right, swimming backwards whenever it went left on screen. The wall lizards, the flying vulture and the nibblers use the same flip, so they were affected the same way.
