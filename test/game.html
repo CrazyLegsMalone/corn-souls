@@ -13630,12 +13630,15 @@ function crLeg(c, away) {   // pick a clear straight run along the floor (one di
   return false;
 }
 function updateCritters(dt) {
-  if (!critters) critters = [makeCritter('rat'), makeCritter('lizard')];
+  // v1.97.170, owner: "increase lizard number to 4" - four lizards and the one rat, each with its own sprite material (the hit /
+  // eat tint is per creature, so a shared material would turn all four belly-up red when you shoot one).
+  if (!critters) critters = [makeCritter('rat'), makeCritter('lizard'), makeCritter('lizard'), makeCritter('lizard'), makeCritter('lizard')];
   if (critNetGuest()) return;   // 2 player: the host's critters (critNetUpdate mirrors them)
   if ((crSolidsT += dt) > 10 || !crSolids.length) { crSolids = crSolidsNear(collectSolids(true)); crSolidsT = 0; }
+  let crBudget = 1;   // v1.97.170: one spawn probe a frame for the whole set, the budget v1.97.92 set - four lizards must not mean four rays
   for (const c of critters) {
     const p = c.g.position;
-    if (c.state === 'gone') { if ((c.t -= dt) <= 0) crSpawn(c); continue; }
+    if (c.state === 'gone') { if ((c.t -= dt) <= 0 && crBudget > 0) { crBudget--; crSpawn(c); } continue; }   // no budget left: t stays under 0, so it asks again next frame
     if (c.state === 'hit') { if (!c.held && !c.thrown && (c.t -= dt) <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 10 + Math.random() * 30; } continue; }
     c.life -= dt;
     const near = walk.on && !walk.dead && Math.hypot(p.x - walk.x, p.z - walk.z) < 4;

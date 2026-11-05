@@ -1,3 +1,13 @@
+## TEST v1.97.170 — four lizards instead of one (2026-11-04)
+- Owner: *"havent seen a single lizard"*, then *"increase lizard number to 4"*.
+- **Why he never saw one:** the whole plant had exactly **one** lizard and one rat - `critters = [makeCritter('rat'), makeCritter('lizard')]` is built once and nothing ever adds to it. That one lizard is a **0.30 x 0.11 m sprite** on a wall 0.55-3.35 m up, only in the cook and evap alleys (~2,000 m²), never within 6 m of you, it drops and runs when you come within 4 m, lives 60-150 s and then is gone for 8-43 s.
+- **Now:** four lizards and the one rat, each built by `makeCritter` with **its own sprite material** - the hit / eat tint is applied per creature, so a shared material would have turned all four belly-up red when you shot one.
+- **The frame budget is unchanged.** A waiting critter makes one probe a frame, so five waiting at once would have been five raycasts a frame where v1.97.92 had cut it to one. `updateCritters` now spends a shared `crBudget = 1` per frame: one critter gets to ask, the rest keep their `t` below zero and ask again next frame, so the same one-probe-a-frame cost now covers the whole set.
+- **Two player needs nothing new:** `critSnapshot()` maps over the whole critter list and the wire rows are `[kind, index, ...]`, so four lizards mirror by index. The guest's climbing lizard still counts as alive.
+- Tests: `validate-frame-stability.cjs` (which owns the critter probes) now asserts the set is exactly 4 lizards + 1 rat, that each creature gets a fresh sprite material, and it **runs `updateCritters`** over five waiting critters for 12 frames: never more than one spawn probe in a frame, and all five still get their turn. `validate-critter-sync.cjs` now builds the real 1 + 4 set so the index-based mirroring is exercised over all of them. The new checks fail on the previous revision and pass now.
+- Verified locally: the 53 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes. LIVE is untouched.
+- Bumped TEST to `1.97.170` / `corn-souls-test-shell-v197`.
+
 ## TEST v1.97.169 — headlights on whatever you drive (2026-11-04)
 - Owner: *"vehicles should have headlights when driving them especially after dark"*.
 - **A second spot in the lighting pass** (`csHl0/1/2`, beside the walker's headlamp `csFl*`), fed every frame by `vehLights`:

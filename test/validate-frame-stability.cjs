@@ -35,7 +35,31 @@ assert.ok(html.includes('crSolids = crSolidsNear(collectSolids(true));'), 'the p
   assert.equal(ctx.out, 2, 'a mesh inside or touching (with 2 m margin) a critter area is kept, far ones are dropped');
 }
 
-// 2b --------------------------------------------------------------- lizards spawn on walls, not floors
+// 2c --------------------------------------------------------------- four lizards (v1.97.170, owner: "increase lizard number to 4")
+{ const set = html.match(/if \(!critters\) critters = (\[[^\]]*\]);/);
+  assert.ok(set, 'the critter set is created in one place');
+  assert.equal((set[1].match(/makeCritter\('lizard'\)/g) || []).length, 4, 'four lizards');
+  assert.equal((set[1].match(/makeCritter\('rat'\)/g) || []).length, 1, 'and still the one rat');
+  // each lizard has its own sprite material: the hit / eat tint is applied per creature
+  assert.ok(html.includes('const sm = new T.SpriteMaterial({ map: srgbTex(new T.CanvasTexture(cv)), alphaTest: 0.5 }); mats.push(sm);'),
+    'makeCritter builds a fresh sprite material per creature (shooting one cannot recolour the rest)');
+  // one spawn probe a frame for the whole set, whatever the population
+  assert.ok(html.includes('let crBudget = 1;') && html.includes('if ((c.t -= dt) <= 0 && crBudget > 0) { crBudget--; crSpawn(c); }'),
+    'the spawn budget is shared, so four lizards still cost one probe a frame');
+  // run it: five critters all waiting, one frame at a time
+  const src = fn(html, 'updateCritters');
+  const mk = () => ({ state: 'gone', t: -1, life: 100, g: { position: { x: 0, y: 0, z: 0 }, visible: false }, mats: [], cols: [] });
+  const ctx = { dt: 0, calls: 0, critters: [mk(), mk(), mk(), mk(), mk()], crSolids: [1], crSolidsT: 0, collectSolids: () => [], crSolidsNear: () => [1],
+    critNetGuest: () => false, crSpawn: c => { ctx.calls++; c.state = 'idle'; }, crLeg: () => true, crFloor: () => 0, walk: { on: false, dead: false }, clock: 0,
+    Math, V3: (x = 0, y = 0, z = 0) => ({ x, y, z }), makeCritter: () => mk() };
+  vm.createContext(ctx);
+  vm.runInContext(src + '\nthis.updateCritters = updateCritters;', ctx);
+  let worst = 0;
+  for (let i = 0; i < 12; i++) { const before = ctx.calls; ctx.updateCritters(0.1); worst = Math.max(worst, ctx.calls - before); }
+  assert.equal(worst, 1, 'never more than one spawn probe in a frame (worst ' + worst + ')');
+  assert.equal(ctx.calls, 5, 'and all five still get their turn (' + ctx.calls + ' spawns over 12 frames)'); }
+
+
 const wallSpot = fn(html, 'crWallSpot'), wallStep = fn(html, 'crWallStep');
 assert.ok(spawn.includes("if (c.kind === 'lizard' && (c.spawnTries || 0) < 8)"), 'a lizard asks for a wall first, and only falls back to the floor after 8 frames');
 assert.ok(spawn.includes("c.state = 'climb'"), 'and it starts out clinging to it');

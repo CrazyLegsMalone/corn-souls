@@ -20,7 +20,7 @@ const make = host => {
   const frog = (x, z) => { const group = new T.Group(); group.position.set(x, 0.2, z); scene.add(group); const mats = [mat(0x468443), mat(0xabc37b)]; return { group, g: group, mats, cols: mats.map(m => m.color.getHex()), state: 'live', t: 0, held: false, thrown: false }; };
   const off = host ? 0 : 30;   // the guest's own random critters start somewhere else
   const ctx = { T, Math, console, scene, camera, clock: 0, walk: { on: true, dead: false, drive: false, x: 0, y: 0, z: 0, yaw: 0 },
-    birds: [bird(10 + off, 10), bird(-12 + off, 6)], critters: [crit('rat', 3 + off, 2), crit('lizard', -3 + off, -2)], pondFrogs: [frog(40 + off, 40), frog(44 + off, 40)],
+    birds: [bird(10 + off, 10), bird(-12 + off, 6)], critters: [crit('rat', 3 + off, 2), crit('lizard', -3 + off, -2), crit('lizard', 6 + off, -5), crit('lizard', -7 + off, 4), crit('lizard', 1 + off, -8)], pondFrogs: [frog(40 + off, 40), frog(44 + off, 40)],   // v1.97.170: the game's 1 rat + 4 lizards, so the index-based sync is exercised over the whole set
     V3: (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z), puff: (p, s, c) => puffs.push(c), powerGive: (k, pre) => notes.push((pre || '') + 'power:' + k), powerKindOf: o => o.kind || (o.group ? 'frog' : 'pigeon'), floorAt: () => 0, tsnd: { ctx: null }, DMG_NOTIFY: m => notes.push(m),
     flyTo: (o, p) => { o.state = 'fly'; o.from = o.g.position.clone(); o.to = p; }, farPerch: () => new T.Vector3(0, 3, 0), scareNear() {}, pigeonHits: 0, critterHits: 0,
     NET: { host, conn: { open: true, send: o => q.push(JSON.parse(JSON.stringify(o))) }, rp: null }, q, puffs, notes };
