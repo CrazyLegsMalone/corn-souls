@@ -20,8 +20,8 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
   const drawSrc = rendered.slice(s0, rendered.indexOf('\nconst tq =', s0));
   assert.ok(/heldG/.test(drawSrc), 'the post-world pass is drawn for any held item, not just the shotgun');
   if (rendered.includes('function ensureHud()')) {
-   assert.equal((rendered.match(/g\.visible = false; ensureHud\(\)\.add\(g\); return g;/g) || []).length, 5,
-    'hand, squeegee, washer, hand tool and extinguisher are all built into the HUD scene');
+   assert.equal((rendered.match(/g\.visible = false; ensureHud\(\)\.add\(g\); return g;/g) || []).length, 4,
+    'hand, washer, hand tool and extinguisher are all built into the HUD scene (v1.97.174: the squeegee is gone)');
    assert.equal((rendered.match(/camera\.add\(g\)/g) || []).length, 0, 'nothing first-person hangs off the world camera');
    assert.equal((rendered.match(/hudScene \|\| camera/g) || []).length, 0, 'a carried item never falls back to the world camera');
   } else {
@@ -29,7 +29,7 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
     'LIVE still builds them in the world camera, and its loader patch moves them into the HUD scene');
   }
  }
- const initHeld=rendered.split('\n').find(line=>line.includes('if (!heldG.squeegee)'));
+ const initHeld=rendered.split('\n').find(line=>line.includes('if (!heldG.hand)'))||rendered.split('\n').find(line=>line.includes('if (!heldG.squeegee)'));   // LIVE still has the squeegee
  const makeHeld=()=>({visible:false,parent:'world-camera',position:{x:.1,y:-.2,z:-.6}});
  const hudState={heldG:{},TOOLS:{crowbar:{}},hudScene:{add(item){item.parent=this;}},
   makeSqueegee:makeHeld,makeHand:makeHeld,makeWasher:makeHeld,makeTool:makeHeld,makeExtHud:makeHeld};
@@ -43,12 +43,18 @@ const scripts=html=>[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].
   renderer:{autoClear:true,clearDepth(){calls.push('clearDepth');},render(scene){calls.push(scene===hudState.hudScene?'hud':'world');}}};
  const drawStart=rendered.indexOf('function drawHudGun() {'),drawEnd=rendered.indexOf('\nconst tq =',drawStart);
  vm.runInNewContext(rendered.slice(drawStart,drawEnd)+'\nthis.draw=drawHudGun;',hudRender);
- for(const name of ['crowbar','hand','squeegee','ext']){
+ for(const name of Object.keys(hudRender.heldG)){
   calls.length=0;Object.values(hudRender.heldG).forEach(item=>item.visible=false);hudRender.heldG[name].visible=true;
   hudRender.renderer.render('world');hudRender.draw();assert.equal(calls.join(','),'world,clearDepth,hud',name+' renders after complete world');
   assert.equal(hudRender.renderer.autoClear,true,'renderer state restored');
  }
  Object.values(hudRender.heldG).forEach(item=>item.visible=false);calls.length=0;hudRender.draw();assert.equal(calls.length,0,'hidden first-person items do not draw');
+ if (rendered.includes('function ensureHud()')) {   // TEST only: LIVE keeps the squeegee until it is promoted
+  // v1.97.174, owner: "remove the squegee instead you should start with the shotgun, wrench, and crowbar"
+  assert.ok(rendered.includes("const ITEMS = ['gun', 'wrench', 'crowbar', 'hand'];"), 'the starting kit: the shotgun, the wrench and the crowbar (plus the empty hand you carry things with)');
+  assert.ok(!rendered.includes('makeSqueegee') && !rendered.includes("'squeegee'") && !rendered.includes('squeegee: ['), 'the squeegee item is gone - no model, no viewmodel, no HUD label');
+  assert.ok(rendered.includes("P3.setItem(['gun', 'wrench', 'crowbar'][+k - 1])"), 'keys 1 / 2 / 3 pick the three starting items');
+  assert.ok(rendered.includes('Mouse wheel or 1 2 3'), 'and the controls card still matches the keys'); }
  const boostStart=rendered.indexOf('  const boosting = !!(!u.noNos'),boostEnd=rendered.indexOf('  const MAXF =',boostStart);
  const boost={u:{noNos:false,nos:0,boosting:false},I:{nos:true,b:0},fs:10,dt:1/60,utvWhoosh(){}};
  vm.createContext(boost);const tickBoost=new vm.Script('{'+rendered.slice(boostStart,boostEnd)+'}');

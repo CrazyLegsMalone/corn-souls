@@ -1,3 +1,13 @@
+## TEST v1.97.174 — the squeegee is gone; you start with the shotgun, wrench and crowbar (2026-11-04)
+- Owner: *"remove the squegee instead you should start with the shotgun, wrench, and crowbar"*.
+- **The squeegee item is removed outright** - not just parked: `makeSqueegee()` (the yellow-handled, black-bladed viewmodel), its `heldG.squeegee` entry, its swipe branch in `fire()`, its push-forward animation in `updateGun()`, its two third-person hand meshes, its HUD label and its line in the controls card are all gone. Nothing else could reach it: it was only ever in `ITEMS`.
+- **The starting kit** is now `ITEMS = ['gun', 'wrench', 'crowbar', 'hand']` - the paintball **shotgun** (the `gun` item is the pump shotgun model from `buildShotgun`), the **wrench** and the **crowbar** in your hands from the first frame, where before the wrench and crowbar were only on the shop pegboard. The **empty hand stays** as the fourth slot: it is what you carry a corpse or the boom box with, so dropping it would have broken carrying.
+- Keys **1 / 2 / 3** now pick shotgun / wrench / crowbar (they used to be gun / squeegee / hand); the empty hand is still on the mouse wheel / L1 / R1 cycle, and 4 is still the ammo swap (paint / water) - untouched.
+- The radio's "go squeegee the floor in the process building" job line stays as flavour; it is the cleaner you are, not an item.
+- Tests: `validate-traffic.cjs` (which runs the launcher-patched TEST source) now requires the new `ITEMS` line, that **no** trace of the squeegee is left (`makeSqueegee`, `'squeegee'`, `squeegee: [`) and that 1/2/3 map to the three starting items while the controls card still says "1 2 3"; its held-item HUD count drops 5 -> 4 and it now walks whatever held groups exist instead of a hard-coded list. Fails on the previous revision, passes now.
+- Verified locally: the 54 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes. LIVE is untouched.
+- Bumped TEST to `1.97.174` / `corn-souls-test-shell-v201`.
+
 ## TEST v1.97.173 — the wet cake pad has walls on its south and east sides too (2026-11-04)
 - Owner: *"wetcake pads needs walls on the south and east side matching the north wall"*.
 - The pad (67 x 24 m, under an open roof on steel posts, right south of the energy center) had a single **2.2 m push wall** on its north side. The same wall is now on the other two sides the owner named:

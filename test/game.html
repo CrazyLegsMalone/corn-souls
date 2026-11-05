@@ -10593,10 +10593,9 @@ function netDrop() {
 function netRemote() {
   if (NET.rp) return;
   const other = NET.host ? 1 : 0, av = makeCharacter(VEST_COL[other], false); av.scale.setScalar(SQ_K);   // the other player: their vest color
-  // what they're holding, in the right hand: paintball gun, squeegee, power washer wand (empty hand = nothing)
+  // what they're holding, in the right hand: paintball shotgun, the tools (wrench, crowbar, ...), power washer wand (empty hand = nothing)
   const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; g.userData.item = true; av.add(g); items[k] = g; };
   const sg = buildShotgun(true); sg.g.position.set(0.2, 1.0, -0.2); sg.g.visible = false; sg.g.userData.item = true; av.add(sg.g); items.gun = sg.g;   // the same pump shotgun model
-  it('squeegee', [[0.03, 0.03, 1.2, 0xc9a227, 0, -0.05, -0.45], [0.5, 0.1, 0.04, 0x1d1f22, 0, -0.08, -1.05]]);
   for (const k in TOOLS) items[k] = toolItem(k, av);
   { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; e.userData.item = true; av.add(e); items.ext = e; }
   it('washer', [[0.04, 0.04, 0.8, 0xf2c200, 0, 0, -0.35], [0.08, 0.14, 0.1, 0x1d1f22, 0, -0.06, 0.02]]);
@@ -13390,7 +13389,6 @@ function buildSelfAv() {
     (leg ? VIEW.legs : VIEW.arms).push(pv); }
   const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); q.castShadow = true; g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; g.userData.item = true; av.add(g); items[k] = g; };
   const sg = buildShotgun(true); sg.g.position.set(0.2, 1.0, -0.2); sg.g.visible = false; sg.g.userData.item = true; av.add(sg.g); items.gun = sg.g;
-  it('squeegee', [[0.03, 0.03, 1.2, 0xc9a227, 0, -0.05, -0.45], [0.5, 0.1, 0.04, 0x1d1f22, 0, -0.08, -1.05]]);
   for (const k in TOOLS) items[k] = toolItem(k, av);
   { const e = new T.Group(), can = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 0.42, 10), mat(0xc8211c)); can.position.y = -0.1; e.add(can); const vb = new T.Mesh(new T.BoxGeometry(0.06, 0.08, 0.14), mat(0x2b2d30)); vb.position.set(0, 0.15, -0.04); e.add(vb); e.position.set(0.29, 0.9, -0.2); e.visible = false; e.userData.item = true; av.add(e); items.ext = e; }
   av.traverse(o => { o.userData.noHit = true; if (o.isMesh) o.castShadow = true; }); av.visible = false; scene.add(av);
@@ -13409,7 +13407,7 @@ function updateSelfAv() {
   const moving = sp > 0.004 && sp < 1 && walk.y <= (walk.floor || 0) + 0.05; VIEW.ph += moving ? sp * 3.2 : 0;
   const sw = moving ? Math.sin(VIEW.ph) * Math.min(0.7, sp * 18) : 0;
   VIEW.legs.forEach((l, i) => { l.rotation.x += ((i ? -sw : sw) - l.rotation.x) * 0.3; });
-  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.9 : (i === 0 && SR.carry === 'me' ? -2.6 : (i ? sw : -sw) * 0.8); a.rotation.x += (hold - a.rotation.x) * 0.3; });   // right arm forward with a gun / squeegee, left arm up holding the boom box
+  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.9 : (i === 0 && SR.carry === 'me' ? -2.6 : (i ? sw : -sw) * 0.8); a.rotation.x += (hold - a.rotation.x) * 0.3; });   // right arm forward with a gun or a tool, left arm up holding the boom box
   for (const k in VIEW.items) VIEW.items[k].visible = k === held;
 }
 
@@ -14476,7 +14474,7 @@ const HIP = { x: 0.075, y: -0.142, z: -0.46, rx: 0.04, ry: 0.045 };   // low and
 const ADS = { x: 0, y: -0.0562, z: -0.3861, rx: 0.0199, ry: 0 };   // rear notch 30 cm in front of the eye; notch and the top of the bead line up on the crosshair
 // EVERY first-person item lives in hudScene, drawn by drawHudGun() with its own near plane of 1 cm. The world camera's
 // near plane is 1 m (that is what keeps the depth buffer usable out to 9 km, and the floors rely on it), so anything
-// parented to the camera that sits half a metre from the eye - the hand, the squeegee's handle, a tool - was simply
+// parented to the camera that sits half a metre from the eye - the hand, a tool - was simply
 // clipped away and the player looked empty-handed. One scene, one near plane, no clipping.
 function ensureHud() {
   if (hudScene) return hudScene;
@@ -14515,8 +14513,11 @@ function drawHudGun() {
 }
 const tq = new T.Quaternion();
 function startReload(to, fill) { if (reloadT > 0) return false; reloadT = 0.0001; reloadTo = to || ammo; reloadFill = fill !== false; idleT = 0; gunClick(520, 0.04, 0.05); return true; }
-// ---------- held items: paintball gun, squeegee (for cleaning up messes later), empty hand; L1/R1 switch ----------
-const ITEMS = ['gun', 'squeegee', 'hand'];   // + any hand tools you take off the shop pegboard
+// ---------- held items: the paintball shotgun, the wrench and the crowbar you start with, empty hand; L1/R1 switch ----------
+// v1.97.174, owner: "remove the squegee instead you should start with the shotgun, wrench, and crowbar" - the squeegee item is
+// gone (model, viewmodel and its swipe), and the wrench and crowbar are in your hands from the start instead of only on the
+// shop pegboard. The empty hand stays: it is what you carry a corpse or the boom box with.
+const ITEMS = ['gun', 'wrench', 'crowbar', 'hand'];   // + any other hand tools you take off the shop pegboard
 let held = 'gun', heldG = {}, swipe = 0, ammo = 'paint';   // the gun shoots paintballs or a pressure-washer stream (switch ammo)
 function ammoNext() { return reloadT > 0 ? reloadTo : ammo; }   // what the gun is (or is about to be) loaded with
 function toggleAmmo() {   // swaps in the other magazine; pressing again mid-swap changes your mind (the last pick wins)
@@ -14525,18 +14526,6 @@ function toggleAmmo() {   // swaps in the other magazine; pressing again mid-swa
   return to; }   // swaps in the other magazine
 function hudPart(g, geo, mt, x, y, z) { const o = new T.Mesh(geo, mt); o.position.set(x, y, z); o.renderOrder = 20 + g.children.length; g.add(o); return o; }
 const hudMat = (c, o) => new T.MeshLambertMaterial(Object.assign({ color: c, depthTest: false }, o || {}));
-function makeSqueegee() {
-  const g = new T.Group(); g.userData.noHit = true;
-  // handle runs from the hand (off the bottom-right of the screen) forward and down to the blade on the floor ahead
-  const a = V3(0.28, -0.3, -0.42), b = V3(0.02, -0.5, -1.7);
-  const h = hudPart(g, new T.CylinderGeometry(0.02, 0.02, a.distanceTo(b), 8), hudMat(0xb8c2cc), 0, 0, 0);
-  h.position.copy(a).add(b).multiplyScalar(0.5); h.quaternion.setFromUnitVectors(V3(0, 1, 0), b.clone().sub(a).normalize());
-  const grip = hudPart(g, new T.CylinderGeometry(0.02, 0.02, 0.12, 8), hudMat(0xffc531), 0, 0, 0);
-  grip.position.copy(a).lerp(b, 0.06); grip.quaternion.copy(h.quaternion);
-  hudPart(g, new T.BoxGeometry(0.55, 0.05, 0.05), hudMat(0xffc531), 0.02, -0.51, -1.72);    // yellow blade holder
-  hudPart(g, new T.BoxGeometry(0.57, 0.035, 0.02), hudMat(0x1d2a3a), 0.02, -0.55, -1.73);   // black rubber blade
-  g.visible = false; ensureHud().add(g); return g;
-}
 function makeHand() {
   const g = new T.Group(); g.userData.noHit = true;
   const sleeve = hudPart(g, new T.CylinderGeometry(0.035, 0.04, 0.22, 10), hudMat(0xff7a1a), 0.17, -0.17, -0.3); sleeve.rotation.x = 1.25;   // hi-vis sleeve
@@ -14596,7 +14585,6 @@ function cycleItem(d) { return setItem(ITEMS[(ITEMS.indexOf(held) + d + ITEMS.le
 function fire() {
   if (!walk.on || walk.dead) return false;
   if (walk.mow) { const t = performance.now(); if (t - MOW.fireT > 300) mowBlade(); MOW.fireT = t; return true; }   // on the mower: fire toggles the blades
-  if (held === 'squeegee') { if (swipe <= 0) swipe = 1; return true; }
   if (TOOLS[held]) { if (swipe <= 0) { swipe = 1; toolHit(); } return true; }
   if (held === 'ext') { EXT.sprayT = 0.25; return true; }   // hold to spray   // a push stroke; cleaning up messes comes later
   if (held !== 'gun') return false;
@@ -14705,13 +14693,12 @@ function updateBalls(dt) {
 }
 function updateGun(dt) {
   if (!gun) gun = makeGun();
-  if (!heldG.squeegee) { heldG.squeegee = makeSqueegee(); heldG.hand = makeHand(); heldG.washer = makeWasher(); for (const k in TOOLS) heldG[k] = makeTool(k); heldG.ext = makeExtHud(); }
+  if (!heldG.hand) { heldG.hand = makeHand(); heldG.washer = makeWasher(); for (const k in TOOLS) heldG[k] = makeTool(k); heldG.ext = makeExtHud(); }
   const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !heldDead;   // carrying a dead critter: both hands on it, no gun (v1.97.111)
-  gun.visible = fp && held === 'gun'; heldG.squeegee.visible = fp && held === 'squeegee'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
+  gun.visible = fp && held === 'gun'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
   wash.t = Math.max(0, wash.t - dt); updateWasher(dt, show && held === 'gun' && wash.t > 0);
   if (!show) { aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
   if (swipe > 0) swipe = Math.max(0, swipe - dt * 2.2);
-  heldG.squeegee.position.z = -0.32 * Math.sin(Math.PI * swipe);   // push forward and pull back
   if (TOOLS[held]) { const k = Math.sin(Math.PI * swipe), G = heldG[held]; G.rotation.set(-0.9 * k, 0.2 * k, 0.9 * k); G.position.set(-0.12 * k, 0.05 * k, -0.1 * k); }   // tools: chop across, down and to the left
   heldG.hand.position.y = 0.006 * Math.sin(clock * 2);
   // aim down sights: hold right mouse / LT / the AIM button. The world zooms in, looking around slows down.
@@ -14953,7 +14940,7 @@ $('homeBtn').onclick = () => { P3.focus(null); setWalkUI(); };
 // ---------- walk mode toggle ----------
 const walkIn = { f: 0, s: 0 }, fireIn = { mouse: false, btn: false, cd: 0 };
 // Squeeg mode (first person) is entered only with the on-screen Squeeg button; Savior Mode (the bird's-eye view) is the way back
-const HELD = { gun: ['🎯', 'Paintball gun'], squeegee: ['🧹', 'Squeegee'], hand: ['✋', 'Empty hand'], crowbar: ['🪝', 'Crowbar'], shovel: ['🪏', 'Shovel'], pick: ['⛏️', 'Pickaxe'], pitchfork: ['🔱', 'Pitchfork'], wrench: ['🔧', 'Adjustable wrench'], ext: ['🧯', 'Fire extinguisher'] };
+const HELD = { gun: ['🎯', 'Paintball gun'], hand: ['✋', 'Empty hand'], crowbar: ['🪝', 'Crowbar'], shovel: ['🪏', 'Shovel'], pick: ['⛏️', 'Pickaxe'], pitchfork: ['🔱', 'Pitchfork'], wrench: ['🔧', 'Adjustable wrench'], ext: ['🧯', 'Fire extinguisher'] };
 function showHeld(quiet) { const h = P3.held; document.body.dataset.held = h; $('fireBtn').textContent = h === 'gun' && P3.ammo === 'water' ? '💦' : HELD[h][0]; $('ammoBtn').textContent = P3.ammo === 'water' ? '💦' : '🎨'; }
 function swapAmmo() { if (P3.held !== 'gun') P3.setItem('gun'); const a = P3.toggleAmmo(); showHeld(); toast(a === 'water' ? '💦 Water (pressure washer) — cleans paint off, scares birds' : '🎨 Paintballs'); }
 const carIn = { gas: 0, brake: 0, hb: 0, nos: 0 };
@@ -15011,8 +14998,8 @@ function help() {
   <i style="background:#ffb300"></i>Corn oil<i style="background:#7a4b22"></i>Wet cake</div>
   <p style="font-size:12.5px;color:#5d6b7c">Area lights: <b style="color:#2fbf71">green</b> good · <b style="color:#f2a900">yellow</b> watch it · <b style="color:#ff4d4d">red</b> problem. Green bands on temperature sliders show the best range. Tap <b>⏱</b> to change speed: real time, 1 plant minute per second (normal), 10 minutes per second, or 1 hour per second. A fermenter takes 9 h to fill, 50 h to ferment, 2 h to drain and 1 h to clean.<br>
   <b>Touch:</b> one finger — drag to move around, tap a tank to select it · two fingers — twist to turn, pinch or +/− to zoom, slide up/down together to tilt.<br>
-  <b>Squeeg mode:</b> tap the Squeeg button to walk around at human size — left thumb/stick moves, right thumb/stick looks, push the stick all the way to jog. Tap Savior Mode to go back to the bird's-eye view. Controller in Squeeg mode: A jump · X interact with what you're looking at · Y headlamp · R2 shoots paintballs (or swipes the squeegee) · L1/R1 switch between the paintball gun, squeegee and empty hand · B closes a panel · click the left stick to sprint. Three pigeons hang around the plant — they fly off if you get close, so sneak up or take long shots. Tap 🔦 for the headlamp on a phone.<br>
-  <b>PC:</b> a USB/Bluetooth controller works with the same layout as above (8BitDo: use X-input or Switch mode). Savior Mode — WASD pan, Q/E turn, R/F tilt, wheel or -/= zoom, drag to pan, right-drag to turn, click equipment to open it. Squeeg — click to grab the mouse, mouse looks, left click shoots, scroll wheel or 1/2/3 switch gun/squeegee/hand, WASD walk, Shift sprint, Space jump, E or click interact, F headlamp, Esc frees the mouse.<br>
+  <b>Squeeg mode:</b> tap the Squeeg button to walk around at human size — left thumb/stick moves, right thumb/stick looks, push the stick all the way to jog. Tap Savior Mode to go back to the bird's-eye view. Controller in Squeeg mode: A jump · X interact with what you're looking at · Y headlamp · R2 shoots paintballs (or swings the tool in your hands) · L1/R1 switch between the shotgun, the wrench, the crowbar and empty hand · B closes a panel · click the left stick to sprint. Three pigeons hang around the plant — they fly off if you get close, so sneak up or take long shots. Tap 🔦 for the headlamp on a phone.<br>
+  <b>PC:</b> a USB/Bluetooth controller works with the same layout as above (8BitDo: use X-input or Switch mode). Savior Mode — WASD pan, Q/E turn, R/F tilt, wheel or -/= zoom, drag to pan, right-drag to turn, click equipment to open it. Squeeg — click to grab the mouse, mouse looks, left click shoots, scroll wheel or 1/2/3 switch shotgun/wrench/crowbar, WASD walk, Shift sprint, Space jump, E or click interact, F headlamp, Esc frees the mouse.<br>
   <b>Controller:</b> L1/R1 next/previous tank · D-pad up/down pick a setpoint, left/right change it · sticks move/rotate · L2/R2 zoom · B close · Y whole plant · Select speed · Start menu.</p>`,
   [['Got it', null]]);
 }
@@ -15128,7 +15115,7 @@ function controlsMenu(code, fromTitle) {
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
       ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Roll-up door switch (inside, beside the door): look at a button and interact - green opens door + mesh, yellow opens the door with the mesh closed, red closes both', 'E', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
-      ['Switch item (gun / squeegee / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
+      ['Switch item (shotgun / wrench / crowbar / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
       ['Switch ammo (paint / water)', 'Q or 4', 'D-pad up', '🎨 / 💦'], ['Reload (fresh magazine)', 'R (auto when empty)', 'D-pad down (auto when empty)', 'auto when empty or after a pause']]],
@@ -15614,7 +15601,7 @@ function press(n) {
     if (n === 'R1' || n === 'L1') { P3.cycleItem(n === 'R1' ? 1 : -1); showHeld(); return; }
     if (n === 'UP' && P3.driving && P3.inKia) { const r = P3.kiaRadio(); if (r) toast(r); return; }   // D-pad up in any car: stereo
     if (n === 'DOWN' && !cur && !P3.driving) { P3.reload(); return; }   // D-pad down: a fresh magazine (v1.97.167: it no longer tops up by itself)
-    if (n === 'UP' && !cur && !P3.driving) { swapAmmo(); return; }   // D-pad up: paintballs <-> water   // switch gun / squeegee / empty hand
+    if (n === 'UP' && !cur && !P3.driving) { swapAmmo(); return; }   // D-pad up: paintballs <-> water   // switch shotgun / wrench / crowbar
   }
   if ($('modal').classList.contains('open')) {
     if (n === 'LEFT' || n === 'UP') modalFocus = (modalFocus + modalBtns.length - 1) % modalBtns.length;
@@ -15665,7 +15652,7 @@ window.addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') { if (e.key === 'Enter') { const b = $('card').querySelectorAll('button')[1]; if (b) b.click(); } return; }   // typing a join code
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; kb.shift = e.shiftKey; if (k === ' ') kb.space = true;
   const typing = $('modal').classList.contains('open');
-  if (P3.walking && !typing && (k === '1' || k === '2' || k === '3')) { P3.setItem(['gun', 'squeegee', 'hand'][+k - 1]); showHeld(); return; }
+  if (P3.walking && !typing && (k === '1' || k === '2' || k === '3')) { P3.setItem(['gun', 'wrench', 'crowbar'][+k - 1]); showHeld(); return; }
   if (P3.walking && !typing && !P3.driving && (k === 'q' || k === '4')) { e.preventDefault(); if (!e.repeat) swapAmmo(); return; }   // switch the gun's ammo: paint / water
   if (P3.walking && !typing && P3.driving && k === 'r') { e.preventDefault(); if (!e.repeat) { const r = P3.kiaRadio(); if (r) toast(r); } return; }   // R in any car: stereo
   if (P3.walking && !typing && !P3.driving && k === 'r') { e.preventDefault(); if (!e.repeat) P3.reload(); return; }   // R: fresh magazine

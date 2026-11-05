@@ -81,8 +81,8 @@ assert.ok(html.includes('fp = show && !VIEW.third && !heldDead;'), 'the game hid
 assert.ok(loader.includes("const hudVis='  const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !heldDead;';") &&
   loader.includes("fp = show && !VIEW.third && !heldDead && !CORN_PROPS_STATE.held;"), 'and the launcher keeps that when it adds its own corn carry');
 { const ug = html.slice(html.indexOf('function updateGun(dt) {'), html.indexOf('wash.t = Math.max(0, wash.t - dt);', html.indexOf('function updateGun(dt) {')));
-  const vis = {}, mk = () => ({ visible: true }), gc2 = { walk: { on: true, dead: false, drive: false, mow: false }, VIEW: { third: false }, held: 'gun', TOOLS: { pick: 1 }, gun: mk(), heldG: { squeegee: mk(), hand: mk(), washer: mk(), ext: mk(), pick: mk() }, heldDead: null };
-  vm.createContext(gc2); const run = () => vm.runInContext('{' + ug.replace('function updateGun(dt) {', '') + '\nthis.out = [gun.visible, heldG.squeegee.visible, heldG.pick.visible]; }', gc2);
+  const vis = {}, mk = () => ({ visible: true }), gc2 = { walk: { on: true, dead: false, drive: false, mow: false }, VIEW: { third: false }, held: 'gun', TOOLS: { pick: 1 }, gun: mk(), heldG: { hand: mk(), washer: mk(), ext: mk(), pick: mk() }, heldDead: null };
+  vm.createContext(gc2); const run = () => vm.runInContext('{' + ug.replace('function updateGun(dt) {', '') + '\nthis.out = [gun.visible, heldG.hand.visible, heldG.pick.visible]; }', gc2);
   run(); assert.equal(gc2.out[0], true, 'the gun shows normally');
   gc2.heldDead = { nm: 'rat' }; run(); assert.deepEqual(Array.from(gc2.out), [false, false, false], 'carrying a dead rat: no gun in your hands');
   gc2.heldDead = null; run(); assert.equal(gc2.out[0], true, 'put it down (or throw it): the gun is back'); }
