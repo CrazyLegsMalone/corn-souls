@@ -18,8 +18,7 @@ const phone = pick({ nav: { maxTouchPoints: 5, deviceMemory: 4, hardwareConcurre
 assert.equal(phone.name, 'low', 'a phone with 4 GB picks the low tier');
 assert.equal(phone.aa, false, 'and never asks for MSAA');
 assert.equal(phone.px, 0.75, 'and renders the 3D canvas below CSS resolution');
-assert.equal(phone.shadow, 512, 'with a 512 shadow map');
-assert.equal(phone.shadowType, 'BasicShadowMap', 'and one shadow tap per pixel instead of nine');
+assert.equal(phone.shadow, 0, 'and skips dynamic sun shadows');
 assert.equal(phone.fps, 60, 'and a 60 fps cap');
 const desktop = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 } });
 assert.equal(desktop.name, 'high', 'a desktop picks the high tier');
@@ -32,7 +31,7 @@ assert.equal(desktop.fps, 144, 'and the old 144 cap');
 const tablet = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 1024 } });
 assert.equal(tablet.name, 'medium', 'a big touch device with enough memory is not pushed to the floor');
 assert.equal(tablet.shadowEvery, 1, 'medium redraws the shadow map every frame too (v1.97.92: alternate heavy/light frames were judder)');
-for (const [t, R, st, mc] of [[phone, 28, 4, 1], [tablet, 65, 3, 0.35], [desktop, 85, 2, 0]]) {   // the pass is made cheaper instead of rarer
+for (const [t, R, st, mc] of [[tablet, 65, 3, 0.35], [desktop, 85, 2, 0]]) {   // the pass is made cheaper instead of rarer
   assert.equal(t.shadowEvery, 1, t.name + ' redraws its shadows every frame (steady cost)');
   assert.equal(t.shadowR, R, t.name + ' shadow box half-size ' + R + ' m');
   assert.equal(t.shadowStep, st, t.name + ' moves the shadow box in ' + st + ' m steps');
@@ -83,14 +82,17 @@ assert.equal(frames(false, 2, 14).slice(10).join(''), '0101', 'after that a stil
 // ---------------------------------------------------------------- the source keeps the wiring this depends on
 assert.ok(html.includes('renderer.shadowMap.autoUpdate = false;'), 'lazy shadows: the renderer no longer redraws the shadow map on its own');
 assert.ok(html.includes('renderer.info.autoReset = false;'), 'the renderer counters are reset by us, once per frame');
-assert.ok(html.includes('shadowFollow(); shadowRefresh(); renderer.info.reset();') &&
+assert.ok(html.includes('if (renderer.shadowMap.enabled) { shadowFollow(); shadowRefresh(); }') &&
   html.indexOf('renderer.info.reset();') < html.indexOf('renderer.render(scene, camera);', html.indexOf('shadowFollow(); shadowRefresh()')),
   'and the reset comes before the world render, so the shadow pass and the world are both counted');
 assert.ok(html.includes('PERF.dc = renderer.info.render.calls; PERF.tri = renderer.info.render.triangles;'),
   'the counters are captured before the HUD pass overwrites the picture of the frame');
 assert.ok(html.includes('renderer.setPixelRatio(Math.min(TIER.px, window.devicePixelRatio || 1));'), 'the pixel ratio comes from the tier (and never exceeds the display)');
 assert.ok(html.includes('renderer.shadowMap.type = T[TIER.shadowType] || T.PCFShadowMap;'), 'and so does the shadow filter');
-assert.ok(html.includes('sun.shadow.mapSize.set(TIER.shadow, TIER.shadow);'), 'and the shadow-map size');
+assert.ok(html.includes('renderer.shadowMap.enabled = TIER.shadow > 0;') &&
+  html.includes('sun.castShadow = renderer.shadowMap.enabled;') &&
+  html.includes('if (sun.castShadow) sun.shadow.mapSize.set(TIER.shadow, TIER.shadow);'),
+  'Low neither renders nor allocates a sun shadow map');
 assert.ok(html.includes("const pref = TIER.name === 'high' ? { antialias: TIER.aa, powerPreference: 'high-performance' } : { antialias: TIER.aa };"),
   'the context is asked for exactly what the tier wants (and nothing else)');
 assert.ok(!html.includes('[{ antialias: true }'), 'no unconditional MSAA request is left anywhere');

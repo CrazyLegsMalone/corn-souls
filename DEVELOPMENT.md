@@ -1,3 +1,8 @@
+## TEST v1.97.194 — start in the Maintenance Shop and skip Low-tier sun shadows
+- Start in first person on the Maintenance Shop floor when the title menu launches the game. A saved third-person view cannot override the starting camera.
+- Low skips the dynamic sun-shadow render and sampling while keeping the v1.97.193 resolution. Medium and High keep their shadow settings. Razr FPS still needs an on-device measurement.
+- Bumped TEST to `1.97.194` / `corn-souls-test-shell-v221`.
+
 ## TEST v1.97.193 — reduce the phone rendering budget (2026-11-06)
 - The Razr reported about 15 FPS. The Low tier now renders the 3D canvas at 0.75 of CSS resolution, about 44% fewer pixels, and uses a 512 × 512 sun shadow map. On foot, the shadow box half-size is 28 m. The minimum radius for ordinary startup shadow casters rises to 1 m. Shadows still update every frame for even pacing.
 - A touch viewport with a short side of 600 CSS pixels or less also selects Low, including when a phone opens the game in landscape. Explicit quality overrides still take priority.

@@ -80,7 +80,7 @@ const frame = async (gpuDone = true) => { rendersThisFrame = 0; ctx.roofMapGuard
 
   // Run the actual frame scheduler for a fresh spawn and the late-model rebuild.
   const powerUpdate = vm.runInContext('(' + cut('function powerUpdate(dt) {', '\nfunction ') + ')', ctx);
-  const startWalk = cut('function walkStart() {', '\nfunction ');
+  const startWalk = cut('function walkStart(firstPerson) {', '\nfunction ');
   assert.ok(!startWalk.includes('roofMapBuild('), 'walking never calls the one-shot GPU readback');
   const queue = startWalk.split('\n').find(line => line.includes('ROOFMAP.again = 0;'));
   assert.ok(queue, 'walking queues the roof map');
