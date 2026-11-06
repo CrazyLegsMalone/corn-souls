@@ -124,7 +124,7 @@ body.driving #carBtn{right:auto;left:calc(18px + env(safe-area-inset-left,0px));
 #hbBtn{right:calc(36px + env(safe-area-inset-right,0px));bottom:calc(124px + env(safe-area-inset-bottom,0px));width:52px;height:52px;font-size:12px;font-weight:800}
 #camBtn{right:calc(120px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));width:44px;height:44px;font-size:20px}#radioBtn{right:calc(172px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));width:44px;height:44px;font-size:20px}body.kia:not(.pc) #radioBtn{display:block}
 body.driving:not(.pc) #gasBtn,body.driving:not(.pc) #brakeBtn,body.driving:not(.pc) #hbBtn,body.driving:not(.pc) #camBtn{display:block}
-#actBtn,#jumpBtn{display:none;position:fixed;bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:6;width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#actBtn{right:calc(96px + env(safe-area-inset-right,0px))}#jumpBtn{right:calc(160px + env(safe-area-inset-right,0px))}body.walking:not(.pc):not(.driving) #actBtn,body.walking:not(.pc):not(.driving) #jumpBtn{display:block}body.walking:not(.driving) #carBtn{display:none!important}#aimBtn{display:none;position:fixed;right:calc(30px + env(safe-area-inset-right,0px));bottom:calc(158px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font:bold 12px Arial;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#aimBtn.on{background:#ffcf33}body.walking:not(.pc)[data-held=gun] #aimBtn{display:block}body.driving #aimBtn,body.ads #xhair{display:none!important}#ammoBtn{display:none;position:fixed;right:calc(84px + env(safe-area-inset-right,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}body.walking:not(.pc)[data-held=gun] #ammoBtn{display:block}
+#actBtn,#jumpBtn{display:none;position:fixed;bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:6;width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#actBtn{right:calc(96px + env(safe-area-inset-right,0px))}#jumpBtn{right:calc(160px + env(safe-area-inset-right,0px))}body.walking:not(.pc):not(.driving) #actBtn,body.walking:not(.pc):not(.driving) #jumpBtn{display:block}body.walking:not(.driving):not(.nearutv) #carBtn{display:none!important}#aimBtn{display:none;position:fixed;right:calc(30px + env(safe-area-inset-right,0px));bottom:calc(158px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font:bold 12px Arial;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#aimBtn.on{background:#ffcf33}body.walking:not(.pc)[data-held=gun] #aimBtn{display:block}body.driving #aimBtn,body.ads #xhair{display:none!important}#ammoBtn{display:none;position:fixed;right:calc(84px + env(safe-area-inset-right,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}body.walking:not(.pc)[data-held=gun] #ammoBtn{display:block}
 body.driving #fireBtn,body.driving #swapBtn,body.driving #ammoBtn,body.driving #xhair{display:none!important}
 /* v1.97.151: the phone's Eat button - only while something edible is in your hands, never in a vehicle (body.canEat) */
 #eatBtn{display:none;position:fixed;right:calc(96px + env(safe-area-inset-right,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:6;width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:26px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}
@@ -6077,7 +6077,8 @@ function loadVendMachine(spot) {                 // spot: { x, y, z, yaw, kind }
       M.flap = null;
     }
     M.root = g; M.g = g; M.byName = byName; M.ready = true;
-    extraCols.push([spot.x, spot.z, spot.kind === 'snack' ? 0.62 : 0.62]);
+    const col = [spot.x, spot.z, spot.kind === 'snack' ? 0.62 : 0.62]; extraCols.push(col);
+    if (typeof colliders !== 'undefined' && colliders) colliders.push(col);   /* v1.97.197: walking may already have built the collider list before this model arrived */
   }, spot.kind + ':' + spot.x + ',' + spot.z);
   return M;
 }
@@ -6133,16 +6134,31 @@ function vendUpdate(dt) {
     else if (m.flap && m.flap.rotation.x !== 0) m.flap.rotation.x = 0;
   }
 }
+/* v1.97.197: the Milo-Rade machines' button nodes stay separate from the merge so the press can find them, and each
+   placed cabinet is handed to its VEND entry (it had no root, so X at a Milo-Rade machine did nothing). */
+const DRINK_KEEP = /^(MILO_RADE_SELECT_BUTTON(_SECOND)?|WATER_SELECT_BUTTON|MILO_RADE_DISPENSED_CAN)$/;
+function drinkButtons(M, g) {
+  const by = nm => g.getObjectByName(nm);
+  M.buttons = [];
+  for (const nm of ['MILO_RADE_SELECT_BUTTON', 'MILO_RADE_SELECT_BUTTON_SECOND']) { const n = by(nm); if (n) M.buttons.push({ node: n, file: 'milo_rade_can.glb', name: 'Milo-Rade' }); }
+  const w = by('WATER_SELECT_BUTTON'); if (w) M.buttons.push({ node: w, file: 'milo_rade_can.glb', name: 'Milo-Rade', water: true });
+  const c = by('MILO_RADE_DISPENSED_CAN'); if (c) c.visible = false;
+  return M.buttons.length;
+}
 function loadDrinkMachines() {
   loadGlbModel('/corn-souls/assets/models/milorade_machine.glb', ({ root }) => {
-    mergeModel(root, false);                             // 19 parts -> one draw per material, indoors so no shadow pass
+    const keep = o => { for (let q = o; q && q !== root; q = q.parent) if (DRINK_KEEP.test(q.name || '')) return true; return false; };
+    mergeModel(root, false, keep);                       // 19 parts -> one draw per material (buttons kept), indoors so no shadow pass
     DRINK_SPOTS.forEach((s, i) => {
       const g = i ? root.clone(true) : root;
       g.position.set(s.x, s.y, s.z); g.rotation.y = s.yaw || 0;
       scene.add(g); g.updateMatrixWorld(true);
       const bb = new T.Box3().setFromObject(g);
       g.position.y += s.y - bb.min.y;                     // s.y is the floor: sit the base on it, whatever the origin is
-      extraCols.push([s.x, s.z, 0.7]);
+      const col = [s.x, s.z, 0.7]; extraCols.push(col);
+      if (typeof colliders !== 'undefined' && colliders) colliders.push(col);
+      const M = VEND.machines.find(m => m.spot && m.spot.kind === 'drink' && !m.root && Math.abs(m.spot.x - s.x) < 0.01 && Math.abs(m.spot.z - s.z) < 0.01);
+      if (M) { M.root = g; M.g = g; drinkButtons(M, g); }
     });
     DRINK.ready = true;
   }, 'milorade');
@@ -6372,7 +6388,8 @@ function flow(path, geo, color, max, opts) {
   }
   const m = selfLit(new T.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: opts.glow ? 0.4 : liquid ? 0.28 : 0 }));
   if (!opts.glow && !liquid) m.emissiveIntensity = 0;
-  const mesh = new T.InstancedMesh(geo, m, liquid ? max * 2 : max);   // a pill is two halves so it can bend at a corner mesh.castShadow = !!opts.shadow; mesh.count = 0;
+  const mesh = new T.InstancedMesh(geo, m, liquid ? max * 2 : max);   /* a pill is two halves so it can bend at a corner */
+  mesh.castShadow = !!opts.shadow; mesh.count = 0;   // v1.97.197: was swallowed by the comment above (flows drew every slot until their first update and never cast shadows)
   mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
   scene.add(mesh);
   const jit = []; for (let i = 0; i < max; i++) jit.push([(Math.random() - 0.5) * (opts.spread || 0), Math.random() * (opts.lift || 0), (Math.random() - 0.5) * (opts.spread || 0), Math.random() * 6.28]);
@@ -8649,7 +8666,8 @@ function init(container) {
       box(0.25, 0.25, 6.0, red, TX1 + 0.4, 5.6, TZ0 + 3.2); box(0.25, 5.6, 0.25, red, TX1 + 0.4, 2.8, TZ0 + 0.3);
     }
     { const rx = -76.2, rz = 100.2;                                    // RTO (pink): oxidizer chambers + exhaust stack
-      building(rx - 5.2, rx + 5.2, rz - 3.9, rz + 3.9, 5, [[rx + 2.5, 0.95, 2.13]]); keyHook('flower', rx - 1.8, rz - 3.9 + 0.28, 0);   // the pink Kia's key manDoor(rx + 2.5, rz - 3.9, true, null, 1); concreteFloor(rx - 5.2, rx + 5.2, rz - 3.9, rz + 3.9);   // RTO shack: hollow, man door on the north side
+      building(rx - 5.2, rx + 5.2, rz - 3.9, rz + 3.9, 5, [[rx + 2.5, 0.95, 2.13]]); keyHook('flower', rx - 1.8, rz - 3.9 + 0.28, 0);   /* the pink Kia's key */
+      manDoor(rx + 2.5, rz - 3.9, true, null, 1); concreteFloor(rx - 5.2, rx + 5.2, rz - 3.9, rz + 3.9);   // RTO shack: hollow, man door on the north side (v1.97.197: these two were commented out by the key note above)
       cyl(0.9, 16, mat(0x8a9097), rx - 6.5, 0, rz, null, 12); extraCols.push([rx - 6.5, rz, 1.0]); STACKS.push({ x: rx - 6.5, y: 16.1, z: rz, r: 0.9, rate: 7, grid: true });   /* stack on the west side (plume) */ }
     // WIND SOCK by the wet cake pad (west end): orange/white striped sock on a 20 ft pole. It swings to point downwind with the live
     // weather and fills out with the wind speed (limp and hanging when it's calm), fluttering a little.
@@ -9803,9 +9821,11 @@ function updateRail(dt) {
     if (R.u < 0) { if ((R.wait -= dt) <= 0) { R.u = 0; R.horn = false; R.state = 'run'; R.speed = 22; R.target = null; R.cars.forEach(c => { c.g.visible = true; }); } continue; }
     // dispatcher hold: ease up to the stop point, park across the crossing, release after five minutes
     if (R.state === 'hold') {
+      /* v1.97.197: the guest gets the hold (state, speed 0) from the host; it never times the hold out itself */
+      if (!NET.host && NET.conn && NET.conn.open) { R.speed = 0; } else {
       R.heldT = (R.heldT || 0) + dt;
       if (R.heldT > 285 && !R.warned) { R.warned = true; RAIL_PHONE.notice = 'Dispatcher: the hold at Road P expires in 15 seconds'; }
-      if (R.heldT > 300) { R.state = 'leave'; R.target = null; R.speed = 8; R.warned = false; }
+      if (R.heldT > 300) { R.state = 'leave'; R.target = null; R.speed = 8; R.warned = false; } }
     } else if (R.target !== null && R.target !== undefined) {
       const gap = R.target - R.u;
       R.speed = Math.max(1.5, Math.min(22, gap * 0.8));
@@ -11052,6 +11072,7 @@ function netWire(c) {
 function netLeave() { try { if (NET.conn) NET.conn.close(); } catch (e) {} try { if (NET.peer) NET.peer.destroy(); } catch (e) {} NET.conn = null; NET.peer = null; netDrop(); }
 function netDrop() {
   NET.conn = null;
+  CREEP.snapSeen = false;   // v1.97.197: the next game's first creature snapshot is a first one again
   if (O.idleP2) O.idleP2.visible = true;   // Player 2 left: the idle squeeg2 at the smoking area is back, waiting for the next game
   if (O.cars) for (const c of O.cars) { if (c.passFig) c.passFig.visible = false; if (c.drvFig) c.drvFig.visible = false; }   // nobody else in the cars now
   if (walk.pass) passExit();
@@ -11078,7 +11099,7 @@ function netRemote() {
   dressPlayerSkin(av, VEST_COL[other], {});   // the other player wears their own wardrobe build (P1 squeeg1, P2 squeeg2)
   NET.rp = { av, items, sg, aim: 0, aimK: 0, am: 0, sh: MAG, held: null, x: 0, y: 0, z: 0, yaw: 0, tx: 0, ty: 0, tz: 0, tyaw: 0, walk: false, drive: false };
   const rr = { x: NET.host ? 58.6 : 55, z: 22, a: 0, y: 0, steer: 0, tx: 0, tz: 0, ta: 0, spin: 0 }; rr.tx = rr.x; rr.tz = rr.z;
-  rr.g = makeRangerMesh(rr, RANGER_COL[other]); rr.driver = seatDriver(rr.g, VEST_COL[other]); rr.driver.visible = false; rr.flame = addFlame(rr.g); rr.g.traverse(o => { o.userData.noHit = true; }); rr.g.position.set(rr.x, 0.13, rr.z); scene.add(rr.g); NET.rr = rr;
+  rr.g = makeRangerMesh(rr, RANGER_COL[other]); rr.driver = seatDriver(rr.g, VEST_COL[other]); rr.driver.visible = false; rr.flame = addFlame(rr.g); rangerNoHit(rr.g, true); rr.g.position.set(rr.x, 0.13, rr.z); scene.add(rr.g); NET.rr = rr;
 }
 const _lerpA = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 // ---------- WORLD SYNC (v1.97.109): in 2 player the host's world is the world. 4x a second the host sends its power state,
@@ -11108,7 +11129,7 @@ function wsApply(m) {   // guest: the host's world
 function wsClock() { return GT.real ? null : [Math.round(gameDate().getTime()), GT.rate]; }
 function netRecv(m) {
   if (!m || !m.t) return;
-  if (m.t === 'cp') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }
+  if (m.t === 'cprop') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }   // v1.97.197: corn props were 'cp', which shadowed the parked-car 'cp' below
   if (m.t === 'du') { if (!NET.host) duckApply(m.a); return; }   // the host's ducks (v1.97.179)
   if (m.t === 'crs') { if (!NET.host) critApply(m); return; }   // critters (v1.97.112)
   if (m.t === 'crh') { if (NET.host) critRecvHit(m); return; }
@@ -11182,7 +11203,8 @@ function netUpdate(dt) {
   if (NET.host) { NET.worldT += rdt; if (NET.worldT > 1) { NET.worldT = 0; netSend({ t: 'w', ts: train.s, wx: weather.kind }); } }
   const R = NET.rp; if (R && R.sg) {   // their shotgun: at the hip, or shouldered when they aim; magazine shows their ammo
     R.aimK += (R.aim - R.aimK) * Math.min(1, rdt * 10); const q = R.aimK;
-    R.sg.g.position.set(0.2 - 0.13 * q, 1.0 + 0.57 * q, -0.2 - 0.12 * q);   // shouldered: sights at the right eye R.sg.g.rotation.set(0.04 * (1 - q), 0.06 * (1 - q), 0);
+    R.sg.g.position.set(0.2 - 0.13 * q, 1.0 + 0.57 * q, -0.2 - 0.12 * q);   /* shouldered: sights at the right eye */
+    R.sg.g.rotation.set(0.04 * (1 - q), 0.06 * (1 - q), 0);   // v1.97.197: the tilt was swallowed by the comment above
     R.sg.setRounds(R.am ? 'water' : 'paint', R.sh);
   }
   if (R) {   // glide toward the latest reported spot
@@ -11853,10 +11875,10 @@ function binWalkway(xa, za, xb, zb, y) {   // grain-yard coords, like siloClimb:
     const ox = Math.cos(ang) * s2 * (W / 2 - 0.05), oz = -Math.sin(ang) * s2 * (W / 2 - 0.05);
     for (const hh of [1.07, 0.55]) { const r = box(0.05, 0.05, L, yel, mx + ox, y + hh - 0.04, mz + oz); r.rotation.y = ang; }
     for (let t2 = 0; t2 <= 1.001; t2 += 0.25) { box(0.05, 1.07, 0.05, yel, xa + (xb - xa) * t2 + ox, y + 0.495, za + (zb - za) * t2 + oz); }
-    box(W, 0.12, 0.04, yel, mx + ox, y - 0.02, mz + oz).rotation.y = ang;                                  // toe board
+    box(0.04, 0.12, L, yel, mx + ox, y - 0.02, mz + oz).rotation.y = ang;                                  // toe board along each edge (v1.97.197: was a 1.4 m board across the middle)
     wallSegs.push([xa + ox + SX, za + oz + SZ2, xb + ox + SX, zb + oz + SZ2, y - 0.4, y + 2.2]);            // stops you stepping off
   }
-  WALK_SURF.push({ x0: Math.min(xa, xb) - W / 2, x1: Math.max(xa, xb) + W / 2, z0: Math.min(za, zb) - W / 2, z1: Math.max(za, zb) + W / 2, y0: y, y1: y });
+  WALK_SURF.push({ x0: Math.min(xa, xb) - W / 2 + SX, x1: Math.max(xa, xb) + W / 2 + SX, z0: Math.min(za, zb) - W / 2 + SZ2, z1: Math.max(za, zb) + W / 2 + SZ2, y0: y, y1: y });   // v1.97.197: in world coords like its wall lines (it sat 44 m off)
 }
 function siloLadderAt(x, z, R, H, ang) {   // a ladder and cage on any side of a bin (siloClimb's own is on the west)
   const SX = GDX, SZ2 = GDZ, lrail = mat(0xd8b23a), top = H + 0.15, LX = R + 0.3;
@@ -12221,7 +12243,7 @@ function toolHit() {   // a swing: whatever is right in front of you (about arm 
     const bc = b.g.position.clone(); bc.y += 0.25; const t = Math.max(0, Math.min(2.3, bc.clone().sub(o).dot(dir)));
     if (bc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.65) { hitBird(b, null); splatSnd(bc); return; }
   }
-  if (critters) for (const c of critters) if (c.state === 'idle' || c.state === 'run') {
+  if (critters) for (const c of critters) if (c.state === 'idle' || c.state === 'run' || c.state === 'climb') {   /* v1.97.197: lizards on a wall can be hit too */
     const cc = c.g.position.clone(); cc.y += 0.06; const t = Math.max(0, Math.min(2.3, cc.clone().sub(o).dot(dir)));
     if (cc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.45) { hitCritter(c, null); splatSnd(cc); return; }
   }
@@ -13450,7 +13472,7 @@ function rangerSkin(g) {
     swap.set(mt, r); return r;
   };
   m.traverse(c => { if (!c.isMesh) return; c.material = remat(c.material); c.castShadow = true; c.receiveShadow = false;
-    c.userData.charOK = true; if (noHit) c.userData.noHit = true; });
+    c.userData.charOK = true; if (noHit) { c.userData.noHit0 = !!c.userData.noHit; c.userData.noHit = true; } });
   // wheels: each glTF wheel node spins on its own X; a pivot group at the hub steers it (Y) and rides the suspension (Y position)
   const W = g.userData.rangerWheels; W.length = 0;
   for (const [n, front] of RANGER_WHEELS) {
@@ -13663,11 +13685,24 @@ function addFlame(g) {   // NOS exhaust flame (hidden until boosting)
 }
 // 2 player: hop into the other player's (parked) Ranger. The two Ranger objects trade bodies — mesh, spot, heading — so "utv" is always
 // the one you drive; the other PC does the same trade when it hears about it. Each player's seated driver moves to their new Ranger.
+/* v1.97.197: the other player's Ranger is not a shot target on your screen. Its own flags are kept (noHit0) so a swap can
+   give them back when it becomes yours. */
+function rangerNoHit(g, other) {
+  if (!g) return;
+  if (other) g.traverse(o => { if (o.userData.noHit0 === undefined) o.userData.noHit0 = !!o.userData.noHit; o.userData.noHit = true; });
+  else g.traverse(o => { if (o.userData.noHit0 !== undefined) { o.userData.noHit = o.userData.noHit0; delete o.userData.noHit0; } });
+}
 function swapRangers() {
   const A = utv, B = NET.rr; if (!B) return;
+  const ga = A.g, gb = B.g;
   for (const k of ['g', 'wheels', 'sw', 'flame', 'x', 'z', 'a', 'y']) { const t = A[k]; A[k] = B[k]; B[k] = t; }
   A.vx = A.vz = 0; B.tx = B.x; B.tz = B.z; B.ta = B.a; B.ty = B.y; A.steer = 0;
   if (A.driver) A.g.add(A.driver); if (B.driver) B.g.add(B.driver);
+  /* v1.97.197: everything that belongs to "my Ranger" follows the swap too: its walk-into box, which one can be shot, and
+     the damage (health, fire, burnt) that is on that physical Ranger. Both players swap, so both stay in step. */
+  for (const V of VBOXES) { if (V.g === ga) V.g = gb; else if (V.g === gb) V.g = ga; }
+  rangerNoHit(A.g, false); rangerNoHit(B.g, true);
+  { const r = DMG.r, rr = DMG.rr; if (rr) DMG.r = rr; else delete DMG.r; if (r) DMG.rr = r; else delete DMG.rr; }
 }
 function utvEnter() { utvIgnition(); walk.drive = true; walk.vy = 0; utv.vx = utv.vz = 0; utv.vy = 0; utv.air = false; utv.camYaw = utv.a; utv.look = utv.lookP = 0; }
 // ---------- DRIVABLE CARS (the three parked in the dirt behind the plant): same arcade handling as the Ranger, no NOS. Each one is locked
@@ -13913,6 +13948,7 @@ function buildSelfAv() {
   VIEW.av = av; VIEW.key = key; VIEW.items = items;
   VIEW.pending = performance.now();
   dressPlayerSkin(av, VEST_COL[me], { onRig: (R, root, swing) => {   // the walk cycle drives the skinned bones once the model is on
+    if (VIEW.av !== av) return;   /* v1.97.197: a model that arrives after the 8 s retry rebuilt the avatar must not bind to the old one */
     VIEW.pending = 0;
     VIEW.legs = [swing.legL, swing.legR].filter(Boolean); VIEW.arms = [swing.armL, swing.armR].filter(Boolean); VIEW.knees = [swing.kneeL, swing.kneeR].filter(Boolean); } });
 }
@@ -13927,7 +13963,10 @@ function updateSelfAv() {
   /* v1.97.196: a limb that has settled on its target is not re-posed every frame (standing still cost the full swing
      maths for six bones per frame). The swing is about the model's own X axis, so a settled bone's pose does not depend on
      how its parent is swinging. */
-  const limb = (l, t, k) => { if (Math.abs(t - l.cur) > 1e-4) { l.cur += (t - l.cur) * k; skinSwing(l.root, l.b, l.rest, SKIN_X, l.cur); } else if (l.cur !== t || !l.posed) { l.cur = t; l.posed = true; skinSwing(l.root, l.b, l.rest, SKIN_X, l.cur); } };
+  const limb = (l, t, k) => {
+    if (l.isObject3D) { const c = l.userData.cur || 0; l.userData.cur = c + (t - c) * k; l.rotation.x = l.userData.cur; return; }   /* v1.97.197: the box stand-in's hip/shoulder pivots (before the model loads) swing directly; they had no .cur, so the cycle was NaN */
+    if (!l.b) return;
+    if (Math.abs(t - l.cur) > 1e-4) { l.cur += (t - l.cur) * k; skinSwing(l.root, l.b, l.rest, SKIN_X, l.cur); } else if (l.cur !== t || !l.posed) { l.cur = t; l.posed = true; skinSwing(l.root, l.b, l.rest, SKIN_X, l.cur); } };
   VIEW.legs.forEach((l, i) => { const t = i ? -sw : sw; limb(l, t, 0.3); });
   const ksw = moving ? Math.min(0.55, sp * 14) : 0, kc = Math.cos(VIEW.ph);   // knees bend mid-swing (foot clears the ground), straighten at heel-strike
   VIEW.knees.forEach((k, i) => { const t = Math.max(0, i ? kc : -kc) * ksw; limb(k, t, 0.4); });
@@ -14436,7 +14475,7 @@ function loadCreeps() {
     root.traverse(o => { if (o.isMesh && o.material && o.material.color) { const col = o.material.color; if (col.r > 0.6 && col.g < 0.1 && col.b < 0.1 && o.material.emissive) { o.material.emissive.setRGB(0.7, 0.02, 0.02); } } });   // red eyes glow in the dark
     foldModel(root, /Leg_Hip/);
     CREEP.proto[kind] = { root, minY: all.min.y, hitY: c.y - all.min.y, hitR: Math.max(s.x, s.z) * 0.7, maxR: Math.max(all.max.x - all.min.x, all.max.z - all.min.z) / 2 };
-    if (CREEP.proto.stalker && CREEP.proto.daddy && !CREEP.ready) { CREEP.ready = true; creepStalkers(); }
+    if (CREEP.proto.stalker && CREEP.proto.daddy && !CREEP.ready) { CREEP.ready = true; if (!creepGuest()) creepStalkers(); }   // v1.97.197: a guest whose models load late takes the host's creatures, it does not spawn its own
   }, 'creeps');
 }
 function creepSpawn(kind, x, z, rise, id) {
@@ -15142,7 +15181,7 @@ function updateWasher(dt, on) {
       wash.hitD = h ? h.distance : 9;
       for (let i = splats.length - 1; i >= 0; i--) { const sp = splats[i].getWorldPosition(tv); if (sp.distanceTo(at) < 0.9) { splats[i].removeFromParent(); splats.splice(i, 1); } }   // washed clean
       scareNear(at, 5);
-      if (critters) for (const c of critters) if ((c.state === 'idle' || c.state === 'run') && c.g.position.distanceTo(at) < 2) crLeg(c, true);
+      if (critters) for (const c of critters) if ((c.state === 'idle' || c.state === 'run' || c.state === 'climb') && c.g.position.distanceTo(at) < 2) crLeg(c, true);
       if (h && Math.random() < 0.5) puff(at.clone(), 0.12, 0xe6f4ff);   // mist where it hits
     }
   }
@@ -15249,7 +15288,7 @@ function updateBalls(dt) {
     }
     if (!done && CREEP.list.length && creepPaintHit(p, dir, len, B.c)) { splatSnd(p); done = true; }   // the corn field's creatures
     if (!done && critters) for (const c of critters) {
-      if (c.state !== 'idle' && c.state !== 'run') continue;
+      if (c.state !== 'idle' && c.state !== 'run' && c.state !== 'climb') continue;
       const cc = tv.copy(c.g.position); cc.y += 0.06;
       const t = Math.max(0, Math.min(len, tv2.copy(cc).sub(p).dot(dir)));
       if (cc.distanceTo(tv2.copy(p).addScaledVector(dir, t)) < 0.3) { hitCritter(c, B.c); splatSnd(cc); done = true; break; }
@@ -15305,7 +15344,7 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, creepHurt, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, CSU, ENCL, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, utv, KEYS, buildShotgun, truck, vehicles, get fpGun() { return fpGun; }, wallSegs, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -15739,7 +15778,7 @@ const NPC_DEF = {
       cooler: { k: ['cooler', 'yeast', 'tote', 'temperature', 'temp', 'hot', 'cold'], say: coolerSay, opts: ['Any alarms?', 'What do the totes do?'] },
       totes: { k: ['what do the totes', 'totes do'], say: 'The totes are the yeast. Yeast eats the sugar in the mash and makes the ethanol. Warm yeast is sad yeast.', opts: ['How\'s the cooler?', 'How does the plant work?'] },
       alarms: { k: ['alarm', 'alarms', 'board', 'problem', 'wrong', 'status'], say: alarmSay, opts: ['How\'s the cooler?', 'Got anything for me to do?'] },
-      job: { k: ['got anything for me to do', 'got anything else', 'give me a job', 'job', 'task', 'help', 'bored'], say: () => pick(['Go check the yeast cooler doors. Somebody always leaves them open.', 'Mow something. The mower\'s in the shed.', 'Go squeegee the floor in the process building. It\'s gross.', 'Pigeons are everywhere. Do something about that.']), opts: ['Where\'s the mower?', 'Pigeons?', 'Never mind.'] },
+      job: { k: ['got anything for me to do', 'got anything else', 'give me a job', 'job', 'task', 'help', 'bored'], say: () => pick(['Go check the yeast cooler doors. Somebody always leaves them open.', 'Mow something. The mower\'s in the shed.', 'Go walk the north corn field. Something out there keeps chewing the stalks.', 'Pigeons are everywhere. Do something about that.']), opts: ['Where\'s the mower?', 'Pigeons?', 'Never mind.'] },
       mower: { k: ['mower', 'mow', 'grass', 'shed'], say: 'Zero-turn is in the shed. Hop on, push both sticks. Try not to mow the scarecrows. Or do, I don\'t care.', opts: ['Scarecrows?', 'Got anything else?'] },
       pigeons: { k: ['pigeon', 'pigeons', 'bird', 'birds'], say: () => 'They roost all over the plant. You\'ve gotten ' + P3.pigeonHits + ' of them so far. Paintballs are cheaper than spikes.', opts: ['Got anything else?', 'Bye.'] },
       scarecrows: { k: ['scarecrow', 'scarecrows', 'creepy', 'evil'], say: 'Don\'t look at the scarecrows too long. I\'m serious. The night guy quit over them.', opts: ['What about the buzzard?', 'Okay...'] },

@@ -23,11 +23,12 @@ function soundSettings(focus=0){
   '<button id="csMusicPlus" type="button" aria-label="Increase music volume" style="height:44px;padding:0;font-size:22px">+</button></div>',
   [[musicOn?'Music: On':'Music: Off',()=>{toggleMusic();soundSettings(2);}],
    ['Back to pause menu',()=>menu()]],true);
- $('csMusicMinus').onclick=()=>soundSetMusicVolume(music.volume-.1);
- $('csMusicPlus').onclick=()=>soundSetMusicVolume(music.volume+.1);
+ // v1.97.197: steps land on whole percents (0.1 + 0.2 drifted to 0.30000000000000004)
+ $('csMusicMinus').onclick=()=>soundSetMusicVolume(Math.round((music.volume-.1)*100)/100);
+ $('csMusicPlus').onclick=()=>soundSetMusicVolume(Math.round((music.volume+.1)*100)/100);
  modalBtns=Array.from($('card').querySelectorAll('button:not(#csModalExit)'));
  modalFocus=focus;markModal();
  const slider=$('csMusicVolume');
  slider.oninput=()=>soundSetMusicVolume(Number(slider.value)/100);
- slider.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();inboxClose();}e.stopPropagation();});
+ slider.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();menu();}e.stopPropagation();});   // v1.97.197: Escape goes back to the pause menu it came from
 }

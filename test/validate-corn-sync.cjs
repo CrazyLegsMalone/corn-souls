@@ -24,7 +24,7 @@ const make = host => {
 };
 const H = make(true), G = make(false);
 let peers = [H, G];
-const pipe = () => { for (const [a, b] of [[peers[0], peers[1]], [peers[1], peers[0]]]) for (const m of a.q.splice(0)) if (m.t === 'cp') b.cornNetRecv(m); };
+const pipe = () => { for (const [a, b] of [[peers[0], peers[1]], [peers[1], peers[0]]]) for (const m of a.q.splice(0)) if (m.t === 'cprop') b.cornNetRecv(m); };
 const step = (sec, dt = 0.02) => { for (let t = 0; t < sec; t += dt) { for (const c of peers) c.cornUpdate(dt); pipe(); } };
 const look = (c, t) => { const p = t.g.position; c.camera.position.set(p.x, 1.6, p.z + 1.6); c.camera.dir.set(0, p.y - 1.6, -1.6).normalize(); };
 const near = (a, b, e = 0.05) => a.distanceTo(b) < e;
@@ -59,7 +59,7 @@ const L = make(false); peers = [H, L]; step(2.5);
 assert.ok(H.S.props.every((t, i) => near(t.g.position, L.S.props[i].g.position, 0.02)), 'the late joiner sees every prop where the host has it');
 // a move the guest just made is not undone by an older snapshot from the host
 peers = [H, G]; const g2 = G.S.props[1]; look(G, g2); G.cornInteract(); G.camera.dir.set(-1, 0, 0); G.cornThrow();
-const old = { t: 'cp', a: [[1, +H.S.props[1].g.position.x.toFixed(2), +H.S.props[1].g.position.y.toFixed(2), +H.S.props[1].g.position.z.toFixed(2), 0, 0, 0, 2]], f: 1 };
+const old = { t: 'cprop', a: [[1, +H.S.props[1].g.position.x.toFixed(2), +H.S.props[1].g.position.y.toFixed(2), +H.S.props[1].g.position.z.toFixed(2), 0, 0, 0, 2]], f: 1 };
 for (let i = 0; i < 200 && !(g2.sleep && g2.net == null); i++) { G.cornUpdate(0.02); H.cornUpdate(0.02); pipe(); }
 const rest = g2.g.position.clone(); G.cornNetRecv(old); assert.ok(near(g2.g.position, rest, 0.001), 'a resting snapshot sent before the host heard of the throw is ignored');
 step(3); assert.ok(near(H.S.props[1].g.position, rest, 0.01) && near(g2.g.position, rest, 0.01), 'and both agree where it is');
@@ -71,7 +71,8 @@ assert.ok(hh.sleep && hh.g.position.y < 0.4, 'it dropped to the ground');
 const solo = make(true); solo.NET.conn = null; look(solo, solo.S.props[2]); solo.cornInteract(); solo.cornThrow(); for (let i = 0; i < 100; i++) solo.cornUpdate(0.02); assert.equal(solo.q.length, 0, 'single player: no messages');
 
 // the game's hooks
-assert.ok(html.includes("if (m.t === 'cp') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }"), 'the game hands corn messages to the corn engine');
+assert.ok(html.includes("if (m.t === 'cprop') { if (typeof cornNetRecv === 'function') cornNetRecv(m); return; }"), 'the game hands corn messages to the corn engine');
+assert.ok(!html.includes("if (m.t === 'cp') { if (typeof cornNetRecv"), "and no longer under 'cp', which the parked-car exit uses (v1.97.197)");
 assert.ok(html.includes("if (typeof cornNetDrop === 'function') cornNetDrop();"), 'and lets go of the other player\'s corn when they leave');
 assert.ok(html.includes("t.inCan || t.net === 'them' || !t.g) continue;"), 'a creature does not go for an ear the other player is moving');
 assert.ok(html.includes("if (typeof cornNetTake === 'function') cornNetTake(t); }"), 'an ear a creature eats goes back in the can on both PCs');
