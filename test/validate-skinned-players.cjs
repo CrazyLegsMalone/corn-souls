@@ -29,9 +29,13 @@ for (const [f, joints, skinned, rigid, tri] of [[S1, 66, 15, 1, [6000, 6400]], [
 // wiring
 assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("url: ['/corn-souls/assets/models/squeeg1_2_0.glb', '/corn-souls/assets/models/squeeg2_2_0.glb']") && html.includes('h: [1.78, 1.65]'), 'P1 wears squeeg1 at 1.78 m, P2 wears squeeg2 at 1.65 m');
 assert.ok(html.includes('slot = vest === VEST_COL[1] ? 1 : 0'), 'the vest colour picks the slot');
-assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 7, 'one definition + six avatars');
+assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 8, 'one definition + seven avatars (the two players, four seated, and the idle Player 2 at the smoking area)');
 assert.ok(html.includes('function loadPlayerSkin(slot, cb)') && html.includes('glbBuild(S.bytes[slot])'), 'raw bytes are cached and glbBuild runs per avatar (no skeleton sharing)');
 assert.ok(!html.includes('squeeg-model.js') && !html.includes('squeegAvatar'), 'the legacy PSX squeeg-model.js inline is gone');
+// v1.97.190: Player 2 waits idle at the smoking area until somebody joins
+assert.ok(html.includes('function idlePlayer2()') && html.includes('av.position.set(147, 0, -80)') && html.includes('av.rotation.y = Math.PI / 2'), 'idle Player 2 stands on the smoking pad, facing west toward the plant');
+assert.ok(html.includes('dressPlayerSkin(av, VEST_COL[1], {})') && html.includes('O.idleP2 = idlePlayer2();'), 'she wears squeeg2 and is put there at init');
+assert.ok(html.includes('if (O.idleP2) O.idleP2.visible = false;') && html.includes('if (O.idleP2) O.idleP2.visible = true;'), 'hidden when Player 2 joins, back when they leave');
 // registered and credited
 const reg = JSON.parse(fs.readFileSync(path.join(root, 'assets/registry.json'), 'utf8')), credits = fs.readFileSync(path.join(root, 'CREDITS.md'), 'utf8');
 for (const [id, f, title] of [['sketchfab-loves-art-low-poly-male-squeeg1-2-0', S1, 'Low Poly Male — squeeg1 2.0'], ['sketchfab-loves-art-low-poly-female-squeeg2-2-0', S2, 'Low Poly Female — squeeg2 2.0']]) {

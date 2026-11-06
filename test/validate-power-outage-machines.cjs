@@ -626,7 +626,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
   // ---------------------------------------------------------------- the players wear their own wardrobe builds (v1.97.185)
   assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("'/corn-souls/assets/models/squeeg1_2_0.glb'") && html.includes("'/corn-souls/assets/models/squeeg2_2_0.glb'"), 'Player 1 wears squeeg1, Player 2 wears squeeg2');
-  assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 7, 'one definition + six avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, and the other player seated in a car (v1.97.109)');
+  assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 8, 'one definition + seven avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, the other player seated in a car, and the idle Player 2 at the smoking area (v1.97.190)');
   for (const call of ['dressPlayerSkin(av, VEST_COL[other], {});', 'dressPlayerSkin(d, vest, { sit: true });', 'dressPlayerSkin(av, VEST_COL[me], { onRig: (R, root, swing) => {'])
 
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));

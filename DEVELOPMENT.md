@@ -1,3 +1,11 @@
+## TEST v1.97.190 — Player 2 waits idle at the smoking area (2026-11-05)
+- Owner: *"place the squeeg2 model at the new smoking area by parking lot idle ready to be used if player 2 joins"*.
+- **`idlePlayer2()`** stands squeeg2 (Player 2's build) on the smoking pad east of the parking lot (`147, 0, -80`, facing west toward the plant) at init, so there is always a Player 2 figure waiting at the smoking area in solo play.
+- **When somebody joins** (`netRemote()`), the idle figure is hidden and the real Player 2 is drawn wherever they actually are; **when they leave** (`netDrop()`), the idle figure comes back for the next game.
+- `validate-skinned-players.cjs` pins the idle figure (position, facing, squeeg2, init wiring) and the hide/show in `netRemote`/`netDrop`; `validate-power-outage-machines.cjs` and `validate-skinned-players.cjs` now count seven avatars (was six).
+- Verified locally: the 60 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.190` / `corn-souls-test-shell-v217`.
+
 ## TEST v1.97.189 — Brenda and Tammy sit 4 inches back from their windows (2026-11-05)
 - Owner: *"move brenda and tammy 4 inches away from the wall they are facing"*.
 - Brenda (inbound, north window) moved `+0.1016` (4 in) along +Z; Tammy (outbound, south window) moved `-0.1016` along -Z — each is now 4 inches further back from the drive-through window they face. `validate-seating.cjs` pins the new positions.

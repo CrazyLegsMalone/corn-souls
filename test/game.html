@@ -5759,6 +5759,15 @@ function loadSmokingArea() {
     g.add(root); scene.add(g); scene.updateMatrixWorld(true);
   }, 'smoking-area');
 }
+// v1.97.190: Player 2 waiting at the smoking area — squeeg2 stands idle there until a 2-player connection opens, when the real
+// Player 2 replaces her (netRemote hides her, netDrop brings her back for the next game).
+function idlePlayer2() {
+  const av = makeCharacter(VEST_COL[1], false); av.scale.setScalar(SQ_K);
+  av.position.set(147, 0, -80); av.rotation.y = Math.PI / 2;   // on the smoking pad east of the parking lot, facing west toward the plant
+  av.userData.idleP2 = true; scene.add(av);
+  dressPlayerSkin(av, VEST_COL[1], {});   // squeeg2 (Player 2's build)
+  return av;
+}
 // ---------- PLAYER MODELS: Player 1 wears squeeg1 (male), Player 2 wears squeeg2 (female) - the owner's Crew Wardrobe builds
 // of Loves_Art's Low Poly Male / Female (CC BY 4.0). One fresh build per avatar (a skinned model cannot be cloned without sharing
 // its skeleton, and two avatars of the same player must fold independently), so the raw bytes are cached and glbBuild() runs per
@@ -7953,6 +7962,7 @@ function init(container) {
   // ---------- the NPC character models (Vern, Rick at the board, Brenda + Tammy in the scale house)
   loadNpcModels();
   loadSmokingArea();   // the smoking-area shelter east of the employee parking lot
+  O.idleP2 = idlePlayer2();   // v1.97.190: Player 2's squeeg2 stands idle at the smoking area until somebody joins
   makeTote(EXR - 22, SZR - 12, 0.15);                                  // a liquid tote sitting in the dirt north of the cooling tower, across the south road                 // south of the south road
   mark('FIRE &\nPROCESS\nWATER', -62, SZR + 30, 24, 40);
   // ---------- EMPLOYEE PARKING: east of the east road, south of the exit road. Driveways in from the exit road (NW corner)
@@ -10787,6 +10797,7 @@ function netWire(c) {
 function netLeave() { try { if (NET.conn) NET.conn.close(); } catch (e) {} try { if (NET.peer) NET.peer.destroy(); } catch (e) {} NET.conn = null; NET.peer = null; netDrop(); }
 function netDrop() {
   NET.conn = null;
+  if (O.idleP2) O.idleP2.visible = true;   // Player 2 left: the idle squeeg2 at the smoking area is back, waiting for the next game
   if (O.cars) for (const c of O.cars) { if (c.passFig) c.passFig.visible = false; if (c.drvFig) c.drvFig.visible = false; }   // nobody else in the cars now
   if (walk.pass) passExit();
   if (typeof cornNetDrop === 'function') cornNetDrop();
@@ -10797,6 +10808,7 @@ function netDrop() {
 // the other player: a simple low-poly Squeeg (orange hi-vis vest, white hardhat) with a name tag, and their own Ranger
 function netRemote() {
   if (NET.rp) return;
+  if (O.idleP2) O.idleP2.visible = false;   // the real Player 2 has arrived: the idle squeeg2 at the smoking area steps aside
   const other = NET.host ? 1 : 0, av = makeCharacter(VEST_COL[other], false); av.scale.setScalar(SQ_K);   // the other player: their vest color
   // what they're holding, in the right hand: paintball shotgun, the tools (wrench, crowbar, ...), power washer wand (empty hand = nothing)
   const items = {}, it = (k, parts) => { const g = new T.Group(); for (const [w, h, d, c, x, y, z] of parts) { const q = new T.Mesh(new T.BoxGeometry(w, h, d), mat(c)); q.position.set(x, y, z); g.add(q); } g.position.set(0.29, 0.95, -0.15); g.visible = false; g.userData.item = true; av.add(g); items[k] = g; };
