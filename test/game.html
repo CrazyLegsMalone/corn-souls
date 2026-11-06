@@ -5434,18 +5434,34 @@ function glbAccessor(d, bin, i) {
   for (let k = 0; k < a.count; k++) out.set(new C(bin.buffer, start + k * stride, n), k * n);
   return out;
 }
+const GLB_IMG_CACHE = new WeakMap();
 function glbBuild(buf) {
   const { json: d, bin } = glbChunks(buf);
-  // embedded images: a PNG in the BIN chunk becomes a blob URL that three fills in asynchronously
-  const imgs = (d.images || []).map(im => {
-    if (im.bufferView === undefined) return null;
-    const bv = d.bufferViews[im.bufferView], off = bin.byteOffset + (bv.byteOffset || 0);
-    const url = URL.createObjectURL(new Blob([new Uint8Array(bin.buffer, off, bv.byteLength)], { type: im.mimeType || 'image/png' }));
-    const t = new T.TextureLoader().load(url, x2 => { x2.needsUpdate = true; URL.revokeObjectURL(url); });
-    if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
-    t.flipY = false;                                  // glTF UV origin is top-left
-    return t;
-  });
+  const pbr = typeof MODEL_PBR !== 'undefined' ? MODEL_PBR : false;
+  let usedImgs = null;
+  if (!pbr && d.images && d.images.length) {
+    usedImgs = new Set();
+    for (const m of d.materials || []) {
+      const bt = m.pbrMetallicRoughness && m.pbrMetallicRoughness.baseColorTexture;
+      const src = bt && d.textures && d.textures[bt.index] ? d.textures[bt.index].source : undefined;
+      if (src !== undefined) usedImgs.add(src);
+    }
+  }
+  // embedded images: cached per ArrayBuffer so all 7 glbBuild(S.bytes[slot]) player avatars share one GPU texture upload
+  let cached = buf && typeof buf === 'object' ? GLB_IMG_CACHE.get(buf) : null;
+  let imgs = cached && cached.pbr === pbr ? cached.imgs : null;
+  if (!imgs) {
+    imgs = (d.images || []).map((im, idx) => {
+      if (im.bufferView === undefined || (usedImgs && !usedImgs.has(idx))) return null;
+      const bv = d.bufferViews[im.bufferView], off = bin.byteOffset + (bv.byteOffset || 0);
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bin.buffer, off, bv.byteLength)], { type: im.mimeType || 'image/png' }));
+      const t = new T.TextureLoader().load(url, x2 => { x2.needsUpdate = true; URL.revokeObjectURL(url); });
+      if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+      t.flipY = false;                                  // glTF UV origin is top-left
+      return t;
+    });
+    if (buf && typeof buf === 'object') GLB_IMG_CACHE.set(buf, { pbr, imgs });
+  }
   const texs = (d.textures || []).map(t2 => imgs[t2.source] || null);
   const mats = (d.materials || []).map(m => {
     const pr = m.pbrMetallicRoughness || {}, c = new T.Color().fromArray(pr.baseColorFactor || [1, 1, 1, 1]);
@@ -5454,7 +5470,6 @@ function glbBuild(buf) {
     // opacity channel - so Lambert draws exactly what Standard would, for a fraction of the fragment cost, and a
     // PBR "metal" (metalness 1) with no environment map comes out near-black instead of looking like painted steel.
     // (typeof guard: the validator suites run this reader on its own, without the tier table.)
-    const pbr = typeof MODEL_PBR !== 'undefined' ? MODEL_PBR : false;
     const mat = pbr
       ? new T.MeshStandardMaterial({ color: c, metalness: pr.metallicFactor === undefined ? 1 : pr.metallicFactor,
         roughness: pr.roughnessFactor === undefined ? 1 : pr.roughnessFactor, side: T.DoubleSide })
@@ -5710,9 +5725,133 @@ function skinTurn(root, bone, axis, ang) {
   root.updateMatrixWorld(true);
 }
 function skinBox(root) {   // the posed mesh's real extent (a skinned mesh's geometry bounds are its T-pose)
-  root.updateMatrixWorld(true); const bb = new T.Box3(), v = new T.Vector3();
-  root.traverse(o => { if (o.isSkinnedMesh) for (let i = 0, n = o.geometry.attributes.position.count; i < n; i++) { o.getVertexPosition(i, v); bb.expandByPoint(v.applyMatrix4(o.matrixWorld)); } });
+  root.updateMatrixWorld(true); const bb = new T.Box3(), v = new T.Vector3(); let sk = 0;
+  root.traverse(o => { if (o.isSkinnedMesh) { sk++; for (let i = 0, n = o.geometry.attributes.position.count; i < n; i++) { o.getVertexPosition(i, v); bb.expandByPoint(v.applyMatrix4(o.matrixWorld)); } } });
+  if (!sk) root.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.position) { const p = o.geometry.attributes.position; for (let i = 0, n = p.count; i < n; i++) { v.fromBufferAttribute(p, i); bb.expandByPoint(v.applyMatrix4(o.matrixWorld)); } } });
   return bb;
+}
+let SKIN_VC_MAT = null;
+function skinVcMat() { return SKIN_VC_MAT || (SKIN_VC_MAT = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide })); }
+function dedupSkeletons(root) {
+  const canon = [], sameM = (a, b) => { const ae = a.elements, be = b.elements; for (let i = 0; i < 16; i++) if (Math.abs(ae[i] - be[i]) > 1e-4) return false; return true; };
+  root.traverse(o => {
+    if (!o.isSkinnedMesh || !o.skeleton) return;
+    const sk = o.skeleton; let match = null;
+    for (const c of canon) {
+      if (c === sk) { match = c; break; }
+      if (c.bones.length !== sk.bones.length) continue;
+      let ok = true;
+      for (let i = 0; i < c.bones.length; i++) if (c.bones[i] !== sk.bones[i] || !sameM(c.boneInverses[i], sk.boneInverses[i])) { ok = false; break; }
+      if (ok) { match = c; break; }
+    }
+    if (!match) canon.push(sk);
+    else if (match !== sk) { o.bind(match, o.bindMatrix); if (sk.dispose) sk.dispose(); }
+  });
+  return canon.length;
+}
+function mergeSkinnedFlat(root) {
+  dedupSkeletons(root);
+  const parts = []; let sk0 = null;
+  root.traverse(o => {
+    if (!o.isSkinnedMesh || !o.skeleton || !o.material || Array.isArray(o.material)) return;
+    const m = o.material; if (m.map || m.transparent || m.opacity !== 1) return;
+    if (!sk0) sk0 = o.skeleton;
+    if (o.skeleton === sk0 && o.geometry && o.geometry.attributes.position && o.geometry.attributes.skinIndex && o.geometry.attributes.skinWeight) parts.push(o);
+  });
+  if (parts.length < 2) return;
+  let n = 0;
+  const geos = parts.map(o => { const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); n += g.attributes.position.count; return { g, o }; });
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  const p0 = new T.Vector3(), n0 = new T.Vector3(); let k = 0;
+  for (const { g, o } of geos) {
+    const cnt = g.attributes.position.count, ap = g.attributes.position, an = g.attributes.normal, ac = g.attributes.color, asi = g.attributes.skinIndex, asw = g.attributes.skinWeight;
+    const mc = o.material.color, bm = o.bindMatrix;
+    for (let i = 0; i < cnt; i++, k++) {
+      p0.fromBufferAttribute(ap, i).applyMatrix4(bm); pos[k * 3] = p0.x; pos[k * 3 + 1] = p0.y; pos[k * 3 + 2] = p0.z;
+      if (an) { n0.fromBufferAttribute(an, i).transformDirection(bm); nor[k * 3] = n0.x; nor[k * 3 + 1] = n0.y; nor[k * 3 + 2] = n0.z; }
+      col[k * 3] = mc.r * (ac ? ac.getX(i) : 1); col[k * 3 + 1] = mc.g * (ac ? ac.getY(i) : 1); col[k * 3 + 2] = mc.b * (ac ? ac.getZ(i) : 1);
+      for (let r = 0; r < 4; r++) { si[k * 4 + r] = asi.getComponent(i, r); sw[k * 4 + r] = asw.getComponent(i, r); }
+    }
+    g.dispose();
+  }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
+  geo.setAttribute('color', new T.BufferAttribute(col, 3)); geo.setAttribute('skinIndex', new T.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new T.BufferAttribute(sw, 4));
+  const merged = new T.SkinnedMesh(geo, skinVcMat());
+  merged.castShadow = false; merged.receiveShadow = false; merged.userData.noHit = true;
+  (parts[0].parent || root).add(merged); merged.bind(sk0, new T.Matrix4());
+  for (const o of parts) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); }
+}
+function bakeStaticSkin(target, castShadow) {
+  target.updateMatrixWorld(true);
+  const inv = new T.Matrix4().copy(target.matrixWorld).invert(), bmCache = new Map(), skels = new Set(), buckets = new Map(), meshes = [];
+  target.traverse(o => { if (o.isMesh && o.material && !Array.isArray(o.material) && o.geometry && o.geometry.attributes.position) meshes.push(o); });
+  if (!meshes.length) return target;
+  const p0 = new T.Vector3(), n0 = new T.Vector3(), vp = new T.Vector3(), vn = new T.Vector3(), tmp = new T.Vector3();
+  for (const o of meshes) {
+    const src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, cnt = src.attributes.position.count;
+    const ap = src.attributes.position, an = src.attributes.normal, au = src.attributes.uv, ac = src.attributes.color;
+    const pos = new Float32Array(cnt * 3), nor = new Float32Array(cnt * 3);
+    if (o.isSkinnedMesh && o.skeleton && src.attributes.skinIndex && src.attributes.skinWeight) {
+      const sk = o.skeleton; skels.add(sk);
+      let bm = bmCache.get(sk);
+      if (!bm) bmCache.set(sk, bm = sk.bones.map((bn, j) => new T.Matrix4().multiplyMatrices(inv, bn.matrixWorld).multiply(sk.boneInverses[j])));
+      const asi = src.attributes.skinIndex, asw = src.attributes.skinWeight, bindM = o.bindMatrix;
+      for (let i = 0; i < cnt; i++) {
+        p0.fromBufferAttribute(ap, i).applyMatrix4(bindM); vp.set(0, 0, 0);
+        if (an) { n0.fromBufferAttribute(an, i).transformDirection(bindM); vn.set(0, 0, 0); }
+        for (let r = 0; r < 4; r++) {
+          const w = asw.getComponent(i, r); if (!w) continue;
+          const m = bm[asi.getComponent(i, r)];
+          vp.addScaledVector(tmp.copy(p0).applyMatrix4(m), w);
+          if (an) vn.addScaledVector(tmp.copy(n0).transformDirection(m), w);
+        }
+        pos[i * 3] = vp.x; pos[i * 3 + 1] = vp.y; pos[i * 3 + 2] = vp.z;
+        if (an) { vn.normalize(); nor[i * 3] = vn.x; nor[i * 3 + 1] = vn.y; nor[i * 3 + 2] = vn.z; }
+      }
+    } else {
+      const m = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      for (let i = 0; i < cnt; i++) {
+        p0.fromBufferAttribute(ap, i).applyMatrix4(m); pos[i * 3] = p0.x; pos[i * 3 + 1] = p0.y; pos[i * 3 + 2] = p0.z;
+        if (an) { n0.fromBufferAttribute(an, i).transformDirection(m); nor[i * 3] = n0.x; nor[i * 3 + 1] = n0.y; nor[i * 3 + 2] = n0.z; }
+      }
+    }
+    const mat = o.material, flat = !mat.map && !mat.transparent && mat.opacity === 1;
+    const key = flat ? '__vc__' : (mat.map ? 'tex:' + mat.map.uuid + ':' + mat.color.getHex() : 'mat:' + mat.uuid) + ':' + (mat.transparent ? mat.opacity : 1);
+    let b = buckets.get(key); if (!b) buckets.set(key, b = { mat: flat ? skinVcMat() : mat, flat, parts: [], n: 0 });
+    let col = null;
+    if (flat) {
+      col = new Float32Array(cnt * 3); const mc = mat.color;
+      for (let i = 0; i < cnt; i++) { col[i * 3] = mc.r * (ac ? ac.getX(i) : 1); col[i * 3 + 1] = mc.g * (ac ? ac.getY(i) : 1); col[i * 3 + 2] = mc.b * (ac ? ac.getZ(i) : 1); }
+    }
+    const uv = !flat && au ? new Float32Array(au.array) : null;
+    b.parts.push({ pos, nor, uv, col, cnt }); b.n += cnt;
+    if (src !== o.geometry) src.dispose();
+    o.geometry.dispose();
+  }
+  for (const sk of skels) if (sk.dispose) sk.dispose();
+  while (target.children.length) target.remove(target.children[0]);
+  for (const { mat, flat, parts, n } of buckets.values()) {
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = flat ? new Float32Array(n * 3) : null;
+    const allUv = !flat && parts.every(p => p.uv), uv = allUv ? new Float32Array(n * 2) : null;
+    let k = 0;
+    for (const p of parts) {
+      pos.set(p.pos, k * 3); nor.set(p.nor, k * 3);
+      if (col) col.set(p.col, k * 3);
+      if (uv) uv.set(p.uv, k * 2);
+      k += p.cnt;
+    }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
+    if (col) geo.setAttribute('color', new T.BufferAttribute(col, 3));
+    if (uv) geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    const mesh = new T.Mesh(geo, mat);
+    mesh.castShadow = !!castShadow; mesh.receiveShadow = !!castShadow; mesh.userData.noHit = true; mesh.matrixAutoUpdate = false;
+    target.add(mesh);
+  }
+  target.updateMatrix(); target.matrixAutoUpdate = false; target.updateMatrixWorld(true);
+  return target;
 }
 // set a bone to a stored rest orientation, then rotate ang about a model-space axis - the per-frame walk swing. skinTurn() is
 // incremental (it pre-multiplies the current orientation), which compounds every frame; this one is absolute from the rest pose.
@@ -5755,6 +5894,7 @@ function skinnedNpc(npc, cfg, { root }) {
   R.position.set(cfg.dx || 0, base + (cfg.dy || 0), cfg.dz || 0);
   for (const k in cfg.colors || {}) root.traverse(o => { if (o.isMesh && o.material && o.material.name === k) { o.material = o.material.clone(); o.material.color.set(cfg.colors[k]); } });
   root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  if (npc && npc.id) bakeStaticSkin(R, false);                     // in-game NPCs never animate after posing: bake to static meshes & drop skeletons
   if (cfg.pose !== 'sit') npc.g.position.y = 0;                    // drop the box avatar's own lift
   if (cfg.x !== undefined) npc.g.position.x = cfg.x;
   if (cfg.z !== undefined) npc.g.position.z = cfg.z;
@@ -5834,6 +5974,7 @@ function dressPlayerSkin(av, vest, opts) {
     }
     R.position.set(0, base, 0);
     root.traverse(o2 => { o2.userData.noHit = true; if (o2.isMesh) { o2.castShadow = false; o2.receiveShadow = false; } });
+    if (o.onRig) mergeSkinnedFlat(root); else bakeStaticSkin(R, false);   // animating 3P keeps 1 shared skeleton; static/seated avatars bake to plain meshes
     // The box body is REMOVED, not hidden: a stray visible=true anywhere else must never be able to resurrect it, and a
     // left-over box under the model is exactly how a player ends up looking like the old Squeeg with somebody standing inside
     // them. Held items live in their own groups and are untouched.
