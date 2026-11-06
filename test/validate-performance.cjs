@@ -20,7 +20,12 @@ assert.equal(phone.aa, false, 'and never asks for MSAA');
 assert.equal(phone.px, 0.75, 'and renders the 3D canvas below CSS resolution');
 assert.equal(phone.shadow, 512, 'with a 512 shadow map');
 assert.equal(phone.shadowType, 'BasicShadowMap', 'and one shadow tap per pixel instead of nine');
-assert.equal(phone.fps, 60, 'and a 60 fps cap');
+assert.equal(phone.fps, 30, 'and a steady 30 fps cap (v1.97.21, owner: the frame rate jumped up to 60 sometimes)');
+{   // the cap lands on whole refreshes, so frames are evenly spaced: every 2nd refresh at 60 Hz, every 4th at 120 Hz
+  const m = html.match(/PACE\.k = FPS_CAP > 0 \? Math\.max\(1, Math\.round\(PACE\.hz \/ FPS_CAP - 0\.15\)\) : 1;/); assert.ok(m, 'the refresh-multiple pacing is in place');
+  const k = (hz, cap) => Math.max(1, Math.round(hz / cap - 0.15));
+  assert.deepEqual([k(60, 30), k(90, 30), k(120, 30), k(144, 30)], [2, 3, 4, 5], 'a 30 cap draws every 2nd / 3rd / 4th / 5th refresh on 60 / 90 / 120 / 144 Hz screens');
+}
 const desktop = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 } });
 assert.equal(desktop.name, 'high', 'a desktop picks the high tier');
 assert.equal(desktop.aa, true, 'with MSAA');

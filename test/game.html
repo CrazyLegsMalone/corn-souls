@@ -4897,7 +4897,7 @@ const mat = (c, o) => o ? matU(c, o) : (MATS[c] || (MATS[c] = matU(c)));   // pl
 // cheaper on low / medium: a smaller shadow box (shadowR, metres), objects smaller than minCaster (metres, bounding radius)
 // do not cast, and the box moves in coarse shadowStep jumps so walking does not force anything extra.
 const TIERS = {
-  low:    { name: 'low',    aa: false, px: 0.75, shadow: 512,  shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 60,  pbr: false },
+  low:    { name: 'low',    aa: false, px: 0.75, shadow: 512,  shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 30,  pbr: false },   // v1.97.21: a steady 30 on phones (it swung between ~40 and 60, which felt rougher)
   medium: { name: 'medium', aa: true,  px: 1.25, shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 65, shadowStep: 3, minCaster: 0.35, fps: 90,  pbr: false },
   high:   { name: 'high',   aa: true,  px: 1.5,  shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 85, shadowStep: 2, minCaster: 0,    fps: 144, pbr: false }
 };
@@ -16393,7 +16393,7 @@ function frameBody(now) {
   P3.perf.frame = performance.now() - now;   // whole frame body: sim + scene + both render passes + HUD
 }
 let fpsN = 0, fpsT = 0;
-const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fps) || 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;   // 0 = uncapped; the tier caps it (60 on a phone, 144 on a desktop)
+const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fps) || 144, FPS_STEP = FPS_CAP > 0 ? 1000 / FPS_CAP : 0;   // 0 = uncapped; the tier caps it (30 on a phone, 144 on a desktop)
 // Frame pacing (v1.97.92): measure the screen's real refresh interval and draw on every k-th refresh, k = refresh / cap
 // rounded to a whole number. The old time accumulator compared each refresh gap against 1000 / cap, so ordinary timing
 // jitter made it skip a frame it should have drawn (a visible hitch even on a 60 Hz screen) and gave 90 / 120 Hz screens

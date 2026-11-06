@@ -1,3 +1,9 @@
+## TEST v1.97.21 — a steady 30 fps on phones (2026-11-06)
+- Owner: *"frame rate jumps up to 60fps sometimes is there a way we could limit it so it's smoother?"*
+- The Low tier (phones) now caps at 30 fps instead of 60. The existing pacing draws on whole screen refreshes, so frames are evenly spaced: every 2nd refresh at 60 Hz, every 4th at 120 Hz. Swinging between about 40 and 60 felt rougher than a steady 30. Medium (90) and High (144) are unchanged, and the `cs_perf` quality override still picks another tier.
+- `validate-performance.cjs` pins the 30 cap and checks the refresh multiples at 60/90/120/144 Hz. Verified locally: all 66 CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.21` / `corn-souls-test-shell-v227`.
+
 ## TEST v1.97.20 — version numbers back to two digits (2026-11-06)
 - Owner: *"Can we just use 1.97.xx not 1.97.xxx"* and *"Next would be 1.97.20"*. TEST goes from 1.97.198 to 1.97.20; normal bumps continue 1.97.21, 1.97.22 and so on.
 - `scripts/bump_test_version.py` takes `--set VERSION` for a change like this one (the TEST cache name still bumps). The launcher's update check only compares for a different version, so phones on 1.97.198 still update to 1.97.20.
