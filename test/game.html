@@ -4897,7 +4897,7 @@ const mat = (c, o) => o ? matU(c, o) : (MATS[c] || (MATS[c] = matU(c)));   // pl
 // cheaper on low / medium: a smaller shadow box (shadowR, metres), objects smaller than minCaster (metres, bounding radius)
 // do not cast, and the box moves in coarse shadowStep jumps so walking does not force anything extra.
 const TIERS = {
-  low:    { name: 'low',    aa: false, px: 1.0,  shadow: 1024, shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 50, shadowStep: 4, minCaster: 0.5,  fps: 60,  pbr: false },
+  low:    { name: 'low',    aa: false, px: 0.75, shadow: 512,  shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 60,  pbr: false },
   medium: { name: 'medium', aa: true,  px: 1.25, shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 65, shadowStep: 3, minCaster: 0.35, fps: 90,  pbr: false },
   high:   { name: 'high',   aa: true,  px: 1.5,  shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 85, shadowStep: 2, minCaster: 0,    fps: 144, pbr: false }
 };
@@ -4907,7 +4907,8 @@ function perfTier(env) {   // env is for the tests only: a real call reads the l
   if (pick && TIERS[pick]) return Object.assign({}, TIERS[pick]);
   const nav = e.nav || (typeof navigator !== 'undefined' ? navigator : {}), win = e.win || (typeof window !== 'undefined' ? window : {});
   const touch = (nav.maxTouchPoints || 0) > 0, mem = nav.deviceMemory || 0, cores = nav.hardwareConcurrency || 0, w = win.innerWidth || 0;
-  if (touch && (mem <= 4 || cores <= 4 || w < 900)) return Object.assign({}, TIERS.low);        // phone / handheld / small tablet
+  const shortSide = Math.min(w, win.innerHeight || w);
+  if (touch && (mem <= 4 || cores <= 4 || w < 900 || shortSide <= 600)) return Object.assign({}, TIERS.low);   // includes phones opened in landscape
   if (touch || (mem && mem <= 4) || (cores && cores <= 4)) return Object.assign({}, TIERS.medium);
   return Object.assign({}, TIERS.high);
 }
