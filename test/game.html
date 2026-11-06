@@ -4939,12 +4939,16 @@ const titleCover = () => titleHidesWorld(titleEl, titleFrames);
 // costs that one update instead of the render, the first-person gun and the paintball cooldown that follow it in the
 // chain - and the first failure of each is named in the console AND on the fps line, so a silent freeze is impossible.
 const FAILS = {};
+/* v1.97.24: the dev performance recorder times each guarded sub-update while it records (off otherwise: no cost) */
+const DEVT = { on: false, sum: Object.create(null), max: Object.create(null) };
 function stepSafe(name, fn) {
+  const _dv = typeof DEVT !== 'undefined' && DEVT.on, _t0 = _dv ? performance.now() : 0;
   try { fn(); } catch (e) {
     const n = FAILS[name] = (FAILS[name] || 0) + 1;
     PERF.errs++; PERF.err = name; PERF.msg = (e && e.message) || String(e);
     if (n === 1 || n === 64) { try { console.error('[update:' + name + '] failed ' + n + 'x', e); } catch (err) {} }
   }
+  if (_dv) { const d = performance.now() - _t0; DEVT.sum[name] = (DEVT.sum[name] || 0) + d; if (d > (DEVT.max[name] || 0)) DEVT.max[name] = d; }
 }
 const MODEL_PBR = TIER.pbr;   // imported models: false = Lambert. Cheaper per pixel, and a PBR "metal" with no environment map renders almost black anyway.
 // A power outage only kills what is actually plugged in, so every emitter declares itself once, where it is built:
@@ -5550,7 +5554,7 @@ function loadGlbModel(url, onReady, tag) {
   (GLB_FETCH[url] || (GLB_FETCH[url] = fetch(url, { cache: 'force-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
     .catch(e => { delete GLB_FETCH[url]; throw e; })))
-    .then(buf => onReady(glbBuild(buf)))
+    .then(buf => { const r = glbBuild(buf); if (r && r.root) r.root.userData.glb = url.split('/').pop(); onReady(r); })   // v1.97.24: the file name, for the dev placement tool
     .catch(e => console.warn('[' + (tag || 'glb') + '] ' + url.split('/').pop() + ' not loaded:', e && e.message));
 }
 // ---------- FIRE HYDRANT (v1.97.143, owner: lopoly_hydrant.glb): the owner's low-poly hydrant in place of the old code-drawn flat
@@ -10385,7 +10389,7 @@ const boxDist = (e, x, z) => Math.hypot(Math.max(e.x0 - x, 0, x - e.x1), Math.ma
    yard props, ground cells) and the grass chunks outside it cannot be on screen. They are hidden for the draw only and
    shown again straight after it (indoorCullHide / indoorCullShow round renderer.render), so no game code ever sees a
    changed .visible. Dynamic things (vehicles, creatures, players) are never touched. */
-const INDOOR = { e: null, list: [], hid: [], t: -1e9, on: false, hidden: 0, margin: 1, cone: 0.3 };
+const INDOOR = { e: null, list: [], hid: [], t: -1e9, on: false, hidden: 0, margin: 1, cone: 0.3, enabled: true };
 const _icV = new T.Vector3(), _icB = new T.Box3();
 function indoorOpeningsHidden(cam) {   // true when no opening of any envelope holding the camera can be in view
   const fwd = cam.getWorldDirection(_icV), half = Math.atan(Math.tan(cam.fov * Math.PI / 360) * Math.hypot(1, cam.aspect || 1));
@@ -10403,7 +10407,7 @@ function indoorOpeningsHidden(cam) {   // true when no opening of any envelope h
 }
 function indoorCullWant(cam) {   // the envelope to cull round, or null
   cam = cam || camera;
-  if (!cam || !walk.on || walk.dead || walk.drive || walk.mow || walk.ride || walk.pass || VIEW.third) return null;
+  if (!INDOOR.enabled || !cam || !walk.on || walk.dead || walk.drive || walk.mow || walk.ride || walk.pass || VIEW.third) return null;
   const p = cam.position, e = enclAt(p.x, p.y, p.z);
   if (!e || !e.wins.length) return null;   // no listed openings: we cannot tell what can be seen, so draw everything
   if (Math.min(p.x - e.x0, e.x1 - p.x, p.z - e.z0, e.z1 - p.z) < 1.5 || e.top - p.y < 0.5) return null;
@@ -11006,6 +11010,7 @@ function update(sim, dt, events) {
     indoorCullShow(_ic);
     PERF.draw = performance.now() - _rt; PERF.dc = renderer.info.render.calls; PERF.tri = renderer.info.render.triangles;   // shadow pass + world, excluding the HUD pass below
     drawHudGun();
+    if (DEVR.on) devRecSample();   // v1.97.24: dev performance recorder
   } else { renderer.info.reset(); PERF.draw = PERF.dc = PERF.tri = 0; }   // so the fps line reads 0 dc, not the last world frame
 }
 
@@ -11485,7 +11490,7 @@ function mergeStatic() {
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uvs = withUV ? new Float32Array(n * 2) : null; let k = 0;
     for (const g of parts) { pos.set(g.attributes.position.array, k * 3); nor.set(g.attributes.normal.array, k * 3); if (uvs) uvs.set(g.attributes.uv.array, k * 2); k += g.attributes.position.count; g.dispose(); }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); if (uvs) geo.setAttribute('uv', new T.BufferAttribute(uvs, 2)); geo.computeBoundingSphere();
-    const m = new T.Mesh(geo, G.m); m.castShadow = G.cast; m.receiveShadow = G.recv; m.matrixAutoUpdate = false;
+    const m = new T.Mesh(geo, G.m); m.castShadow = G.cast; m.receiveShadow = G.recv; m.matrixAutoUpdate = false; m.userData.merged = true;
     if (G.noHit) m.userData.noHit = true;
     if (G.noRoof) m.userData.noRoof = true;
     scene.add(m);
@@ -11593,7 +11598,7 @@ function walkStart() {
   // layering (grass under dirt under asphalt) needs at distance. The first-person weapon lives in hudScene with its own
   // 0.01 near, so nothing held can be clipped by this.
 }
-function setHeadlamp(on) { if (headlamp) headlamp.intensity = on ? 28 : 0; walk.lamp = !!on; }
+function setHeadlamp(on) { if (headlamp) headlamp.intensity = on ? TUNE.lamp : 0; walk.lamp = !!on; }
 function walkStop() {
   setWallsSolid(false); setHeadlamp(false); if (walk.drive) { walk.drive = false; utvSound(0, 0); if (utv.driver) utv.driver.visible = false; if (CAR_ON) carRestore(); }
   if (walk.mow) mowExit(true);
@@ -13067,12 +13072,14 @@ function walkMove(fwd, strafe, dt, run) {
     walk.ride.lz = Math.max(-1.15, Math.min(1.15, walk.ride.lz + dx * Math.sin(a) + dz * Math.cos(a)));
     return;
   }
-  const sp = (run ? 17.01 : 8.91) * (POWER.kind === 'rat' ? 1.5 : 1) * dt / Math.max(1, Math.hypot(fwd, strafe));   // v1.97.112: 10% slower (was 18.9 sprint, 9.9 walk); rat speed 1.5x
+  const sp = (run ? TUNE.sprint : TUNE.walk) * (POWER.kind === 'rat' ? 1.5 : 1) * dt / Math.max(1, Math.hypot(fwd, strafe));   // v1.97.112: 10% slower (was 18.9 sprint, 9.9 walk); rat speed 1.5x
   if (POWER.kind === 'rat' && run) POWER.moveT = 0.2;
   const n = Math.max(1, Math.ceil(sp * Math.max(1, Math.hypot(fwd, strafe)) / 0.25)), sx = walk.x, sz = walk.z;
   for (let i = 0; i < n; i++) { walk.x += (fx * fwd + rx * strafe) * sp / n; walk.z += (fz * fwd + rz * strafe) * sp / n; pushOut(); }
   if (POWER.kind === 'lizard' && fwd > 0.3) lizardClimb(fx, fz, sp * fwd, (walk.x - sx) * fx + (walk.z - sz) * fz, dt);
 }
+/* v1.97.24: the feel numbers the dev tuning sliders can change live (defaults are the shipped values) */
+const TUNE = { walk: 8.91, sprint: 17.01, fogNear: 120, fogFar: 900, lamp: 28 };
 // semis and train cars are solid in Squeeg mode; a moving one that hits you runs you over
 const VBOX = { truck: [0.5, 10.6, 1.4], car: [0, 8.6, 1.7], loco: [0, 10.6, 1.6] };   // [center offset along length, half length, half width]
 function vehicleHits() {
@@ -13908,7 +13915,7 @@ function utvCam(dt) {
   camera.lookAt(u.x - Math.sin(a) * 2, u.y + (cc ? cc[1] * 0.4 : 1.1), u.z - Math.cos(a) * 2);
 }
 function walkCam() {
-  scene.fog.near = 120; scene.fog.far = 900;
+  scene.fog.near = TUNE.fogNear; scene.fog.far = TUNE.fogFar;
   const cp = Math.cos(walk.pitch);
   const ey = EYE + walk.y, fx = -Math.sin(walk.yaw) * cp, fy = Math.sin(walk.pitch), fz = -Math.cos(walk.yaw) * cp;
   updateSelfAv();
@@ -15344,7 +15351,238 @@ function updateGun(dt) {
   fpGun.stock.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
 }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+// ---------- LESION TOOLBOX (v1.97.24, TEST only): the owner's in-game dev tools. One 🛠 button opens a panel with three tabs:
+// Place (aim at a thing, nudge / turn / raise it, copy its new spot), Tune (live sliders for look, feel and speed), and
+// Record (30 s of frame timing, draw calls and per-system cost, as a text report). Every tab ends in one Copy button; what
+// it copies is plain text for the owner to paste to the developer, who then makes the change for real. Nothing here is
+// saved into the game except the slider values the game already remembers (grass, brightness), and Reset puts those back.
+// It never appears outside /corn-souls/test/, so a LIVE promotion of this file does not show it to players.
+const LESION = { on: false, tab: 'place', el: null, sel: null, box: null, step: 1, log: [], orig: new Map(), tuneDef: null, report: '' };
+const DEVR = { on: false, t0: 0, last: 0, dur: 30000, s: [] };
+const LESION_STEPS = [[0.05, 5], [0.25, 15], [1, 45]];   // [metres, degrees] per press
+function lesionAllowed() { try { return /\/corn-souls\/test\//.test(location.pathname) || localStorage.getItem('cs_lesion') === '1'; } catch (e) { return false; } }
+function lesionCopy(text) {
+  const done = () => lesionSay('Copied - paste it to Claude');
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, () => lesionCopyOld(text)); return; } } catch (e) {}
+  lesionCopyOld(text);
+}
+function lesionCopyOld(text) {   // older browsers / no permission: select the text so a long-press copy works too
+  const ta = LESION.el && LESION.el.querySelector('#lzOut'); if (!ta) return;
+  ta.value = text; ta.style.display = 'block'; ta.focus(); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+  lesionSay(ok ? 'Copied - paste it to Claude' : 'Select the text below and copy it');
+}
+function lesionSay(t) { const m = LESION.el && LESION.el.querySelector('#lzMsg'); if (m) m.textContent = t; }
+const lzN = (v, d) => (+v).toFixed(d === undefined ? 2 : d);
+function lesionCompass(yaw) {   // walk.yaw 0 looks north (-z)
+  const deg = ((-yaw * 180 / Math.PI) % 360 + 360) % 360;
+  return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(deg / 45) % 8];
+}
+function lesionWhere() {
+  const inside = typeof enclAt === 'function' && walk.on && enclAt(walk.x, walk.y + 1, walk.z);
+  return 'x ' + lzN(walk.x, 1) + ', z ' + lzN(walk.z, 1) + (walk.y > 0.3 ? ', up ' + lzN(walk.y, 1) + ' m' : '') + ', facing ' + lesionCompass(walk.yaw) + (inside ? ', indoors' : ', outdoors');
+}
+
+// ---------------------------------------------------------------- Place
+function lesionName(o) {
+  if (!o) return '';
+  {   // the game's own name for it, when it keeps one (O.idleP2, an NPC, a vending machine, the Rangers, a parked car...)
+    const own = q => q === o || (q && (q.g === o || q.root === o || q.group === o));
+    try { for (const k in O) { const v = O[k]; if (own(v)) return 'O.' + k; if (Array.isArray(v)) { const i = v.findIndex(own); if (i >= 0) return 'O.' + k + '[' + i + ']'; } } } catch (e) {}
+    try { const n = NPCS.find(q => own(q)); if (n) return 'NPC ' + n.id; } catch (e) {}
+    try { const i = VEND.machines.findIndex(own); if (i >= 0) return 'vending machine ' + i + ' (' + VEND.machines[i].spot.kind + ')'; } catch (e) {}
+    if (own(utv)) return 'your Ranger (utv)'; if (NET.rr && own(NET.rr)) return 'other player\'s Ranger';
+  }
+  if (o.userData.glb) return o.userData.glb;
+  if (o.name) return o.name;
+  let n = ''; o.traverse(q => { if (!n && (q.userData.glb || q.name)) n = q.userData.glb || q.name; });
+  return n || (o.isMesh ? (o.geometry && o.geometry.type || 'mesh') : 'group');
+}
+function lesionPick() {   // the thing under the crosshair (the scene-level group it belongs to)
+  const rc = new T.Raycaster(); rc.setFromCamera(new T.Vector2(0, 0), camera); rc.far = 60;
+  for (const h of rc.intersectObjects(scene.children, true)) {
+    let o = h.object; if (!o.visible || o === LESION.box) continue;
+    while (o.parent && o.parent !== scene) o = o.parent;
+    if (o === LESION.box || o.userData.selfAv) continue;
+    if (o.userData.merged || o.isInstancedMesh) return { refuse: 'that is part of the merged buildings and ground, so it can\'t move on its own' };
+    if (o.geometry && o.geometry.boundingSphere && o.geometry.boundingSphere.radius > 60) return { refuse: 'that is the ground or sky' };
+    return { o };
+  }
+  return { refuse: 'nothing under the crosshair within 60 m' };
+}
+function lesionSelect() {
+  const r = lesionPick();
+  if (r.refuse) { lesionSay('Can\'t pick: ' + r.refuse); return; }
+  const o = r.o; LESION.sel = o;
+  if (!LESION.orig.has(o)) LESION.orig.set(o, { x: o.position.x, y: o.position.y, z: o.position.z, ry: o.rotation.y, s: o.scale.x });
+  if (!LESION.box) { LESION.box = new T.BoxHelper(o, 0xffe14d); LESION.box.userData.noHit = true; LESION.box.userData.noRoof = true; scene.add(LESION.box); }
+  else LESION.box.setFromObject(o);
+  LESION.box.visible = true; lesionRender();
+}
+function lesionApply(o) { o.updateMatrix(); o.updateMatrixWorld(true); if (LESION.box) LESION.box.setFromObject(o); lesionRender(); }
+function lesionMove(f, s, u) {   // forward / sideways relative to where you look, up
+  const o = LESION.sel; if (!o) return lesionSay('Pick something first');
+  const st = LESION_STEPS[LESION.step][0], fx = -Math.sin(walk.yaw), fz = -Math.cos(walk.yaw);
+  o.position.x += (fx * f - fz * s) * st; o.position.z += (fz * f + fx * s) * st; o.position.y += u * st;
+  lesionApply(o);
+}
+function lesionTurn(dir) { const o = LESION.sel; if (!o) return lesionSay('Pick something first'); o.rotation.y += dir * LESION_STEPS[LESION.step][1] * Math.PI / 180; lesionApply(o); }
+function lesionHere() {   // bring it in front of you, on the floor
+  const o = LESION.sel; if (!o) return lesionSay('Pick something first');
+  o.position.x = walk.x - Math.sin(walk.yaw) * 2; o.position.z = walk.z - Math.cos(walk.yaw) * 2;
+  if (typeof floorAt === 'function') o.position.y = floorAt(o.position.x, o.position.z, walk.y + 0.5);
+  lesionApply(o);
+}
+function lesionUndo() { const o = LESION.sel, a = o && LESION.orig.get(o); if (!a) return; o.position.set(a.x, a.y, a.z); o.rotation.y = a.ry; lesionApply(o); }
+function lesionLine(o) {
+  const a = LESION.orig.get(o), p = o.position, deg = Math.round(((o.rotation.y * 180 / Math.PI) % 360 + 360) % 360);
+  return lesionName(o) + ': x ' + lzN(p.x) + ', y ' + lzN(p.y) + ', z ' + lzN(p.z) + ', turn ' + lzN(o.rotation.y, 3) + ' rad (' + deg + '°)' +
+    (a ? '   [was x ' + lzN(a.x) + ', y ' + lzN(a.y) + ', z ' + lzN(a.z) + ', turn ' + lzN(a.ry, 3) + ']' : '');
+}
+function lesionPlaceText() {
+  const moved = [...LESION.orig.keys()].filter(o => { const a = LESION.orig.get(o); return Math.abs(o.position.x - a.x) + Math.abs(o.position.y - a.y) + Math.abs(o.position.z - a.z) + Math.abs(o.rotation.y - a.ry) > 1e-4; });
+  if (!moved.length) return '';
+  return 'Lesion Toolbox - placement (TEST v' + (window.APP_VERSION || '?') + '). Make these the real positions:\n' + moved.map(o => '- ' + lesionLine(o)).join('\n') +
+    '\n(note: collision boxes did not move with them in the test)';
+}
+
+// ---------------------------------------------------------------- Tune
+// [key, label, min, max, step, get, set]. Each set applies at once; nothing is permanent until the developer makes it so.
+const LESION_TUNE = [
+  ['scale', 'Render sharpness (pixel ratio)', 0.5, 2, 0.05, () => renderer.getPixelRatio(), v => renderer.setPixelRatio(Math.min(v, window.devicePixelRatio || 1))],
+  ['shadow', 'Shadow distance (m)', 10, 120, 1, () => SH.R, v => { SH.R = v; const C = sunL.shadow.camera; if (SH.on) { Object.assign(C, { left: -v, right: v, top: v, bottom: -v }); C.updateProjectionMatrix(); } SH.moved = true; }],
+  ['grassDist', 'Grass draw distance (m)', 0, 200, 4, () => GRASS.dist, v => grassSet({ dist: v })],
+  ['grassDens', 'Grass amount', 0, 0.03, 0.00075, () => GRASS.density, v => grassSet({ density: v })],
+  ['fogNear', 'Fog starts at (m)', 10, 500, 5, () => TUNE.fogNear, v => { TUNE.fogNear = v; }],
+  ['fogFar', 'Fog solid at (m)', 100, 2500, 25, () => TUNE.fogFar, v => { TUNE.fogFar = v; }],
+  ['walk', 'Walk speed', 3, 20, 0.1, () => TUNE.walk, v => { TUNE.walk = v; }],
+  ['sprint', 'Sprint speed', 5, 40, 0.1, () => TUNE.sprint, v => { TUNE.sprint = v; }],
+  ['lamp', 'Headlamp strength', 0, 80, 1, () => TUNE.lamp, v => { TUNE.lamp = v; if (walk.lamp && headlamp) headlamp.intensity = v; }],
+  ['bright', 'Darkest-place brightness (0-3)', 0, 3, 1, () => LIGHT.bright, v => lightBrightness(Math.round(v))],
+  ['cull', 'Indoor culling (1 on, 0 off)', 0, 1, 1, () => INDOOR.enabled ? 1 : 0, v => { INDOOR.enabled = v >= 0.5; }],
+];
+function lesionTuneDefaults() { if (!LESION.tuneDef) { LESION.tuneDef = {}; for (const t of LESION_TUNE) { try { LESION.tuneDef[t[0]] = t[5](); } catch (e) {} } } return LESION.tuneDef; }
+function lesionTuneSet(k, v) { const t = LESION_TUNE.find(q => q[0] === k); if (!t) return; lesionTuneDefaults(); try { t[6](+v); } catch (e) { lesionSay('Could not set ' + t[1]); } }
+function lesionTuneReset() { const d = lesionTuneDefaults(); for (const t of LESION_TUNE) if (d[t[0]] !== undefined) { try { t[6](d[t[0]]); } catch (e) {} } lesionRender(); lesionSay('Back to how it was'); }
+function lesionTuneText() {
+  const d = lesionTuneDefaults(), ch = [];
+  for (const t of LESION_TUNE) { let v; try { v = t[5](); } catch (e) { continue; } if (d[t[0]] !== undefined && Math.abs(v - d[t[0]]) > 1e-9) ch.push('- ' + t[1] + ': ' + (+v.toFixed(5)) + '   [was ' + (+(+d[t[0]]).toFixed(5)) + ']'); }
+  if (!ch.length) return '';
+  return 'Lesion Toolbox - tuning (TEST v' + (window.APP_VERSION || '?') + ', quality ' + TIER.name + '). Make these the defaults:\n' + ch.join('\n');
+}
+
+// ---------------------------------------------------------------- Record
+function devRecStart() {
+  DEVR.on = true; DEVR.s = []; DEVR.t0 = DEVR.last = performance.now(); DEVT.sum = Object.create(null); DEVT.max = Object.create(null); DEVT.on = true;
+  LESION.report = ''; lesionRender();
+  { const b = typeof document !== 'undefined' && document.getElementById('lzBtn'); if (b) { b.textContent = '⏺'; b.style.background = '#b3261e'; } }   // recording: the button turns red
+}
+function devRecStop() {
+  if (!DEVR.on) return; DEVR.on = false; DEVT.on = false;
+  LESION.report = devRecReport();
+  { const b = typeof document !== 'undefined' && document.getElementById('lzBtn'); if (b) { b.textContent = '🛠'; b.style.background = ''; } }
+  lesionRender();
+  if (LESION.el && !LESION.on) lesionOpen('rec');
+}
+function devRecSample() {   // once per drawn frame, after the world render
+  const now = performance.now(), gap = now - DEVR.last; DEVR.last = now;
+  DEVR.s.push([gap, PERF.dc, PERF.tri, PERF.draw, walk.x, walk.z, walk.yaw, INDOOR.on ? 1 : 0, walk.drive ? 1 : 0, walk.y]);
+  if (now - DEVR.t0 >= DEVR.dur) devRecStop();
+  else if ((DEVR.s.length & 15) === 0) { const b = LESION.el && LESION.el.querySelector('#lzRecBtn'); if (b) b.textContent = '■ Stop (' + Math.ceil((DEVR.dur - (now - DEVR.t0)) / 1000) + ' s)'; }
+}
+function devRecReport() {
+  const S = DEVR.s.slice(1); if (S.length < 10) return 'Too short to measure - record a little longer.';
+  const secs = S.reduce((a, r) => a + r[0], 0) / 1000, gaps = S.map(r => r[0]).sort((a, b) => a - b), q = p => gaps[Math.min(gaps.length - 1, Math.floor(p * gaps.length))];
+  const avg = (i) => S.reduce((a, r) => a + r[i], 0) / S.length, max = (i) => S.reduce((a, r) => Math.max(a, r[i]), 0);
+  const P = window.CS_PACE || {}, ua = navigator.userAgent || '', dev = (ua.match(/\(([^)]+)\)/) || [, ua])[1].slice(0, 70);
+  const hitch = S.filter(r => r[0] > 50).length;
+  const sys = Object.keys(DEVT.sum).map(k => [k, DEVT.sum[k] / S.length, DEVT.max[k]]).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const worst = S.map((r, i) => [r, i]).sort((a, b) => b[0][0] - a[0][0]).slice(0, 5);
+  const mem = renderer.info.memory || {}, heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB JS heap' : '';
+  const L = [];
+  L.push('Lesion Toolbox - performance recording (TEST v' + (window.APP_VERSION || '?') + ')');
+  L.push('Device: ' + dev + ' | screen ' + (window.innerWidth || 0) + 'x' + (window.innerHeight || 0) + ' @' + lzN(window.devicePixelRatio || 1, 2) + 'x | render ' + lzN(renderer.getPixelRatio(), 2) + 'x');
+  L.push('Quality: ' + TIER.name + (P.hz ? ' | screen ' + Math.round(P.hz) + ' Hz, drawing every ' + P.k + (P.k === 1 ? ' refresh' : ' refreshes') + ' (target ' + Math.round(P.hz / P.k) + ' fps)' : ''));
+  L.push('Recorded ' + lzN(secs, 1) + ' s, ' + S.length + ' frames: avg ' + lzN(S.length / secs, 1) + ' fps | typical frame ' + lzN(q(0.5), 1) + ' ms | worst 5% ' + lzN(q(0.95), 1) + ' ms | worst 1% ' + lzN(q(0.99), 1) + ' ms (' + lzN(1000 / q(0.99), 0) + ' fps)');
+  L.push('Hitches over 50 ms: ' + hitch + (hitch ? ' | longest ' + lzN(gaps[gaps.length - 1], 0) + ' ms' : ''));
+  L.push('Draw calls: avg ' + Math.round(avg(1)) + ', max ' + max(1) + ' | triangles avg ' + Math.round(avg(2) / 1000) + 'k, max ' + Math.round(max(2) / 1000) + 'k | world render CPU avg ' + lzN(avg(3), 1) + ' ms, max ' + lzN(max(3), 1) + ' ms');
+  L.push('Indoor culling active ' + Math.round(avg(7) * 100) + '% of frames | driving ' + Math.round(avg(8) * 100) + '% of frames');
+  if (sys.length) L.push('Slowest systems (avg / worst ms per frame): ' + sys.map(([k, a, m]) => k + ' ' + lzN(a, 2) + '/' + lzN(m, 1)).join(', '));
+  L.push('Slowest moments:');
+  for (const [r, i] of worst) L.push('  ' + lzN(r[0], 0) + ' ms at ' + lzN(i / S.length * secs, 1) + ' s - x ' + lzN(r[4], 1) + ', z ' + lzN(r[5], 1) + (r[9] > 0.3 ? ', up ' + lzN(r[9], 1) : '') + ', facing ' + lesionCompass(r[6]) + ' | ' + r[1] + ' draw calls' + (r[8] ? ' | driving' : '') + (r[7] ? ' | culled indoors' : ''));
+  L.push('GPU objects: ' + (mem.geometries || 0) + ' geometries, ' + (mem.textures || 0) + ' textures, ' + ((renderer.info.programs || []).length) + ' shaders' + (heap ? ' | ' + heap : '') + ' | errors so far ' + PERF.errs);
+  return L.join('\n');
+}
+
+// ---------------------------------------------------------------- the panel
+function lesionCss() {
+  if (document.getElementById('lzCss')) return;
+  const st = document.createElement('style'); st.id = 'lzCss';
+  st.textContent = '#lzBtn{position:fixed;top:calc(64px + env(safe-area-inset-top,0px));right:12px;z-index:30;width:44px;height:44px;border:0;border-radius:12px;background:rgba(20,28,40,.78);color:#fff;font-size:22px}' +
+    '#lzPanel{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:64px;z-index:30;width:min(276px,calc(100vw - 80px));max-height:calc(100dvh - 16px);overflow:auto;background:rgba(14,20,30,.86);color:#e9f1ff;border-radius:14px;padding:8px 10px;font:13px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.4);display:none}' +
+    '#lzPanel h2{margin:0 0 6px;font-size:16px;display:flex;justify-content:space-between;align-items:center}#lzPanel .lzT{display:flex;gap:4px;margin:0 0 8px}' +
+    '#lzPanel button{min-height:36px;border:0;border-radius:9px;background:#2a3b52;color:#fff;font:600 13px system-ui,sans-serif;padding:0 8px}#lzPanel button.on{background:#ffd23f;color:#1b1b1b}#lzPanel button.go{background:#1f7a3f}' +
+    '#lzPanel .lzG{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:5px 0}#lzPanel .lzRow{display:flex;gap:4px;flex-wrap:wrap;margin:5px 0}#lzPanel .lzRow button{flex:1}' +
+    '#lzPanel label{display:block;margin:7px 0 2px;font-size:13px}#lzPanel input[type=range]{width:100%}#lzPanel .lzV{float:right;color:#ffd23f}' +
+    '#lzPanel pre,#lzPanel textarea{white-space:pre-wrap;font:12px ui-monospace,monospace;background:#0a0f17;color:#cfe3ff;border-radius:8px;padding:8px;margin:6px 0;max-height:34dvh;overflow:auto;width:100%;box-sizing:border-box}' +
+    'body:not(.walking) #lzBtn,body:not(.walking) #lzPanel{display:none!important}#lzMsg{min-height:18px;color:#9fe3a8;font-size:13px}#lzPanel .lzS{color:#9fb3c8;font-size:12px}';
+  document.head.appendChild(st);
+}
+function lesionInit() {
+  if (LESION.el || !lesionAllowed() || typeof document === 'undefined' || !document.body) return;
+  lesionCss();
+  const b = document.createElement('button'); b.id = 'lzBtn'; b.type = 'button'; b.title = 'Lesion Toolbox'; b.textContent = '🛠';
+  const p = document.createElement('div'); p.id = 'lzPanel';
+  for (const el of [b, p]) for (const ev of ['pointerdown', 'pointerup', 'touchstart', 'touchmove', 'mousedown', 'click', 'wheel', 'keydown']) el.addEventListener(ev, e => e.stopPropagation());   // taps here never reach the game
+  b.addEventListener('click', () => { if (LESION.on) lesionClose(); else lesionOpen(); });
+  p.addEventListener('click', e => { const t = e.target.closest('[data-a]'); if (t) lesionAct(t.dataset.a); });
+  p.addEventListener('input', e => { const t = e.target; if (t.dataset.k) { lesionTuneSet(t.dataset.k, t.value); const v = p.querySelector('[data-v="' + t.dataset.k + '"]'); if (v) v.textContent = +(+t.value).toFixed(5); } });
+  document.body.appendChild(b); document.body.appendChild(p); LESION.el = p;
+}
+function lesionOpen(tab) { if (!LESION.el) lesionInit(); if (!LESION.el) return; if (tab) LESION.tab = tab; LESION.on = true; LESION.el.style.display = 'block'; lesionTuneDefaults(); lesionRender(); try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) {} }
+function lesionClose() { LESION.on = false; if (LESION.el) LESION.el.style.display = 'none'; if (LESION.box) LESION.box.visible = false; }
+function lesionAct(a) {
+  if (a === 'close') return lesionClose();
+  if (a.startsWith('tab:')) { LESION.tab = a.slice(4); return lesionRender(); }
+  if (a === 'pick') return lesionSelect();
+  if (a.startsWith('step:')) { LESION.step = +a.slice(5); return lesionRender(); }
+  const mv = { fwd: [1, 0, 0], back: [-1, 0, 0], left: [0, -1, 0], right: [0, 1, 0], up: [0, 0, 1], down: [0, 0, -1] }[a];
+  if (mv) return lesionMove(mv[0], mv[1], mv[2]);
+  if (a === 'turnL') return lesionTurn(1); if (a === 'turnR') return lesionTurn(-1);
+  if (a === 'here') return lesionHere(); if (a === 'undo') return lesionUndo();
+  if (a === 'copyPlace') { const t = lesionPlaceText(); return t ? lesionCopy(t) : lesionSay('Nothing moved yet'); }
+  if (a === 'copyTune') { const t = lesionTuneText(); return t ? lesionCopy(t) : lesionSay('No slider changed yet'); }
+  if (a === 'tuneReset') return lesionTuneReset();
+  if (a === 'rec') { if (DEVR.on) devRecStop(); else { devRecStart(); lesionClose(); } return; }
+  if (a === 'copyRec') return LESION.report ? lesionCopy(LESION.report) : lesionSay('Record first');
+}
+function lesionRender() {
+  const p = LESION.el; if (!p || !LESION.on) return;
+  const tab = LESION.tab, T3 = (k, n) => '<button data-a="tab:' + k + '" class="' + (tab === k ? 'on' : '') + '">' + n + '</button>';
+  let h = '<h2>🛠 Lesion Toolbox <button data-a="close">✕</button></h2><div class="lzT">' + T3('place', 'Place') + T3('tune', 'Tune') + T3('rec', 'Record') + '</div>';
+  if (tab === 'place') {
+    const o = LESION.sel;
+    h += '<div class="lzRow"><button class="go" data-a="pick">◎ Pick</button>' + LESION_STEPS.map((s, i) => '<button data-a="step:' + i + '" class="' + (LESION.step === i ? 'on' : '') + '" title="' + s[0] + ' m / ' + s[1] + '° per press">' + ['fine', 'mid', 'big'][i] + '</button>').join('') + '</div>' +
+      '<div>' + (o ? '<b>' + lesionName(o) + '</b><br><span class="lzS">' + lesionLine(o).split(': ').slice(1).join(': ').replace(/   \[was.*$/, '') + '</span>' : '<span class="lzS">Aim the crosshair at a thing, tap Pick. Moves follow where you look.</span>') + '</div>' +
+      '<div class="lzG"><button data-a="turnL">↺ turn</button><button data-a="fwd">▲ away</button><button data-a="turnR">turn ↻</button>' +
+      '<button data-a="left">◀ left</button><button data-a="back">▼ closer</button><button data-a="right">right ▶</button>' +
+      '<button data-a="down">⤓ lower</button><button data-a="here">to me</button><button data-a="up">⤒ raise</button></div>' +
+      '<div class="lzRow"><button data-a="undo">Undo this one</button><button class="go" data-a="copyPlace">Copy changes</button></div>';
+  } else if (tab === 'tune') {
+    h += '<div class="lzS">Changes apply live. Copy sends only what you changed.</div>';
+    for (const t of LESION_TUNE) { let v = 0; try { v = t[5](); } catch (e) {} h += '<label>' + t[1] + ' <span class="lzV" data-v="' + t[0] + '">' + (+(+v).toFixed(5)) + '</span></label><input type="range" data-k="' + t[0] + '" min="' + t[2] + '" max="' + t[3] + '" step="' + t[4] + '" value="' + v + '">'; }
+    h += '<div class="lzRow"><button data-a="tuneReset">Reset all</button><button class="go" data-a="copyTune">Copy changes</button></div>';
+  } else {
+    h += '<div class="lzS">Records 30 s of frame times, draw calls and which systems are slow, plus where you were in the game. No video, nothing outside the game. Tap Record, play normally; the panel comes back with the report.</div>' +
+      '<div class="lzRow"><button class="go" id="lzRecBtn" data-a="rec">' + (DEVR.on ? '■ Stop' : '● Record 30 s') + '</button>' + (LESION.report ? '<button class="go" data-a="copyRec">Copy report</button>' : '') + '</div>' +
+      (LESION.report ? '<pre>' + LESION.report.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>' : '');
+  }
+  h += '<div id="lzMsg"></div><textarea id="lzOut" style="display:none" rows="6"></textarea>';
+  p.innerHTML = h;
+}
+
+if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
+root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -16419,6 +16657,7 @@ const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fp
 // jitter made it skip a frame it should have drawn (a visible hitch even on a 60 Hz screen) and gave 90 / 120 Hz screens
 // uneven gaps. Now a 60 Hz screen draws every refresh, 120 Hz under a 60 cap draws every 2nd, and the gaps are always even.
 const PACE = { gaps: [], hz: 0, k: 1, n: 0, prev: 0, t: 0 };
+if (typeof window !== 'undefined') window.CS_PACE = PACE;   // v1.97.24: the Lesion Toolbox recorder reports the measured refresh and divisor
 function paceUpdate(now) {   // keeps a rolling median of the refresh gap; re-picks k every couple of seconds (screens can change rate)
   if (PACE.prev) { const g = now - PACE.prev; if (g > 2 && g < 50) { PACE.gaps.push(g); if (PACE.gaps.length > 90) PACE.gaps.shift(); } }
   PACE.prev = now;

@@ -97,5 +97,5 @@ for (const t of ["m.t === 'crs'", "m.t === 'crh'", "m.t === 'crp'", "m.t === 'cr
 assert.ok(html.includes('  critNetDrop();'), 'a dropped connection lets go of their critters');
 assert.ok(html.includes('|| critNearRp(g.position, 8);   // either player scares them'), 'pigeons fly off from either player');
 // walking and sprinting 10% slower
-assert.ok(html.includes("const sp = (run ? 17.01 : 8.91) * (POWER.kind === 'rat' ? 1.5 : 1) * dt"), 'walk 8.91, sprint 17.01 (10% under 9.9 and 18.9)');
+assert.ok(html.includes("const sp = (run ? TUNE.sprint : TUNE.walk) * (POWER.kind === 'rat' ? 1.5 : 1) * dt") && html.includes('const TUNE = { walk: 8.91, sprint: 17.01,'), 'walk 8.91, sprint 17.01 (10% under 9.9 and 18.9; v1.97.24: held in TUNE so the Lesion Toolbox can try others)');
 console.log('PASS: 2 player critters (pigeons, rat, lizard, frogs mirrored from the host, guest hits land on the host, carried corpse shown and protected, thrown corpse rests in the same spot, eaten on both), eating effect (three bites, crumbs, put back for respawn), walk/sprint 10% slower');
