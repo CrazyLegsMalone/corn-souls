@@ -4892,12 +4892,10 @@ const mat = (c, o) => o ? matU(c, o) : (MATS[c] || (MATS[c] = matU(c)));   // pl
 // The tier picks antialias, pixel ratio, shadow-map size and filter, how often the shadow map is redrawn, and the
 // frame cap. The manual override (localStorage cs_perf = 'low' | 'medium' | 'high') beats the guess every time,
 // because a heuristic always gets somebody wrong. Nothing here touches the THREE namespace, so it is plain data.
-// v1.97.92: every tier redraws the shadow map EVERY frame. Redrawing it every other frame made alternate frames ~80% more
-// expensive (measured 1155 vs 638 draw calls), which is judder however good the average looks. Instead the pass itself is
-// cheaper on low / medium: a smaller shadow box (shadowR, metres), objects smaller than minCaster (metres, bounding radius)
-// do not cast, and the box moves in coarse shadowStep jumps so walking does not force anything extra.
+// Low skips dynamic sun shadows. Medium and High redraw the map every frame for even pacing.
+// The walking shadow box follows the player in steps and skips casters smaller than minCaster (metres).
 const TIERS = {
-  low:    { name: 'low',    aa: false, px: 0.75, shadow: 512,  shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 60,  pbr: false },
+  low:    { name: 'low',    aa: false, px: 0.75, shadow: 0,    shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 60,  pbr: false },
   medium: { name: 'medium', aa: true,  px: 1.25, shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 65, shadowStep: 3, minCaster: 0.35, fps: 90,  pbr: false },
   high:   { name: 'high',   aa: true,  px: 1.5,  shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 85, shadowStep: 2, minCaster: 0,    fps: 144, pbr: false }
 };
@@ -6278,7 +6276,7 @@ function init(container) {
     throw new Error('3D graphics could not start. ' + (lastErr && lastErr.message) + ' | WebGL2: ' + g2 + ', WebGL1: ' + g1 + ' | ' + navigator.userAgent);
   }
   renderer.setPixelRatio(Math.min(TIER.px, window.devicePixelRatio || 1));   // fixed (changing it on the fly made the screen flash white)
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T[TIER.shadowType] || T.PCFShadowMap;   // Low: BasicShadowMap, 1 tap per pixel instead of 9
+  renderer.shadowMap.enabled = TIER.shadow > 0; renderer.shadowMap.type = T[TIER.shadowType] || T.PCFShadowMap;   // Low: BasicShadowMap, 1 tap per pixel instead of 9
   // The sun moves only when Squeeg walks across a whole shadow texel (shadowFollow snaps it) or every 20 s (daylight),
   // so redrawing the whole shadow map every frame was paying twice for the same picture. shadowRefresh() asks for a
   // pass when something actually moved, and at a floor rate so vehicles/train/NPC shadows keep up.
@@ -6296,7 +6294,8 @@ function init(container) {
   const sun = new T.DirectionalLight(0xfff4e0, 1.7); sunL = sun;
   headlamp = { intensity: 0, color: new T.Color(0xfff1d6) };   // drawn by the LIGHTING pass (csFl*), not a three.js light
   scene.add(camera);
-  sun.position.set(-60, 140, 90); sun.castShadow = true; sun.shadow.mapSize.set(TIER.shadow, TIER.shadow);
+  sun.position.set(-60, 140, 90); sun.castShadow = renderer.shadowMap.enabled;
+  if (sun.castShadow) sun.shadow.mapSize.set(TIER.shadow, TIER.shadow);
   Object.assign(sun.shadow.camera, { left: -260, right: 170, top: 120, bottom: -100, near: 20, far: 480 });
   sun.shadow.bias = -0.0005;
   scene.add(sun);
@@ -10727,7 +10726,8 @@ function update(sim, dt, events) {
   // Everything above still ran: the plant is simulated behind the title exactly as before.
   PERF.title = titleCover();
   if (!PERF.title) {
-    shadowFollow(); shadowRefresh(); renderer.info.reset();
+    if (renderer.shadowMap.enabled) { shadowFollow(); shadowRefresh(); }
+    renderer.info.reset();
     const _rt = performance.now();
     renderer.render(scene, camera);
     PERF.draw = performance.now() - _rt; PERF.dc = renderer.info.render.calls; PERF.tri = renderer.info.render.triangles;   // shadow pass + world, excluding the HUD pass below
@@ -11293,7 +11293,9 @@ function setWallsSolid(on) {
     m.transparent = !on; m.opacity = on ? 1 : m.userData.op; m.depthWrite = on; m.side = on ? T.DoubleSide : T.FrontSide; m.needsUpdate = true;
   }
 }
-function walkStart() {
+function walkStart(firstPerson) {
+  if (!camera) return;
+  if (firstPerson) VIEW.third = false;
   setWallsSolid(true);
   walk.diedAt = null; walk.toxic = 0;   // bodies stay (up to 5)
   if (!colliders) buildColliders();
@@ -15198,7 +15200,7 @@ $('pnext').onclick = () => cycle(1);
 $('homeBtn').onclick = () => { P3.focus(null); setWalkUI(); };
 // ---------- walk mode toggle ----------
 const walkIn = { f: 0, s: 0 }, fireIn = { mouse: false, btn: false, cd: 0 };
-// Squeeg mode (first person) is entered only with the on-screen Squeeg button; Savior Mode (the bird's-eye view) is the way back
+// The Squeeg and Savior Mode buttons switch between walking and the bird's-eye view.
 const HELD = { gun: ['🎯', 'Paintball gun'], hand: ['✋', 'Empty hand'], crowbar: ['🪝', 'Crowbar'], shovel: ['🪏', 'Shovel'], pick: ['⛏️', 'Pickaxe'], pitchfork: ['🔱', 'Pitchfork'], wrench: ['🔧', 'Adjustable wrench'], ext: ['🧯', 'Fire extinguisher'] };
 function showHeld(quiet) { const h = P3.held; document.body.dataset.held = h; $('fireBtn').textContent = h === 'gun' && P3.ammo === 'water' ? '💦' : HELD[h][0]; $('ammoBtn').textContent = P3.ammo === 'water' ? '💦' : '🎨'; }
 function swapAmmo() { if (P3.held !== 'gun') P3.setItem('gun'); const a = P3.toggleAmmo(); showHeld(); toast(a === 'water' ? '💦 Water (pressure washer) — cleans paint off, scares birds' : '🎨 Paintballs'); }
@@ -16069,8 +16071,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 let first = true; try { first = !localStorage.getItem('ethsim4_seen'); localStorage.setItem('ethsim4_seen', '1'); } catch (e) {}
-// start straight into the plant — no startup control hint; help lives in the ☰ menu
-if (!(window.__splashWas || !window.__splashOn)) window.__splashDone = () => { musicPlay(); };
+// Enter first person when the title menu starts the game, after the scene has loaded.
+function startInShop() {
+  P3.cam.tx = 10; P3.cam.tz = 27; P3.cam.yaw = 0.35;
+  P3.walkStart(true);
+  setWalkUI();
+}
+if (window.__splashOn && !window.__splashWas) {
+  window.__splashDone = () => { startInShop(); musicPlay(); };
+} else {
+  startInShop();
+}
 // title screen menu choices
 window.__splashMenu = { one() {}, host() { P3.netHost(); }, join(c) { P3.netJoin(c); }, controls() { controlsMenu('', true); } };
 requestAnimationFrame(frame);

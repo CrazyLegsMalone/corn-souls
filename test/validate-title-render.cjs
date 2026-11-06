@@ -40,7 +40,7 @@ const upd = fn(html, 'update');
 const guard = upd.indexOf('PERF.title = titleCover();');
 assert.ok(guard > 0, 'update() asks the gate once a frame');
 assert.ok(upd.indexOf('if (!PERF.title) {') > guard, 'and everything that draws sits inside it');
-for (const s of ['shadowFollow(); shadowRefresh(); renderer.info.reset();', 'renderer.render(scene, camera);', 'PERF.dc = renderer.info.render.calls;', 'drawHudGun();'])
+for (const s of ['if (renderer.shadowMap.enabled) { shadowFollow(); shadowRefresh(); }', 'renderer.info.reset();', 'renderer.render(scene, camera);', 'PERF.dc = renderer.info.render.calls;', 'drawHudGun();'])
   assert.ok(upd.indexOf(s) > upd.indexOf('if (!PERF.title) {'), s.trim() + ' is inside the guard');
 assert.ok(upd.includes('} else { renderer.info.reset(); PERF.draw = PERF.dc = PERF.tri = 0; }'), 'and the skip path reports 0 dc / 0 tri / 0 ms, so the fps line cannot show the last world frame');
 assert.ok(upd.indexOf("stepSafe('lighting', () => lightUpdate(dt));") < guard, 'the lighting is still updated - only the drawing stops');
@@ -65,4 +65,25 @@ assert.ok(fn(html, 'snapshot').includes('renderer.render(scene, camera);'), 'sna
 { const line = html.split('\n').find(l => l.includes('live = false;'));
   assert.ok(line && line.includes("sp.classList.add('out')"), 'go() adds .out on the same line as live = false');
   assert.equal(line.split('//')[0].includes('sp.classList.add'), true, 'and that statement is live code, not behind a // comment'); }
+// The title exit uses the real walking setup, even when third person was saved.
+const shopStart = html.slice(html.indexOf('function startInShop()'), html.indexOf('// title screen menu choices'));
+assert.ok(shopStart.includes('window.__splashDone'), 'the shop spawn is wired to the title exit');
+for (const splash of [true, false]) {
+  const cam = {}, walk = {}, VIEW = { third: true };
+  let ui = 0;
+  const start = {
+    cam, walk, VIEW, window: splash ? { __splashOn: () => true } : {},
+    setWallsSolid() {}, colliders: {}, ROOFMAP: { again: -1 }, pushOut() {},
+    camera: { updateProjectionMatrix() {} }, musicPlay() {}, setWalkUI() { ui++; }
+  };
+  vm.createContext(start);
+  vm.runInContext(fn(html, 'walkStart') + '\nthis.P3 = { cam, walkStart };\n' + shopStart, start);
+  if (splash) {
+    assert.equal(walk.on, undefined, 'the title does not start walking behind the menu');
+    start.window.__splashDone();
+  }
+  assert.deepEqual([walk.on, walk.x, walk.z, walk.yaw, VIEW.third, ui], [true, 10, 27, 0.35, false, 1],
+    'the game opens in first person on the Maintenance Shop floor and refreshes the walking controls');
+}
+
 console.log('PASS: the plant is not drawn behind the title (opaque splash, its bonfire on its own renderer): ' + WARM + ' warm-up frames, the fade re-opens the gate, the simulation keeps running, 0 dc reported while covered');
