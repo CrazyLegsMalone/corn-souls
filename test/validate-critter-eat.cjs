@@ -45,7 +45,7 @@ assert.ok(html.includes('#eatBtn{display:none;') && html.includes('body.walking:
 assert.ok(html.includes('body.driving #eatBtn{display:none!important}') && html.includes('body.padmode #eatBtn{display:none!important}'),
   'and never over the driving controls or the pad mode');
 assert.ok(html.includes('get canEat() { return !!(heldDead && !heldDead.eating); }'), 'P3.canEat is exactly "a corpse is in my hands and I am not already chewing it"');
-assert.ok(html.includes("document.body.classList.toggle('canEat', P3.walking && !P3.driving && !!P3.canEat);"), 'the frame body drives the class from that');
+assert.ok(html.includes("bodyCls('canEat', P3.walking && !P3.driving && !!P3.canEat);"), 'the frame body drives the class from that (v1.97.196: through bodyCls, which only writes on a change)');
 assert.ok(html.includes("$('eatBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); const m = P3.critterEat(); if (m) toast(m); });"),
   'and the button does what B does, with the same toast');
 console.log('PASS: every dead critter you can pick up can be eaten (eating pickup reaches 2.2 m round you or 3.8 m where you look; the corn carry leaves critters alone), and on a phone there is an Eat button that only shows while something edible is in your hands');

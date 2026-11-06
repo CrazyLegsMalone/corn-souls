@@ -58,7 +58,11 @@ const M = ctx.MMAP, tick = () => new Promise(r => setImmediate(r));
   assert.equal(bad, 0, 'pixels in the wrong place: ' + bad);
   assert.deepEqual(px(-150, 150).slice(0, 3), [0x76, 0xbd, 0x62], 'empty ground shows the grass colour');
   // a second bake reuses the flat materials (new ones were the slow part)
-  const n0 = M.flat.size; ctx.mmapBakeStart(); while (M.job) { ctx.mmapStep(); while (pending.length) pending.shift()(); await tick(); } assert.equal(M.flat.size, n0, 'the flat stand-ins are kept between bakes'); assert.equal(M.bakes, 2);
+  const n0 = M.flat.size; ctx.mmapBakeStart(); assert.equal(M.flat.size, n0, 'the flat stand-ins are kept between bakes');
+  const flats = [...M.flat.values()].filter(b => b && b.dispose); let freed = 0; for (const b of flats) { const d = b.dispose.bind(b); b.dispose = () => { freed++; d(); }; }
+  while (M.job) { ctx.mmapStep(); while (pending.length) pending.shift()(); await tick(); } assert.equal(M.bakes, 2);
+  // v1.97.196: no bake follows the second (late-model) one, so its unlit stand-ins are freed instead of kept all session
+  assert.equal(M.flat, null, 'the stand-ins are dropped after the second bake'); assert.ok(freed > 0, 'and their GPU state freed (' + freed + ')');
 
   // the widget: bottom right, only while walking, lifted over the touch buttons; turned so what is ahead is up
   const css = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
