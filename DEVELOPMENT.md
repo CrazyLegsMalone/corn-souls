@@ -1,3 +1,9 @@
+## TEST v1.97.191 — the idle Player 2's feet sit on the smoking pad (2026-11-05)
+- Owner: *"her feet clip into the concrete"* — the idle squeeg2 was standing at y 0, but the smoking pad's concrete top is 0.2 m (its 0.2 m slab, lifted 0.1 m off the grass), so her feet sank into it.
+- Raised `idlePlayer2()`'s position to `y: 0.2` so her feet rest on the pad. `validate-skinned-players.cjs` pins the new height.
+- Verified locally: the 60 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.191` / `corn-souls-test-shell-v218`.
+
 ## TEST v1.97.190 — Player 2 waits idle at the smoking area (2026-11-05)
 - Owner: *"place the squeeg2 model at the new smoking area by parking lot idle ready to be used if player 2 joins"*.
 - **`idlePlayer2()`** stands squeeg2 (Player 2's build) on the smoking pad east of the parking lot (`147, 0, -80`, facing west toward the plant) at init, so there is always a Player 2 figure waiting at the smoking area in solo play.

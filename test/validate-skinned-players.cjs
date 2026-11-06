@@ -33,7 +33,7 @@ assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 8, 'one definition
 assert.ok(html.includes('function loadPlayerSkin(slot, cb)') && html.includes('glbBuild(S.bytes[slot])'), 'raw bytes are cached and glbBuild runs per avatar (no skeleton sharing)');
 assert.ok(!html.includes('squeeg-model.js') && !html.includes('squeegAvatar'), 'the legacy PSX squeeg-model.js inline is gone');
 // v1.97.190: Player 2 waits idle at the smoking area until somebody joins
-assert.ok(html.includes('function idlePlayer2()') && html.includes('av.position.set(147, 0, -80)') && html.includes('av.rotation.y = Math.PI / 2'), 'idle Player 2 stands on the smoking pad, facing west toward the plant');
+assert.ok(html.includes('function idlePlayer2()') && html.includes('av.position.set(147, 0.2, -80)') && html.includes('av.rotation.y = Math.PI / 2'), 'idle Player 2 stands on the smoking pad (feet at the 0.2 m pad top), facing west toward the plant');
 assert.ok(html.includes('dressPlayerSkin(av, VEST_COL[1], {})') && html.includes('O.idleP2 = idlePlayer2();'), 'she wears squeeg2 and is put there at init');
 assert.ok(html.includes('if (O.idleP2) O.idleP2.visible = false;') && html.includes('if (O.idleP2) O.idleP2.visible = true;'), 'hidden when Player 2 joins, back when they leave');
 // registered and credited

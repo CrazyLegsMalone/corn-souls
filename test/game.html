@@ -5763,7 +5763,7 @@ function loadSmokingArea() {
 // Player 2 replaces her (netRemote hides her, netDrop brings her back for the next game).
 function idlePlayer2() {
   const av = makeCharacter(VEST_COL[1], false); av.scale.setScalar(SQ_K);
-  av.position.set(147, 0, -80); av.rotation.y = Math.PI / 2;   // on the smoking pad east of the parking lot, facing west toward the plant
+  av.position.set(147, 0.2, -80); av.rotation.y = Math.PI / 2;   // on the smoking pad east of the parking lot (the pad top is 0.2 m), facing west toward the plant
   av.userData.idleP2 = true; scene.add(av);
   dressPlayerSkin(av, VEST_COL[1], {});   // squeeg2 (Player 2's build)
   return av;
