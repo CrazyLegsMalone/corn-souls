@@ -16089,6 +16089,290 @@ Object.assign(NPC_DEF.op.byLabel, {
   'how is your shift': 'shift', 'what do the totes do': 'totes',
   'got anything else': 'job'
 });
+// ---------- SITUATIONAL DIALOGUE + BARKS (v1.97.25, owner: "add them to the game"): a small DialogueManager engine driven by the
+// live plant state (RICK_STATE). When you walk up to Rick, Brenda, Tammy or Vern, their opening line comes from it, in their own
+// voice: blackout, ammonia (Rick), the corn field creatures, night shift, everyday lines, irritated repeats. Their topics work as
+// before. Unprompted lines share one voice slot (8 s apart); only Rick radios you across the plant. ~0.3 µs a check.
+// DialogueManager.js — state-driven NPC dialogue + barks. Zero dependencies, no allocation per lookup.
+//
+// Data model (see dialogueData.js):
+//   pool[npcId] = { barkCooldown, exhaustResetMs, nodes: [ node, ... ] }
+//   node = {
+//     id, channel: 'talk' | 'bark',        // talk = player interacts; bark = ambient line the NPC says on its own
+//     priority,                             // higher wins; ties keep data order
+//     when: { key: value | { eq, ne, gt, gte, lt, lte, in, nin, truthy } },   // ALL must pass; dotted keys read nested state
+//     lines: [ 'text' | { text, onTrigger, set } ],
+//     order: 'cycle' | 'shuffle',           // cycle = in order; shuffle = random, never the same line twice in a row
+//     exhaustAfter, exhaustedLines,         // after N talks in a row on this node, switch to the irritated lines
+//     once, cooldownMs,                     // once = never again after first delivery; cooldown = min gap between uses
+//     onTrigger, set                        // fired / applied when ANY line of this node is delivered
+//   }
+//
+// Lookup cost: nodes are pre-sorted by priority and conditions pre-compiled into flat tuples, so a check is a single
+// early-exit loop with no allocation. ~40 nodes evaluate in well under 0.05 ms on a mid-range phone.
+
+const OP = { EQ: 0, NE: 1, GT: 2, GTE: 3, LT: 4, LTE: 5, IN: 6, NIN: 7, TRUTHY: 8 };
+const OP_KEYS = { eq: OP.EQ, ne: OP.NE, gt: OP.GT, gte: OP.GTE, lt: OP.LT, lte: OP.LTE, in: OP.IN, nin: OP.NIN, truthy: OP.TRUTHY };
+
+class DialogueManager {
+  /**
+   * @param {object} gameState  live reference; read on every check, mutated by `set` hooks
+   * @param {object} pool       { [npcId]: { nodes: [...] } }
+   * @param {object} [opts]     { onTrigger(event, ctx), now(), random() }
+   */
+  constructor(gameState, pool, opts = {}) {
+    this.state = gameState;
+    this.onTrigger = opts.onTrigger || null;
+    this.now = opts.now || (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
+    this.random = opts.random || Math.random;
+    this.npcs = Object.create(null);
+    this.result = { npc: '', nodeId: '', text: '', exhausted: false, priority: 0 };   // reused: copy what you keep
+    for (const id in pool) this.npcs[id] = this._compileNpc(pool[id]);
+  }
+
+  // ---------------------------------------------------------------- public API
+  /** Player interacts with the NPC. Returns the reused result object, or null if no node matches. */
+  talk(npcId, now = this.now()) { return this._deliver(npcId, 'talk', now); }
+
+  /** Ambient bark. Respects the NPC's barkCooldown and each node's cooldownMs. Null when nothing is due. */
+  bark(npcId, now = this.now()) {
+    const N = this.npcs[npcId]; if (!N || now - N.lastBark < N.barkCooldown) return null;
+    const r = this._deliver(npcId, 'bark', now);
+    if (r) N.lastBark = now;
+    return r;
+  }
+
+  /** Which node would answer right now (no side effects). For debug overlays. */
+  peek(npcId, channel = 'talk', now = this.now()) { const n = this._select(this.npcs[npcId], channel, now); return n ? n.id : null; }
+
+  /** Why each node did or didn't pass: [{ id, priority, pass, failed: 'key' }]. Allocates; debug only. */
+  explain(npcId, channel = 'talk', now = this.now()) {
+    const N = this.npcs[npcId]; if (!N) return [];
+    return N.nodes.filter(n => n.channel === channel).map(n => {
+      const f = this._firstFail(n, now);
+      return { id: n.id, priority: n.priority, pass: f === null, failed: f };
+    });
+  }
+
+  /** Counters for saving (localStorage-friendly). */
+  save() {
+    const out = {};
+    for (const id in this.npcs) { const o = (out[id] = {}); for (const n of this.npcs[id].nodes) if (n.count || n.done) o[n.id] = [n.count, n.done ? 1 : 0, n.last]; }
+    return out;
+  }
+  load(data) {
+    for (const id in data) { const N = this.npcs[id]; if (!N) continue;
+      for (const n of N.nodes) { const d = data[id][n.id]; if (d) { n.count = d[0] | 0; n.done = !!d[1]; n.lastAt = 0; } } }
+  }
+
+  /** Forget the "spoken to repeatedly" streak (e.g. when the player leaves the room). */
+  resetStreak(npcId) { const N = this.npcs[npcId]; if (N) { N.streakNode = null; N.streak = 0; } }
+
+  // ---------------------------------------------------------------- internals
+  _compileNpc(def) {
+    const nodes = (def.nodes || []).map((n, i) => ({
+      id: n.id || ('node' + i), channel: n.channel || 'talk', priority: n.priority || 0, order: n.order || 'cycle', idx: i,
+      conds: this._compileWhen(n.when || {}), lines: (n.lines || []).map(l => (typeof l === 'string' ? { text: l } : l)),
+      exhaustAfter: n.exhaustAfter || 0, exhausted: (n.exhaustedLines || (n.exhaustedLine ? [n.exhaustedLine] : [])).map(l => (typeof l === 'string' ? { text: l } : l)),
+      once: !!n.once, cooldownMs: n.cooldownMs || 0, onTrigger: n.onTrigger || null, set: n.set || null,
+      count: 0, done: false, lastAt: -1e12, last: -1, ex: 0,
+    }));
+    nodes.sort((a, b) => b.priority - a.priority || a.idx - b.idx);
+    return { nodes, barkCooldown: def.barkCooldown ?? 12000, exhaustResetMs: def.exhaustResetMs ?? 20000, lastBark: -1e12, streakNode: null, streak: 0, streakAt: -1e12 };
+  }
+
+  _compileWhen(when) {   // -> flat array: [path0, op0, value0, path1, op1, value1, ...]
+    const out = [];
+    for (const key in when) {
+      const path = key.indexOf('.') >= 0 ? key.split('.') : key, v = when[key];
+      if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+        for (const k in v) { if (!(k in OP_KEYS)) throw new Error('DialogueManager: unknown operator "' + k + '" on ' + key); out.push(path, OP_KEYS[k], v[k]); }
+      } else out.push(path, OP.EQ, v);   // plain value = strict equality (booleans, numbers, strings)
+    }
+    return out;
+  }
+
+  _read(path) {
+    if (typeof path === 'string') return this.state[path];
+    let o = this.state; for (let i = 0; i < path.length && o != null; i++) o = o[path[i]]; return o;
+  }
+
+  _firstFail(n, now) {   // null if the node may speak, else the key that failed
+    if (n.once && n.done) return '(once)';
+    if (n.cooldownMs && now - n.lastAt < n.cooldownMs) return '(cooldown)';
+    const c = n.conds;
+    for (let i = 0; i < c.length; i += 3) {
+      const a = this._read(c[i]), want = c[i + 2]; let ok;
+      switch (c[i + 1]) {
+        case OP.EQ: ok = a === want; break;
+        case OP.NE: ok = a !== want; break;
+        case OP.GT: ok = a > want; break;
+        case OP.GTE: ok = a >= want; break;
+        case OP.LT: ok = a < want; break;
+        case OP.LTE: ok = a <= want; break;
+        case OP.IN: ok = want.indexOf(a) >= 0; break;
+        case OP.NIN: ok = want.indexOf(a) < 0; break;
+        case OP.TRUTHY: ok = !!a === !!want; break;
+      }
+      if (!ok) return typeof c[i] === 'string' ? c[i] : c[i].join('.');
+    }
+    return null;
+  }
+
+  _select(N, channel, now) {
+    if (!N) return null;
+    const nodes = N.nodes;
+    for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; if (n.channel === channel && this._firstFail(n, now) === null) return n; }
+    return null;
+  }
+
+  _pickLine(n) {
+    const L = n.lines, len = L.length; if (!len) return null;
+    let k;
+    if (n.order === 'shuffle' && len > 1) { k = (this.random() * (len - 1)) | 0; if (k >= n.last) k++; }   // never the same line twice running
+    else k = n.count % len;
+    n.last = k; return L[k];
+  }
+
+  _deliver(npcId, channel, now) {
+    const N = this.npcs[npcId], n = this._select(N, channel, now); if (!n) return null;
+    let line, exhausted = false;
+    if (channel === 'talk') {   // repetition streak: same node, again and again, without a long enough break
+      if (N.streakNode === n && now - N.streakAt < N.exhaustResetMs) N.streak++; else { N.streakNode = n; N.streak = 1; }
+      N.streakAt = now;
+      if (n.exhaustAfter && N.streak > n.exhaustAfter && n.exhausted.length) { line = n.exhausted[n.ex++ % n.exhausted.length]; exhausted = true; }
+    }
+    if (!line) { line = this._pickLine(n); n.count++; }
+    if (!line) return null;
+    n.done = true; n.lastAt = now;
+    // hooks: node first, then line; `set` mutates gameState, `onTrigger` is a function or an event name for the global handler
+    if (!exhausted) this._hook(n.set, n.onTrigger, npcId, n, line);   // an irritated repeat doesn't re-grant items or replay stings
+    this._hook(line.set, line.onTrigger, npcId, n, line);
+    const r = this.result; r.npc = npcId; r.nodeId = n.id; r.text = line.text; r.exhausted = exhausted; r.priority = n.priority;
+    return r;
+  }
+
+  _hook(set, trig, npcId, n, line) {
+    if (set) for (const k in set) this.state[k] = typeof set[k] === 'function' ? set[k](this.state[k], this.state) : set[k];
+    if (!trig) return;
+    const ctx = { npc: npcId, node: n.id, text: line.text, state: this.state };
+    const list = Array.isArray(trig) ? trig : [trig];
+    for (const t of list) { if (typeof t === 'function') t(ctx); else if (this.onTrigger) this.onTrigger(t, ctx); }
+  }
+}
+
+const RICK_STATE = { blackout: false, breakersReset: false, hazardZone: false, hazardLevel: 0, horrorStage: 0, timeOfDay: 'day', objective: '' };
+let rickWasDark = false;
+function rickStateUpdate() {   // read the plant into the plain state object the dialogue data is written against
+  const S = RICK_STATE, dark = !!P3.powerOutage;
+  if (rickWasDark && !dark) S.breakersReset = true;   // the power just came back: Rick gets one "lights are back" line
+  rickWasDark = dark; S.blackout = dark;
+  const a = P3.nh3 || 0; S.hazardZone = a > 0.05; S.hazardLevel = a > 0.6 ? 3 : a > 0.3 ? 2 : a > 0.05 ? 1 : 0;
+  let st = 0;
+  try { const C = P3.dbg.CREEP, live = C.list.filter(c => c.hp > 0 && c.state !== 'dead');
+    if (C.kills > 0 || C.bites > 0) st = 1;
+    if (st && live.some(c => c.kind === 'nibbler')) st = 2;
+    if (live.some(c => c.zombie)) st = 3;
+    if (live.some(c => c.kind === 'daddy')) st = 4; } catch (e) {}
+  S.horrorStage = st;
+  const h = gameDate().getHours(); S.timeOfDay = h >= 20 || h < 6 ? 'night' : 'day';
+  return S;
+}
+const NPC_DIALOGUE = { rick: { barkCooldown: 14000, exhaustResetMs: 25000, nodes: [
+  // the big one in the north field: the one thing that gets Rick talking straight
+  { id: 'daddy', priority: 100, when: { horrorStage: { gte: 4 } }, set: { objective: 'Take down Daddy Cob Legs in the north corn field' },
+    lines: ["Something big's walking the north field. Tallest corn I ever saw, and it had legs.", "Night guy called it Daddy Cob Legs before he quit. Don't laugh. Don't go in there alone either.", "Stay out of the corn till it's down. Paintball from the road, and keep moving."],
+    exhaustAfter: 2, exhaustedLines: ["It's in the field, not in here. Go.", "Every second you're talking to me, it's walking."] },
+  // ammonia: the plant's real vapor hazard
+  { id: 'ammonia', priority: 95, order: 'shuffle', when: { hazardZone: true }, set: { objective: 'Get upwind, then close the ammonia drain valve' },
+    lines: ["You're standing in ammonia. Get upwind before your eyes start doing that thing.", "Drain valve's on the tank. Close it, then get clear, and breathe through your nose.", "That cough means leave. Leave, then fix it."],
+    exhaustAfter: 3, exhaustedLines: ["Upwind. Valve. Not me.", "I'll talk when you're done coughing."] },
+  // blackout: the main breaker at the substation is the reset
+  { id: 'blackout_go', priority: 75, when: { blackout: true }, set: { objective: 'Reset the main breaker at the substation south of the retention ponds' },
+    lines: ["Mains tripped. Everything I've got is on battery and that red light's giving me a headache.", "Main breaker's at the substation, south past the retention ponds. Big handle. Take the Ranger.", "Mills spun down, cook's losing temp, and the mash is going to set up like concrete. Hurry."],
+    exhaustAfter: 2, exhaustedLines: ["Breaker. Not me. Breaker.", "I can't fix it from this chair, that's why I'm sending you."] },
+  { id: 'blackout_back', priority: 70, when: { blackout: false, breakersReset: true }, set: { breakersReset: false, objective: '' },
+    lines: ["Lights are back. Hear that? Every pump in the plant restarting at once. Beautiful noise."] },
+  // the corn field creatures, as they escalate
+  { id: 'zombies', priority: 62, when: { horrorStage: 3 },
+    lines: ["They got back up. Green ones. I'm not even writing that in the log.", "You didn't finish the group fast enough. Now they're coming back wrong.", "Those aren't dead. Shoot again."],
+    exhaustAfter: 3, exhaustedLines: ["I don't want to talk about it.", "Go wash your hands."] },
+  { id: 'nibblers', priority: 56, when: { horrorStage: 2 },
+    lines: ["Little ones are pouring out of the stalks. Kill the whole bunch quick or they get back up.", "Five at a time, and they spread out on you. Don't let them flank.", "Whatever those things are, they're chewing the stalks down to the root."],
+    exhaustAfter: 3, exhaustedLines: ["Stop asking me what they are.", "I saw it on camera. Everybody saw it. Go."] },
+  { id: 'stalkers', priority: 50, when: { horrorStage: 1 },
+    lines: ["Cameras caught something walking the north corn on two legs. Corn doesn't walk.", "Whatever bit you out there, it's still in the field. Paintball, then distance.", "Corn's moving with no wind. I don't like it."],
+    exhaustAfter: 3, exhaustedLines: ["The corn isn't going to explain itself.", "Go look. Carefully."] },
+  // everyday
+  { id: 'night_shift', priority: 20, order: 'shuffle', when: { timeOfDay: 'night', hazardLevel: 0, blackout: false },
+    lines: ["Three a.m. is when the plant talks. Pipes knock, the dryer ticks. Don't let it get in your head.", "Coffee's been on the burner since six. It's not coffee anymore, it's a decision.", "Night shift rule: if it's not alarming, it's not your problem.", "Watch the yard camera. Coyotes love the spilled cake by the load-out."],
+    exhaustAfter: 5, exhaustedLines: ["I'm on break. Mentally.", "You're going to make me miss the good part of this alarm log."] },
+  { id: 'baseline', priority: 10, order: 'shuffle', when: { hazardLevel: { lte: 1 }, blackout: false },
+    lines: ["Hammer mill two's shaking the whole floor again. Maintenance says it's 'within spec.' Maintenance says that about everything.", "Boilers are running hot. Not alarm hot. Just annoying hot.", "Grain dust on every screen in this building. I wipe them, they come back.", "Mash tanks are fine. Fermenters are fine. I'm fine. Everything's fine.", "Liquefaction's holding temp for once. Don't touch anything.", "If the DCS beeps one more time for a transmitter that's been broken since spring, I'm unplugging it."].concat(NPC_DEF.op.hi),
+    exhaustAfter: 6, exhaustedLines: ["You need something, or are you just collecting my complaints?", "I've got a board to stare at. Go find a bucket to fill."] },
+  // barks
+  { id: 'bark_ammonia', channel: 'bark', priority: 95, order: 'shuffle', cooldownMs: 20000, when: { hazardZone: true }, lines: ["Radio: Ammonia alarm's on your side of the plant. Get upwind.", "Radio: I can hear you coughing over the radio. Move."] },
+  { id: 'bark_blackout', channel: 'bark', priority: 75, order: 'shuffle', cooldownMs: 15000, when: { blackout: true }, lines: ["Radio: Batteries at sixty percent. Breaker, please.", "Radio: Cook just dropped another ten degrees.", "Radio: Substation. South. Past the ponds."] },
+  { id: 'bark_daddy', channel: 'bark', priority: 100, order: 'shuffle', cooldownMs: 25000, when: { horrorStage: { gte: 4 } }, lines: ["Radio: North field's shaking. Tell me you see that.", "Radio: It's taller than the corn. Keep your distance."] },
+  { id: 'bark_creatures', channel: 'bark', priority: 56, order: 'shuffle', cooldownMs: 30000, when: { horrorStage: { gte: 2, lt: 4 } }, lines: ["Radio: North corn's moving again.", "Radio: There it goes again.", "Radio: Count them. Then count again."] },
+  { id: 'bark_idle', channel: 'bark', priority: 10, order: 'shuffle', cooldownMs: 30000, when: { hazardLevel: 0, blackout: false, horrorStage: 0 }, lines: ["*sighs at a trend graph*", "Who keeps setting the dryer to manual?", "Hammer mill vibration's up two-tenths. Sure. Why not.", "*taps the monitor* Come on. Update."] },
+] },
+// Brenda, inbound scale: curt, buried in trucks. She only reacts when you are with her (no radio).
+brenda: { barkCooldown: 20000, exhaustResetMs: 25000, nodes: [
+  { id: 'daddy', priority: 100, when: { horrorStage: { gte: 4 } }, lines: ["Nobody's unloading till that thing's gone. Drivers won't get out of their cabs.", "One of my farmers just turned his truck around and left. With the corn."], exhaustAfter: 2, exhaustedLines: ["Go deal with it.", "Not my department."] },
+  { id: 'blackout', priority: 75, when: { blackout: true }, lines: ["Power's out, the scale's out, and I've got six trucks honking.", "Can't weigh anything without power. Go tell Rick. Better, go fix it.", "Generator's not my department. Trucks are."], exhaustAfter: 2, exhaustedLines: ["I said the scale's out.", "Still no power. Still busy."] },
+  { id: 'creatures', priority: 56, when: { horrorStage: { gte: 2, lt: 4 } }, lines: ["A farmer asked me what's walking in the north field. I told him corn.", "Don't bring whatever that is in here."], exhaustAfter: 2, exhaustedLines: ["I have trucks.", "Ask Rick."] },
+  { id: 'night', priority: 20, order: 'shuffle', when: { timeOfDay: 'night', blackout: false }, lines: ["Night loads. Half these drivers are asleep at the probe.", "Nothing good comes in after dark. Wet corn and bad attitudes."], exhaustAfter: 4, exhaustedLines: ["I already answered you.", "Trucks. Waiting. You. In the way."] },
+  { id: 'baseline', priority: 10, order: 'shuffle', when: { blackout: false }, lines: ["Moisture's running high on everything today.", "Three trucks, one probe, zero patience."].concat(NPC_DEF.brenda.hi), exhaustAfter: 4, exhaustedLines: ["I already answered you.", "Trucks. Waiting. You. In the way."] },
+  { id: 'bark_blackout', channel: 'bark', priority: 75, order: 'shuffle', cooldownMs: 30000, when: { blackout: true }, lines: ["Dead. Everything's dead.", "*slaps the scale terminal*"] },
+  { id: 'bark_idle', channel: 'bark', priority: 10, order: 'shuffle', cooldownMs: 45000, when: { blackout: false }, lines: ["*slaps the printer*", "Next!", "Pull forward. Forward. FORWARD."] },
+] },
+// Tammy, outbound scale: friendly, wants to go home, nervous when things go wrong.
+tammy: { barkCooldown: 20000, exhaustResetMs: 25000, nodes: [
+  { id: 'daddy', priority: 100, when: { horrorStage: { gte: 4 } }, lines: ["I'm not walking to the white car till you say it's gone. Promise me.", "Is it still out there? Don't lie to me."], exhaustAfter: 2, exhaustedLines: ["Please go make it stop.", "I'm staying right here."] },
+  { id: 'blackout', priority: 75, when: { blackout: true }, lines: ["Oh no, is the power out everywhere? Is it safe to stay in here?", "My computer died mid-ticket. That's a whole truck I have to redo.", "Somebody's fixing it, right? Is that you?"], exhaustAfter: 2, exhaustedLines: ["I'm okay, just go get the lights back on!", "Go, go! I'll be fine."] },
+  { id: 'creatures', priority: 56, when: { horrorStage: { gte: 2, lt: 4 } }, lines: ["Is it true there's something in the north corn? Don't tell me, I still have to walk to my car.", "Brenda says it's deer. Those aren't deer, are they?"], exhaustAfter: 2, exhaustedLines: ["I really don't want to know.", "Can we talk about something else?"] },
+  { id: 'night', priority: 20, order: 'shuffle', when: { timeOfDay: 'night', blackout: false }, lines: ["I'm supposed to be off at six. It's never six.", "Night trucks are the worst. Everybody's tired and everybody's late."], exhaustAfter: 4, exhaustedLines: ["You're sweet, but I have tickets to do!", "Okay, I really need to finish these."] },
+  { id: 'baseline', priority: 10, order: 'shuffle', when: { blackout: false }, lines: ["Two more loads of cake and I'm caught up. Maybe.", "If you see a white car, that's mine. Don't let anyone park me in."].concat(NPC_DEF.tammy.hi), exhaustAfter: 4, exhaustedLines: ["You're sweet, but I have tickets to do!", "Okay, I really need to finish these."] },
+  { id: 'bark_blackout', channel: 'bark', priority: 75, order: 'shuffle', cooldownMs: 30000, when: { blackout: true }, lines: ["Hello? Is anybody fixing this?", "*taps the dead monitor* Come on..."] },
+  { id: 'bark_idle', channel: 'bark', priority: 10, order: 'shuffle', cooldownMs: 45000, when: { blackout: false }, lines: ["*humming*", "Almost done... almost done...", "Okay, ticket's printing. Have a good one!"] },
+] },
+// Vern, grain receiving: barely talks. One or two words, and he has seen things before.
+vern: { barkCooldown: 25000, exhaustResetMs: 25000, nodes: [
+  { id: 'daddy', priority: 100, when: { horrorStage: { gte: 4 } }, lines: ["Big one.", "Stay out of the field."], exhaustAfter: 2, exhaustedLines: ["Go.", "..."] },
+  { id: 'blackout', priority: 75, when: { blackout: true }, lines: ["Breaker.", "Substation.", "Pit's backing up."], exhaustAfter: 2, exhaustedLines: ["Go.", "..."] },
+  { id: 'creatures', priority: 56, when: { horrorStage: { gte: 1, lt: 4 } }, lines: ["Corn's moving.", "Seen it before.", "Don't go in at night."], exhaustAfter: 3, exhaustedLines: ["Hm.", "..."] },
+  { id: 'night', priority: 20, order: 'shuffle', when: { timeOfDay: 'night', blackout: false }, lines: ["Quiet.", "Listen to the pit."], exhaustAfter: 3, exhaustedLines: ["Hm.", "..."] },
+  { id: 'baseline', priority: 10, order: 'shuffle', when: { blackout: false }, lines: ["Belt's tracking left.", "Pit's clear."].concat(NPC_DEF.vern.hi), exhaustAfter: 3, exhaustedLines: ["Hm.", "..."] },
+  { id: 'bark_creatures', channel: 'bark', priority: 56, order: 'shuffle', cooldownMs: 40000, when: { horrorStage: { gte: 1 } }, lines: ["Corn's moving.", "*looks north*"] },
+  { id: 'bark_idle', channel: 'bark', priority: 10, order: 'shuffle', cooldownMs: 60000, when: { blackout: false }, lines: ["Hm.", "*listens to the pit*"] },
+] } };
+const RICK_DLG = new DialogueManager(RICK_STATE, NPC_DIALOGUE);   // one engine, all four people (RICK_STATE is the shared plant state)
+const NPC_POOL = { op: 'rick', brenda: 'brenda', tammy: 'tammy', vern: 'vern' };   // NPC_DEF id -> dialogue pool
+function rickObjective(before) { if (RICK_STATE.objective && RICK_STATE.objective !== before) setTimeout(() => toast('📋 ' + RICK_STATE.objective), 1600); }
+function npcOpening(id) {   // the first line when you walk up to someone: what is going on, in their own voice
+  const pool = NPC_POOL[id]; if (!pool) return null;
+  rickStateUpdate(); const before = RICK_STATE.objective, r = RICK_DLG.talk(pool);
+  if (!r) return null; rickObjective(before); return r.text;
+}
+// Unprompted lines share ONE voice slot: after anyone speaks, nobody else does for NPC_GAP ms. Rick goes first (his radio
+// matters most), and he is the only one who reaches you across the plant; the others only mutter when you stand with them.
+const NPC_GAP = 8000; let npcSpokeAt = -1e9;
+setInterval(() => {
+  if (!P3.walking || $('modal').classList.contains('open')) return;   // (not while a conversation or menu is open)
+  const now = performance.now(); if (now - npcSpokeAt < NPC_GAP) return;
+  const S = rickStateUpdate(), emergency = S.blackout || S.hazardZone || S.horrorStage >= 2;
+  let ppl = []; try { ppl = P3.npcs; } catch (e) {}
+  const w = P3.walkPos, dist = id => { const o = ppl.find(n => n.id === id); return o ? Math.hypot(o.x - w.x, o.z - w.z) : 1e9; };
+  for (const [id, pool, reach] of [['op', 'rick', 10], ['brenda', 'brenda', 6], ['tammy', 'tammy', 6], ['vern', 'vern', 6]]) {
+    const near = dist(id) < reach, radioOk = pool === 'rick' && emergency;
+    if (!near && !radioOk) continue;
+    const b = RICK_DLG.bark(pool); if (!b) continue;
+    const who = NPC_DEF[id].name.split(' ·')[0], t = b.text.replace(/^Radio:\s*/, '');
+    if (near) toast(who + ': ' + t); else radio(who, t);
+    npcSpokeAt = now; return;   // one voice at a time
+  }
+}, 1000);
 function npcSay(D, text) {   // the device voice: lower and slower for Rick, higher for Brenda and Tammy
   try { if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.pitch = D.pitch; u.rate = D.rate; u.volume = 0.95;
     const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); const fem = D.pitch > 1; const v = vs.find(v => (fem ? /female|woman|zira|samantha|victoria|karen|aria|jenny/i : /male|man|david|daniel|alex|guy|fred/i).test(v.name) && !(fem ? /\bmale/i : /female/i).test(v.name)); if (v) u.voice = v;
@@ -16147,7 +16431,7 @@ function talk(id, topic, heard) {
   const D = NPC_DEF[id]; if (!D) return; talkWith = id;
   let say, opts;
   if (topic === 'bye') { const l = pick(['See ya.', 'Bye.', 'Later.']); npcSay(D, l); toast(D.name.split(' ·')[0] + ': ' + l); talkWith = null; return; }
-  if (!topic) { say = npcLine(id, D.hi); opts = D.start; }
+  if (!topic) { say = npcOpening(id) || npcLine(id, D.hi); opts = D.start; }   // v1.97.25: everyone opens with what is going on, in their own voice
   else if (topic === '?') { say = npcLine(id, D.fallback); opts = D.start; }
   else { const T = D.topics[topic]; say = typeof T.say === 'function' ? T.say() : Array.isArray(T.say) ? npcLine(id, T.say) : T.say; opts = T.opts || D.start; }
   if (id === 'brenda' && topic && topic !== 'bye') {
@@ -16212,7 +16496,7 @@ function radio(who, text) {
   if (!el) { el = document.createElement('div'); el.id = 'radioSub'; el.style.cssText = 'position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(58px + env(safe-area-inset-right,0px));max-width:min(42vw,420px);background:rgba(15,18,22,.72);color:#fff;font:13px/1.3 Arial;padding:6px 10px;border-radius:8px;z-index:20;pointer-events:none;transition:opacity .4s;text-align:left'; document.body.appendChild(el); }
   el.innerHTML = '📻 <b style="color:#ffcf5a">' + who + ':</b> ' + text; el.style.opacity = '1'; clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0'; }, 6000);
 }
-P3.coolerNotify = (who, text) => radio(who, text); window.__radio = radio;   // (__radio: for testing the call-out box)
+P3.coolerNotify = (who, text) => radio(who, text); window.__radio = radio;   window.__talk = (id, t) => talk(id, t); window.__rick = { state: RICK_STATE, dlg: RICK_DLG };   // (v1.97.25: for testing Rick's lines)   // (__radio: for testing the call-out box)
 P3.mowNotify = m => toast(m);
 P3.dmgNotify = m => toast(m);   // vehicle damage / repair, acid tank, extinguisher, corn field bites (was never connected)
 P3.pivotNotify = m => toast(m);   // "the pivot engine ran out of diesel"

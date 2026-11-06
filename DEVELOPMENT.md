@@ -1,3 +1,13 @@
+## TEST v1.97.25 — Rick, Brenda, Tammy and Vern react to what is happening (2026-11-06)
+- Owner: *"Sweet add them to the game"* (the situational dialogue system), *"get rid of Virgil only want Rick"*, *"did Tammy Brenda and Vern get updated lines?"* and *"they aren't all going to talk at the same time right?"*
+- A small dialogue engine (priority rules over the live plant state, line rotation, irritated repeats that forget after 25 s, objective hooks; ~0.3 µs a check) now picks each person's **opening line** when you walk up to them. Their topics and replies are unchanged.
+  - **Rick** (Board Op): blackout briefing to the substation main breaker (sets a 📋 objective), a "lights are back" line, ammonia ("get upwind, close the drain valve"), the corn field ladder (stalkers → nibblers → green ones that got back up → Daddy Cob Legs), night shift and everyday gripes alongside his own greetings.
+  - **Brenda** (curt, trucks), **Tammy** (friendly, nervous, wants to get to her white car) and **Vern** (one or two words) react to the blackout, the creatures and the night in their own voices.
+- **One voice at a time:** unprompted lines share one slot, at least 8 s apart. Only Rick radios you across the plant (blackout, ammonia, creatures); the others only mutter when you are standing with them. Nothing unprompted plays while a conversation or menu is open.
+- The PPE, RTO-failure and hopper/elevator lines from the brief are not in the game: those mechanics do not exist yet. No "Virgil" anywhere.
+- Added `test/validate-npc-dialogue.cjs` (runs the engine, data and bark loop: every state for all four, repeats, objective, the 8 s voice slot, radio only for Rick, no Virgil). Checked in headless Chromium through the real launcher: openings in normal / blackout / power-back states, repeats rotate, Rick's radio call during a blackout, no page errors. All 69 CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.25` / `corn-souls-test-shell-v231`.
+
 ## TEST v1.97.24 — Lesion Toolbox: in-game dev tools (2026-11-06)
 - Owner: *"tools or labs I could use in game to help with game development … I could make changes on the fly and test and just give you the data"*, named **Lesion Toolbox**, *"with the least friction"*.
 - A 🛠 button (TEST only, only while playing) opens the panel. Each tab ends in one **Copy** button that copies plain text to paste to the developer:
