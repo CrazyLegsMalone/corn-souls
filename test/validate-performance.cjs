@@ -25,6 +25,16 @@ assert.equal(phone.fps, 30, 'and a steady 30 fps cap (v1.97.21, owner: the frame
   const m = html.match(/PACE\.k = FPS_CAP > 0 \? Math\.max\(1, Math\.round\(PACE\.hz \/ FPS_CAP - 0\.15\)\) : 1;/); assert.ok(m, 'the refresh-multiple pacing is in place');
   const k = (hz, cap) => Math.max(1, Math.round(hz / cap - 0.15));
   assert.deepEqual([k(60, 30), k(90, 30), k(120, 30), k(144, 30)], [2, 3, 4, 5], 'a 30 cap draws every 2nd / 3rd / 4th / 5th refresh on 60 / 90 / 120 / 144 Hz screens');
+  // v1.97.22: on a fast screen the phone tier steps up to fpsHi (40), still on whole refreshes and never faster than that
+  assert.equal(phone.fpsHi, 40, 'the phone tier may run at 40 on a fast screen');
+  const src = html.slice(html.indexOf('function paceHi('), html.indexOf('\n}', html.indexOf('function paceHi(')) + 2);
+  const run = (hz, tier) => { const c = { window: { Plant3D: { tier } }, Math }; vm.createContext(c); vm.runInContext(src + '\nthis.f = paceHi;', c); return c.f(hz, k(hz, tier.fps)); };
+  for (const [hz, want] of [[60, 2], [90, 3], [120, 3], [144, 4], [165, 4]]) {
+    const kk = run(hz, phone); assert.equal(kk, want, hz + ' Hz: every ' + want + ' refreshes');
+    assert.ok(hz / kk <= 41.5 && Number.isInteger(kk), hz + ' Hz runs at ' + (hz / kk).toFixed(1) + ' fps, evenly paced, not above ~40');
+  }
+  assert.equal(run(120, { fps: 144 }), k(120, 144), 'tiers without fpsHi are unchanged');
+  assert.ok(html.includes('PACE.k = paceHi(PACE.hz, PACE.k); }'), 'and the pacing uses it');
 }
 const desktop = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 } });
 assert.equal(desktop.name, 'high', 'a desktop picks the high tier');

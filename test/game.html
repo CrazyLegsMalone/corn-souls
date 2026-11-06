@@ -4897,7 +4897,7 @@ const mat = (c, o) => o ? matU(c, o) : (MATS[c] || (MATS[c] = matU(c)));   // pl
 // cheaper on low / medium: a smaller shadow box (shadowR, metres), objects smaller than minCaster (metres, bounding radius)
 // do not cast, and the box moves in coarse shadowStep jumps so walking does not force anything extra.
 const TIERS = {
-  low:    { name: 'low',    aa: false, px: 0.75, shadow: 512,  shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 30,  pbr: false },   // v1.97.21: a steady 30 on phones (it swung between ~40 and 60, which felt rougher)
+  low:    { name: 'low',    aa: false, px: 0.75, shadow: 512,  shadowType: 'BasicShadowMap', shadowEvery: 1, shadowR: 28, shadowStep: 4, minCaster: 1.0,  fps: 30,  fpsHi: 40, pbr: false },   // v1.97.21: a steady 30 on phones (it swung between ~40 and 60, which felt rougher); v1.97.22: 40 on a 120 Hz screen
   medium: { name: 'medium', aa: true,  px: 1.25, shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 65, shadowStep: 3, minCaster: 0.35, fps: 90,  pbr: false },
   high:   { name: 'high',   aa: true,  px: 1.5,  shadow: 2048, shadowType: 'PCFShadowMap',   shadowEvery: 1, shadowR: 85, shadowStep: 2, minCaster: 0,    fps: 144, pbr: false }
 };
@@ -16403,7 +16403,16 @@ function paceUpdate(now) {   // keeps a rolling median of the refresh gap; re-pi
   if (PACE.prev) { const g = now - PACE.prev; if (g > 2 && g < 50) { PACE.gaps.push(g); if (PACE.gaps.length > 90) PACE.gaps.shift(); } }
   PACE.prev = now;
   if (now - PACE.t > 2000 && PACE.gaps.length >= 30) { PACE.t = now; const s = PACE.gaps.slice().sort((a, b) => a - b), med = s[s.length >> 1]; PACE.hz = 1000 / med;
-    PACE.k = FPS_CAP > 0 ? Math.max(1, Math.round(PACE.hz / FPS_CAP - 0.15)) : 1; }   // -0.15: a 70 Hz screen under a 60 cap still draws every refresh
+    PACE.k = FPS_CAP > 0 ? Math.max(1, Math.round(PACE.hz / FPS_CAP - 0.15)) : 1;   // -0.15: a 70 Hz screen under a 60 cap still draws every refresh
+    PACE.k = paceHi(PACE.hz, PACE.k); }
+}
+/* v1.97.22, owner (Razr 2025, 120 Hz): a tier with fpsHi may run faster on a fast screen, as long as frames still land on whole
+   refreshes and never above fpsHi: 120 Hz -> every 3rd refresh (40 fps); 144 Hz -> every 4th (36); 60 or 90 Hz keep the plain cap
+   (30). The refresh divisor is rounded up, so the rate stays at or just about at fpsHi, never well above it. */
+function paceHi(hz, k) {
+  const T = typeof window !== 'undefined' && window.Plant3D && window.Plant3D.tier, hi = T && T.fpsHi;
+  if (!hi || !(hz >= 110)) return k;
+  return Math.max(1, Math.ceil(hz / hi - 0.15));
 }
 function frame(now) {
   paceUpdate(now);

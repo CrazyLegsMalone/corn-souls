@@ -94,6 +94,9 @@ assert.ok(html.includes('if (c.wall) { const y = crFloor(c.g.position.x, c.g.pos
   assert.equal(k(144, 144), 1, '144 Hz desktop, 144 cap: every refresh');
   assert.equal(k(165, 60), 3, '165 Hz screen, 60 cap: every 3rd refresh');
   assert.equal(k(240, 90), 3, '240 Hz screen, 90 cap: every 3rd refresh');
+  { const kp = (hz) => { const ctx = { FPS_CAP: 30, window: { Plant3D: { tier: { fps: 30, fpsHi: 40 } } } }; vm.createContext(ctx); vm.runInContext(src + '\nlet t = 0; for (let i = 0; i < 1200; i++) { t += 1000 / ' + hz + ' + (i % 3 - 1) * 0.15; paceUpdate(t); } this.k = PACE.k;', ctx); return ctx.k; };
+    assert.equal(kp(120), 3, 'v1.97.22: phone tier on a 120 Hz screen: every 3rd refresh (40 fps), measured from real refresh gaps');
+    assert.equal(kp(60), 2, 'and on a 60 Hz screen it keeps 30 (every 2nd)'); }
 }
 assert.ok(html.includes('function frame(now) {\n  paceUpdate(now);'), 'every refresh feeds the pacing measurement');
 

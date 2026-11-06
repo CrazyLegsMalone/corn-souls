@@ -1,3 +1,9 @@
+## TEST v1.97.22 — 40 fps on a 120 Hz phone screen (2026-11-06)
+- Owner (Razr 2025, which reports 120 Hz): asked for smoother frames; a steady 40 is possible on that screen.
+- The Low tier keeps its 30 fps cap but gains `fpsHi: 40`. When the measured refresh is 110 Hz or more, `paceHi()` picks the refresh divisor for 40 (rounded up), so frames still land on whole refreshes: 120 Hz → every 3rd (40 fps), 144 Hz → every 4th (36), 165 Hz → every 4th (41). At 60 or 90 Hz (for example when Android drops Chrome to 60 Hz to save battery) it stays at 30. Medium and High are unchanged.
+- `validate-performance.cjs` checks the divisor and resulting rate at 60/90/120/144/165 Hz, and that tiers without `fpsHi` are unaffected. Verified locally: all 66 CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.22` / `corn-souls-test-shell-v228`.
+
 ## TEST v1.97.21 — a steady 30 fps on phones (2026-11-06)
 - Owner: *"frame rate jumps up to 60fps sometimes is there a way we could limit it so it's smoother?"*
 - The Low tier (phones) now caps at 30 fps instead of 60. The existing pacing draws on whole screen refreshes, so frames are evenly spaced: every 2nd refresh at 60 Hz, every 4th at 120 Hz. Swinging between about 40 and 60 felt rougher than a steady 30. Medium (90) and High (144) are unchanged, and the `cs_perf` quality override still picks another tier.
