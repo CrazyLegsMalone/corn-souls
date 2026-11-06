@@ -1,5 +1,5 @@
 // Corn Souls TEST is an independent install; NEVER control or clear the live app.
-const CACHE = 'corn-souls-test-shell-v224';
+const CACHE = 'corn-souls-test-shell-v225';
 const APP_PATH = '/corn-souls/test/';
 const PRECACHE = ['./index.html', './game.html', './note-sharing.js', './inbox.js', './inbox-config.json', './sound-settings.js', './acid-liquid.js', './cooler-door-audio.js', './developer-inbox.html', './manifest.webmanifest', './icon-192-blue-psx.png', './icon-512-blue-psx.png'];
 self.addEventListener('install', event => {
@@ -41,12 +41,15 @@ self.addEventListener('fetch', event => {
       }
       return response;
     } catch (err) {
+      // v1.97.198: offline, the cached copy comes first (the shell is precached at install); the "needs a connection"
+      // page is only the last resort when nothing was ever cached. The old order made the cache unreachable for pages.
+      const cached = await caches.match(url.pathname, {ignoreSearch:true}) || await caches.match(req, {ignoreSearch:true})
+        || (req.mode === 'navigate' ? await caches.match('./index.html', {ignoreSearch:true}) : undefined);
+      if (cached) return cached;
       if (req.mode === 'navigate') return new Response(
         '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>TEST update needs internet</title><body style="font:18px system-ui;background:#06111f;color:white;padding:2rem"><h2>Corn Souls TEST needs a connection</h2><p>Reconnect to the internet and reopen TEST to get the latest build.</p><a style="color:#9cf" href="/corn-souls/test/refresh.html">Refresh TEST</a></body>',
         {headers:{'Content-Type':'text/html;charset=utf-8'},status:503}
       );
-      const hit = await caches.match(url.pathname, {ignoreSearch:true}) || await caches.match(req, {ignoreSearch:true});
-      if (hit) return hit;
       throw err;
     }
   })());

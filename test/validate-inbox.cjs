@@ -1,17 +1,25 @@
-const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+// Run from the repo root or from test/ (v1.97.198: it only worked from the root, and its mock had no window, so it was left out of CI).
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
+const DIR=__dirname;   // the TEST files next to this suite, wherever it is run from
 (async()=>{
  let saved=[],dialogs=[],notices=[],calls=[],handler=async()=>({ok:true,status:200,json:async()=>null});
  const modalClasses=new Set(['open']);
  const elements={modal:{classList:{remove:s=>modalClasses.delete(s)}},card:{textContent:'',classList:{add(){},remove(){}},querySelectorAll:()=>[]},inboxEmail:{value:'owner@example.test'},inboxPassword:{value:'password',addEventListener(){}}};
- const c={modalBtns:[],modalFocus:0,INBOX_CONFIG:{url:'',publicKey:''},crypto:require('node:crypto').webcrypto,AbortController,setTimeout,clearTimeout,Date,
+ const assigned=[];
+ const c={window:{location:{assign:u=>assigned.push(u)}},document:{},modalBtns:[],modalFocus:0,INBOX_CONFIG:{url:'',publicKey:''},crypto:require('node:crypto').webcrypto,AbortController,setTimeout,clearTimeout,Date,
   notesLoad:()=>structuredClone(saved),notesSave:a=>{saved=structuredClone(a);return true;},
   toast:s=>notices.push(s),modal:(...a)=>dialogs.push(a),escH:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
   $:id=>elements[id]||(elements[id]={value:'',addEventListener(){}}),noteShare(){},markModal(){},
   P3:{weather:'sunny',setWeather(k){this.weather=k;}},wxForced:null,wxLive:'sunny',fetchWeather(){},debugMenu(){},
   fetch:async(...args)=>{calls.push(args);if(args[0].endsWith('/logout'))return {ok:true,status:204};return handler(...args);}};
- vm.createContext(c);vm.runInContext(fs.readFileSync('test/inbox.js','utf8'),c);
+ vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(DIR,'inbox.js'),'utf8'),c);
  const state=s=>vm.runInContext(s,c);
- c.inboxOpen();assert.ok(dialogs.at(-1)[0].includes('not connected'));
+ // the in-game inbox now opens the standalone developer page (TEST scope), which signs in and lists reports itself
+ c.inboxOpen();assert.deepEqual(assigned,['/corn-souls/test/developer-inbox.html'],'the pause-menu inbox opens the TEST developer page');
+ { const page=fs.readFileSync(path.join(DIR,'developer-inbox.html'),'utf8');
+   assert.ok(page.includes('href="/corn-souls/test/index.html"'),'and the page links back to the TEST game, not LIVE');
+   assert.ok(page.includes('function checkConfig(')&&page.includes("/^(sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9._-]+)$/"),'it only accepts a public key');
+   assert.ok(page.includes("if(auth)headers.Authorization='Bearer '+session.token;"),'and sends the owner token only on signed-in requests'); }
  const n={kind:'bug',name:'Tester',text:'Door stuck',t:1,v:'1.96.7',dev:'iPhone',where:'shop'};
  saved=[structuredClone(n)];await c.inboxSend(n);assert.equal(calls.length,0,'unconfigured never uploads');
  c.INBOX_CONFIG={url:'https://example.supabase.co',publicKey:'sb_publishable_test'};

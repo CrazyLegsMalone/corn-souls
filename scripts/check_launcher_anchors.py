@@ -34,6 +34,52 @@ def unescape(raw):
     return "".join(out)
 
 
+TABLE = re.compile(r"const ([A-Za-z_]\w*)=\[")
+STRING = re.compile(r"'((?:\\.|[^'\\])*)'|" + r'"((?:\\.|[^"\\])*)"')
+
+
+def table_anchors(loader):
+    """The first string of every [from, to] pair in the launcher's patch tables (trafficPatches, scopedEffects,
+    acidVisualPatches, modalExitPatches, notePatches, ...), with any later NAME[i][0]="..." override applied.
+    Only tables that a `for(const [from,to] of NAME)` loop applies are considered patch tables."""
+    out = {}
+    for m in TABLE.finditer(loader):
+        name = m.group(1)
+        if f"of {name})" not in loader:
+            continue
+        i, depth, quote, rows, row_start = m.end(), 1, None, [], None
+        while i < len(loader) and depth:
+            ch = loader[i]
+            if quote:
+                if ch == "\\":
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = None
+            elif ch in "'\"`":
+                quote = ch
+            elif ch == "[":
+                depth += 1
+                if depth == 2:
+                    row_start = i + 1
+            elif ch == "]":
+                if depth == 2 and row_start is not None:
+                    rows.append(loader[row_start:i])
+                    row_start = None
+                depth -= 1
+            i += 1
+        anchors = []
+        for row in rows:
+            first = STRING.match(row.lstrip())
+            anchors.append(unescape(first.group(1) if first.group(1) is not None else first.group(2)) if first else None)
+        for o in re.finditer(re.escape(name) + r"\[(\d+)\]\[0\]=(?:" + STRING.pattern + ")", loader):
+            k = int(o.group(1))
+            if k < len(anchors):
+                anchors[k] = unescape(o.group(2) if o.group(2) is not None else o.group(3))
+        out[name] = [a for a in anchors if a]
+    return out
+
+
 def read(rel):
     return (ROOT / rel).read_text(encoding="utf-8").replace("\r\n", "\n")
 
@@ -66,8 +112,25 @@ for loader_rel, game_rel in PAIRS:
         hook_bad += 1
     failures += hook_bad
 
+    # v1.97.198: the [from, to] patch tables were not checked here at all; each "from" must be in the game (or be text
+    # that an earlier patch in the same launcher injects).
+    tables = table_anchors(loader)
+    plain_loader = unescape(loader)
+    table_ok = table_derived = table_bad = 0
+    for name, anchors in tables.items():
+        for anchor in anchors:
+            if anchor in game:
+                table_ok += 1
+            elif plain_loader.count(anchor) > 1:   # its own literal, plus the earlier patch text that injects it
+                table_derived += 1
+            else:
+                print(f"FAIL {loader_rel}: {name} anchor not in {game_rel}: {anchor[:80]!r}")
+                table_bad += 1
+    failures += table_bad
+
     print(f"{loader_rel} -> {game_rel}: {checked} anchors OK, {derived} post-replacement, "
-          f"{replaces} replacement calls, {len(hooks)} hooks, {hook_bad} bad")
+          f"{replaces} replacement calls, {len(hooks)} hooks, {hook_bad} bad; "
+          f"{len(tables)} patch tables: {table_ok} anchors OK, {table_derived} post-replacement, {table_bad} bad")
 
 if failures:
     print(f"RESULT: FAIL ({failures} problem(s))")

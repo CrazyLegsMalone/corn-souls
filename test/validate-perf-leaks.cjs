@@ -137,13 +137,9 @@ const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); 
 }
 
 // ---------------------------------------------------------------- 3.6 leaks: dead critters, trucks, Nibblers, fallbacks, audio
-{   // the launcher no longer wraps dead critters as permanent corn props
-  const k = launcher.indexOf('function cornSyncDeadCritters(){'); assert.ok(k > 0);
-  const body = launcher.slice(k, launcher.indexOf('\\n}', k) + 3).replace(/\\n/g, '\n');
-  const colliders = [], items = [];
-  const ctx = { birds: [{ state: 'down', g: {} }], critters: [{ state: 'hit', kind: 'rat', g: {} }], pondFrogs: [{ state: 'hit', group: {} }], CORN_PROPS_STATE: { items }, colliders, cornCritterWrap() { items.push(1); colliders.push([1e5, 1e5, 0.2]); }, cornSolid() { colliders.push([1e5, 1e5, 0.2]); return [1e5, 1e5, 0.2]; } };
-  vm.createContext(ctx); vm.runInContext(body + '\nfor (let i = 0; i < 50; i++) cornSyncDeadCritters();', ctx);
-  assert.equal(items.length + colliders.length, 0, 'killing critters no longer grows the props list or the colliders');
+{   // the launcher no longer wraps dead critters as permanent corn props (v1.97.198: the whole dead-critter carry is gone)
+  for (const f of ['cornSyncDeadCritters', 'cornCritterWrap', 'cornCritterDead']) assert.ok(!launcher.includes(f), f + ' is gone: no corpse ever becomes a corn prop or a collider');
+  assert.ok(!/isCritter:true/.test(launcher), 'nothing creates a critter corn item');
   assert.ok(launcher.includes("if(t.held||t.net==='them'||t.isCritter||"), 'and the corn carry still skips critters');
 }
 {   // a despawned semi frees its own GPU buffers, never the shared ones
