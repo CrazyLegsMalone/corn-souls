@@ -1,3 +1,10 @@
+## TEST v1.97.23 — Quality choice on the pause menu (2026-11-06)
+- Owner: asked for a way to pick the quality setting (for example Medium on a Retroid Pocket Nova, or Low on a weak PC).
+- The pause menu has **⚙️ Quality: Auto (low) / Low / Medium / High**. The page shows what is running and offers Auto, Low (steady 30-40 fps), Medium and High. The choice is stored as `cs_perf`, which `perfTier()` already obeys ahead of the device guess; Auto removes it.
+- Antialiasing and the pixel ratio are fixed when the renderer starts, so a new choice offers **Restart now** or **Later**, and warns when a restart would leave a 2 player game. Choosing the setting that is already running just returns to the pause menu.
+- Added `test/validate-quality-menu.cjs` (runs the menu code: labels, storing, Auto clearing, restart and 2 player warning, perfTier honouring the choice, launcher anchor intact). Checked in headless Chromium through the real launcher: the pause menu shows the entry, picking Low and restarting comes back on Low, no page errors. All 67 CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.23` / `corn-souls-test-shell-v229`.
+
 ## TEST v1.97.22 — 40 fps on a 120 Hz phone screen (2026-11-06)
 - Owner (Razr 2025, which reports 120 Hz): asked for smoother frames; a steady 40 is possible on that screen.
 - The Low tier keeps its 30 fps cap but gains `fpsHi: 40`. When the measured refresh is 110 Hz or more, `paceHi()` picks the refresh divisor for 40 (rounded up), so frames still land on whole refreshes: 120 Hz → every 3rd (40 fps), 144 Hz → every 4th (36), 165 Hz → every 4th (41). At 60 or 90 Hz (for example when Android drops Chrome to 60 Hz to save battery) it stays at 30. Medium and High are unchanged.

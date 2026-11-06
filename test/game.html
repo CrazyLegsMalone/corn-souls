@@ -16056,9 +16056,29 @@ P3.netNotify = m => { toast('👥 ' + m); if (m.startsWith('Hosting')) twoPlayer
 let mapOn = true; try { mapOn = localStorage.getItem('cs_minimap') !== 'off'; } catch (e) {}
 function mapSet(on) { mapOn = !!on; document.body.classList.toggle('nomap', !mapOn); try { localStorage.setItem('cs_minimap', mapOn ? 'on' : 'off'); } catch (e) {} }
 mapSet(mapOn);
+// v1.97.23, owner: a Quality choice on the pause menu. Auto keeps the device guess (perfTier); Low / Medium / High is stored as
+// cs_perf, which perfTier already obeys. The renderer's antialiasing and pixel ratio are fixed when it starts, so a new choice
+// applies on a restart: the menu offers one, and warns that a restart leaves a 2 player game.
+const QUALITY = [['auto', 'Auto'], ['low', 'Low · steady 30-40 fps'], ['medium', 'Medium · sharper, follows the screen'], ['high', 'High · sharpest, follows the screen']];
+function qualityPick() { try { const v = localStorage.getItem('cs_perf'); return v === 'low' || v === 'medium' || v === 'high' ? v : 'auto'; } catch (e) { return 'auto'; } }
+function qualityLabel() { const p = qualityPick(), now = (P3.tier && P3.tier.name) || 'auto'; return p === 'auto' ? 'Auto (' + now + ')' : p[0].toUpperCase() + p.slice(1); }
+function qualitySet(v) { try { if (v === 'auto') localStorage.removeItem('cs_perf'); else localStorage.setItem('cs_perf', v); } catch (e) { return false; } return true; }
+function qualityMenu() {
+  const cur = qualityPick(), running = (P3.tier && P3.tier.name) || '';
+  const b = QUALITY.map(([v, name]) => [(v === cur ? '● ' : '') + name, () => {
+    if (!qualitySet(v)) { toast('Could not save the quality setting on this device'); return; }
+    const want = v === 'auto' ? null : v;
+    if (want === running || (!want && cur === 'auto')) { toast('Quality: ' + name.split(' ·')[0]); menu(); return; }
+    const twoP = P3.net && P3.net.on;
+    modal('<h1>Quality: ' + name.split(' ·')[0] + '</h1><p>It takes effect when the game restarts.' + (twoP ? ' Restarting now leaves the 2 player game.' : '') + '</p>',
+      [['Restart now', () => { try { location.reload(); } catch (e) {} }], ['Later', () => menu()]]);
+  }]);
+  b.push(['Back to pause menu', () => menu()]);
+  modal('<h1>Quality</h1><p>Running now: <b>' + (running || 'auto') + '</b>. Auto picks for this device; Low is smoothest on phones and handhelds.</p>', b);
+}
 function menu() {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }
-  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['Reset all setpoints', resetAll]];
+  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['⚙️ Quality: ' + qualityLabel(), () => qualityMenu()], ['Reset all setpoints', resetAll]];
   if (window.Android) b.push(['Quit', () => { try { Android.quit(); } catch (e) {} }]);
   modal('<h1>Corn Souls</h1>', b);
 }
