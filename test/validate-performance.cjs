@@ -17,8 +17,8 @@ const pick = env => {
 const phone = pick({ nav: { maxTouchPoints: 5, deviceMemory: 4, hardwareConcurrency: 8 }, win: { innerWidth: 390 } });
 assert.equal(phone.name, 'low', 'a phone with 4 GB picks the low tier');
 assert.equal(phone.aa, false, 'and never asks for MSAA');
-assert.equal(phone.px, 1.0, 'and renders one device pixel per CSS pixel');
-assert.equal(phone.shadow, 1024, 'with a 1024 shadow map');
+assert.equal(phone.px, 0.75, 'and renders the 3D canvas below CSS resolution');
+assert.equal(phone.shadow, 512, 'with a 512 shadow map');
 assert.equal(phone.shadowType, 'BasicShadowMap', 'and one shadow tap per pixel instead of nine');
 assert.equal(phone.fps, 60, 'and a 60 fps cap');
 const desktop = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 } });
@@ -32,7 +32,7 @@ assert.equal(desktop.fps, 144, 'and the old 144 cap');
 const tablet = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 1024 } });
 assert.equal(tablet.name, 'medium', 'a big touch device with enough memory is not pushed to the floor');
 assert.equal(tablet.shadowEvery, 1, 'medium redraws the shadow map every frame too (v1.97.92: alternate heavy/light frames were judder)');
-for (const [t, R, st, mc] of [[phone, 50, 4, 0.5], [tablet, 65, 3, 0.35], [desktop, 85, 2, 0]]) {   // the pass is made cheaper instead of rarer
+for (const [t, R, st, mc] of [[phone, 28, 4, 1], [tablet, 65, 3, 0.35], [desktop, 85, 2, 0]]) {   // the pass is made cheaper instead of rarer
   assert.equal(t.shadowEvery, 1, t.name + ' redraws its shadows every frame (steady cost)');
   assert.equal(t.shadowR, R, t.name + ' shadow box half-size ' + R + ' m');
   assert.equal(t.shadowStep, st, t.name + ' moves the shadow box in ' + st + ' m steps');
@@ -40,6 +40,10 @@ for (const [t, R, st, mc] of [[phone, 50, 4, 0.5], [tablet, 65, 3, 0.35], [deskt
 }
 const smallPhone = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 380 } });
 assert.equal(smallPhone.name, 'low', 'a small screen wins over a generous memory figure');
+const landscapePhone = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 1000, innerHeight: 420 } });
+assert.equal(landscapePhone.name, 'low', 'a wide landscape phone still uses the phone budget');
+const overriddenPhone = pick({ nav: { maxTouchPoints: 5, deviceMemory: 8, hardwareConcurrency: 8 }, win: { innerWidth: 1000, innerHeight: 420 }, storage: { getItem: () => 'medium' } });
+assert.equal(overriddenPhone.name, 'medium', 'an explicit quality setting still takes priority on a phone');
 const override = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 }, storage: { getItem: k => k === 'cs_perf' ? 'low' : null } });
 assert.equal(override.name, 'low', 'the manual override beats the heuristic');
 const bogus = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 }, storage: { getItem: () => 'ultra' } });

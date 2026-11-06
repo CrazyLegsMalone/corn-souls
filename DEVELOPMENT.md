@@ -1,3 +1,9 @@
+## TEST v1.97.193 — reduce the phone rendering budget (2026-11-06)
+- The Razr reported about 15 FPS. The Low tier now renders the 3D canvas at 0.75 of CSS resolution, about 44% fewer pixels, and uses a 512 × 512 sun shadow map. On foot, the shadow box half-size is 28 m. The minimum radius for ordinary startup shadow casters rises to 1 m. Shadows still update every frame for even pacing.
+- A touch viewport with a short side of 600 CSS pixels or less also selects Low, including when a phone opens the game in landscape. Explicit quality overrides still take priority.
+- The performance suite checks the Low budget, the landscape case and the override. Razr frame rate still needs an on-device measurement.
+- Bumped TEST to `1.97.193` / `corn-souls-test-shell-v220`.
+
 ## TEST v1.97.192 — spread startup roof collision work across frames (2026-11-06)
 - The first walk now queues the same tiled roof collision build used for late models. It draws at most one roof tile per frame, keeps regular ground and wall collision active, and swaps in the completed roof grid. The late-model rebuild still runs after the first pass.
 - TEST worker activation claims fetches without navigating open windows. The launcher checks for a new version on a fresh open, so focusing an active game does not trigger an update reload.
