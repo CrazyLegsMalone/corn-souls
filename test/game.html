@@ -5642,8 +5642,8 @@ const NPC_TAMMY = '/corn-souls/assets/models/tammy_2_0.glb';     // and Tammy's 
 const NPC_MODELS = {
   vern:   { url: NPC_VERN, skin: true, h: 1.78, pose: 'stand', x: -232 },   // off the loop track (it runs at x -240)
   op:     { url: NPC_RICK, skin: true, h: 1.78, pose: 'sit' },              // Rick, the board operator
-  brenda: { url: NPC_BRENDA, skin: true, h: 1.65, pose: 'sit' },
-  tammy:  { url: NPC_TAMMY, skin: true, h: 1.65, pose: 'sit' }
+  brenda: { url: NPC_BRENDA, skin: true, h: 1.65, pose: 'sit', dy: 0.1524 },   // 6 inches higher (owner)
+  tammy:  { url: NPC_TAMMY, skin: true, h: 1.65, pose: 'sit', dy: 0.1524 }     // 6 inches higher (owner)
 };
 function loadCharacter(id, cfg) {
   const npc = (NPCS || []).find(n => n.id === id);

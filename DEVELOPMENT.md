@@ -1,3 +1,10 @@
+## TEST v1.97.188 — Brenda and Tammy sit 6 inches higher (2026-11-05)
+- Owner: *"move tammy and brendas position 6 inches higher"*.
+- Added `dy: 0.1524` (6 in) to Brenda's and Tammy's `NPC_MODELS` entries — `skinnedNpc()` already adds `cfg.dy` to the seated anchor, so both scale-house techs now sit 6 inches higher. Vern and Rick are untouched.
+- `validate-skinned-npcs.cjs` now asserts Brenda and Tammy carry the `dy: 0.1524` offset and that Vern and Rick do not.
+- Verified locally: the 60 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.188` / `corn-souls-test-shell-v215`.
+
 ## TEST v1.97.187 — the walk looks like walking now (2026-11-05)
 - Owner: *"animate"* follow-up — the first pass walked, but with **straight, stiff legs** (a goose-step march), and a real bug in the swing primitive made it worse.
 - **The bug:** `skinSwing()` (added in v1.97.186) wrote `pw.invert().multiply(… pw.clone().multiply(rest))`. In JS the receiver `pw.invert()` runs *before* the argument's `pw.clone()`, so by the time the clone was taken `pw` was already inverted — the knee was being rotated by `pw⁻²·rest` instead of `rest`. `skinTurn()` (the one-shot pose helper the NPCs use) doesn't have this bug because it reads its operand into a separate variable first. Fix: capture `w = pw.clone().multiply(rest)` **before** inverting, exactly like `skinTurn()`.

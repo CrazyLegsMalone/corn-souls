@@ -118,6 +118,8 @@ for (const [name, file] of [['NPC_VERN', VERN], ['NPC_RICK', RICK], ['NPC_BRENDA
   assert.ok(html.includes("const " + name + " = '/corn-souls/assets/models/" + file + "';"), name + ' points at ' + file);
 assert.ok(!html.includes('NPC_MALE') && !html.includes('NPC_FEMALE'), 'the plain male and female are no longer wired anywhere: all four NPCs wear their own builds');
 assert.ok(!/colors:/.test(table), 'no NPC is repainted in game: every wardrobe colour is in its own file');
+assert.ok(/brenda:\s*\{[^}]*dy: 0.1524/.test(table) && /tammy:\s*\{[^}]*dy: 0.1524/.test(table), 'Brenda and Tammy sit 6 inches (0.1524 m) higher');
+assert.ok(!/vern:\s*\{[^}]*dy:/.test(table) && !/op:\s*\{[^}]*dy:/.test(table), 'Vern and Rick are not moved');
 assert.ok(html.includes("  if (cfg.skin) return loadGlbModel(cfg.url, m => skinnedNpc(npc, cfg, m), 'npc:' + id);"), 'loadCharacter hands a skinned model to skinnedNpc');
 const reg = JSON.parse(fs.readFileSync(path.join('..', 'assets', 'registry.json'), 'utf8')), credits = fs.readFileSync(path.join('..', 'CREDITS.md'), 'utf8');
 for (const [id, file, title] of [['sketchfab-loves-art-low-poly-male', MALE, 'Low Poly Male'], ['sketchfab-loves-art-low-poly-female', FEMALE, 'Low Poly Female'], ['sketchfab-loves-art-low-poly-female-brenda-2-0', BRENDA, 'Low Poly Female — Brenda 2.0'], ['sketchfab-loves-art-low-poly-female-tammy-2-0', TAMMY, 'Low Poly Female — Tammy 2.0'], ['sketchfab-loves-art-low-poly-male-rick-2-0', RICK, 'Low Poly Male — Rick 2.0'], ['sketchfab-loves-art-low-poly-male-vern-2-0', VERN, 'Low Poly Male — Vern 2.0']]) {
