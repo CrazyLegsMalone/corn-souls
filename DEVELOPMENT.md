@@ -1,3 +1,9 @@
+## TEST v1.97.189 — Brenda and Tammy sit 4 inches back from their windows (2026-11-05)
+- Owner: *"move brenda and tammy 4 inches away from the wall they are facing"*.
+- Brenda (inbound, north window) moved `+0.1016` (4 in) along +Z; Tammy (outbound, south window) moved `-0.1016` along -Z — each is now 4 inches further back from the drive-through window they face. `validate-seating.cjs` pins the new positions.
+- Verified locally: the 60 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.189` / `corn-souls-test-shell-v216`.
+
 ## TEST v1.97.188 — Brenda and Tammy sit 6 inches higher (2026-11-05)
 - Owner: *"move tammy and brendas position 6 inches higher"*.
 - Added `dy: 0.1524` (6 in) to Brenda's and Tammy's `NPC_MODELS` entries — `skinnedNpc()` already adds `cfg.dy` to the seated anchor, so both scale-house techs now sit 6 inches higher. Vern and Rick are untouched.

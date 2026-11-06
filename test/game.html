@@ -7794,7 +7794,7 @@ function init(container) {
       glazing(E, WINX + SH_DX, FY + 1.65, ZN, 3.6); glazing(E, WINX + SH_DX, FY + 1.65, ZS, 3.6);
       glazing(E, X0 + SH_DX + 0.2, FY + 1.2, HZ, 3.0); }
     // two scale techs at the drive-through windows (inbound on the north wall, outbound on the south wall), facing the trucks
-    NPCS.push({ id: 'brenda', g: seatedPerson(WINX + SH_DX, ZN + 0.85, 0, 0x8a5a9e, FY, { woman: 0x5a3a22 }) }, { id: 'tammy', g: seatedPerson(WINX + SH_DX, ZS - 0.85, Math.PI, 0x4f8f5a, FY, { woman: 0xc9a25a }) });   // scale techs: women, no hard hats (brunette, blonde)
+    NPCS.push({ id: 'brenda', g: seatedPerson(WINX + SH_DX, ZN + 0.85 + 0.1016, 0, 0x8a5a9e, FY, { woman: 0x5a3a22 }) }, { id: 'tammy', g: seatedPerson(WINX + SH_DX, ZS - 0.85 - 0.1016, Math.PI, 0x4f8f5a, FY, { woman: 0xc9a25a }) });   // scale techs: 4 in (0.1016 m) back from the windows they face
   }
   // Vern: veteran grain operator, standing just outside the receiving building's south doors.
   // Receiving building coordinates are offset by GDX/GDZ, as are the surrounding grain-yard roads.

@@ -70,8 +70,8 @@ assert.ok(html.includes('box(0.08, 0.94, 0.7, mat(0xcfc9ba), 86 + sx * 3.21, FY 
 assert.ok(html.includes('for (const z of [ZN + 0.5, ZS - 0.5])'), 'both windows keep their counter');
 
 // the techs still sit at their windows, facing out, and their knees reach into the knee hole, not the panels
-assert.ok(html.includes('seatedPerson(WINX + SH_DX, ZN + 0.85, 0,'), 'Brenda at the north window, facing it');
-assert.ok(html.includes('seatedPerson(WINX + SH_DX, ZS - 0.85, Math.PI,'), 'Tammy at the south window, facing it');
+assert.ok(html.includes('seatedPerson(WINX + SH_DX, ZN + 0.85 + 0.1016, 0,'), 'Brenda at the north window, 4 in back from it');
+assert.ok(html.includes('seatedPerson(WINX + SH_DX, ZS - 0.85 - 0.1016, Math.PI,'), 'Tammy at the south window, 4 in back from it');
 const reach = thighAvg * Math.sin(THIGH_A);
 assert.ok(reach > 0.2 && reach < 0.4, 'knees reach ' + reach.toFixed(2) + ' m forward, into the desk knee hole');
 
