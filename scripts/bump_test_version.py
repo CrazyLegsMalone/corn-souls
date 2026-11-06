@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Bump the TEST channel version so installed TEST apps pick up the change.
 
-The TEST launcher polls ./index.html?check= on launch/resume/focus; when
-TEST_VERSION differs it clears the TEST caches, reloads, and the new service
-worker activates. So every TEST push should bump this first.
+The TEST launcher checks ./index.html?check= when it opens. If the
+version differs, it clears the TEST caches and opens the latest build.
+Bump the version before every TEST push.
 
   python scripts/bump_test_version.py            # 1.97.17 -> 1.97.18, shell-v44 -> v45
   python scripts/bump_test_version.py --dry-run

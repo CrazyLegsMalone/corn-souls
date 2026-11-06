@@ -95,7 +95,7 @@ assert.equal(ctx.powerKindOf({ kind: 'rat' }), 'rat'); assert.equal(ctx.powerKin
 assert.ok(html.includes("critNetEat(h.o); powerGive(powerKindOf(h.o), 'You ate the ' + h.nm + '. ');"), 'eating a critter gives its power');
 assert.ok(html.includes("stepSafe('powerSim', () => powerUpdate(dt));"), 'the power clock runs every frame (driving or not), under its own guard label');
 assert.ok(html.includes('P3.jumpHold(!!(pad.held.A || kb.space || jumpBtnHeld));'), 'holding jump (A, Space or the touch button) is passed in for gliding');
-assert.ok(html.includes("if (!ROOFMAP.h) { try { roofMapBuild(); } catch (e) { console.warn('roof map', e); } ROOFMAP.again = 12; }"), 'the roof map is built when you start walking, and again once the late models are in');
+assert.ok(html.includes("if (!ROOFMAP.h && !ROOFMAP.job && ROOFMAP.again < 0) ROOFMAP.again = 0;"), 'walking queues the initial roof map');
 assert.ok(html.includes('const f = 42 + POWER.fov - 12 * aimK;'), 'the rat view widening reaches the camera');
 { const rm = cut('function roofMapMeshes() {', 'function roofMapBuild() {');
   for (const k of ['vehicles', 'train.cars', 'THRUS', 'birds', 'critters', 'pondFrogs', 'CORN_PROPS_STATE', 'NPCS', 'O.cars', 'CREEP.list', 'utv.g', 'O.shedMower', 'NET.rp', 'SKY.dome', 'VULT.s', 'bodies']) assert.ok(rm.includes(k), 'the roof map leaves out moving things: ' + k);

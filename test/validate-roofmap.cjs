@@ -38,7 +38,7 @@ const renderer = {
   readRenderTargetPixelsAsync(rt, x, y, w, h, buf) { const px = data.get(rt); return new Promise(res => pending.push(() => { buf.set(px); res(buf); })); }
 };
 const PERF = { errs: 0, err: null };
-const ctx = { T, Math, console: { log() {}, warn() {}, error() {} }, Float32Array, Uint8Array, Infinity, scene, renderer, PERF, wallSegs: [[0, 0, 300, 0], [400, 0, 400, 50]], performance: { now: () => 0 }, roofMapMeshes: () => [yard] };
+const ctx = { T, Math, POWER: { fov: 0 }, walk: {}, powerHud() {}, console: { log() {}, warn() {}, error() {} }, Float32Array, Uint8Array, Infinity, scene, renderer, PERF, wallSegs: [[0, 0, 300, 0], [400, 0, 400, 50]], performance: { now: () => 0 }, roofMapMeshes: () => [yard] };
 vm.createContext(ctx);
 vm.runInContext(src + '\nthis.ROOFMAP = ROOFMAP; this.roofAt = roofAt; this.roofMapGrid = roofMapGrid; this.roofMapRebuildStart = roofMapRebuildStart; this.roofMapStep = roofMapStep; this.roofMapGuard = roofMapGuard;', ctx);
 const M = ctx.ROOFMAP, tick = () => new Promise(r => setImmediate(r));
@@ -78,9 +78,29 @@ const frame = async (gpuDone = true) => { rendersThisFrame = 0; ctx.roofMapGuard
   assert.equal(scene.overrideMaterial, null, 'the scene is put back even when a tile throws');
   assert.ok(!yard.layers.test(Object.assign(new T.Layers(), { mask: 1 << 30 })), 'and the layer cleared');
 
-  // in the game
-  assert.ok(html.includes('if (ROOFMAP.again > 0 && (ROOFMAP.again -= dt) <= 0) roofMapGuard(roofMapRebuildStart);') && html.includes('if (ROOFMAP.job) roofMapGuard(roofMapStep);'), 'the 12 s rebuild runs sliced, a step each frame');
-  assert.ok(!/ROOFMAP\.again[^\n]*roofMapBuild\(\)/.test(html), 'not the old one-shot');
+  // Run the actual frame scheduler for a fresh spawn and the late-model rebuild.
+  const powerUpdate = vm.runInContext('(' + cut('function powerUpdate(dt) {', '\nfunction ') + ')', ctx);
+  const startWalk = cut('function walkStart() {', '\nfunction ');
+  assert.ok(!startWalk.includes('roofMapBuild('), 'walking never calls the one-shot GPU readback');
+  const queue = startWalk.split('\n').find(line => line.includes('ROOFMAP.again = 0;'));
+  assert.ok(queue, 'walking queues the roof map');
+  Object.assign(M, { h: null, again: -1 });
+  vm.runInContext(queue, ctx);
+  const beforeStart = renders;
+  assert.equal(M.job, null, 'walking does not begin the GPU work synchronously');
+  powerUpdate(0.016);
+  assert.ok(M.job);
+  assert.equal(renders, beforeStart + 1, 'the first update draws one tile');
+  while (M.job) await frame();
+  assert.ok(M.h, 'the first build produces collision data');
+  powerUpdate(11.5);
+  assert.equal(M.job, null, 'the late-model rebuild waits');
+  powerUpdate(0.5);
+  assert.ok(M.job, 'the late-model rebuild starts once the timer elapses');
+  while (M.job) await frame();
+  powerUpdate(12);
+  assert.equal(M.job, null, 'the timer only schedules one late-model rebuild');
+
   const rm = code(cut('function roofMapSkip() {', 'return skip;'));   // (v1.97.159: the list is shared with the mini map)
   for (const k of ['vehicles', 'train.cars', 'THRUS', 'NPCS', 'birds', 'critters', 'pondFrogs', 'CORN_PROPS_STATE', 'O.cars', 'O.pivot.g', 'CREEP.list', 'utv.g', 'O.shedMower', 'NET.rp', 'NET.rr', 'SKY.dome', 'VULT.s', 'bodies'])
     assert.ok(rm.includes(k), 'the roof map leaves out what moves (in code, not a comment): ' + k);

@@ -1,5 +1,5 @@
 // Corn Souls TEST is an independent install; NEVER control or clear the live app.
-const CACHE = 'corn-souls-test-shell-v218';
+const CACHE = 'corn-souls-test-shell-v219';
 const APP_PATH = '/corn-souls/test/';
 const PRECACHE = ['./index.html', './game.html', './note-sharing.js', './inbox.js', './inbox-config.json', './sound-settings.js', './acid-liquid.js', './cooler-door-audio.js', './developer-inbox.html', './manifest.webmanifest', './icon-192-blue-psx.png', './icon-512-blue-psx.png'];
 self.addEventListener('install', event => {
@@ -20,13 +20,6 @@ self.addEventListener('activate', event => {
     await Promise.all(names.filter(name => name.startsWith('corn-souls-test-shell-') && name !== CACHE)
       .map(name => caches.delete(name)));
     await self.clients.claim();
-    // Automatically reload any open TEST PWA window still showing a previous build.
-    const clients = await self.clients.matchAll({type: 'window'});
-    for (const client of clients) {
-      if (client.url.includes(APP_PATH) && !client.url.includes('sw=' + CACHE) && 'navigate' in client) {
-        client.navigate(APP_PATH + 'index.html?sw=' + CACHE + '&t=' + Date.now()).catch(() => {});
-      }
-    }
   })());
 });
 self.addEventListener('fetch', event => {

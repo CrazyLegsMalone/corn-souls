@@ -136,3 +136,36 @@ assert.ok(html.includes("if (!P3.walking && $('labels').offsetParent) for (const
   const face = +m[3] + +m[2] / 2; assert.ok(+m[1] - face >= 0.005, 'the readout stands clear in front of its housing (' + (+m[1]).toFixed(3) + ' vs face ' + face.toFixed(3) + '), not on it'); }
 
 console.log('PASS: frame stability - shadows every frame with a cheaper pass, critter probes time-sliced and local, refresh-locked frame pacing, no per-frame garbage in vehicle contacts / roofs / hits / floorAt, no layout reads while walking');
+
+async function verifyTestUpdate() {
+  const worker = fs.readFileSync('sw.js', 'utf8');
+  const handlers = new Map(), deleted = [];
+  let claims = 0, navigations = 0;
+  const current = worker.match(/const CACHE = '([^']+)'/)[1];
+  const oldTest = 'corn-souls-test-shell-v1', live = 'corn-souls-live-shell-v1';
+  vm.runInNewContext(worker, {
+    caches: {
+      keys: async () => [oldTest, current, live],
+      delete: async name => deleted.push(name),
+    },
+    self: {
+      addEventListener: (type, fn) => handlers.set(type, fn),
+      clients: {
+        claim: async () => claims++,
+        matchAll: async () => [{
+          url: 'https://example.test/corn-souls/test/index.html',
+          navigate: async () => navigations++,
+        }],
+      },
+    },
+  });
+  let activation;
+  handlers.get('activate')({ waitUntil: promise => { activation = promise; } });
+  await activation;
+  assert.deepEqual(deleted, [oldTest]);
+  assert.equal(claims, 1, 'the new worker takes over fetches');
+  assert.equal(navigations, 0, 'activating the worker keeps an open game running');
+  assert.equal([...launcher.matchAll(/checkLatestVersion\(\)/g)].length, 1, 'only a fresh launch can redirect to a new version');
+  assert.ok(launcher.includes('if (await checkLatestVersion()) return;'));
+}
+verifyTestUpdate().catch(err => { console.error(err); process.exitCode = 1; });

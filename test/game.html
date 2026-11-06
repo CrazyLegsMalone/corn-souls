@@ -11296,7 +11296,7 @@ function walkStart() {
   setWallsSolid(true);
   walk.diedAt = null; walk.toxic = 0;   // bodies stay (up to 5)
   if (!colliders) buildColliders();
-  if (!ROOFMAP.h) { try { roofMapBuild(); } catch (e) { console.warn('roof map', e); } ROOFMAP.again = 12; }   // and once more when the late models are in
+  if (!ROOFMAP.h && !ROOFMAP.job && ROOFMAP.again < 0) ROOFMAP.again = 0;   // queue the first tiled build
   walk.on = true; walk.x = cam.tx; walk.z = cam.tz; walk.yaw = cam.yaw; walk.pitch = -0.08; cam.goal = null;
   pushOut();
   camera.near = 0.2; camera.updateProjectionMatrix();   // 0.2 not 0.1: halves the depth range, which is what the ground
@@ -12467,7 +12467,13 @@ function powerHud(force) {
 function powerUpdate(dt) {
   if (POWER.moveT > 0) POWER.moveT -= dt;
   POWER.fov += ((POWER.kind === 'rat' && POWER.moveT > 0 ? 8 : 0) - POWER.fov) * Math.min(1, dt * 4); if (Math.abs(POWER.fov) < 0.01) POWER.fov = 0;
-  if (ROOFMAP.again > 0 && (ROOFMAP.again -= dt) <= 0) roofMapGuard(roofMapRebuildStart);   // v1.97.147: sliced over frames, no hitch
+  if (ROOFMAP.again === 0) {
+    ROOFMAP.again = 12;   // rebuild after the late models have had time to load
+    roofMapGuard(roofMapRebuildStart);
+  } else if (!ROOFMAP.job && ROOFMAP.again > 0 && (ROOFMAP.again -= dt) <= 0) {
+    ROOFMAP.again = -1;
+    roofMapGuard(roofMapRebuildStart);
+  }
   if (ROOFMAP.job) roofMapGuard(roofMapStep);
   if (walk.dead && POWER.kind) { POWER.kind = null; walk.climbT = 0; walk.slide = false; }   // dying ends it
   if (POWER.kind) {
@@ -12516,8 +12522,8 @@ function roofMapMeshes() {
 // stall until the GPU handed all ~3 MB of it back, decode ~750k cells and redo every wall top - ~0.3 s on a desktop, more on a
 // phone, a freeze in the middle of play. Now it is a job: one 128 x 128 tile drawn per frame, read back without stalling
 // (readRenderTargetPixelsAsync; two tiles in flight at most), decoded into a NEW grid while the old one keeps answering, and
-// swapped in (with the wall tops) when every tile is in. The first build when you start walking is still the one-shot
-// roofMapBuild (it is part of loading). Same picture, same numbers: each tile is the full build's camera cut down to its cells.
+// swapped in (with the wall tops) when every tile is in. The first build uses the same tiles. Ground, walls and explicit
+// walkable surfaces still handle collisions while the first roof map is pending.
 const ROOFMAP_TILE = 128;
 function roofMapSkip() {   // everything that moves or isn't the plant (shared by the roof map and the mini map)
   const skip = new Set(), add = o => { if (o) skip.add(o); };

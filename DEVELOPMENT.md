@@ -1,3 +1,9 @@
+## TEST v1.97.192 — spread startup roof collision work across frames (2026-11-06)
+- The first walk now queues the same tiled roof collision build used for late models. It draws at most one roof tile per frame, keeps regular ground and wall collision active, and swaps in the completed roof grid. The late-model rebuild still runs after the first pass.
+- TEST worker activation claims fetches without navigating open windows. The launcher checks for a new version on a fresh open, so focusing an active game does not trigger an update reload.
+- Verified locally with all 60 CI suites, launcher anchor checks and LIVE wiring checks. The new assertions fail against v1.97.191.
+- Bumped TEST to `1.97.192` / `corn-souls-test-shell-v219`.
+
 ## TEST v1.97.191 — the idle Player 2's feet sit on the smoking pad (2026-11-05)
 - Owner: *"her feet clip into the concrete"* — the idle squeeg2 was standing at y 0, but the smoking pad's concrete top is 0.2 m (its 0.2 m slab, lifted 0.1 m off the grass), so her feet sank into it.
 - Raised `idlePlayer2()`'s position to `y: 0.2` so her feet rest on the pad. `validate-skinned-players.cjs` pins the new height.
