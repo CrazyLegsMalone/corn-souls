@@ -4883,7 +4883,7 @@ function nameplate(text, x, y, z, r, dx, dz, k) {
   const tex = srgbTex(new T.CanvasTexture(cv)); tex.anisotropy = 4;
   const L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L, h = (tag ? 0.53 : 0.34) * (k || 1) * NAME_K;   // 25% smaller than the original plate sizes
   const m = new T.Mesh(new T.PlaneGeometry(h * W / H, h), new T.MeshBasicMaterial({ map: tex }));
-  m.position.set(x + ux * (r + 0.05), y, z + uz * (r + 0.05)); m.rotation.y = Math.atan2(ux, uz); m.userData.noHit = true; scene.add(m);
+  m.position.set(x + ux * (r + 0.05), y, z + uz * (r + 0.05)); m.rotation.y = Math.atan2(ux, uz); m.userData.noHit = true; m.updateMatrix(); m.matrixAutoUpdate = false; scene.add(m);
   return m;
 }
 const MATS = {}, matU = (c, o) => new T.MeshLambertMaterial(Object.assign({ color: c }, o || {}));   // matU: a material of its own (safe to recolor)
@@ -5001,7 +5001,7 @@ const GB = k => GLAYER[k][1];                 // and how far forward (-) or back
 // Road markings need the paint layer's depth pull as well as its height. A plain mat() has no polygon offset, and the asphalt
 // under it is pulled 12 steps forward, so beyond a few tens of metres the asphalt won the 7 mm and the dashes flickered or
 // vanished (v1.97.96). One material per colour, shared by every marking of that colour.
-const MARK_MATS = {};
+const MARK_MATS = {}, PAD_MATS = {};
 const markMat = c => MARK_MATS[c] || (MARK_MATS[c] = new T.MeshLambertMaterial({ color: c, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB('paint') }));
 // v1.97.158, owner: "ground still flickers green especially when looking down at it from high places like the top of tin bin 4".
 // The grass under everything was ONE shape, 16 km square, with holes cut for the ponds, the tank-farm pit and the receiving pits:
@@ -5088,7 +5088,7 @@ function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are a
   gm.userData.ground = kind;   // the grass tufts place themselves with a downward probe: only a 'grass' hit takes them
   return gm;
 }
-const glass = (c, op) => new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide });
+const GLASS_MATS = {}, glass = (c, op) => { const k = c + ':' + (op || 0.25); return GLASS_MATS[k] || (GLASS_MATS[k] = new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide })); };
 function add(geo, m, x, y, z, st, noShadow) {
   const o = new T.Mesh(geo, m); o.position.set(x, y, z);
   if (!noShadow) { o.castShadow = true; o.receiveShadow = true; }
@@ -5177,7 +5177,8 @@ function ribTexture() {
   g.fillStyle = '#f3f4f3'; g.fillRect(0, 0, 64, 4); g.fillStyle = '#cfd3d7'; g.fillRect(0, 0, 3, 4); g.fillStyle = '#e4e7e9'; g.fillRect(3, 0, 3, 4); g.fillRect(30, 0, 2, 4);
   const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return RIB_TEX = t;
 }
-function ribWall(m) { m.map = ribTexture(); m.userData.ribSiding = true; m.needsUpdate = true; return m; }
+const ribMats = [];
+function ribWall(m) { m.map = ribTexture(); m.userData.ribSiding = true; m.needsUpdate = true; ribMats.push(m); return m; }
 function ribGeo(geo) {   // a box: each face gets one texture repeat per foot along its width (the ribs run up the wall)
   if (!geo || geo.userData.ribbed || geo.type !== 'BoxGeometry') return; geo.userData.ribbed = true;
   const P = geo.parameters, uv = geo.attributes.uv, n = geo.attributes.normal;
@@ -5525,9 +5526,11 @@ function glbPose(a, t) {
   return len;
 }
 // Shared model fetch: absolute URLs (the page carries <base href="../">), cached, and a failure only warns.
+const GLB_FETCH = {};
 function loadGlbModel(url, onReady, tag) {
-  fetch(url, { cache: 'force-cache' })
+  (GLB_FETCH[url] || (GLB_FETCH[url] = fetch(url, { cache: 'force-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+    .catch(e => { delete GLB_FETCH[url]; throw e; })))
     .then(buf => onReady(glbBuild(buf)))
     .catch(e => console.warn('[' + (tag || 'glb') + '] ' + url.split('/').pop() + ' not loaded:', e && e.message));
 }
@@ -5540,7 +5543,7 @@ function hydrantModel(x, z, yaw) {
   loadGlbModel('/corn-souls/assets/models/lopoly_hydrant.glb', ({ root }) => {
     root.scale.setScalar(HYDRANT_SCALE); root.position.set(x, 0, z); root.rotation.y = yaw || 0; root.name = 'hydrant';
     root.traverse(o => { if (o.isMesh && o.material.map) { const t = o.material.map; t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; } });
-    scene.add(root);
+    mergeModel(root, true); scene.add(root);
   }, 'hydrant');
 }
 function loadSubstation() {
@@ -5557,6 +5560,7 @@ function loadSubstation() {
       const gx = R.gateX === undefined ? (bb.min.x + bb.max.x) / 2 : R.gateX, gw = 6.6;
       wallSegs.push([bb.min.x, bb.min.z, gx - gw / 2, bb.min.z], [gx + gw / 2, bb.min.z, bb.max.x, bb.min.z],
         [bb.min.x, bb.max.z, bb.max.x, bb.max.z], [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
+      mergeModel(root, true, o => { for (const f of [R.handle, R.gate, R.door]) if (f) { let q = o; while (q) { if (q === f) return true; q = q.parent; } } return false; });
       SUBSTATION.ready = true;
   }, 'substation');
 }
@@ -5577,31 +5581,41 @@ function mergeModel(root, castShadow, skip) {   // skip(o): true for a mesh that
   root.traverse(o => {
     if (skip && skip(o)) return;
     if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || !o.geometry || !o.geometry.attributes.position) return;
-    const m = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld);
-    let g = groups.get(o.material); if (!g) groups.set(o.material, g = []);
-    g.push({ g: o.geometry, m, o });
+    const m = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld), cs = o.geometry.attributes.color ? o.geometry.attributes.color.itemSize : 0;
+    const key = o.material.uuid + ':' + (o.userData.noHit ? 1 : 0) + ':' + cs;
+    let g = groups.get(key); if (!g) groups.set(key, g = { mat: o.material, noHit: !!o.userData.noHit, cs, parts: [] });
+    g.parts.push({ g: o.geometry, m, o });
   });
-  for (const [mat, parts] of groups) {
+  for (const { mat, noHit, cs, parts } of groups.values()) {
     if (parts.length < 2) continue;
     if (mat.map && !parts.every(x => x.g.attributes.uv)) continue;      // a textured batch needs UVs on every part
     let n = 0;
     const geos = parts.map(x => { const g = x.g.index ? x.g.toNonIndexed() : x.g.clone(); g.applyMatrix4(x.m); n += g.attributes.position.count; return g; });
-    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = cs ? new Float32Array(n * cs) : null;
     let k = 0; const allUv = geos.every(g => g.attributes.uv);
-    for (const g of geos) { pos.set(g.attributes.position.array, k * 3); if (g.attributes.normal) nor.set(g.attributes.normal.array, k * 3); if (allUv) uv.set(g.attributes.uv.array, k * 2); k += g.attributes.position.count; }
+    for (const g of geos) { pos.set(g.attributes.position.array, k * 3); if (g.attributes.normal) nor.set(g.attributes.normal.array, k * 3); if (allUv) uv.set(g.attributes.uv.array, k * 2); if (col && g.attributes.color) col.set(g.attributes.color.array, k * cs); k += g.attributes.position.count; }
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3));
     if (allUv) geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+    if (col) geo.setAttribute('color', new T.BufferAttribute(col, cs));
     geo.computeBoundingSphere();
     const mesh = new T.Mesh(geo, mat);
     mesh.castShadow = !!castShadow; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false;
+    if (noHit) mesh.userData.noHit = true;
     root.add(mesh);
     for (const x of parts) gone.push(x.o);
     for (const g of geos) g.dispose();
   }
   for (const o of gone) if (o.parent) o.parent.remove(o);
+  const mc = castShadow && typeof TIER !== 'undefined' && TIER.minCaster > 0 ? TIER.minCaster : 0, wsc = mc ? new T.Vector3() : null;
+  root.updateMatrixWorld(true);
   root.traverse(o => {   // static parts: no per-frame matrix walk, and the caller's shadow choice applies to every part
-    if (o.isMesh) { o.castShadow = !!castShadow; o.receiveShadow = true; }
+    if (skip && skip(o)) return;
+    if (o.isMesh) {
+      let cs = !!castShadow;
+      if (cs && mc && o.geometry) { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); if (o.geometry.boundingSphere) { o.getWorldScale(wsc); if (o.geometry.boundingSphere.radius * Math.max(wsc.x, wsc.y, wsc.z) < mc) cs = false; } }
+      o.castShadow = cs; o.receiveShadow = true;
+    }
     if (o !== root) o.matrixAutoUpdate = false; });
   root.updateMatrixWorld(true);
   return root;
@@ -5757,7 +5771,7 @@ function loadNpcModels() { for (const id in NPC_MODELS) loadCharacter(id, NPC_MO
 function loadSmokingArea() {
   loadGlbModel('/corn-souls/assets/models/smoking_area_lopoly.glb', ({ root }) => {
     const g = new T.Group(); g.position.set(145, 0.1, -80);
-    g.add(root); scene.add(g); scene.updateMatrixWorld(true);
+    g.add(root); mergeModel(root, true); scene.add(g); scene.updateMatrixWorld(true);
   }, 'smoking-area');
 }
 // v1.97.190: Player 2 waiting at the smoking area — squeeg2 stands idle there until a 2-player connection opens, when the real
@@ -6317,7 +6331,7 @@ function init(container) {
   // A pad is a thin flat plane lying on the ground, so it needs the same protection the ground textures have: its own
   // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
   // grass. The offset is resolution steps only - a slope factor here is what made the pad vanish in the distance.
-  const padMat = c => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; m.userData.ground = 'pad'; return m; };
+  const padMat = c => PAD_MATS[c] || (PAD_MATS[c] = (() => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; m.userData.ground = 'pad'; return m; })());
   const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, GY('pad'), z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
   { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD, GSEG(EXR - WXR), GSEG(SZR - NROAD)).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'), (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
@@ -8676,13 +8690,13 @@ function init(container) {
     const N = Math.floor(340 / 3.1), cm = new T.InstancedMesh(geo, CORN.mat, N * 12);
     let k = 0; for (let i = 0; i < 12; i++) for (let j = 0; j < N; j++) { const s = 0.85 + Math.random() * 0.3;
       dummy.position.set(-30 - 170 + 1.6 + j * 3.1 + (Math.random() - 0.5) * 0.6, 0.15, NROAD - 52 - i * 4 + (Math.random() - 0.5) * 0.4); dummy.rotation.set(0, Math.random() * 0.6 - 0.3 + Math.PI / 4, 0); dummy.scale.set(s, s * (0.9 + Math.random() * 0.2), s); dummy.updateMatrix(); cm.setMatrixAt(k++, dummy.matrix); }
-    cm.userData.noHit = true; scene.add(cm); cornField(cm);
+    cm.userData.noHit = true; scene.add(cm); cornField(cm); cm.updateMatrix(); cm.matrixAutoUpdate = false;
     if (O.pivot) { // corn in the center-pivot circle too: rows 6 m apart, a clump every 4 m (~14,000 clumps, still one draw call)
       const { cx, cz, R } = O.pivot, pts = [];
       for (let z = -R + 3; z < R - 3; z += 6) { const hw = Math.sqrt(R * R - z * z) - 3; for (let x = -hw; x < hw; x += 4) pts.push([cx + x + (Math.random() - 0.5) * 1.2, cz + z + (Math.random() - 0.5) * 0.8]); }
       const pm = new T.InstancedMesh(geo, CORN.mat, pts.length);
       pts.forEach(([x, z], i) => { const s = 1.0 + Math.random() * 0.35; dummy.position.set(x, 0.12, z); dummy.rotation.set(0, Math.random() * Math.PI, 0); dummy.scale.set(s * 1.25, s, s * 1.25); dummy.updateMatrix(); pm.setMatrixAt(i, dummy.matrix); });
-      pm.userData.noHit = true; scene.add(pm); cornField(pm);
+      pm.userData.noHit = true; scene.add(pm); cornField(pm); pm.updateMatrix(); pm.matrixAutoUpdate = false;
       buildScarecrows(cx, cz, R);
     } }
 
@@ -8698,6 +8712,7 @@ function init(container) {
       o.getWorldScale(wsc); if (g.boundingSphere.radius * Math.max(wsc.x, wsc.y, wsc.z) < TIER.minCaster) { o.castShadow = false; off++; } });
     PERF.smallCasters = off; }
   { let n = 0; scene.traverse(o => { if (o.isMesh && o.castShadow) n++; }); PERF.casters = n; }
+  setWallsSolid(true);
   try { const t0 = performance.now(); renderer.compile(scene, camera); PERF.compile = performance.now() - t0; } catch (e) {}
   try { console.info('[perf] tier ' + TIER.name + ' · pixel ratio ' + renderer.getPixelRatio() + ' · shadows ' + TIER.shadow + ' ' + TIER.shadowType + ' every ' + TIER.shadowEvery + ' frame(s) · ' + PERF.casters + ' casters · shaders compiled in ' + Math.round(PERF.compile) + ' ms'); } catch (e) {}
   resize(); window.addEventListener('resize', resize);
@@ -11166,22 +11181,25 @@ function mergeGroup(g, keep) {   // inside one moving/toggled group: fold its pl
   for (const o of g.children) {
     if (!o.isMesh || o.isInstancedMesh || o.children.length || (keep && keep.has(o)) || !o.visible || o.material.transparent || o.material.map) continue;
     const ge = o.geometry; if (!ge.attributes.position || !ge.attributes.normal) continue;
-    let L = by.get(o.material); if (!L) by.set(o.material, L = []); L.push(o);
+    const key = o.material.uuid + (o.userData.noHit ? ':n' : '');
+    let L = by.get(key); if (!L) by.set(key, L = []); L.push(o);
   }
-  for (const [m, L] of by) {
+  for (const L of by.values()) {
     if (L.length < 2) continue;
+    const m = L[0].material;
     let n = 0; const parts = L.map(o => { o.updateMatrix(); let ge = o.geometry; ge = ge.index ? ge.toNonIndexed() : ge.clone(); ge.applyMatrix4(o.matrix); n += ge.attributes.position.count; return ge; });
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let k = 0;
     for (const ge of parts) { pos.set(ge.attributes.position.array, k * 3); nor.set(ge.attributes.normal.array, k * 3); k += ge.attributes.position.count; ge.dispose(); }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); geo.computeBoundingSphere();
-    const mm = new T.Mesh(geo, m); mm.castShadow = L.some(o => o.castShadow); mm.receiveShadow = L.some(o => o.receiveShadow);
+    const mm = new T.Mesh(geo, m); mm.castShadow = L.some(o => o.castShadow); mm.receiveShadow = L.some(o => o.receiveShadow); mm.matrixAutoUpdate = false;
+    if (L[0].userData.noHit) mm.userData.noHit = true;
     const pk = L.find(o => pickables.includes(o)); if (pk) { Object.assign(mm.userData, pk.userData); pickables.push(mm); }
     for (const o of L) { g.remove(o); const i = pickables.indexOf(o); if (i >= 0) pickables.splice(i, 1); }
     g.add(mm);
   }
 }
 function mergeStatic() {
-  const shared = new Set([...Object.values(MATS), ...wallMats]), keep = new Set();
+  const shared = new Set([...Object.values(MATS), ...Object.values(MARK_MATS), ...Object.values(PAD_MATS), ...Object.values(GLASS_MATS), ...wallMats, ...ribMats, EXIT_SIGN.mat, EXIT_SIGN.halo, EGRESS.lens].filter(Boolean)), keep = new Set();
   for (const s of spinners) keep.add(s.o);
   { // groups: fold their static parts together (train wheels and anything kept in O stay separate)
     train.wheels.length = 0;   // wheel spin isn't noticeable at train speed; folding the wheels into the cars saves ~200 draw calls
@@ -11194,8 +11212,8 @@ function mergeStatic() {
   for (const o of scene.children.slice()) {
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !o.visible || keep.has(o) || !shared.has(o.material) || o.children.length) continue;
     const g = o.geometry; if (!g.attributes.position || !g.attributes.normal || g.morphAttributes.position) continue;
-    const cx = Math.floor(o.position.x / CELL), cz = Math.floor(o.position.z / CELL), key = o.material.uuid + (o.castShadow ? 's' : '') + (o.receiveShadow ? 'r' : '') + ':' + cx + ',' + cz + (pickables.includes(o) ? '|' + o.userData.unit + '|' + o.userData.station : '');
-    let G = groups.get(key); if (!G) groups.set(key, G = { m: o.material, cast: o.castShadow, recv: o.receiveShadow, list: [], pk: pickables.includes(o) ? o.userData : null });
+    const cx = Math.floor(o.position.x / CELL), cz = Math.floor(o.position.z / CELL), key = o.material.uuid + (o.castShadow ? 's' : '') + (o.receiveShadow ? 'r' : '') + (o.userData.noHit ? 'n' : '') + (o.userData.noRoof ? 'f' : '') + ':' + cx + ',' + cz + (pickables.includes(o) ? '|' + o.userData.unit + '|' + o.userData.station : '');
+    let G = groups.get(key); if (!G) groups.set(key, G = { m: o.material, cast: o.castShadow, recv: o.receiveShadow, noHit: !!o.userData.noHit, noRoof: !!o.userData.noRoof, list: [], pk: pickables.includes(o) ? o.userData : null });
     G.list.push(o);
   }
   let removed = 0;
@@ -11206,10 +11224,17 @@ function mergeStatic() {
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uvs = withUV ? new Float32Array(n * 2) : null; let k = 0;
     for (const g of parts) { pos.set(g.attributes.position.array, k * 3); nor.set(g.attributes.normal.array, k * 3); if (uvs) uvs.set(g.attributes.uv.array, k * 2); k += g.attributes.position.count; g.dispose(); }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); if (uvs) geo.setAttribute('uv', new T.BufferAttribute(uvs, 2)); geo.computeBoundingSphere();
-    const m = new T.Mesh(geo, G.m); m.castShadow = G.cast; m.receiveShadow = G.recv; m.matrixAutoUpdate = false; scene.add(m);
+    const m = new T.Mesh(geo, G.m); m.castShadow = G.cast; m.receiveShadow = G.recv; m.matrixAutoUpdate = false;
+    if (G.noHit) m.userData.noHit = true;
+    if (G.noRoof) m.userData.noRoof = true;
+    scene.add(m);
     if (G.pk) { Object.assign(m.userData, G.pk); pickables.push(m); }
     const gone = new Set(G.list); for (const o of G.list) { scene.remove(o); removed++; }
     if (G.pk) for (let i = pickables.length - 1; i >= 0; i--) if (gone.has(pickables[i])) pickables.splice(i, 1);
+  }
+  for (const o of scene.children) {
+    if (!o.isMesh || keep.has(o) || o.children.length) continue;
+    if (o.isInstancedMesh || (o.material && ((o.material.userData && o.material.userData.ground) || shared.has(o.material)))) { o.updateMatrix(); o.matrixAutoUpdate = false; }
   }
   return removed;
 }
@@ -11288,8 +11313,11 @@ function pushOut() {
   walk.x = Math.max(-1300, Math.min(1500, walk.x)); walk.z = Math.max(-800, Math.min(1300, walk.z));   // whole site, train loop included
 }
 function setWallsSolid(on) {
+  on = !!on;
   for (const m of wallMats) {
     if (m.userData.op === undefined) m.userData.op = m.opacity;
+    if (m.userData.solid === on) continue;
+    m.userData.solid = on;
     m.transparent = !on; m.opacity = on ? 1 : m.userData.op; m.depthWrite = on; m.side = on ? T.DoubleSide : T.FrontSide; m.needsUpdate = true;
   }
 }
@@ -12334,7 +12362,12 @@ function vultureInit() {
     if (sock) { const v = V3(); sock.getWorldPosition(v); lift = -v.y; }        // Grip_Target_Socket sits at 0.59 in the export: put THAT on the perch
     root.position.y = lift;
     root.traverse(o => { o.userData.noHit = true; });                           // never blocks a shot, a raycast or the chalk line
-    VULT.rig = root; VULT.joints = vultureRig(root); VULT.s.add(root);
+    VULT.rig = root; VULT.joints = vultureRig(root);
+    { const js = new Set(Object.values(VULT.joints).filter(Boolean));
+      for (const p of [root, ...js]) mergeModel(p, true, o => { let q = o; while (q && q !== p) { if (js.has(q)) return true; q = q.parent; } return false; });
+      for (const j of js) { let q = j; while (q && q !== root) { q.matrixAutoUpdate = true; q = q.parent; } }
+      if (sock) { let q = sock; while (q && q !== root) { q.matrixAutoUpdate = true; q = q.parent; } } }
+    VULT.s.add(root);
     if (VULT.sprite) VULT.sprite.visible = false;                              // hidden only now: a failed fetch leaves the drawn bird
   }, 'vulture');
   VULT.pos = VULT.perch.clone(); VULT.vel = V3(); VULT.yaw = VULT.perchYaw; return true;
@@ -13128,16 +13161,24 @@ function rangerTire() {
   return RANGER_TIRE = { geo, tread, sideG, side, rim, hub, rimG, hubG, nutG };
 }
 function rangerTireOn(w) {
-  const TT = rangerTire(), tyre = new T.Mesh(TT.geo, TT.tread); tyre.castShadow = true; tyre.name = 'tyre';
+  const TT = rangerTire(), tyre = new T.Mesh(TT.geo, TT.tread); tyre.castShadow = true; tyre.name = 'tyre'; tyre.matrixAutoUpdate = false;
+  if (!TT.sidesG) {
+    const cat = list => {
+      const gs = list.map(([src, x, y, z, ry]) => { const g = src.index ? src.toNonIndexed() : src.clone(); if (ry) g.rotateY(ry); g.translate(x, y, z); return g; });
+      let n = 0; for (const g of gs) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of gs) { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; g.dispose(); }
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(pos, 3)); out.setAttribute('normal', new T.BufferAttribute(nor, 3)); out.computeBoundingSphere(); return out;
+    };
+    TT.sidesG = cat([[TT.sideG, -0.11, 0, 0, Math.PI], [TT.sideG, 0.11, 0, 0, 0]]);
+    TT.rimsG = cat([[TT.rimG, -0.115, 0, 0, 0], [TT.rimG, 0.115, 0, 0, 0]]);
+    const hl = []; for (const s of [-1, 1]) { hl.push([TT.hubG, s * 0.125, 0, 0, 0]); for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5; hl.push([TT.nutG, s * 0.125, Math.cos(a) * 0.11, Math.sin(a) * 0.11, 0]); } }
+    TT.hubsG = cat(hl);
+  }
   w.traverse(c => { if (c.isMesh) c.visible = false; });   // the model's own wheel mesh (kept, hidden)
   if (w.isMesh) { w.visible = true; w.material = RANGER_TIRE_HIDE || (RANGER_TIRE_HIDE = new T.MeshBasicMaterial({ visible: false })); }   // (a mesh node: its children must still draw)
   w.add(tyre);
-  for (const s of [-1, 1]) {   // a sidewall and a rim on each face, the rim standing 5 mm off the sidewall
-    const sd = new T.Mesh(TT.sideG, TT.side); sd.position.x = s * 0.11; if (s < 0) sd.rotation.y = Math.PI; w.add(sd);
-    const rm = new T.Mesh(TT.rimG, TT.rim); rm.position.x = s * 0.115; w.add(rm);
-    const hb = new T.Mesh(TT.hubG, TT.hub); hb.position.x = s * 0.125; w.add(hb);
-    for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5, n = new T.Mesh(TT.nutG, TT.hub); n.position.set(s * 0.125, Math.cos(a) * 0.11, Math.sin(a) * 0.11); w.add(n); }
-  }
+  for (const [geo, m] of [[TT.sidesG, TT.side], [TT.rimsG, TT.rim], [TT.hubsG, TT.hub]]) { const p = new T.Mesh(geo, m); p.matrixAutoUpdate = false; w.add(p); }
 }
 function rangerSkinSafe(g) { try { rangerSkin(g); } catch (e) { console.warn('[ranger] model swap failed, the box Ranger stays:', e && e.message); } }
 function rangerSkin(g) {
@@ -13935,7 +13976,7 @@ function chompSnd(v) {   // a short crunch: a burst of noise through a band-pass
   gn.gain.value = 0.4 * (v == null ? 1 : v); n.connect(f); f.connect(gn); gn.connect(C.destination); n.start(t);
 }
 function eatCrumbs(p, o) {   // bits of it, and a little red
-  const c = o && o.mats && o.mats[0] && o.mats[0].color ? o.mats[0].color.getHex() : 0x8a6a4a;
+  const m0 = o && o.mats && o.mats[0], mh = m0 && m0.color ? m0.color.getHex() : 0x8a6a4a, c = m0 && m0.vertexColors && mh === 0xffffff ? 0x468443 : mh;
   for (let i = 0; i < 4; i++) puff(p.clone().add(V3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.25)), 0.035 + Math.random() * 0.03, i % 2 ? 0x8e2a22 : c);
 }
 function eatGone(o) {   // eaten: out of the world (it comes back later as a fresh one, like any other critter)
@@ -14715,6 +14756,10 @@ function buildShotgun(shadows) {
   const balls = [], wcol = B(1, 0.009, 0.004, M.water, 0.019, 0, 0.0136, mag);
   for (let i = 0; i < MAG; i++) balls.push(add(new T.SphereGeometry(0.0057, 10, 8), M.paint[i % PAINT.length], 0.03 + i * 0.022, 0, 0.0118, mag));
   B(0.142, 0.012, 0.001, M.glass, 0.085, 0, 0.0182, mag);                               // clear window over the slit
+  { const dyn = new Set([pump, stockG, mag, wcol, ...balls]);
+    mergeModel(pump, !!shadows); mergeModel(stockG, !!shadows); mergeModel(mag, !!shadows, o => dyn.has(o));
+    mergeModel(g, !!shadows, o => { let q = o; while (q && q !== g) { if (dyn.has(q)) return true; q = q.parent; } return false; });
+    for (const d of dyn) d.matrixAutoUpdate = true; }
   const api = { g, pump, mag, stock: stockG, balls, wcol, kind: null, n: -1,
     // The rounds feed from the GUN end: slot 0 sits at x 0.03, right up against the receiver, and slot 5 at 0.14 out at
     // the closed end, so 'i >= MAG - n' drops the one nearest the gun on every shot and the empty slot grows where the
