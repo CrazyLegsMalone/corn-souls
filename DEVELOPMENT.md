@@ -1,3 +1,9 @@
+## TEST v1.97.20 — version numbers back to two digits (2026-11-06)
+- Owner: *"Can we just use 1.97.xx not 1.97.xxx"* and *"Next would be 1.97.20"*. TEST goes from 1.97.198 to 1.97.20; normal bumps continue 1.97.21, 1.97.22 and so on.
+- `scripts/bump_test_version.py` takes `--set VERSION` for a change like this one (the TEST cache name still bumps). The launcher's update check only compares for a different version, so phones on 1.97.198 still update to 1.97.20.
+- Verified locally: all 66 CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.20` / `corn-souls-test-shell-v226`.
+
 ## TEST v1.97.198 — Batch 5: offline TEST shell, dead code, anchor and inbox checks (2026-11-06)
 - Owner: *"I want to do everything you recommend earlier from batch 1 to batch 5"*. This is the last batch of the plan.
 - **Offline TEST (`test/sw.js`):** when the network failed, a page request got the "needs a connection" page before the cache was checked, so the precached shell could never open offline. The worker now serves the cached page (or the precached `index.html`) first and shows that page only when nothing is cached. It is still network-first online, and the scope and cache name are unchanged, so LIVE is never intercepted.

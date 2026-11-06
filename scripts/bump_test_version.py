@@ -40,13 +40,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--set", metavar="VERSION", help="use this version instead of +1 (e.g. 1.97.20); the cache still bumps")
     args = parser.parse_args()
     try:
         launcher = read("test/index.html")
         found = re.search(r"const TEST_VERSION='([^']+)';", launcher)
         if not found:
             raise Fail("test/index.html: TEST_VERSION not found")
-        old, new = found.group(1), bump(found.group(1))
+        old, new = found.group(1), (args.set or bump(found.group(1)))
+        if args.set and not re.fullmatch(r"\d+(\.\d+)+", args.set):
+            raise Fail(f"--set wants a numeric version like 1.97.20, not {args.set!r}")
 
         sw = read("test/sw.js")
         cache_old = re.search(r"const CACHE = 'corn-souls-test-shell-v(\d+)';", sw)
