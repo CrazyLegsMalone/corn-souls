@@ -1,3 +1,12 @@
+## TEST v1.97.187 — the walk looks like walking now (2026-11-05)
+- Owner: *"animate"* follow-up — the first pass walked, but with **straight, stiff legs** (a goose-step march), and a real bug in the swing primitive made it worse.
+- **The bug:** `skinSwing()` (added in v1.97.186) wrote `pw.invert().multiply(… pw.clone().multiply(rest))`. In JS the receiver `pw.invert()` runs *before* the argument's `pw.clone()`, so by the time the clone was taken `pw` was already inverted — the knee was being rotated by `pw⁻²·rest` instead of `rest`. `skinTurn()` (the one-shot pose helper the NPCs use) doesn't have this bug because it reads its operand into a separate variable first. Fix: capture `w = pw.clone().multiply(rest)` **before** inverting, exactly like `skinTurn()`.
+- **The gait:** with the swing primitive fixed, the walk is now a real two-joint stride. `updateSelfAv()` adds a **knee bend** that peaks mid-swing and straightens at heel-strike (`K·max(0, ∓cos(ph))`, driven off the same `VIEW.ph` as the hip swing), so the foot clears the ground instead of scissoring through it. Hip swing softened 0.7→0.55 rad, arms 0.8→0.6, and the two held-item arm poses eased (-0.9→-0.7, -2.6→-2.2).
+- Measured in a vm (not guessed): the foot now **plants at the front**, sweeps back during stance, **lifts ~20 cm** off the ground as the knee bends, and returns — an alternating gait with a proper swing phase, instead of the stiff march.
+- `validate-power-outage-machines.cjs` now asserts **both** halves of the gait: the hip swing moves the feet in opposite directions, and bending the knee lifts the foot off the ground.
+- Verified locally: the 60 suites in `.github/workflows/validate.yml` all pass, `scripts/check_launcher_anchors.py` passes, `sync_test_to_live.py --consistency` passes, all 10 script blocks parse. LIVE is untouched.
+- Bumped TEST to `1.97.187` / `corn-souls-test-shell-v214`.
+
 ## TEST v1.97.186 — the players walk (2026-11-05)
 - Owner: *"animate"* — the walk cycle is back, now on the skinned skeletons instead of the old rigid pivots.
 - **`skinSwing(root, bone, rest, axis, ang)`** is the new primitive: it sets a bone to a stored rest orientation, then rotates it by `ang` about a model-space axis. `skinTurn()` (the one-shot pose helper) pre-multiplies the current orientation, which compounds every frame, so the per-frame swing needs an absolute-from-rest setter — this is it.

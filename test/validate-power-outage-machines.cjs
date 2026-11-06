@@ -765,12 +765,16 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
       const a5 = avatar(); let cap = null;
       pctx.dressPlayerSkin(a5, 0xff7a1a, { onRig: (R, root, swing) => { cap = { root, swing }; } });
       const X = new T4.Vector3(1, 0, 0), footZ = n => { const v = new T4.Vector3(); pctx.skinBone(cap.root, n).getWorldPosition(v); return v.z; };
+      const footY = n => { const v = new T4.Vector3(); pctx.skinBone(cap.root, n).getWorldPosition(v); return v.y; };
       const zL0 = footZ('LeftFoot'), zR0 = footZ('RightFoot');
       pctx.skinSwing(cap.root, cap.swing.legL.b, cap.swing.legL.rest, X, 0.5);   // left forward
       pctx.skinSwing(cap.root, cap.swing.legR.b, cap.swing.legR.rest, X, -0.5);  // right back
       const dzL = footZ('LeftFoot') - zL0, dzR = footZ('RightFoot') - zR0;
       assert.ok(Math.abs(dzL) > 0.05 && Math.abs(dzR) > 0.05, 'swinging the hips moves the feet (' + dzL.toFixed(2) + ' / ' + dzR.toFixed(2) + ')');
       assert.ok(Math.sign(dzL) !== Math.sign(dzR), 'left and right feet move in opposite directions');
+      const y0 = footY('LeftFoot');
+      pctx.skinSwing(cap.root, cap.swing.kneeL.b, cap.swing.kneeL.rest, X, 0.55);   // and bending the knee lifts the foot off the ground
+      assert.ok(footY('LeftFoot') - y0 > 0.1, 'bending the knee lifts the foot (' + (footY('LeftFoot') - y0).toFixed(2) + ' m)');
     }
   }
   // cross-script wiring: the frame loop lives in a later script block than the renderer, so the HUD readout has to go

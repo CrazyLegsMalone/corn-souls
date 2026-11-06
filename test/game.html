@@ -5705,7 +5705,8 @@ function skinSwing(root, bone, rest, axis, ang) {
   if (!bone) return; root.updateMatrixWorld(true);
   const rq = root.getWorldQuaternion(new T.Quaternion()), ax = axis.clone().applyQuaternion(rq).normalize();
   const pw = bone.parent.getWorldQuaternion(new T.Quaternion());
-  bone.quaternion.copy(pw.invert().multiply(new T.Quaternion().setFromAxisAngle(ax, ang).multiply(pw.clone().multiply(rest))));
+  const w = pw.clone().multiply(rest);   // the bone's rest world orientation (captured before pw is inverted below)
+  bone.quaternion.copy(pw.invert().multiply(new T.Quaternion().setFromAxisAngle(ax, ang).multiply(w)));
   root.updateMatrixWorld(true);
 }
 const SKIN_X = new T.Vector3(1, 0, 0);   // the walk swing axis: legs and arms rotate about the model's left-right axis
@@ -5794,7 +5795,7 @@ function dressPlayerSkin(av, vest, opts) {
       skinTurn(root, a, Z, sg * (-P.arm - now));
     }
     // the walk-cycle bones, captured at their resting orientation after the arm-down pose: the caller swings them each frame
-    const swing = { legL: { b: skinBone(root, 'LeftUpLeg') }, legR: { b: skinBone(root, 'RightUpLeg') }, armL: { b: skinBone(root, 'LeftArm') }, armR: { b: skinBone(root, 'RightArm') } };
+    const swing = { legL: { b: skinBone(root, 'LeftUpLeg') }, legR: { b: skinBone(root, 'RightUpLeg') }, kneeL: { b: skinBone(root, 'LeftLeg') }, kneeR: { b: skinBone(root, 'RightLeg') }, armL: { b: skinBone(root, 'LeftArm') }, armR: { b: skinBone(root, 'RightArm') } };
     for (const k in swing) if (swing[k].b) { swing[k].root = root; swing[k].rest = swing[k].b.quaternion.clone(); swing[k].cur = 0; }
     const R = new T.Group(); R.add(root); R.rotation.y = Math.PI;   // the models face +Z, the box avatars face -Z
     let base = -skinBox(R).min.y;                                   // standing: feet on the floor
@@ -13587,7 +13588,7 @@ function buildSelfAv() {
   if (VIEW.av && VIEW.key === key && (VIEW.av.userData.rig || VIEW.pending)) return;   // dressed, or the model is on its way
   if (VIEW.av) scene.remove(VIEW.av);
   for (const o of scene.children.slice()) if (o.userData.selfAv) scene.remove(o);   // a stray from an earlier build must not stand there too
-  const av = makeCharacter(VEST_COL[me], false); av.scale.setScalar(SQ_K); av.userData.selfAv = true; VIEW.legs = []; VIEW.arms = [];
+  const av = makeCharacter(VEST_COL[me], false); av.scale.setScalar(SQ_K); av.userData.selfAv = true; VIEW.legs = []; VIEW.arms = []; VIEW.knees = [];
   for (const m of av.children.slice()) { const P = m.geometry && m.geometry.parameters; if (!P || m.geometry.type !== 'BoxGeometry') continue;
     const leg = Math.abs(P.height - 0.82) < 0.01, arm = Math.abs(P.height - 0.6) < 0.01 && Math.abs(P.width - 0.11) < 0.01; if (!leg && !arm) continue;
     const top = m.position.y + P.height / 2, pv = new T.Group(); pv.position.set(m.position.x, top, m.position.z); av.add(pv); av.remove(m); m.position.set(0, -P.height / 2, 0); pv.add(m);   // swing from the hip / shoulder
@@ -13601,7 +13602,7 @@ function buildSelfAv() {
   VIEW.pending = performance.now();
   dressPlayerSkin(av, VEST_COL[me], { onRig: (R, root, swing) => {   // the walk cycle drives the skinned bones once the model is on
     VIEW.pending = 0;
-    VIEW.legs = [swing.legL, swing.legR].filter(Boolean); VIEW.arms = [swing.armL, swing.armR].filter(Boolean); } });
+    VIEW.legs = [swing.legL, swing.legR].filter(Boolean); VIEW.arms = [swing.armL, swing.armR].filter(Boolean); VIEW.knees = [swing.kneeL, swing.kneeR].filter(Boolean); } });
 }
 function updateSelfAv() {
   const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;
@@ -13610,9 +13611,11 @@ function updateSelfAv() {
   buildSelfAv(); const av = VIEW.av; av.visible = true; av.position.set(walk.x, walk.y, walk.z); av.rotation.y = walk.yaw;
   const sp = Math.hypot(walk.x - VIEW.lx, walk.z - VIEW.lz); VIEW.lx = walk.x; VIEW.lz = walk.z;
   const moving = sp > 0.004 && sp < 1 && walk.y <= (walk.floor || 0) + 0.05; VIEW.ph += moving ? sp * 3.2 : 0;
-  const sw = moving ? Math.sin(VIEW.ph) * Math.min(0.7, sp * 18) : 0;
+  const sw = moving ? Math.sin(VIEW.ph) * Math.min(0.55, sp * 15) : 0;
   VIEW.legs.forEach((l, i) => { const t = i ? -sw : sw; l.cur += (t - l.cur) * 0.3; skinSwing(l.root, l.b, l.rest, SKIN_X, l.cur); });
-  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.9 : (i === 0 && SR.carry === 'me' ? -2.6 : (i ? sw : -sw) * 0.8); a.cur += (hold - a.cur) * 0.3; skinSwing(a.root, a.b, a.rest, SKIN_X, a.cur); });   // right arm forward with a gun or a tool, left arm up holding the boom box
+  const ksw = moving ? Math.min(0.55, sp * 14) : 0, kc = Math.cos(VIEW.ph);   // knees bend mid-swing (foot clears the ground), straighten at heel-strike
+  VIEW.knees.forEach((k, i) => { const t = Math.max(0, i ? kc : -kc) * ksw; k.cur += (t - k.cur) * 0.4; skinSwing(k.root, k.b, k.rest, SKIN_X, k.cur); });
+  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.7 : (i === 0 && SR.carry === 'me' ? -2.2 : (i ? sw : -sw) * 0.6); a.cur += (hold - a.cur) * 0.3; skinSwing(a.root, a.b, a.rest, SKIN_X, a.cur); });   // right arm forward with a gun or a tool, left arm up holding the boom box
   for (const k in VIEW.items) VIEW.items[k].visible = k === held;
 }
 
