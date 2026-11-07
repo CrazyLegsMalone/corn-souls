@@ -87,16 +87,16 @@ const cut = (a, b) => { const i = html.indexOf(a), j = html.indexOf(b, i); asser
   vm.createContext(ctx);
   vm.runInContext(frogSrc + '\nthis.pondFrogs = pondFrogs; this.makePondFrogs = makePondFrogs; this.hitPondFrog = hitPondFrog; this.updatePondFrogs = updatePondFrogs;', ctx);
   ctx.makePondFrogs();
-  assert.equal(ctx.pondFrogs.length, 8, 'eight pond frogs');
+  assert.equal(ctx.pondFrogs.length, 6, 'six pond frogs (v1.97.51, owner: "we will only have 6 frogs now")');
   const geos = new Set();
   for (const f of ctx.pondFrogs) {
     const meshes = f.group.children.filter(c => c.isMesh);
-    assert.equal(meshes.length, 1, 'one merged mesh per frog instead of eight');
+    assert.equal(meshes.length, 1, 'one merged stand-in mesh per frog until its model loads');
     assert.ok(meshes[0].geometry.attributes.color, 'vertex-colored frog geometry');
     assert.equal(meshes[0].castShadow, false, 'tiny frogs skip shadow pass on low tier');
     geos.add(meshes[0].geometry);
   }
-  assert.equal(geos.size, 1, 'all eight frogs share one BufferGeometry');
+  assert.equal(geos.size, 1, 'all six stand-ins share one BufferGeometry');
   ctx.hitPondFrog(ctx.pondFrogs[0], 0xff2266);
   assert.equal(ctx.pondFrogs[0].mats[0].color.getHex(), 0xff2266, 'painted frog takes ball color');
   ctx.pondFrogs[0].t = 0.01; ctx.updatePondFrogs(0.05);

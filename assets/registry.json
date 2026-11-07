@@ -1170,6 +1170,35 @@
       "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
       "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
       "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-micaelsampaio-low-poly-animals-frog-frogglet-crow-fish",
+      "title": "Low Poly Animals (Frog, Frogglet, Crow, Fish)",
+      "creator": "micaelsampaio",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-animals-frog-frogglet-crow-fish-c001be532c4a403e8626f080eda67b4c",
+      "evidence": "The owner's download (low_poly_animals_frog_frogglet_crow_fish.glb): embedded asset.extras {\"author\": \"micaelsampaio (https://sketchfab.com/micaelsampaio)\", \"license\": \"CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\", \"title\": \"Low Poly Animals (Frog, Frogglet, Crow, Fish)\"}.",
+      "notes": "In the TEST channel from v1.97.51: the six pond frogs, the lizards (frogglet), the crow on the RTO stack (in place of the vulture), fish leaping in the ponds and flies over carcasses.",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Each rigged animal split into its own GLB with its skeleton, stood on y 0, centred and scaled (scripts/split_skinned_glb.py); the lily pad and stick not used; animated in code by bone turns; tinted at runtime when hit.",
+      "files": [
+        "assets/models/critters/frog1.glb",
+        "assets/models/critters/frog2.glb",
+        "assets/models/critters/frog3.glb",
+        "assets/models/critters/frog4.glb",
+        "assets/models/critters/frogglet.glb",
+        "assets/models/critters/crow.glb",
+        "assets/models/critters/fish.glb",
+        "assets/models/critters/fly.glb",
+        "assets/models/source/low_poly_animals_frog_frogglet_crow_fish.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the GLB's embedded metadata",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
     }
   ]
 }

@@ -5635,6 +5635,84 @@ function animalsStep(dt) {
   const ph = (c.i + k) * L * 2.2;   // bounding gait: little hops, nose dipping
   c.g.position.set(x, y + Math.abs(Math.sin(ph)) * 0.07, z); c.g.rotation.set(Math.cos(ph) * 0.12, Math.atan2(b[0] - a[0], b[2] - a[2]), 0);
 }
+// ---------- FISH (v1.97.51, owner: "add fish to the pond make them jump out every now and then since water is not transparent"):
+// micaelsampaio's fish (0.45 m), two to a pond. Each waits out of sight, then leaps clear somewhere in the open water - a splash and
+// a ring as it breaks the surface, nose up on the way out and down on the way in, tail beating - and splashes back in. Only while
+// you are within 200 m of its pond; each player's fish are their own.
+const FISH = { list: [], n: 4 };
+function pondXZ(pi, u, v) { const [px, pz] = PONDS[pi], c = Math.cos(PONDS.phi), sn = Math.sin(PONDS.phi); return [px + u * c + v * sn, pz - u * sn + v * c]; }
+function fishInit() {
+  if (FISH.list.length || typeof document === 'undefined') return;
+  for (let i = 0; i < FISH.n; i++) {
+    const f = { pond: i % PONDS.length, g: null, rig: null, t: 3 + Math.random() * 10, k: -1, x0: 0, z0: 0, x1: 0, z1: 0, h: 1, dur: 1, a: 0 }; FISH.list.push(f);
+    critModel('fish', root => { const g = new T.Group(); g.rotation.order = 'YXZ'; g.add(root); g.visible = false; scene.add(g); f.g = g; f.rig = critRig(root, ['Tail', 'Spine1', 'Spine2', 'Head', 'Mouth']); });
+  }
+}
+function fishPlop(x, z, big) {
+  wfxSplash(x, z, big ? 7 : 5, big ? 2.6 : 2, 1); wfxRing(x, z, 0.3, big ? 2.4 : 1.8, 1.2, 0.6);
+  const C = tsnd.ctx; if (!C) return; const d = Math.hypot(x - walk.x, z - walk.z), v = Math.max(0, 1 - d / 70); if (v < 0.03) return; const t = C.currentTime;
+  const s = C.createBufferSource(); s.buffer = noiseBuf(C, 1); const f = C.createBiquadFilter(), g = C.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(1600, t); f.frequency.exponentialRampToValueAtTime(260, t + 0.35);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25 * v, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4); s.connect(f); f.connect(g); g.connect(C.destination); s.start(t); s.stop(t + 0.45);
+  s.onended = () => { s.disconnect(); f.disconnect(); g.disconnect(); };
+}
+function fishStep(dt) {
+  if (!walk.on) return; fishInit();
+  for (const f of FISH.list) {
+    if (!f.g) continue;
+    if (f.k < 0) {
+      const [px, pz] = PONDS[f.pond]; if ((f.t -= dt) > 0 || Math.hypot(px - walk.x, pz - walk.z) > 200) continue;
+      const H = PONDS.half - 8, u = (Math.random() * 2 - 1) * H, v = (Math.random() * 2 - 1) * H, a = Math.random() * Math.PI * 2, L = 1.2 + Math.random() * 1.3;
+      [f.x0, f.z0] = pondXZ(f.pond, u, v); f.x1 = f.x0 + Math.sin(a) * L; f.z1 = f.z0 + Math.cos(a) * L;
+      if (!inPond(f.x1, f.z1, PONDS.half - 3)) { f.t = 0.5; continue; }
+      f.a = a; f.h = 0.6 + Math.random() * 0.8; f.dur = 0.7 + f.h * 0.4; f.k = 0; f.g.visible = true; fishPlop(f.x0, f.z0, false);
+    }
+    f.k = Math.min(1, f.k + dt / f.dur); const k = f.k, rise = f.h + 0.35;
+    const y = PONDS.water - 0.35 + rise * 4 * k * (1 - k), vy = rise * 4 * (1 - 2 * k) / f.dur, vh = Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / f.dur;
+    f.g.position.set(f.x0 + (f.x1 - f.x0) * k, y, f.z0 + (f.z1 - f.z0) * k); f.g.rotation.set(-Math.atan2(vy, vh), f.a, 0);   // nose along the arc
+    const R = f.rig; rigRest(R); const w = Math.sin(k * 40); rigTurn(R, 'Tail', CAX.y, w * 0.7); rigTurn(R, 'Spine2', CAX.y, w * 0.25); rigTurn(R, 'Mouth', CAX.x, -0.3);
+    if (k >= 1) { fishPlop(f.x1, f.z1, true); f.g.visible = false; f.k = -1; f.t = 6 + Math.random() * 18; }
+  }
+}
+// ---------- FLIES (v1.97.51, owner: "add the fly somewhere"): the pack's fly, a small swarm buzzing over anything dead near you - a
+// body the crow hasn't taken yet, a shot rat, lizard, pigeon or frog. Up to two carcasses, three flies each, wings a blur; stand
+// close and you hear them.
+const FLIES = { list: [], n: 6, buzzT: 0, scanT: 0, targets: [] };
+function fliesInit() {
+  if (FLIES.list.length || typeof document === 'undefined') return;
+  for (let i = 0; i < FLIES.n; i++) { const f = { g: null, rig: null, ph: Math.random() * 9, r: 0.22 + Math.random() * 0.25, w: (Math.random() < 0.5 ? -1 : 1) * (2.5 + Math.random() * 2.5) }; FLIES.list.push(f);
+    critModel('fly', root => { root.scale.setScalar(1.7); const g = new T.Group(); g.add(root); g.visible = false; scene.add(g); f.g = g; f.rig = critRig(root, ['right_wing', 'left_wing']); }); }
+}
+function flyTargets() {   // [x, y, z] of the nearest carcasses within 30 m
+  const out = [], add = (x, y, z) => { const d = Math.hypot(x - walk.x, z - walk.z); if (d < 30) out.push([x, y, z, d]); };
+  for (const rd of bodies) if (!rd.taken && rd.pts && rd.pts[0]) { const P = rd.pts[Math.min(1, rd.pts.length - 1)]; add(P.x, P.y, P.z); }
+  for (const c of critters || []) if (c.state === 'hit' && c.g.visible && !c.held && !c.thrown) add(c.g.position.x, c.g.position.y, c.g.position.z);
+  for (const b of birds || []) if (b.state === 'down' && b.g.visible && !b.held) add(b.g.position.x, b.g.position.y, b.g.position.z);
+  if (typeof pondFrogs !== 'undefined') for (const f of pondFrogs) if (f.state === 'hit' && f.group.visible && !f.held && !f.thrown) add(f.group.position.x, f.group.position.y, f.group.position.z);
+  return out.sort((a, b) => a[3] - b[3]).slice(0, 2);
+}
+function fliesStep(dt) {
+  if (!walk.on) return; fliesInit();
+  if ((FLIES.scanT -= dt) <= 0) { FLIES.scanT = 0.5; FLIES.targets = flyTargets(); }
+  const T2 = FLIES.targets, now = performance.now() / 1000; let near = 99;
+  FLIES.list.forEach((f, i) => {
+    if (!f.g) return; const tg = T2[i < 3 ? 0 : 1];   // flies 0-2 on the nearest carcass, 3-5 on the next
+    if (!tg) { f.g.visible = false; return; }
+    f.ph += dt * f.w; const jit = Math.sin(now * 7.3 + i) * 0.06;
+    const x = tg[0] + Math.cos(f.ph) * (f.r + jit), z = tg[2] + Math.sin(f.ph * 1.13) * (f.r + jit), y = tg[1] + 0.25 + Math.sin(now * 3.1 + i * 2) * 0.12;
+    f.g.position.set(x, y, z); f.g.rotation.y = f.ph * Math.sign(f.w) + Math.PI / 2; f.g.visible = true;
+    const R = f.rig; rigRest(R); const fl = (Math.floor(now * 40 + i) % 2 ? 0.7 : -0.5); rigTurn(R, 'right_wing', CAX.z, fl); rigTurn(R, 'left_wing', CAX.z, -fl);
+    near = Math.min(near, Math.hypot(x - walk.x, z - walk.z));
+  });
+  if (near < 3.5 && (FLIES.buzzT -= dt) <= 0) { FLIES.buzzT = 1.6 + Math.random() * 2; flyBuzz(Math.max(0.15, 1 - near / 3.5)); }
+}
+function flyBuzz(v) {
+  const C = tsnd.ctx; if (!C) return; const t = C.currentTime, o = C.createOscillator(), m = C.createOscillator(), mg = C.createGain(), g = C.createGain(), bp = C.createBiquadFilter();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(190 + Math.random() * 40, t); o.frequency.linearRampToValueAtTime(230 + Math.random() * 40, t + 0.35); o.frequency.linearRampToValueAtTime(200, t + 0.7);
+  m.frequency.value = 9; mg.gain.value = 12; m.connect(mg); mg.connect(o.frequency); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 1.2;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 * v, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+  o.connect(bp); bp.connect(g); g.connect(C.destination); o.start(t); m.start(t); o.stop(t + 0.8); m.stop(t + 0.8);
+  o.onended = () => { o.disconnect(); m.disconnect(); mg.disconnect(); bp.disconnect(); g.disconnect(); };
+}
 function loadSubstation() {
   loadGlbModel('/corn-souls/assets/models/main_power_building.glb', ({ root, byName }) => {
       const g = new T.Group(); g.position.set(SUBSTATION.x, 0, SUBSTATION.z); g.rotation.y = SUBSTATION.yaw;
@@ -11156,7 +11234,7 @@ function update(sim, dt, events) {
   updatePuffs(dt); updateWeather(dt);
   // every cosmetic / gameplay sub-update in the frame tail is guarded: one throw must not take the render, the
   // first-person gun and the paintball pump cooldown down with it (see stepSafe)
-  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('animals', () => animalsStep(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt)); stepSafe('hp', () => hpUpdate(dt)); stepSafe('npcAnim', () => npcAnimUpdate(dt)); stepSafe('zombies', () => zombUpdate(dt));
+  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('animals', () => animalsStep(dt)); stepSafe('fish', () => fishStep(dt)); stepSafe('flies', () => fliesStep(dt)); stepSafe('lizPose', () => lizPose(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt)); stepSafe('hp', () => hpUpdate(dt)); stepSafe('npcAnim', () => npcAnimUpdate(dt)); stepSafe('zombies', () => zombUpdate(dt));
   stepSafe('vehTops', () => updateVehTops());
   stepSafe('deadDrop', () => { if (heldDead && (walk.dead || walk.drive)) deadDrop(); });   // dying or getting in puts the corpse down
   stepSafe('ducks', () => updateDucks(dt)); stepSafe('cornBrush', () => cornBrushUpdate(dt)); stepSafe('haulers', () => haulerUpdate(dt)); stepSafe('windsock', () => updateWindsock(dt)); stepSafe('pivot', () => updatePivot(dt));
@@ -12852,12 +12930,13 @@ function srStep(C, S, st, tt, sd, B, D) {   // one 16th-note step of a song: mel
       else for (const k of iv) kiaVoice(C, 'triangle', MID(root + 24 + k), tt, sd * B * 0.6, 0.05, D);
     }
 }
-// ---------- THE BUZZARD: a turkey vulture (flat sprite, drawn in code) that sits on top of the RTO stack. One minute (v1.97.49; was two) after somebody dies
+// ---------- THE BUZZARD, now a giant crow (v1.97.51, owner: "replace vulture with the crow"; the drawn sprite below is only the
+// fallback, and the code keeps the VULT name), sits on top of the RTO stack. One minute (v1.97.49; was two) after somebody dies
 // he glides down, lands by the body, hops on it, grabs it and flaps off with it to the far wastewater pond, drops it in (splash), then
 // flies back to his perch to wait. Where the body was he leaves a white chalk outline, traced from how the ragdoll actually landed.
 const VULT = { s: null, tex: null, sprite: null, rig: null, joints: {}, state: 'perch', pos: null, vel: null, perch: null,
   perchYaw: 0, yaw: 0, target: null, carry: null, t: 0, flapT: 0, croakT: 0, jawT: 0, chalk: [] };
-const VULT_SCALE = 0.8;   // the export is 2.94 m across the spread wings, so this is a 2.35 m bird - a big turkey vulture
+const CROW_SCALE = 1.0;   // v1.97.51, owner: "replace vulture with the crow": crow.glb is 2.19 m across the spread wings - a giant crow, the old vulture's size
 function vultureTex(kind) {   // 'perch' | 'up' | 'down' (wing positions)
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 96; const c = cv.getContext('2d');
   const body = '#1e1a18', wing = '#2a2420', pale = '#8f8577', head = '#c0453a';
@@ -12880,39 +12959,22 @@ function vultureTex(kind) {   // 'perch' | 'up' | 'down' (wing positions)
   }
   const t = new T.CanvasTexture(cv); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t;
 }
-function vultureRig(root) {   // the export's joints are pure translations, so a pose is just a rotation on the named joint
-  const J = {};
-  for (const n of ['Joint_Shoulder_L', 'Joint_Shoulder_R', 'Joint_Elbow_L', 'Joint_Elbow_R', 'Joint_Wrist_L', 'Joint_Wrist_R',
-    'Joint_Neck_Base', 'Joint_Neck_Mid', 'Joint_Head', 'Joint_Jaw', 'Joint_Hip_L', 'Joint_Hip_R']) {
-    const j = root.getObjectByName(n); if (j) J[n.replace('Joint_', '')] = j; }
-  return J;
-}
-function vulturePose(dt) {   // perched: folded and tucked. Flying: a shallow V with the beat on top. Grab: half-open, neck down.
-  const V = VULT, J = V.joints, t = performance.now() / 1000;
+function crowPose(dt) {   // perched: wings swept back along the body. Flying: the beat on a shallow lift. Grab: half open, head down.
+  const V = VULT, R = V.joints, t = performance.now() / 1000;
+  if (!R || !R.b) return;
   const fold = V.state === 'perch', grab = V.state === 'grab';
-  V.jawT = Math.max(0, V.jawT - dt);
-  // the two wings are exact mirrors: whatever angle the left gets, the right gets it negated on Y and Z
-  if (fold) {   // folded: the elbow tucks to the flank, the forearm sweeps back and the primaries cross over the tail
-    if (J.Shoulder_L) J.Shoulder_L.rotation.set(0, 0.40, -0.55);
-    if (J.Shoulder_R) J.Shoulder_R.rotation.set(0, -0.40, 0.55);
-    if (J.Elbow_L) J.Elbow_L.rotation.set(0, 0.60, 0);
-    if (J.Elbow_R) J.Elbow_R.rotation.set(0, -0.60, 0);
-    if (J.Wrist_L) J.Wrist_L.rotation.set(0, 2.40, 0);
-    if (J.Wrist_R) J.Wrist_R.rotation.set(0, -2.40, 0);
-  } else {      // flight (and the half-open hop on the body): a shallow V with the beat lifting on top of it
-    const a = Math.sin(V.flapT * Math.PI), sh = 0.18 + a * 0.7, el = 0.16 - a * 0.12, wr = 0.10 - a * 0.08;
-    if (J.Shoulder_L) J.Shoulder_L.rotation.set(0, 0.05, sh);
-    if (J.Shoulder_R) J.Shoulder_R.rotation.set(0, -0.05, -sh);
-    if (J.Elbow_L) J.Elbow_L.rotation.set(0, el, 0);
-    if (J.Elbow_R) J.Elbow_R.rotation.set(0, -el, 0);
-    if (J.Wrist_L) J.Wrist_L.rotation.set(0, wr, 0);
-    if (J.Wrist_R) J.Wrist_R.rotation.set(0, -wr, 0);
+  V.jawT = Math.max(0, V.jawT - dt); rigRest(R);
+  if (fold) {   // the two wings mirror: right +, left - (about y to sweep back, about z to lift)
+    rigTurn(R, 'right_wing', CAX.z, -0.6); rigTurn(R, 'left_wing', CAX.z, 0.6); rigTurn(R, 'right_wing', CAX.y, 1.35); rigTurn(R, 'left_wing', CAX.y, -1.35);   // lowered, then swept back along the body
+  } else {
+    const a = Math.sin(V.flapT * Math.PI), sh = grab ? 0.35 : 0.15 + a * 0.75, sw = grab ? 0.5 : 0;
+    rigTurn(R, 'right_wing', CAX.z, sh); rigTurn(R, 'left_wing', CAX.z, -sh); if (sw) { rigTurn(R, 'right_wing', CAX.y, sw); rigTurn(R, 'left_wing', CAX.y, -sw); }
   }
-  const nb = grab ? 0.85 : fold ? 0.34 : 0.06;                                 // hunched on the stack, stretched out in flight
-  if (J.Neck_Base) J.Neck_Base.rotation.set(nb, 0, 0);
-  if (J.Neck_Mid) J.Neck_Mid.rotation.set(fold ? -0.18 : -0.05, 0, 0);
-  if (J.Head) J.Head.rotation.set(Math.sin(t * 1.7) * (fold ? 0.1 : 0.05), fold ? Math.sin(t * 0.37) * 0.5 : 0, 0);   // bobbing, scanning
-  if (J.Jaw) J.Jaw.rotation.set(-0.55 * Math.min(1, V.jawT / 0.45), 0, 0);     // opens on every hiss
+  const caw = Math.min(1, V.jawT / 0.45);   // every caw throws the head up and forward
+  const nod = grab ? 0.8 : fold ? Math.sin(t * 1.7) * 0.12 + 0.1 : 0;
+  rigTurn(R, 'head', CAX.x, nod - caw * 0.5);
+  if (fold) rigTurn(R, 'head', CAX.y, Math.sin(t * 0.37) * 0.6);   // scanning the plant
+  if (!fold && !grab) { rigTurn(R, 'right_leg', CAX.x, -0.6); rigTurn(R, 'left_leg', CAX.x, -0.6); }   // legs tucked back in flight
 }
 function vultureInit() {
   if (VULT.s) return true;
@@ -12923,21 +12985,12 @@ function vultureInit() {
   VULT.tex = { perch: vultureTex('perch'), up: vultureTex('up'), down: vultureTex('down') };
   VULT.sprite = new T.Sprite(new T.SpriteMaterial({ map: VULT.tex.perch, transparent: true, alphaTest: 0.4 }));
   VULT.sprite.userData.noHit = true; VULT.s.add(VULT.sprite);
-  loadGlbModel('/corn-souls/assets/models/vulture_rig.glb', ({ root }) => {   // the owner's model, drawn only once it is here
-    root.scale.setScalar(VULT_SCALE); root.updateMatrixWorld(true);
-    const bb = new T.Box3().setFromObject(root), sock = root.getObjectByName('Grip_Target_Socket');
-    let lift = -bb.min.y;                                                      // fallback: claws on the perch
-    if (sock) { const v = V3(); sock.getWorldPosition(v); lift = -v.y; }        // Grip_Target_Socket sits at 0.59 in the export: put THAT on the perch
-    root.position.y = lift;
-    root.traverse(o => { o.userData.noHit = true; });                           // never blocks a shot, a raycast or the chalk line
-    VULT.rig = root; VULT.joints = vultureRig(root);
-    { const js = new Set(Object.values(VULT.joints).filter(Boolean));
-      for (const p of [root, ...js]) mergeModel(p, true, o => { let q = o; while (q && q !== p) { if (js.has(q)) return true; q = q.parent; } return false; });
-      for (const j of js) { let q = j; while (q && q !== root) { q.matrixAutoUpdate = true; q = q.parent; } }
-      if (sock) { let q = sock; while (q && q !== root) { q.matrixAutoUpdate = true; q = q.parent; } } }
+  critModel('crow', root => {   // v1.97.51: the crow, drawn only once it is here (the drawn bird stays otherwise)
+    root.scale.setScalar(CROW_SCALE); root.updateMatrixWorld(true);   // feet on y 0: stands on the perch as made
+    VULT.rig = root; VULT.joints = critRig(root, ['spine1', 'spine2', 'head', 'right_wing', 'left_wing', 'right_leg', 'left_leg']);
     VULT.s.add(root);
     if (VULT.sprite) VULT.sprite.visible = false;                              // hidden only now: a failed fetch leaves the drawn bird
-  }, 'vulture');
+  });
   VULT.pos = VULT.perch.clone(); VULT.vel = V3(); VULT.yaw = VULT.perchYaw; return true;
 }
 function vultSound(kind, at) {
@@ -12945,10 +12998,11 @@ function vultSound(kind, at) {
   const C = tsnd.ctx; if (!C) return; const d = camera.position.distanceTo(at), v = Math.max(0, 1 - d / 120); if (v < 0.03) return; const t = C.currentTime;
   if (kind === 'flap') { const s = C.createBufferSource(); s.buffer = noiseBuf(C, 1); const f = C.createBiquadFilter(), g = C.createGain(); f.type = 'lowpass'; f.frequency.value = 420;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3 * v, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22); s.connect(f); f.connect(g); g.connect(C.destination); s.start(t); s.stop(t + 0.25); }
-  if (kind === 'hiss') { const s = C.createBufferSource(); s.buffer = noiseBuf(C, 1); const f = C.createBiquadFilter(), g = C.createGain(); f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 1.2;   // vultures hiss and grunt
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18 * v, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); s.connect(f); f.connect(g); g.connect(C.destination); s.start(t); s.stop(t + 0.95);
-    const o = C.createOscillator(), og = C.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(95, t + 0.85); o.frequency.exponentialRampToValueAtTime(70, t + 1.15);
-    og.gain.setValueAtTime(0.0001, t + 0.85); og.gain.exponentialRampToValueAtTime(0.12 * v, t + 0.88); og.gain.exponentialRampToValueAtTime(0.0001, t + 1.2); o.connect(og); og.connect(C.destination); o.start(t + 0.85); o.stop(t + 1.25); }
+  if (kind === 'hiss') {   // v1.97.51: the crow caws (two or three), a buzzy saw dropping in pitch through a nasal band-pass
+    const n = 2 + (Math.random() * 2 | 0);
+    for (let i = 0; i < n; i++) { const t0 = t + i * 0.38, o = C.createOscillator(), bp = C.createBiquadFilter(), g = C.createGain(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(560, t0); o.frequency.exponentialRampToValueAtTime(340, t0 + 0.3); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.3 * v, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.32); o.connect(bp); bp.connect(g); g.connect(C.destination); o.start(t0); o.stop(t0 + 0.34); } }
   if (kind === 'splash') { const s = C.createBufferSource(); s.buffer = noiseBuf(C, 1); const f = C.createBiquadFilter(), g = C.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(300, t + 0.8);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5 * Math.max(v, 0.25), t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); s.connect(f); f.connect(g); g.connect(C.destination); s.start(t); s.stop(t + 0.95); }
 }
@@ -13031,7 +13085,7 @@ function updateVulture(dt) {
     if (up && !V.wasUp && rate > 2) vultSound('flap', V.pos); V.wasUp = up; }
   const wantYaw = V.state === 'perch' ? V.perchYaw : (flying && Math.hypot(V.vel.x, V.vel.z) > 0.5 ? Math.atan2(V.vel.x, V.vel.z) : V.yaw);
   V.yaw += (((wantYaw - V.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 4); S.rotation.y = V.yaw;
-  if (V.rig) vulturePose(dt);
+  if (V.rig) crowPose(dt);
   else if (V.sprite) {   // the drawn bird: perched pose or two-frame flap, flipped the way he is flying
     const sp = V.sprite; let map;
     if (!flying) { map = V.tex.perch; sp.scale.set(0.95, 0.72, 1); }
@@ -14657,6 +14711,24 @@ function scareNear(p, r) { if (birds) for (const b of birds) if (b.state === 'pe
 // They run from Squeeg, and a paintball knocks them over (they disappear a few seconds later and come back somewhere else).
 let critters = null, critterHits = 0, crSolids = [], crSolidsT = 99;
 const CR_AREA = [[-73.5, -12, -31.5, WEST_WING.officeNorth - 0.5], [-73.5, WEST_WING.officeNorth + 7.5, -31.5, WEST_WING.south - 0.5]];   // cook alley, evap alley (not the office block)
+// ---------- RIGGED CRITTERS (v1.97.51, owner: "swap the frog models ... replace vulture with the crow, add fish to the pond ...
+// use [the frogglet] to replace lizard ... add the fly somewhere"): micaelsampaio's Low Poly Animals (Frog, Frogglet, Crow, Fish),
+// CC BY 4.0, split one animal per file with its skeleton (scripts/split_skinned_glb.py), head toward +z, feet on y 0. The pack
+// ships no animation clips, so every move is a bone turn about a MODEL axis (x side, y up, z nose) from the rest pose, each frame.
+const CRIT_GLB = k => '/corn-souls/assets/models/critters/' + k + '.glb';
+const CAX = { x: new T.Vector3(1, 0, 0), y: new T.Vector3(0, 1, 0), z: new T.Vector3(0, 0, 1) };
+function critModel(k, onReady) {   // its own material (tints stay per animal), the 8 px palette kept crisp, never in a raycast
+  if (typeof document === 'undefined') return;
+  loadGlbModel(CRIT_GLB(k), ({ root }) => {
+    root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.material = o.material.clone(); o.frustumCulled = false;   // skinned: its bounds are the bind pose
+      const t = o.material.map; if (t) { t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; } } });   // (no needsUpdate: its image is still decoding; it uploads with these settings)
+    onReady(root);
+  }, k);
+}
+function critRig(root, names) { const r = { root, b: {}, q: {} }; for (const n of names) { const b = skinBone(root, n); if (b) { r.b[n] = b; r.q[n] = b.quaternion.clone(); } } return r; }
+function rigRest(r) { for (const n in r.b) r.b[n].quaternion.copy(r.q[n]); }
+function rigTurn(r, n, ax, a) { if (a && r.b[n]) skinTurn(r.root, r.b[n], ax, a); }
+function critMats(root) { const m = []; root.traverse(o => { if (o.isMesh) m.push(o.material); }); return m; }
 const RAT_GLB = '/corn-souls/assets/models/critters/rat.glb';   /* v1.97.50: Tyler Lazzareschi's Low Poly Rat, CC BY 4.0 */
 function makeCritter(kind) {
   const g = new T.Group(), mats = [], m = c => { const x = new T.MeshLambertMaterial({ color: c }); mats.push(x); return x; };
@@ -14687,6 +14759,15 @@ function makeCritter(kind) {
     c.fillStyle = '#111'; c.beginPath(); c.arc(101, 25, 2, 0, Math.PI * 2); c.fill();                       // eye
     const sm = new T.SpriteMaterial({ map: srgbTex(new T.CanvasTexture(cv)), alphaTest: 0.5 }); mats.push(sm);
     const sp = new T.Sprite(sm); sp.scale.set(0.3, 0.11, 1); sp.position.y = 0.055; g.add(sp); g.userData.sprite = sp;
+    // v1.97.51, owner: "i think the froglet is supposed to be a lizard use it to replace lizard": the frogglet model (0.3 m) in a
+    // pivot that lays it flat on the floor, head to -z like the rat, or belly to the wall while it climbs (lizPose). The drawn
+    // sprite above is only the fallback until it loads.
+    const rec = {}; g.userData.rec = rec;
+    critModel('frogglet', root => {
+      g.remove(sp); g.userData.sprite = null; const pivot = new T.Group(); pivot.add(root); g.add(pivot);
+      rec.mats.length = 0; rec.cols.length = 0; for (const mt of critMats(root)) { rec.mats.push(mt); rec.cols.push(mt.color.getHex()); }
+      g.userData.liz = { pivot, rig: critRig(root, ['spine', 'head', 'tail1', 'tail2', 'left_arm', 'right_arm', 'left_leg', 'right_leg']), last: g.position.clone(), h: [1, 0], ph: Math.random() * 9 };
+    });
   }
   g.traverse(o => { o.userData.noHit = true; }); g.userData.noHit = true; g.visible = false; scene.add(g);
   return Object.assign(g.userData.rec || {}, { kind, g, mats, cols: mats.map(x => x.color.getHex()), state: 'gone', t: 3 + Math.random() * 10, speed: kind === 'rat' ? 3.2 : 1.6 });
@@ -14730,6 +14811,31 @@ function crWallStep(c, dt) {   // crawl along the face and keep hugging it; turn
     else { p.set(w.gx, w.gy, w.gz); w.dir = -w.dir; }   // ran off the top, the bottom or an end: back to solid face, turn round
   }
   const sp = c.g.userData.sprite; if (sp) sp.material.rotation = 0.06 * Math.sin(clock * 22);
+}
+// v1.97.51: the frogglet lizard's body. Flat on the floor facing its run (the group's heading), or flat on the wall it climbs
+// (the group faces out of the wall: belly to the wall, head the way it is crawling, worked out from how it moved - so the 2 player
+// guest, which only gets positions, lays it on the wall too). Tail and legs swing while it moves; dead, it lies still.
+const LZ_Q = new T.Quaternion(), LZ_M = new T.Matrix4(), LZ_FLOOR = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI);
+function lizPose(dt) {
+  if (!critters || !dt) return;
+  for (const c of critters) {
+    const L = c.g.userData.liz; if (!L || !c.g.visible) { if (L) L.last.copy(c.g.position); continue; }
+    const p = c.g.position, dx = p.x - L.last.x, dy = p.y - L.last.y, dz = p.z - L.last.z; L.last.copy(p);
+    const live = c.state === 'climb' || c.state === 'run' || c.state === 'idle', sp = Math.hypot(dx, dy, dz) / dt;
+    if (c.state === 'climb' && sp < 5) {
+      const ry = c.g.rotation.y, lx = dx * Math.cos(ry) - dz * Math.sin(ry);
+      if (Math.hypot(lx, dy) > 1e-4) { const k = Math.hypot(lx, dy); L.h = [lx / k, dy / k]; }
+      const Z = new T.Vector3(L.h[0], L.h[1], 0), Y = CAX.z, X = new T.Vector3().crossVectors(Y, Z);
+      L.pivot.quaternion.setFromRotationMatrix(LZ_M.makeBasis(X, Y, Z));
+    } else L.pivot.quaternion.copy(LZ_FLOOR);
+    const R = L.rig; rigRest(R);
+    if (live && !c.held) {
+      const mv = Math.min(1, sp / 0.4); L.ph += dt * (4 + 14 * mv); const s = Math.sin(L.ph);
+      rigTurn(R, 'tail1', CAX.y, s * (0.15 + 0.35 * mv)); rigTurn(R, 'tail2', CAX.y, Math.sin(L.ph - 1) * (0.2 + 0.4 * mv));
+      if (mv > 0.1) { rigTurn(R, 'left_leg', CAX.y, s * 0.5 * mv); rigTurn(R, 'right_leg', CAX.y, s * 0.5 * mv); rigTurn(R, 'left_arm', CAX.y, -s * 0.5 * mv); rigTurn(R, 'right_arm', CAX.y, -s * 0.5 * mv); }
+      rigTurn(R, 'head', CAX.y, Math.sin(L.ph * 0.31) * 0.15);
+    }
+  }
 }
 // v1.97.92: one ground probe per frame at most. Spawning used to try up to 20 spots in one frame and picking a run up to 8
 // directions, each a ray against every static mesh in the plant - a 5-11 ms spike on a PC (much more on a handheld) about
@@ -15509,7 +15615,7 @@ function birdCooTick(dt) {   // v1.97.178, owner: "sync headlights and pigeon co
   }
 }
 function updateBirds(dt) {
-  if (!birds) { buildPerches(); birds = Array.from({ length: 10 }, () => { const b = makeBird(); perchAt(b, farPerch(null, 25)); return b; }); }
+  if (!birds) { buildPerches(); birds = Array.from({ length: 6 }, () => { const b = makeBird(); perchAt(b, farPerch(null, 25)); return b; }); }   // v1.97.51, owner: "pigeon count should be 6 now" (was 10)
   if (critNetGuest()) { birdCooTick(dt); return; }   // 2 player: the host's pigeons - the guest only hears them (v1.97.178)
   for (const b of birds) {
     const g = b.g;
@@ -16377,7 +16483,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -16815,8 +16921,8 @@ const NPC_DEF = {
       job: { k: ['got anything for me to do', 'got anything else', 'give me a job', 'job', 'task', 'help', 'bored'], say: () => pick(['Go check the yeast cooler doors. Somebody always leaves them open.', 'Mow something. The mower\'s in the shed.', 'Go walk the north corn field. Something out there keeps chewing the stalks.', 'Pigeons are everywhere. Do something about that.']), opts: ['Where\'s the mower?', 'Pigeons?', 'Never mind.'] },
       mower: { k: ['mower', 'mow', 'grass', 'shed'], say: 'Zero-turn is in the shed. Hop on, push both sticks. Try not to mow the scarecrows. Or do, I don\'t care.', opts: ['Scarecrows?', 'Got anything else?'] },
       pigeons: { k: ['pigeon', 'pigeons', 'bird', 'birds'], say: () => 'They roost all over the plant. You\'ve gotten ' + P3.pigeonHits + ' of them so far. Paintballs are cheaper than spikes.', opts: ['Got anything else?', 'Bye.'] },
-      scarecrows: { k: ['scarecrow', 'scarecrows', 'creepy', 'evil'], say: 'Don\'t look at the scarecrows too long. I\'m serious. The night guy quit over them.', opts: ['What about the buzzard?', 'Okay...'] },
-      buzzard: { k: ['vulture', 'buzzard', 'bird on the stack', 'chalk', 'body', 'dead'], say: 'That buzzard on the RTO stack? He cleans up. You die out there, give it a minute, he takes you to the far pond. Saves us paperwork.', opts: ['That\'s messed up.', 'Got anything else?'] },
+      scarecrows: { k: ['scarecrow', 'scarecrows', 'creepy', 'evil'], say: 'Don\'t look at the scarecrows too long. I\'m serious. The night guy quit over them.', opts: ['What about the big crow?', 'Okay...'] },
+      buzzard: { k: ['vulture', 'buzzard', 'the crow', 'big crow', 'giant crow', 'bird on the stack', 'chalk', 'body', 'dead'], say: 'That crow on the RTO stack? Biggest crow you ever saw. He cleans up. You die out there, give it a minute, he takes you to the far pond. Saves us paperwork.', opts: ['That\'s messed up.', 'Got anything else?'] },
       ammonia: { k: ['ammonia', 'nh3', 'leak', 'gas'], say: 'Ammonia tank is north of the sulfuric acid tank. If it leaks, get upwind and close the drain valve. Don\'t shoot it. Again.', opts: ['What\'s the weather?', 'Any alarms?'] },
       weather: { k: ['weather', 'wind', 'rain', 'snow', 'outside', 'sunny'], say: wxSay, opts: ['Any alarms?', 'Bye.'] },
       plant: { k: ['how does the plant work', 'how is ethanol made', 'ethanol', 'plant work', 'process'], say: 'Corn comes in on trucks, gets ground and cooked into mash, yeast ferments it in the big tanks, the beer goes to distillation, and out comes ethanol. The leftovers get dried into cake. Simple. Ha.', opts: ['What do the totes do?', 'Thanks.'] },
