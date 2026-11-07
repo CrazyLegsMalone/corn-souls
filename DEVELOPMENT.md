@@ -1,3 +1,11 @@
+## TEST v1.97.49 — farm animals, the shed cat, half the grass, a quicker buzzard (2026-11-07)
+- Owner: *"could we use thes except the elephant"* (ranaaunhaider12's Low poly animals pack, CC BY 4.0) and *"maybe a few cows in the green fields away from everything same for sheep but in a different area. we can fence them in later and add some animation."* The pack is split into `assets/models/animals/{cow,sheep,dog,cat}.glb` by the new `scripts/split_flat_glb.py` (vertex colours kept, each centred and stood on the ground, head toward +z); the elephant isn't used. Four cows stand in the open grass NE of the plant (around 510, -210), six sheep SE across the rails (around 531, 572). They stand still and have round colliders, ready for fences and animation later. The dog stands at Vern's side at grain receiving.
+- Owner: *"can we use the cat in a jump scare. it runs out the first time you open the lawnmower shed"*. The cat is hidden behind the mower until a shed door first opens with you at it: the man door when you walk up to it, or the roll-up when you hit its switch. Then it yowls (synthesised) and bolts out that door, close past you, and off across the yard, gone after about 25 m. It happens once per session and only on your own screen. It can't fire from the title screen's tour.
+- Owner: *"cut amount of grass tufts by half"*. `GRASS.density` goes from 0.00825 to 0.004125 tufts/m².
+- Owner: *"buzzard picks up bodies after 1 minute instead of 2"*. The vulture now leaves his perch 60 s after a death (was 120 s), and the line about him in the NPC dialogue now says "give it a minute".
+- Credits: CREDITS.md and assets/registry.json. New suite `validate-farm-animals.cjs`.
+- Bumped TEST to `1.97.49` / `corn-souls-test-shell-v255`.
+
 ## TEST v1.97.48 — the shed's lawn mower is there before you walk in (2026-11-07)
 - Owner: *"the lawn mower in the shed should spawn in before player opens door right now it looks empty until player crosses threshold"*. To save draws, the parked mower was only drawn while the roll-up door was open or once you were inside the shed's walls, so looking in through the door showed an empty shed. It is now drawn whenever you're within 30 m of the shed (and, as before, while the roll-up is open, while you're mowing, or once it's been taken out).
 - Bumped TEST to `1.97.48` / `corn-souls-test-shell-v254`.

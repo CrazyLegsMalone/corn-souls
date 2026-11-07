@@ -1123,6 +1123,31 @@
       "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
       "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
       "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-ranaaunhaider12-low-poly-animals",
+      "title": "Low poly animals",
+      "creator": "ranaaunhaider12",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-animals-ab00915d1d40484ea658409be3e4cf93",
+      "evidence": "The owner's download (low_poly_animals.glb): embedded asset.extras naming ranaaunhaider12, the source URL and CC-BY-4.0.",
+      "notes": "In the TEST channel from v1.97.49: cows NE of the plant, sheep SE across the rails, a dog by Vern, and the cat in the mower-shed jump scare. The elephant is not used.",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Elephant left out; cow, sheep, dog and cat split into separate GLBs with their vertex colours, each centred on x/z and stood on y 0 (scripts/split_flat_glb.py); scaled at runtime.",
+      "files": [
+        "assets/models/animals/cow.glb",
+        "assets/models/animals/sheep.glb",
+        "assets/models/animals/dog.glb",
+        "assets/models/animals/cat.glb",
+        "assets/models/source/low_poly_animals.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the GLB's embedded metadata",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
     }
   ]
 }

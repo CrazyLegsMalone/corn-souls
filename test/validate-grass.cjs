@@ -96,13 +96,13 @@ const grassCtx = (probe = () => 0, density = GAME_DENSITY) => {
   // half as many tufts" - so about a twentieth of 0.16 now, and exactly half of the 0.0165 that release left behind.
   let old = 0, prev = 0, now = 0;
   for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) {
-    const o = grassCtx(() => 0, 0.16), p = grassCtx(() => 0, 0.0165), n = grassCtx();
+    const o = grassCtx(() => 0, 0.16), p = grassCtx(() => 0, 0.00825), n = grassCtx();
     o.grassChunk(cx, cz); p.grassChunk(cx, cz); n.grassChunk(cx, cz);
     old += o.GRASS.made; prev += p.GRASS.made; now += n.GRASS.made;
   }
   console.log('  grass: ' + now + ' tufts vs ' + prev + ' before the halving and ' + old + ' at the old 0.16 (' + (100 * now / old).toFixed(1) + '%)');
-  assert.ok(now / old > 0.04 && now / old < 0.07, 'about a twentieth of the old tufts (' + now + ' vs ' + old + ', ' + (100 * now / old).toFixed(1) + '%)');
-  assert.ok(Math.abs(now / prev - 0.5) < 0.05, 'half as many as the 0.0165 default it replaced (' + now + ' vs ' + prev + ', ' + (100 * now / prev).toFixed(1) + '% - whole clumps of three, so not exactly 50.0)');
+  assert.ok(now / old > 0.018 && now / old < 0.036, 'about a fortieth of the old tufts (v1.97.49, owner: "cut amount of grass tufts by half"; ' + now + ' vs ' + old + ', ' + (100 * now / old).toFixed(1) + '%)');
+  assert.ok(Math.abs(now / prev - 0.5) < 0.05, 'half as many as the 0.00825 default it replaced (v1.97.49; ' + now + ' vs ' + prev + ', ' + (100 * now / prev).toFixed(1) + '% - whole clumps of three, so not exactly 50.0)');
   assert.ok(now % 3 === 0, 'still in clumps of three, not lone blades');
   assert.equal(a.GRASS.made, b.GRASS.made, 'and the same chunk grows the same tufts every session (seeded)');
   assert.ok(a.GRASS.chunks.get('0:0').meshes.length <= 6, 'packed into at most one instanced mesh per frame');
