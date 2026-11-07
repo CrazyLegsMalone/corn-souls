@@ -47,4 +47,14 @@ assert.ok(!html.includes('walk.peakY = null;') && html.split('walk.peakY = walk.
 { const drop = (jumpFrom, f) => Math.max(0, jumpFrom - f), hurtAt = 2.4 * 0.62;
   assert.ok(drop(0, 0) < hurtAt && drop(0, 1.2) === 0, 'a jump on flat ground, or up onto a ledge: nothing');
   assert.ok(drop(2, 0) > hurtAt, 'jumping off a 2 m ledge still hurts'); }
-console.log('PASS: player health (jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');
+// v1.97.38: a Respawn button after the death scene, back on foot near where you went down, on a safe spot
+assert.ok(html.includes("toast(msg); respawnShow(true); }, 4900);"), 'the button comes up once the death scene is over');
+assert.ok(html.includes("if (down && respawnUp() && (n === 'A' || n === 'START')) { respawn(); return; }") && html.includes("if (respawnUp() && !e.repeat && (k === 'Enter' || k === ' ' || k === 'e' || k === 'r'))"), 'pad A / Start and E / Enter / Space / R press it');
+{ const src2 = html.slice(html.indexOf('function respawnSafe('), html.indexOf('function walkStart() {'));
+  const c2 = { Math, walk: { diedAt: { x: 0, z: 0 } }, cam: {}, PONDS: { half: 50 }, inPond: (x, z, h) => Math.abs(x) < h && Math.abs(z) < h, inCField: () => false, train: { cars: [] }, THRUS: [] };
+  vm.createContext(c2); vm.runInContext(src2 + '\nthis.respawnPoint = respawnPoint;', c2);
+  const p = c2.respawnPoint(); assert.ok(Math.max(Math.abs(p.x), Math.abs(p.z)) >= 53, 'drowned in a pond: you come back on its bank, not in it (' + p.x.toFixed(0) + ', ' + p.z.toFixed(0) + ')');
+  c2.inPond = () => false; c2.walk.diedAt = { x: 100, z: 100 }; const q = c2.respawnPoint(); assert.ok(Math.hypot(q.x - 100, q.z - 100) <= 6.01, 'otherwise a few metres from where you fell');
+  const back = [-Math.sin(c2.cam.yaw), -Math.cos(c2.cam.yaw)]; assert.ok((100 - q.x) * back[0] + (100 - q.z) * back[1] > 5.9, 'looking back at the spot');
+  c2.train.cars = [{ g: { position: { x: 100, z: 106 } } }]; const r = c2.respawnPoint(); assert.ok(Math.hypot(r.x - 100, r.z - 106) >= 12, 'and never next to a train'); }
+console.log('PASS: player health (respawn button near where you fell, jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');

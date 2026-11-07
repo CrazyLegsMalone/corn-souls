@@ -1,3 +1,10 @@
+## TEST v1.97.38 — Respawn button, back near where you went down (2026-11-07)
+- Owner: *"should be able to press a button to respawn a few seconds after death"*, then *"should respawn nearby death area"*.
+- When the death scene ends (4.9 s), a red **↻ Respawn** button comes up. It, E / Enter / Space / R, or A / Start on a controller puts you straight back on foot at full health. Starting Squeeg mode any other way hides it.
+- `respawnPoint()` (Plant3D.respawnPoint): the nearest spot on rings of 6, 9, 12, 16 and 24 m round the death spot (wider rings up to 100 m for a pond), eight ways round. The spot must be out of the ponds (3 m margin), out of the corn field (3 m) and 12 m from any train car; you face back toward where you fell, and walkStart's push-out keeps you out of walls. Checked in headless Chromium: killed by a pond, the button came up at about 5 s and the click put you back on foot 40 m away on the bank.
+- `validate-player-health.cjs` covers the button, its keys, the pond bank, the few-metres case, facing back and avoiding trains.
+- Bumped TEST to `1.97.38` / `corn-souls-test-shell-v244`.
+
 ## TEST v1.97.37 — windsock back, knife and cleaver held by the handle, jumps never count as falls (2026-11-07)
 - Owner: *"put sock back where it used to be my mistake"*. The ammonia windsock (pole and sock) is back at NH3 + (4, -8) = 39.3, -56.5, i.e. v1.97.36's windsock move is undone. The Pink Sedan stays at its new spot.
 - Owner: *"the cleaver and knife are being held by the blade"*. The slimming script puts the thicker end at +X as the head. On the knife and the cleaver that end is the handle, so the fist closed on the blade. `TOOL_GLB[k].flip` turns the model end for end. Checked on screen: the fist is on the handle with the blade up.
