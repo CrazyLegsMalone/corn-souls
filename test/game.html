@@ -14037,6 +14037,9 @@ function updateSelfAv() {
     av.userData.fpMode = legs;
     for (const m of av.userData.fpMeshes) {
       m.material.clippingPlanes = legs ? FP_CLIP : null;
+      /* v1.97.30: the character models are double-sided (right for the outside view), but with the waist cut you look down INTO
+         the body, and its inside faces drew a dark dome over the legs and boots. First person shows the outside faces only. */
+      m.material.side = legs ? T.FrontSide : T.DoubleSide; m.material.needsUpdate = true;
       // The merged flat mesh spans boots to hard hat. One caster leaves room for both HUD hands.
       m.castShadow = legs && !m.material.map;
       // Player 2's textured shirt starts above the waist. The flat vest and trousers stay visible.

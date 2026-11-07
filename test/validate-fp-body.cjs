@@ -118,6 +118,7 @@ for (let slot = 0; slot < 2; slot++) {
     assert.equal(m.material.clippingPlanes[0], FP_WAIST);
     assert.equal(m.material.clipShadows, false);
     assert.equal(m.material.transparent, false, 'one colour pass per mesh');
+    assert.equal(m.material.side, ctx.T.FrontSide, 'v1.97.30: first person draws the outside faces only (the inside faces of the double-sided model drew a dark dome over the legs)');
   }
   const casters = visible.filter(m => m.castShadow);
   assert.equal(casters.length, 1);
@@ -137,6 +138,7 @@ for (let slot = 0; slot < 2; slot++) {
   setView(true); updateSelfAv();
   assert.equal(VIEW.av, av, 'third person reuses the same model');
   assert.ok(av.visible && VIEW.items.gun.visible && av.userData.fpMeshes.every(m => m.visible && !m.castShadow && !m.material.clippingPlanes));
+  assert.ok(av.userData.fpMeshes.every(m => m.material.side === ctx.T.DoubleSide), 'third person puts the double-sided material back');
   setView(false); updateSelfAv();
   assert.ok(!Object.values(VIEW.items).some(m => m.visible));
   for (const state of ['dead', 'drive', 'mow', 'ride', 'pass', 'ladder']) {

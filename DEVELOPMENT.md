@@ -1,3 +1,15 @@
+## TEST v1.97.30 — first-person legs actually show; Codex's body and hands checked on screen (2026-11-06)
+- Owner: *"catch up on what codex did and then finish it"*. Codex's v1.97.28 note said its cloud browser could not start WebGL, so the first-person body and hands had only been checked by projection maths.
+- Rendered them in headless Chromium through the real launcher. **Bug found:** looking down showed a dark hollow dome at the bottom of the screen instead of legs and boots. The character models are double-sided (right for the outside view); with the waist cut you look down into the body, and its inside faces covered the legs. First person now draws the outside faces only (`material.side = FrontSide` while the waist clip is on; double-sided again in third person). After the fix: both trouser legs and boots show when looking down, with the wrench and beside the gun, standing and walking.
+- Also checked: third person shows Squeeg's legs, arms, boots and held gun; the gloves sit on the shotgun stock and pump, and on the wrench / crowbar handles (v1.97.29 two-handed grips). The vest-coloured cuffs are large on screen with the wrench and crowbar (they run from the glove to the screen edge like forearms); the Lesion Toolbox "hand scale" slider can shrink them if the owner prefers.
+- `validate-fp-body.cjs` now checks the outside-faces-only material in first person and the double-sided material back in third person (fails against v1.97.29). All CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.30` / `corn-souls-test-shell-v236`.
+
+## TEST v1.97.29 — two-handed wrench and crowbar grips (2026-11-06, Codex; entry added in v1.97.30)
+- The wrench and crowbar are held with both gloves: each tool carries grip points along its handle (`userData.gripPoints`, in the tool picture's own space, with an offset for the launcher's 3D crowbar whose shaft sits behind the centre of its bounds). The right glove takes the first point and the left glove the second; the old one-handed fist and cuff only show when seated.
+- `validate-fp-body.cjs` checks both grips.
+- Bumped TEST to `1.97.29` / `corn-souls-test-shell-v235`.
+
 ## TEST v1.97.28 — first-person hands and legs (2026-11-06)
 - Reuses the local third-person rig for boots and legs on both player slots. A waist plane clips the colour pass and the merged body mesh casts one animated shadow. The body hides on ladders and during vehicle, riding and death views.
 - Tan gloves with vest-coloured cuffs grip the shotgun, wrench, crowbar, extinguisher and radio. The shotgun support hand follows the pump and reaches across for the side magazine during reload. The empty hand stays out of view.
