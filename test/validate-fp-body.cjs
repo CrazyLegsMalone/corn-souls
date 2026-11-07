@@ -29,9 +29,9 @@ const hudCam = new T.PerspectiveCamera(42, 1005 / 411, 0.01, 5);
 const fpGun = { g: new T.Group(), stock: new T.Group(), pump: new T.Group(), mag: new T.Group(), setRounds() {} };
 fpGun.g.add(fpGun.stock, fpGun.pump, fpGun.mag); hudScene.add(fpGun.g);
 fpGun.stock.add(new T.Mesh(new T.BoxGeometry(), new T.MeshLambertMaterial()));
-const TOOLS = { wrench: { L: 0.55 }, crowbar: { L: 0.95 }, sledge: { L: 0.9 } };
+const TOOLS = { wrench: { L: 0.55 }, crowbar: { L: 0.95 }, sledge: { L: 0.9 }, pick: { L: 0.95 } };
 const heldG = {};
-for (const name of ['hand', 'washer', 'wrench', 'crowbar', 'sledge', 'ext']) {
+for (const name of ['hand', 'washer', 'wrench', 'crowbar', 'sledge', 'pick', 'ext']) {
   const item = heldG[name] = new T.Group();
   hudScene.add(item);
 }
@@ -220,7 +220,7 @@ for (const name of ['wrench', 'crowbar', 'ext', 'hand']) {
 }
 assert.equal(heldG.hand.visible, false, 'empty hands stay hidden on foot');
 { // v1.97.33: the pipe wrench and the sledgehammer are the owner's models, not pictures, and the fists sit on their handles
-  for (const k of ['wrench', 'sledge']) {
+  for (const k of ['wrench', 'sledge', 'pick']) {   // v1.97.34: + the war pick
     const G = heldG[k]; let model = null, pic = null;
     G.traverse(o => { if (o.isMesh && o.geometry.attributes.position.count > 400) model = o; if (o.isMesh && o.geometry.type === 'PlaneGeometry') pic = o; });
     assert.ok(model, k + ': the model is in the first-person hand'); assert.equal(pic.material.visible, false, k + ': and the flat picture is hidden');

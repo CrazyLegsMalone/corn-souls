@@ -5418,7 +5418,8 @@ const POWER_RESET = { x: -608.6, z: 565.3, r: 3.0, model: null, handle: null, ga
 // this is a small glTF 2.0 reader - buffer views to BufferGeometry, pbr factors to MeshStandardMaterial, nodes to an
 // Object3D tree. Keeping the node names is the whole point: it lets the game drive the compound gate, the building
 // door, the main-breaker handle and the reset button. Any failure just leaves bare ground and never breaks the game.
-const SUBSTATION = { x: -610, z: 562, yaw: Math.PI, ready: false };   // the compound gate faces the model's +Z, so the yaw puts it north
+const SUBSTATION = { x: -610, z: 562, yaw: Math.PI, ready: false };
+const SUBSTATION_BATON_RY = Math.PI;   /* the breaker panel faces north, toward the gate */   // the compound gate faces the model's +Z, so the yaw puts it north
 const Q_CLOSED = new T.Quaternion(), Q_OPEN = new T.Quaternion(0, -Math.SQRT1_2, 0, Math.SQRT1_2);   // the exported -90 deg hinge pose
 const GLB_CT = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
 const GLB_N = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
@@ -5576,7 +5577,7 @@ function loadSubstation() {
       const R = POWER_RESET, wp = o => { const v = V3(); o.getWorldPosition(v); return v; };
       R.model = g; R.handle = byName['MAIN_BREAKER_HANDLE'] || null;
       R.gate = byName['Compound_Access_Gate_Hinge'] || null; R.door = byName['Electrical_Building_Door'] || null;
-      if (byName['PLANT_POWER_RESET_BUTTON']) { const v = wp(byName['PLANT_POWER_RESET_BUTTON']); R.x = v.x; R.z = v.z; }
+      if (byName['PLANT_POWER_RESET_BUTTON']) { const v = wp(byName['PLANT_POWER_RESET_BUTTON']); R.x = v.x; R.z = v.z; R.y = v.y; }
       if (R.gate) { const v = wp(R.gate); R.gateX = v.x; R.gateZ = v.z; }
       if (R.door) { const v = wp(R.door); R.doorX = v.x; R.doorZ = v.z; }
       const bb = new T.Box3().setFromObject(g);                                   // the compound fence line
@@ -5584,6 +5585,7 @@ function loadSubstation() {
       wallSegs.push([bb.min.x, bb.min.z, gx - gw / 2, bb.min.z], [gx + gw / 2, bb.min.z, bb.max.x, bb.min.z],
         [bb.min.x, bb.max.z, bb.max.x, bb.max.z], [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
       mergeModel(root, true, o => { for (const f of [R.handle, R.gate, R.door]) if (f) { let q = o; while (q) { if (q === f) return true; q = q.parent; } } return false; });
+      if (R.y !== undefined && !SUBSTATION.baton) { SUBSTATION.baton = true; toolSpot('baton', R.x + 0.9, R.y, R.z - 0.15, SUBSTATION_BATON_RY); }   // v1.97.34: the stun baton beside the reset button
       SUBSTATION.ready = true;
   }, 'substation');
 }
@@ -6574,6 +6576,7 @@ function init(container) {
     const bx0 = -202, bx1 = -172, bz0 = -12, bz1 = 12, wallH = 9, wall = ribWall(new T.MeshLambertMaterial({ color: 0xf4c430 })), trim = mat(0xd94848);   // (its own copy of the yellow: mat() is shared)
     add(holeySlab(bx0, bz0, bx1, bz1, 0.25, [...RPITS, RSTAIR]), mat(0xb5b9bf), 0, 0.095, 0, 'recv');           // floor, open over the three pits and the stairwell
     box(0.6, wallH, bz1 - bz0, wall, bx0, wallH / 2, 0, 'recv'); box(0.6, wallH, bz1 - bz0, wall, bx1, wallH / 2, 0, 'recv');
+    for (const [k, z] of [['sickle', -4.5], ['machete', -3.6]]) toolSpot(k, bx0 + 0.34, 1.7, z, Math.PI / 2);   // v1.97.34: on the west wall inside (this block's scene is the grain yard group, already offset)
     for (const x of [bx0, bx1]) wallSegs.push([x + GDX, bz0 + GDZ, x + GDX, bz1 + GDZ, -1, 50]);   // side walls (the basement runs out under the east one)
     for (const z of [bz0, bz1]) {                                                                         // north + south walls with 2 doors each
       for (const [x0, x1] of [[bx0, -199], [-193, -189], [-183, -181], [-175, bx1]]) { box(x1 - x0, wallH, 0.6, wall, (x0 + x1) / 2, wallH / 2, z, 'recv'); wallSegs.push([x0 + GDX, z + GDZ, x1 + GDX, z + GDZ]); }
@@ -7532,6 +7535,7 @@ function init(container) {
       // three offices along the west wall, doors into the shop
       wall(OFX, MZ0, OFX, MZ1, OH, blockM, [[22.9 - MZ0, 1.0, 0, ['SUPERVISOR / INVENTORY', 'SHOP']], [31.3 - MZ0, 1.0, 0, ['MAINT LEAD', 'SHOP']], [35.9 - MZ0, 1.0, 0, ['BREAK ROOM', 'SHOP']]], { stripe: true, th: 0.25 });
       for (const z of [24.9, 33.6]) wall(MX0, z, OFX, z, OH, blockM, [], { th: 0.2 });
+      ['pan', 'knife', 'cleaver'].forEach((k, i) => toolSpot(k, OFX - 1.2 - i * 0.5, 1.65, 33.6 + 0.14, 0));   // v1.97.34: hung on the break room's north wall
       add(new T.BoxGeometry(OFX - MX0, 0.2, MZ1 - MZ0), ceilM, (MX0 + OFX) / 2, OH + 0.1, (MZ0 + MZ1) / 2, null, true);
       add(new T.BoxGeometry(OFX - MX0 - 0.3, 0.06, MZ1 - MZ0 - 0.3), tileM, (MX0 + OFX) / 2, 0.25, (MZ0 + MZ1) / 2, null, true);
       // shop furniture: workbenches along the north wall, tool cabinets, a forklift-size clear floor
@@ -7936,6 +7940,7 @@ function init(container) {
     wall(true, HS, 62, TX, [[78, DOOR, 0, DH], [71, DOOR, 0, DH], [65, DOOR, 0, DH]], iw, 0.15);         // south side: plant manager, HR, reception
     for (const x of [78, 72, 62]) wall(false, x, ZN, HN, [], iw, 0.15);                                // restroom | safety | training | open area
     for (const x of [74, 68, 62]) wall(false, x, HS, ZS, [], iw, 0.15);                                // manager | HR | reception | open area
+    toolSpot('golf', 79.5, FY + 1.05, ZS - 0.3, Math.PI);   // v1.97.34: the plant manager's golf club, leaning on his office's south wall
     // floor slab, roof
     add(new T.BoxGeometry(X1 - X0, FY, ZS - ZN), mat(0xb5b0a6), (X0 + X1) / 2, FY / 2, HZ, null);
     add(new T.BoxGeometry(X1 - X0 - 0.2, 0.02, ZS - ZN - 0.2), mat(0x8a7f6c), (X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor, 5 mm clear of the slab top so it cannot z-fight
@@ -8667,6 +8672,7 @@ function init(container) {
       for (const dx of [6.6, 7.3]) { const p = add(new T.CylinderGeometry(0.1, 0.1, 0.3, 8), mat(0x2b2f33), TX1 - dx, 3.8, TZ0 - 0.3); p.rotation.x = Math.PI / 2; }
       box(8.0, 0.9, 0.9, red, TX1 - 2.6, 5.9, TZ0 - 1.0); box(0.9, 2.9, 0.9, red, TX1 - 6.2, 4.0, TZ0 - 1.0); box(0.6, 1.2, 0.6, red, TX1 - 6.2, 1.9, TZ0 - 1.0);
       box(0.4, 6.4, 0.4, mat(0xb9bdc0), TX1 - 3.8, 3.2, TZ0 - 1.5); extraCols.push([TX1 - 6.2, TZ0 - 1.0, 0.5], [TX1 - 3.8, TZ0 - 1.5, 0.3]);
+      toolSpot('pipe', TX0 + 1.4, 1.5, TZ0 + 0.3, 0);   // v1.97.34: a length of steel pipe leaning on the turbine room's north wall, west end
       // east wall red pipe along the top of the turbine room, dropping at the NE corner
       box(0.25, 0.25, 6.0, red, TX1 + 0.4, 5.6, TZ0 + 3.2); box(0.25, 5.6, 0.25, red, TX1 + 0.4, 2.8, TZ0 + 0.3);
     }
@@ -9964,6 +9970,11 @@ function updateTrain(dt, railOn) {
     }
   }
   for (const c of train.cars) { const p = loopAt(train.s - c.off); c.g.position.set(p.x, 0.25, p.z); c.g.rotation.y = p.a; }
+  if (!train.bat && train.cars.length > 2) {   // v1.97.34: an aluminum bat on the back wall of the second-to-last car, in reach from the rider car's deck
+    const car = train.cars[train.cars.length - 2].g, rider = train.cars[train.cars.length - 1].g; car.updateMatrixWorld(true);
+    const s = Math.sign(car.worldToLocal(rider.position.clone()).x) || 1; train.bat = true;
+    toolSpot('bat', s * 8.32, 2.75, 0, s * Math.PI / 2); const W = TOOL_WALL[TOOL_WALL.length - 1]; car.add(W.m); W.reach = 4.6;   // you ride at the front of the deck, about 4 m off
+  }
   // wheels turn with distance travelled; the locomotive puffs gray exhaust while it's moving
   const ds = train.s - train.lastS; train.lastS = train.s;
   if (ds) for (const w of train.wheels) w.rotation.z -= ds / 0.5;
@@ -12119,14 +12130,33 @@ function updatePowerReset(dt) {   // the model's breaker handle, its compound ga
 // (held in the corner like an old-school shooter, on the wall, and in the other player's hand), so they cost next to nothing.
 // A swing that lands on glass cracks it: cars shatter all their windows (and a drivable one can then be hotwired, no keys), and any other
 // window in the game gets a spiderweb crack stuck on right where you hit it.
-const TOOLS = { crowbar: { L: 0.95, name: 'Crowbar' }, shovel: { L: 1.5, name: 'Shovel' }, pick: { L: 0.95, name: 'Pickaxe' }, pitchfork: { L: 1.5, name: 'Pitchfork' }, wrench: { L: 0.55, name: 'Pipe wrench' }, sledge: { L: 0.9, name: 'Sledgehammer' } };
+const TOOLS = { crowbar: { L: 0.95, name: 'Crowbar' }, shovel: { L: 1.5, name: 'Shovel' }, pick: { L: 0.95, name: 'War pick' }, pitchfork: { L: 1.5, name: 'Pitchfork' }, wrench: { L: 0.55, name: 'Pipe wrench' }, sledge: { L: 0.9, name: 'Sledgehammer' },
+  // v1.97.34: weapons from Oxygen3D's pack, each on a wall where it belongs (toolSpot): one-handed, the left hand stays down
+  sickle: { L: 0.5, name: 'Sickle' }, machete: { L: 0.6, name: 'Machete' }, pipe: { L: 0.75, name: 'Steel pipe' },
+  pan: { L: 0.45, name: 'Frying pan' }, knife: { L: 0.32, name: 'Kitchen knife' }, cleaver: { L: 0.34, name: 'Cleaver' }, baton: { L: 0.5, name: 'Stun baton' }, bat: { L: 0.85, name: 'Aluminum bat' }, golf: { L: 1.0, name: 'Golf club' } };
+const TOOL_SAY = { sickle: '🌾 Sickle', machete: '🔪 Machete', pipe: '🔩 Steel pipe', pan: '🍳 Frying pan', knife: '🔪 Kitchen knife', cleaver: '🔪 Cleaver', baton: '⚡ Stun baton', bat: '🏏 Aluminum bat', golf: '🏌️ Golf club' };
+// a tool hung on a wall away from the shop pegboard: centre (x, y, z), ry turns its flat face (+z by default) to face the room
+function toolSpot(k, x, y, z, ry) {
+  const L = TOOLS[k].L, m = new T.Mesh(new T.PlaneGeometry(L, L / 4), toolMat(k)); toolModelOn(k, m, L);
+  m.rotation.set(0, ry || 0, Math.PI / 2); m.position.set(x, y, z); m.userData.noHit = true; scene.add(m); TOOL_WALL.push({ k, m });
+}
 // v1.97.33: tools drawn as real models (the owner's picks, CC BY, credited in assets/models/CREDITS.md). Each file is slimmed
 // to one mesh with a 512 px colour map, its long axis on +X with the head at +X (jaw toward +Y) and the handle centred on the
 // X axis, so it drops in where the flat picture was (the picture stays as the stand-in until the file arrives). grip: the two
 // fists' spots along the handle, as fractions of the length from the middle (primary near the end, support further up).
 const TOOL_GLB = {
   wrench: { url: '/corn-souls/assets/models/pipe_wrench.glb', grip: [-0.4, -0.14] },
-  sledge: { url: '/corn-souls/assets/models/sledge_hammer.glb', grip: [-0.43, -0.1] }
+  sledge: { url: '/corn-souls/assets/models/sledge_hammer.glb', grip: [-0.43, -0.1], hud: [0.24, -0.26, -0.62] },
+  pick: { url: '/corn-souls/assets/models/war_pick.glb', grip: [-0.42, -0.12], hud: [0.24, -0.26, -0.62] },   // v1.97.34: the war pick from Oxygen3D's pack
+  sickle: { url: '/corn-souls/assets/models/sickle.glb', grip: [-0.36], hud: [0.16, -0.16, -0.55] },
+  machete: { url: '/corn-souls/assets/models/machete.glb', grip: [-0.38], hud: [0.16, -0.16, -0.55] },
+  pipe: { url: '/corn-souls/assets/models/pipe.glb', grip: [-0.4, -0.12] },
+  pan: { url: '/corn-souls/assets/models/frying_pan.glb', grip: [-0.4], hud: [0.24, -0.2, -0.55] },
+  knife: { url: '/corn-souls/assets/models/kitchen_knife.glb', grip: [-0.34], hud: [0.12, -0.12, -0.45] },
+  cleaver: { url: '/corn-souls/assets/models/cleaver.glb', grip: [-0.36], hud: [0.12, -0.12, -0.45] },
+  baton: { url: '/corn-souls/assets/models/stun_baton.glb', grip: [-0.38], hud: [0.16, -0.16, -0.55] },
+  bat: { url: '/corn-souls/assets/models/aluminum_bat.glb', grip: [-0.42, -0.29], hud: [0.2, -0.2, -0.6] },
+  golf: { url: '/corn-souls/assets/models/golf_club.glb', grip: [-0.44, -0.33], hud: [0.22, -0.24, -0.62] }
 };
 function toolModelOn(k, holder, L) {   // put tool k's model on a picture mesh (same place, same length) and hide the picture
   const spec = TOOL_GLB[k]; if (!spec) return;
@@ -12189,11 +12219,11 @@ function buildToolWall(x0, z) {   // a brown pegboard on the north wall with the
 function takeTool() {
   if (!walk.on || walk.dead || walk.drive || walk.mow) return null;
   const fx = -Math.sin(walk.yaw), fz = -Math.cos(walk.yaw); let best = null, bs = 0.8;
-  for (const W of TOOL_WALL) { const p = W.m.position, dx = p.x - walk.x, dz = p.z - walk.z, d = Math.hypot(dx, dz); if (d > 2.0 || p.y - walk.y > 3) continue; const f = d < 0.3 ? 1 : (dx * fx + dz * fz) / d; if (f > bs) { bs = f; best = W.k; } }
+  for (const W of TOOL_WALL) { const p = W.m.getWorldPosition(V3()), dx = p.x - walk.x, dz = p.z - walk.z, d = Math.hypot(dx, dz); if (d > (W.reach || 2.0) || p.y - walk.y > 3) continue; const f = d < 0.3 ? 1 : (dx * fx + dz * fz) / d; if (f > bs) { bs = f; best = W.k; } }
   if (!best) return null;
   if (!ITEMS.includes(best)) ITEMS.push(best); setItem(best);
   if (best === 'wrench') return '🔧 Pipe wrench · fire on a damaged Ranger or car to fix it (+15% a whack)';
-  return { crowbar: '🪝 Crowbar', shovel: '🪏 Shovel', pick: '⛏️ Pickaxe', pitchfork: '🔱 Pitchfork', sledge: '🔨 Sledgehammer' }[best] + ' · fire to swing: breaks windows, dents cars' + (best === 'crowbar' ? ' (smash a car window and you can drive it without the keys)' : '');
+  return ({ crowbar: '🪝 Crowbar', shovel: '🪏 Shovel', pick: '⛏️ War pick', pitchfork: '🔱 Pitchfork', sledge: '🔨 Sledgehammer' }[best] || TOOL_SAY[best]) + ' · fire to swing: breaks windows, dents cars' + (best === 'crowbar' ? ' (smash a car window and you can drive it without the keys)' : '');
 }
 function makeTool(k) {   // first person: the picture comes up from the bottom-right corner on a long diagonal, gloved fist at the bottom
   const g = new T.Group(); g.userData.noHit = true; const L = TOOLS[k].L * 0.62;
@@ -12203,8 +12233,8 @@ function makeTool(k) {   // first person: the picture comes up from the bottom-r
   const cuff = hudPart(g, new T.CylinderGeometry(0.045, 0.05, 0.22, 8), sl, 0.35, -0.47, -0.5);
   cuff.rotation.x = 1.2;
   toolModelOn(k, q, L);
-  if (k === 'sledge') q.position.set(0.24, -0.26, -0.62);   // the longest picture: lower and to the right, so the head shows
-  if (k === 'wrench' || k === 'crowbar' || k === 'sledge') {
+  if (TOOL_GLB[k] && TOOL_GLB[k].hud) q.position.fromArray(TOOL_GLB[k].hud);   // long heavy heads lower and right so the head shows; short blades closer in
+  if (k === 'wrench' || k === 'crowbar' || TOOL_GLB[k]) {
     g.userData.legacyGrip = [fist, cuff];
     // Grip points along the handle, in the visual's local space. The launcher
     // substitutes a 3D crowbar whose shaft sits behind the center of its bounds.
@@ -12212,6 +12242,7 @@ function makeTool(k) {   // first person: the picture comes up from the bottom-r
     const handleOffset = k === 'crowbar' && !model ? -L * 0.048 : 0;
     g.userData.gripPoints = (TOOL_GLB[k] ? TOOL_GLB[k].grip.map(f => f * L) : k === 'crowbar' ? [-0.195, -0.075] : [-0.115, -0.025]).map(x =>
       new T.Vector3(x, handleOffset, model ? -0.028 : 0).applyQuaternion(q.quaternion).add(q.position));
+    g.userData.oneAxis = new T.Vector3(1, 0, 0).applyQuaternion(q.quaternion).toArray();   // up the handle, for a one-handed grip
     if (q.isMesh) { q.material.depthTest = true; q.material.transparent = false; }
   }
   g.visible = false; ensureHud().add(g); return g;
@@ -15582,7 +15613,7 @@ function updateFpHands(fp, reloadOut) {
   const radio = SR.carry === 'me' && SR.g && SR.g.parent === hudScene;
   const item = radio ? 'radio' : held;
   const active = fp && FP_BODY.on && !walk.ride && !walk.pass &&
-    (item === 'gun' || item === 'wrench' || item === 'crowbar' || item === 'sledge' || item === 'ext' || item === 'radio');
+    (item === 'gun' || item === 'wrench' || item === 'crowbar' || !!TOOL_GLB[item] || item === 'ext' || item === 'radio');
   if (!active) {
     if (fpHands) for (const hand of fpHands) hand.removeFromParent();
     return;
@@ -15628,6 +15659,10 @@ function updateFpHands(fp, reloadOut) {
   } else {
     const tool = heldG[item];
     const [primary, support] = tool.userData.gripPoints;
+    if (!support) {   // one-handed (knives, the pan, the baton): the right fist on the grip, thumb toward the blade; the left stays down
+      const sp = tool.userData.oneAxis;
+      grip(right, tool, primary.x, primary.y, primary.z, 0.48, -0.46, 0.4, sp); left.removeFromParent(); return;
+    }
     const ax = [support.x - primary.x, support.y - primary.y, support.z - primary.z];   // up the handle, toward the head
     grip(right, tool, primary.x, primary.y, primary.z, 0.48, -0.46, 0.4, ax);
     grip(left, tool, support.x, support.y, support.z, 0.42, 0.55, -0.5, ax);
@@ -16127,7 +16162,7 @@ $('homeBtn').onclick = () => { P3.focus(null); setWalkUI(); };
 // ---------- walk mode toggle ----------
 const walkIn = { f: 0, s: 0 }, fireIn = { mouse: false, btn: false, cd: 0 };
 // Squeeg mode (first person) is entered only with the on-screen Squeeg button; Savior Mode (the bird's-eye view) is the way back
-const HELD = { gun: ['🎯', 'Paintball gun'], hand: ['✋', 'Empty hand'], crowbar: ['🪝', 'Crowbar'], shovel: ['🪏', 'Shovel'], pick: ['⛏️', 'Pickaxe'], pitchfork: ['🔱', 'Pitchfork'], wrench: ['🔧', 'Pipe wrench'], sledge: ['🔨', 'Sledgehammer'], ext: ['🧯', 'Fire extinguisher'] };
+const HELD = { gun: ['🎯', 'Paintball gun'], hand: ['✋', 'Empty hand'], crowbar: ['🪝', 'Crowbar'], shovel: ['🪏', 'Shovel'], pick: ['⛏️', 'War pick'], pitchfork: ['🔱', 'Pitchfork'], wrench: ['🔧', 'Pipe wrench'], sledge: ['🔨', 'Sledgehammer'], sickle: ['🌾', 'Sickle'], machete: ['🔪', 'Machete'], pipe: ['🔩', 'Steel pipe'], pan: ['🍳', 'Frying pan'], knife: ['🔪', 'Kitchen knife'], cleaver: ['🔪', 'Cleaver'], baton: ['⚡', 'Stun baton'], bat: ['🏏', 'Aluminum bat'], golf: ['🏌️', 'Golf club'], ext: ['🧯', 'Fire extinguisher'] };
 function showHeld(quiet) { const h = P3.held; document.body.dataset.held = h; $('fireBtn').textContent = h === 'gun' && P3.ammo === 'water' ? '💦' : HELD[h][0]; $('ammoBtn').textContent = P3.ammo === 'water' ? '💦' : '🎨'; }
 function swapAmmo() { if (P3.held !== 'gun') P3.setItem('gun'); const a = P3.toggleAmmo(); showHeld(); toast(a === 'water' ? '💦 Water (pressure washer) — cleans paint off, scares birds' : '🎨 Paintballs'); }
 const carIn = { gas: 0, brake: 0, hb: 0, nos: 0 };
@@ -16301,7 +16336,7 @@ function controlsMenu(code, fromTitle) {
     ['Walking (Squeeg mode)', [
       ['Move', 'W A S D', 'Left stick', 'Left thumb'], ['Look', 'Mouse (click to grab it, Esc frees it)', 'Right stick', 'Right thumb'],
       ['Sprint', 'Shift', 'Click left stick / push all the way', 'Push the stick all the way'], ['Jump', 'Space', 'A', '⤴ button'],
-      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Roll-up door switch (inside, beside the door): look at a button and interact - green opens door + mesh, yellow opens the door with the mesh closed, red closes both', 'E', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, pickaxe, pitchfork on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
+      ['Interact (doors, valves, keys, vehicles, items, boards)', 'E', 'X', '✋ button'], ['Road P crossing: dispatcher phone (hold a train / send it on / call one through)', 'E at the cabinet', 'X', 'Hand / tap'], ['Roll-up door switch (inside, beside the door): look at a button and interact - green opens door + mesh, yellow opens the door with the mesh closed, red closes both', 'E', 'X', 'Hand / tap'], ['Shop radio: pick up / set down (on a Ranger: in the back)', 'E (look at it)', 'X', '✋ button'], ['Radio while carrying it: on → next song → off', 'Left click', 'R2', '🎯'], ['1st / 3rd person view', 'V', 'Click right stick (R3)', '👁 button'], ['Talk to someone (Rick in the control room, Brenda + Tammy at the scale house, Vern at grain receiving): pick a line, type, or 🎤 say it', 'E (look at them)', 'X', '✋ button'], ['Tools (crowbar, shovel, war pick, pitchfork, sledgehammer, pipe wrench on the shop pegboard): grab, then fire to swing. Breaks windows; a smashed car can be driven without keys', 'E to grab · left click swings', 'X to grab · R2 swings', '✋ to grab · tool button swings'], ['Fire extinguisher (red posts: shop, parking lot): grab, hold fire to spray. Puts out burning vehicles', 'E to grab · hold left click', 'X to grab · hold R2', '✋ to grab · hold 🧯'], ['Adjustable wrench (pegboard): fire on a damaged vehicle to fix it', 'Left click', 'R2', '🔧'], ['Headlamp', 'F', 'Y', '🔦'],
       ['Switch item (shotgun / wrench / crowbar / hand)', 'Mouse wheel or 1 2 3', 'L1 / R1', '🔄']]],
     ['Shotgun', [
       ['Fire (paint shot / water blast)', 'Left click', 'R2', '🎯'], ['Aim down sights', 'Hold right click', 'Hold L2', 'AIM (toggle)'],
@@ -16855,7 +16890,7 @@ const PATCH_NOTES = [
     '📝 <b>Leave a note!</b> Spotted a bug or have an idea? Open the menu (❚❚) and leave a note. It even grabs a screenshot.',
     '🛠️ Fixed menu buttons that sometimes did the wrong thing (conversation replies, notes).'] },
   { v: '1.89', title: 'Tools, Fire & Wrecks', notes: [
-    '🪝 A pegboard of tools in the maintenance shop: <b>crowbar, shovel, pickaxe, pitchfork, sledgehammer</b> and a <b>pipe wrench</b>. Grab one and swing away!',
+    '🪝 A pegboard of tools in the maintenance shop: <b>crowbar, shovel, war pick, pitchfork, sledgehammer</b> and a <b>pipe wrench</b>. Grab one and swing away!',
     '🪟 Smash windows anywhere in the plant. Break a car\'s glass and you can <b>hotwire it, no keys needed</b>.',
     '💥 <b>Vehicle damage!</b> Crash too hard and it smokes, loses power, then bursts into flames and burns down to a charred wreck.',
     '🧯 Grab a <b>fire extinguisher</b> off a red post to put fires out, then fix the vehicle up with the wrench. Good as new!',

@@ -1,3 +1,19 @@
+## TEST v1.97.34 — ten weapons from the Survival Melee Weapon Pack, placed round the plant (2026-11-07)
+- Owner asked, piece by piece: *"replace the pick with the war pick"*, sickle and machete in grain receiving, pipe in the turbine room, frying pan + kitchen knife + cleaver in the maintenance break room, stun baton at the main power station, aluminum bat at the back of the second-to-last train car (reachable while riding the last car), golf club in the scale house manager's office.
+- `scripts/slim_tool_glb.py` gained a 4th argument: take one mesh by name out of a pack and crop its part of the shared atlas. Plain tubes (vertices only at the ends) are handled too. Files are 22–74 KB each.
+- **Placements** (`toolSpot(k, x, y, z, ry)`: hung on a wall, facing the room, in `TOOL_WALL` so E / X takes it):
+  - War pick: the shop pegboard, replacing the drawn pickaxe.
+  - Sickle and machete: the receiving building's west wall inside.
+  - Steel pipe: the turbine room's north wall, west end.
+  - Pan, knife and cleaver: the maintenance break room's north wall.
+  - Stun baton: beside the substation's RESET PLANT POWER button.
+  - Golf club: the scale house plant manager's south wall.
+  - Aluminum bat: the back wall of car 14, as its child so it rides the loop. That spot has a 4.6 m reach, because the rider deck pins you about 4 m away. `takeTool` now measures world positions.
+- **Held:** the war pick, pipe, bat and golf club are two-handed, with grips along the handle. The sickle, machete, pan, knife, cleaver and baton are one-handed: the right fist with the thumb toward the blade, and the left hand down. `TOOL_GLB[k].hud` sets where each sits in view. All of them swing like the other hand tools; the war pick hits creeps for 3.
+- Checked in headless Chromium: every wall spot, every one held, and riding the last car and taking the bat.
+- Registry: the pack is `in-use` with its ten files; credited in `CREDITS.md` and on `credits.html`.
+- Bumped TEST to `1.97.34` / `corn-souls-test-shell-v240`.
+
 ## TEST v1.97.33 — red pipe wrench and a new sledgehammer, as real models (2026-11-07)
 - Owner picked three Sketchfab downloads (all CC BY 4.0): CUBICcube's **Game Wrench** (red pipe wrench), MaX3Dd's **Sledge Hammer** and Oxygen3D's **Survival Melee Weapon Pack** (28 weapons).
 - `scripts/slim_tool_glb.py` turns a Sketchfab GLB into a game tool. It bakes everything to one mesh, keeps only the colour map (resized to 512 px JPEG; normal, roughness and occlusion maps dropped, since the game draws Lambert), puts the long axis on +X with the head at +X and the jaw toward +Y, centres the handle on the X axis, and keeps the author, licence and source in `asset.extras`. Results: `assets/models/pipe_wrench.glb` 97 KB (from 4.1 MB), `sledge_hammer.glb` 65 KB (from 2.7 MB).

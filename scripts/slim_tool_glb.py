@@ -1,4 +1,4 @@
-# Slim a Sketchfab GLB into a game tool: one mesh (all mesh nodes baked), POSITION/NORMAL/TEXCOORD_0 + indices,
+# Slim a Sketchfab GLB into a game tool (optional 4th arg: pick one mesh by name out of a pack, cropping its part of the atlas): one mesh (all mesh nodes baked), POSITION/NORMAL/TEXCOORD_0 + indices,
 # base colour only, resized, long axis -> +X with the heavy head at +X, wide face in XY, handle centreline on the X axis.
 import json, struct, sys, io
 import numpy as np
@@ -46,6 +46,7 @@ cross = lambda sel: np.ptp(Q[sel, 1]) * np.ptp(Q[sel, 2]) if sel.sum() > 3 else 
 if cross(x < lo + 0.2 * Ln) > cross(x > hi - 0.2 * Ln):   # head goes to +X
     Q[:, 0] *= -1; Q[:, 1] *= -1; NQ[:, 0] *= -1; NQ[:, 1] *= -1
 x = Q[:, 0]; lo = x.min(); hand = (x > lo + 0.05 * Ln) & (x < lo + 0.45 * Ln)
+if hand.sum() < 3: hand = x < lo + 0.5 * Ln   # a plain tube has vertices only at its ends: take the handle half
 cy, cz = (Q[hand, 1].min() + Q[hand, 1].max()) / 2, (Q[hand, 2].min() + Q[hand, 2].max()) / 2
 Q[:, 1] -= cy; Q[:, 2] -= cz; Q[:, 0] -= (Q[:, 0].min() + Q[:, 0].max()) / 2
 head_side = np.sign(Q[x > x.max() - 0.25 * Ln, 1].mean()) or 1.0
@@ -54,7 +55,14 @@ print('length', round(Ln, 4), 'width', round(np.ptp(Q[:, 1]), 4), 'thick', round
       'handle r', round(np.ptp(Q[hand, 2]) / 2, 4))
 # base colour texture, resized
 mat = j['materials'][0]; ti = mat['pbrMetallicRoughness']['baseColorTexture']['index']; im = j['images'][j['textures'][ti]['source']]
-bv = j['bufferViews'][im['bufferView']]; img = Image.open(io.BytesIO(BIN[bv.get('byteOffset', 0):bv.get('byteOffset', 0) + bv['byteLength']])).convert('RGB').resize((px, px), Image.LANCZOS)
+bv = j['bufferViews'][im['bufferView']]; img = Image.open(io.BytesIO(BIN[bv.get('byteOffset', 0):bv.get('byteOffset', 0) + bv['byteLength']])).convert('RGB')
+if mesh_filter and U.min() >= 0 and U.max() <= 1:   # one weapon from a shared atlas: keep only its part of the texture
+    W0, H0 = img.size; pad = 4
+    x0, x1 = max(0, int(U[:, 0].min() * W0) - pad), min(W0, int(np.ceil(U[:, 0].max() * W0)) + pad)
+    y0, y1 = max(0, int(U[:, 1].min() * H0) - pad), min(H0, int(np.ceil(U[:, 1].max() * H0)) + pad)
+    img = img.crop((x0, y0, x1, y1)); U = np.c_[(U[:, 0] * W0 - x0) / (x1 - x0), (U[:, 1] * H0 - y0) / (y1 - y0)]
+    print('atlas crop', (x0, y0, x1, y1), 'of', (W0, H0))
+img = img.resize((px, px), Image.LANCZOS)
 ib = io.BytesIO(); img.save(ib, 'JPEG', quality=88); ib = ib.getvalue()
 f = lambda a, dt: np.ascontiguousarray(a, dtype=dt).tobytes()
 idt, ict = (np.uint16, 5123) if len(Q) < 65536 else (np.uint32, 5125)
