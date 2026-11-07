@@ -29,12 +29,11 @@ const hudCam = new T.PerspectiveCamera(42, 1005 / 411, 0.01, 5);
 const fpGun = { g: new T.Group(), stock: new T.Group(), pump: new T.Group(), mag: new T.Group(), setRounds() {} };
 fpGun.g.add(fpGun.stock, fpGun.pump, fpGun.mag); hudScene.add(fpGun.g);
 fpGun.stock.add(new T.Mesh(new T.BoxGeometry(), new T.MeshLambertMaterial()));
-const TOOLS = { wrench: {}, crowbar: {} };
+const TOOLS = { wrench: { L: 0.55 }, crowbar: { L: 0.95 } };
 const heldG = {};
 for (const name of ['hand', 'washer', 'wrench', 'crowbar', 'ext']) {
   const item = heldG[name] = new T.Group();
   hudScene.add(item);
-  if (name in TOOLS) item.userData.legacyGrip = [new T.Group(), new T.Group()];
 }
 const SR = { carry: null, g: new T.Group() };
 const ctx = {
@@ -42,6 +41,10 @@ const ctx = {
   scene, hudScene, fpGun, camera, TOOLS, heldG, held: 'gun', heldDead: null, SQ_K: 1.68 / 1.8, clock: 1,
   TUNE: { fogNear: 120, fogFar: 900 }, EYE: 1.57, POWER: { fov: 0 },
   gun: fpGun.g, aimK: 0, aimWant: false, reloadT: 0, reloadTo: 'paint', reloadFill: true, pumpT: 0,
+  ensureHud: () => hudScene,
+  hudMat: () => new T.MeshBasicMaterial(),
+  toolMat: () => new T.MeshBasicMaterial(),
+  crowbarSlot: () => new T.Group(),
   gunKick: 0, sgTilt: 0, sgLast: null, sgBob: 0, swipe: 0, idleT: 0, MAG: 6, mags: { paint: 4 }, ammo: 'paint',
   wash: { t: 0 }, updateWasher() {}, gunClick() {}, onLadder: () => !!walk.ladder,
   localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },
@@ -58,7 +61,13 @@ const ctx = {
 };
 scene.fog = new T.Fog(0);
 vm.createContext(ctx);
+const launcher = fs.readFileSync('index.html', 'utf8');
+const [, crowbarAnchor, crowbarReplacement] = launcher.match(/const fp='([^']+)';[\s\S]*?html=html\.replace\(fp, "([^"]+)"\);/);
+const makeToolSource = cut('function makeTool(k)', 'function toolItem(');
+assert.ok(makeToolSource.includes(crowbarAnchor));
 vm.runInContext([
+  cut('function hudPart(', '\n'),
+  makeToolSource.replace(crowbarAnchor, crowbarReplacement),
   cut('const GLB_CT = {', 'function loadGlbModel('),
   cut('// ---------- SKINNED NPCs', 'function loadNpcModels() {'),
   cut('const PLAYER_SKIN = {', '// ---------- PACKAGE BOILERS'),
@@ -66,9 +75,13 @@ vm.runInContext([
   cut('const HIP = {', '// EVERY first-person item'),
   cut('function buildFpHands(', 'let fpHands = null'),
   cut('let fpHands = null', '// ---------- LESION TOOLBOX'),
-  'this.test = { FP_BODY, FP_WAIST, VIEW, setView, walkCam, updateSelfAv, updateGun, toggleFpBody, dressPlayerSkin, get hands() { return fpHands; } };'
+  'this.test = { FP_BODY, FP_WAIST, VIEW, setView, walkCam, updateSelfAv, updateGun, toggleFpBody, dressPlayerSkin, makeTool, get hands() { return fpHands; } };'
 ].join('\n'), ctx);
 const { FP_BODY, FP_WAIST, VIEW, setView, walkCam, updateSelfAv, updateGun, toggleFpBody, dressPlayerSkin } = ctx.test;
+for (const name of Object.keys(TOOLS)) {
+  heldG[name].removeFromParent();
+  heldG[name] = ctx.test.makeTool(name);
+}
 
 function bootsInView(meshes) {
   const v = new T.Vector3();
@@ -165,8 +178,23 @@ for (const hand of [right, left]) {
 }
 for (const name of ['wrench', 'crowbar', 'ext', 'hand']) {
   ctx.held = name; updateGun(0);
-  assert.equal(right.parent, name === 'hand' ? null : heldG[name]);
-  assert.equal(left.parent, name === 'ext' ? heldG.ext : null);
+  const item = name === 'hand' ? null : heldG[name];
+  assert.equal(right.parent, item);
+  assert.equal(left.parent, item);
+  if (name in TOOLS) {
+    const [primary, support] = item.userData.gripPoints;
+    assert.ok(right.position.equals(primary) && left.position.equals(support));
+    assert.ok(primary.distanceTo(support) > 0.08, 'hands occupy different points on the handle');
+    for (const hand of [right, left]) {
+      hand.getWorldPosition(v).project(hudCam);
+      assert.ok(Math.abs(v.x) < 1 && Math.abs(v.y) < 1 && Math.abs(v.z) < 1, name + ' grip is in view at rest');
+    }
+    const before = left.getWorldPosition(new T.Vector3());
+    ctx.swipe = 0.25; updateGun(0);
+    assert.ok(left.getWorldPosition(new T.Vector3()).distanceTo(before) > 0.05, 'support hand follows tool swing');
+    assert.ok(right.position.equals(primary) && left.position.equals(support), 'swing maintains both grip points');
+    ctx.swipe = 0;
+  }
 }
 assert.equal(heldG.hand.visible, false, 'empty hands stay hidden on foot');
 hudScene.add(SR.g); SR.carry = 'me'; updateGun(0);
