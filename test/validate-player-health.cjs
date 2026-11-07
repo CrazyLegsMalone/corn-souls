@@ -57,4 +57,17 @@ assert.ok(html.includes("if (down && respawnUp() && (n === 'A' || n === 'START')
   c2.inPond = () => false; c2.walk.diedAt = { x: 100, z: 100 }; const q = c2.respawnPoint(); assert.ok(Math.hypot(q.x - 100, q.z - 100) <= 6.01, 'otherwise a few metres from where you fell');
   const back = [-Math.sin(c2.cam.yaw), -Math.cos(c2.cam.yaw)]; assert.ok((100 - q.x) * back[0] + (100 - q.z) * back[1] > 5.9, 'looking back at the spot');
   c2.train.cars = [{ g: { position: { x: 100, z: 106 } } }]; const r = c2.respawnPoint(); assert.ok(Math.hypot(r.x - 100, r.z - 106) >= 12, 'and never next to a train'); }
-console.log('PASS: player health (respawn button near where you fell, jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');
+// v1.97.42: attacks seen from outside, and on the other player's screen
+{ const src3 = html.slice(html.indexOf('function atkStart('), html.indexOf('function focusUnit('));
+  let now = 0; const c3 = { performance: { now: () => now }, Math }; vm.createContext(c3); vm.runInContext(src3 + '\nthis.atkStart = atkStart; this.atkCurve = atkCurve; this.atkApply = atkApply;', c3);
+  const o = {}; c3.atkStart(o, 'swing');
+  now = 100; assert.ok(c3.atkCurve(o).rot < -1.2, 'wound up over the shoulder at 0.1 s');
+  now = 260; assert.ok(c3.atkCurve(o).rot > 1, 'struck down in front at 0.26 s');
+  now = 600; assert.equal(c3.atkCurve(o).on, false, 'done by half a second'); assert.equal(o.atk, null);
+  c3.atkStart(o, 'shot'); now = 610; assert.ok(c3.atkCurve(o).rot < -0.25 && c3.atkCurve(o).back > 0.05, 'a shot kicks up and back');
+  const g = { rotation: { x: 0.5 }, position: { y: 0.95, z: -0.15 }, userData: {} }; c3.atkStart(o, 'swing'); now = 700; c3.atkApply(g, false, c3.atkCurve(o)); assert.ok(g.rotation.x < -0.5, 'the item turns with it');
+  now = 1300; c3.atkApply(g, false, c3.atkCurve(o)); assert.equal(g.rotation.x, 0.5, 'and back to rest after'); }
+assert.ok(html.includes("atkStart(VIEW, 'swing'); netSend({ t: 'atk', k: 'swing' });"), 'my swing plays on my avatar and is sent');
+assert.ok(html.includes("} else if (m.t === 'atk') { if (NET.rp) atkStart(NET.rp,") && html.includes("} else if (m.t === 'shot') { if (NET.rp) atkStart(NET.rp, 'shot');"), 'their swings and shots play on their avatar');
+assert.ok(html.includes('atkApply(VIEW.items[held], held === \'gun\', atk);'), 'my third-person item moves');
+console.log('PASS: player health (third-person swings and shots, synced; respawn button near where you fell, jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');

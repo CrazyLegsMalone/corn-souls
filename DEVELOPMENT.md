@@ -1,3 +1,12 @@
+## TEST v1.97.42 — third-person attacks (synced), labels back on their buildings, trucks talk at the scale window (2026-11-07)
+- **Third-person attacks** (owner: *"3rd person has no animations for any weapons or attacks ... synced with 2player so both players see each others attacks"*):
+  - A tool swing winds up back over the shoulder, strikes down in front and settles (0.5 s), and the right arm follows it. A shot kicks the gun up and back.
+  - `atkStart` / `atkCurve` / `atkApply`. Your own avatar plays them from `fire()`. The other player's avatar plays them from a new `atk` message (swings) and from the existing `shot` message (shots), so each player sees the other's attacks.
+- **Floating labels** (owner: *"the door labels from the scale house and the tin bins are floating in mid air"*): `nameplate()` freezes its matrix, and the two "move the whole block afterwards" loops (the grain yard by GDX/GDZ, the scale house by SH_DX) shifted `position` but never the frozen matrix. The TIN BIN plates and the scale-house door plates were still drawn where those blocks used to be. Both loops now update frozen matrices too. The scale-house door plates are 25% smaller (owner).
+- **Scale trucks** (owner: *"grain trucks pulling up to scale house should line up with window ... take a little longer to scale in and out"*): each truck now stops with its driver's window at the scale-house window (x 112), using `cabX`. A box truck's cab is 9.1 m ahead of its origin (which is what the old stops were laid out for); the owner's haulers' cab is 6.05 m, so they used to stop 3 m short. `WEIGH_T` goes from 3 to 9 s.
+- `validate-player-health.cjs` covers the attack curves (wind-up, strike, done in 0.5 s, the shot's kick, the item back at rest) and the message wiring.
+- Bumped TEST to `1.97.42` / `corn-souls-test-shell-v248`.
+
 ## TEST v1.97.41 — 3.0 models for Player 1, Player 2, Tammy and Vern (2026-11-07)
 - Owner: *"time to upgrade the models again"*, with four Corn Souls Crew 2.5 exports (each zip: GLB + CREDITS.txt + .wardrobe.json).
 - `assets/models/player1_3_0.glb` (long hair, hard hat, belt, boots), `player2_3_0.glb`, `tammy3_0.glb`, `vern3_0.glb` (hard hat, safety glasses, full beard, hi-vis vest, fingerless gloves), stored byte-for-byte. All are on the 66/71-joint Mixamo rig with every finger bone, so the first-person hands are still baked from the players' own hands. `PLAYER_SKIN.url`, `NPC_TAMMY` and `NPC_VERN` now point at them. Brenda and Rick keep their 2.0 builds, and the old files stay in the repo.

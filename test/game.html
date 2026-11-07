@@ -6786,7 +6786,7 @@ function init(container) {
     rl([sxB + 0.85, landY + 1.0, landZ - 0.2], [sxB + 0.85, 1.0, z1 + 0.7]);
     rl([sxA - 0.9, landY + 1.0, landZ + 1.2], [sxB + 0.9, landY + 1.0, landZ + 1.2]);
   }
-  for (let i = G0; i < scene.children.length; i++) { const o = scene.children[i]; o.position.x += GDX; o.position.z += GDZ; }   // whole grain yard to its real spot
+  for (let i = G0; i < scene.children.length; i++) { const o = scene.children[i]; o.position.x += GDX; o.position.z += GDZ; if (!o.matrixAutoUpdate) o.updateMatrix(); }   // whole grain yard to its real spot (v1.97.42: frozen-matrix pieces - the TIN BIN plates - moved too; they were left hanging where the yard used to be)
   // then a straight line of conveyors, end to end, right into the slurry blender
   const FA = V3(FLOURX + 1 + GDX, MY + 1.6, -2 + GDZ), FB = V3(BLX - 0.1, BLY + 0.6, -5.5), fp = t => FA.clone().lerp(FB, t).toArray();
   // short run south from the mills, then one straight elevated run due east across the road to the blender (satellite)
@@ -8000,8 +8000,8 @@ function init(container) {
     for (const x of [80, 75, 67]) leaf(x, HN, true, DOOR + 0.04, doorM);
     for (const x of [78, 71, 65]) leaf(x, HS, true, DOOR + 0.04, doorM);
     // door signs facing the hallway
-    const sign = (text, x, z, dz) => nameplate(text, x, FY + DH + 0.3, z, 0.1, 0, dz);
-    nameplate('TECH ROOM', TX, FY + DH + 0.3, HZ, 0.1, -1, 0);   // faces down the hallway
+    const sign = (text, x, z, dz) => nameplate(text, x, FY + DH + 0.3, z, 0.1, 0, dz, 0.75);   // v1.97.42: a bit smaller (owner)
+    nameplate('TECH ROOM', TX, FY + DH + 0.3, HZ, 0.1, -1, 0, 0.75);   // faces down the hallway
     sign('RESTROOM', 80, HN, 1); sign('SAFETY', 75, HN, 1); sign('TRAINING', 67, HN, 1);
     sign('PLANT MANAGER', 78, HS, -1); sign('HR', 71, HS, -1); sign('RECEPTION', 65, HS, -1);
     // furniture: tech counters under the windows, a desk per office, training desks with monitors, restroom fixtures, vending machines
@@ -8022,7 +8022,7 @@ function init(container) {
     DRINK_SPOTS.push({ x: 59, y: FY, z: ZN + 0.46, yaw: 0 });                                            // Milo Rade machine on the raised scale-house floor
     const dS = DRINK_SPOTS.length - 1;                                                                   // ...which then moves east with the building
     { const DX = SH_DX;   // shift the building (laid out in its original numbers) east along with the east road
-      for (let i = SH0; i < scene.children.length; i++) scene.children[i].position.x += DX;
+      for (let i = SH0; i < scene.children.length; i++) { const o = scene.children[i]; o.position.x += DX; if (!o.matrixAutoUpdate) o.updateMatrix(); }   // (v1.97.42: the door plates' frozen matrices too)
       for (let i = SHW; i < wallSegs.length; i++) { wallSegs[i][0] += DX; wallSegs[i][2] += DX; }
       for (let i = SHS; i < WALK_SURF.length; i++) { WALK_SURF[i].x0 += DX; WALK_SURF[i].x1 += DX; }
       for (let i = SHD; i < (O.swingDoors || []).length; i++) O.swingDoors[i].x += DX;
@@ -10035,7 +10035,11 @@ function updateTrain(dt, railOn) {
 const pitBusy = [false, false]; let laneNext = 0;
 const RDPX = RDPX_C, RDP_Z0 = -700, RDP_Z1 = 420;                                  // Road P (satellite)
 const HWY = { k: 0.653, b: 434, z(x) { return this.b - this.k * x; } }; HWY.c = 1 / Math.hypot(1, HWY.k); HWY.s = HWY.k * HWY.c;   // highway centerline z = b - k*x
-const SH_DX = 26, SCXI = 95 + SH_DX, SCXO = 77 + SH_DX, SCZ_IN = NROAD + 2, SCZ_OUT = NROAD + 17, SCZ_OUT_L = NROAD + 15, WEIGH_T = 3;   // truck scales at the entrance (see SCALE HOUSE)
+const SH_DX = 26, SCXI = 95 + SH_DX, SCXO = 77 + SH_DX, SCZ_IN = NROAD + 2, SCZ_OUT = NROAD + 17, SCZ_OUT_L = NROAD + 15, WEIGH_T = 9;   // v1.97.42: 9 s on the scale (owner: "take a little longer to scale in and out")
+// v1.97.42 (owner: "trucks ... should line up with window as if they are talking to the scale house techs"): each truck stops with
+// its DRIVER'S window at the scale-house window (x 112): a box truck's cab is 9.1 m ahead of its origin (that is what SCXI / SCXO
+// were laid out for), the owner's haulers' only 6.05 m (front axle at model z 1.79, mid at -5.055), so those stopped 3 m short.
+const SC_WIN = 86 + SH_DX, cabX = g => g.userData.hauler ? 6.05 : 9.1;   // truck scales at the entrance (see SCALE HOUSE)
 const LANES = [-186 + GDX, -178 + GDX];
 function spawn(kind, ship) {
   if (kind !== 'corn') return;                 // product loadouts aren't built in the new layout yet
@@ -10046,7 +10050,7 @@ function spawn(kind, ship) {
   if (kind === 'corn') {
     const lane = laneNext; laneNext = 1 - laneNext; const x = LANES[lane];
     g.position.set(RDPX + 2, 0, HWY.z(RDPX) - 20); g.rotation.y = Math.PI / 2;   // off the highway, north up Road P
-    vehicles.push({ g, kind, lane, route: [[RDPX + 2, NROAD - 2], [SCXI + 40, NROAD - 2], [SCXI + 22, SCZ_IN], [SCXI, SCZ_IN, 'weigh'], [x, NROAD - 1.5], [x, GDZ + (g.userData.hauler ? HAULER.DUMP_AHEAD : 0), 'dump'], [x, SZR + 1.5], [EXR + 1.5, SZR + 1.5], [EXR + 1.5, SCZ_OUT + 2], [SCXO - 30, SCZ_OUT + 2], [SCXO - 14, SCZ_OUT_L], [SCXO, SCZ_OUT_L, 'weigh'], [SCXO + 28, SCZ_OUT + 2], [RDPX - 2, SCZ_OUT + 2], [RDPX - 2, HWY.z(RDPX) - 20]], i: 0, t: 0 });
+    vehicles.push({ g, kind, lane, route: [[RDPX + 2, NROAD - 2], [SCXI + 40, NROAD - 2], [SCXI + 22, SCZ_IN], [SC_WIN + cabX(g), SCZ_IN, 'weigh'], [x, NROAD - 1.5], [x, GDZ + (g.userData.hauler ? HAULER.DUMP_AHEAD : 0), 'dump'], [x, SZR + 1.5], [EXR + 1.5, SZR + 1.5], [EXR + 1.5, SCZ_OUT + 2], [SCXO - 30, SCZ_OUT + 2], [SCXO - 14, SCZ_OUT_L], [SC_WIN - cabX(g), SCZ_OUT_L, 'weigh'], [SCXO + 28, SCZ_OUT + 2], [RDPX - 2, SCZ_OUT + 2], [RDPX - 2, HWY.z(RDPX) - 20]], i: 0, t: 0 });
     return;
   }
 }
@@ -11248,7 +11252,8 @@ function netRecv(m) {
   } else if (m.t === 'cdbg') { if (NET.host) creepDebug(m.w, m.x, m.z, m.a);
   } else if (m.t === 'swap') { if (!walk.drive) swapRangers();
   } else if (m.t === 'rp') { if (NET.host) railPhoneApply(m.a);   // a guest rang the dispatcher
-  } else if (m.t === 'shot') {
+  } else if (m.t === 'atk') { if (NET.rp) atkStart(NET.rp, m.k === 'shot' ? 'shot' : 'swing');   // v1.97.42: the other player swung
+  } else if (m.t === 'shot') { if (NET.rp) atkStart(NET.rp, 'shot');
     if (!ballGeo) ballGeo = new T.SphereGeometry(0.07, 8, 6);
     if (solidsT > 2) { solids = collectSolids(false); solidsT = 0; }
     const b = new T.Mesh(ballGeo, ballMat(m.c)); b.userData.noHit = true; b.position.set(m.p[0], m.p[1], m.p[2]); scene.add(b);
@@ -11302,6 +11307,7 @@ function netUpdate(dt) {
     R.sg.g.rotation.set(0.04 * (1 - q), 0.06 * (1 - q), 0);   // v1.97.197: the tilt was swallowed by the comment above
     R.sg.setRounds(R.am ? 'water' : 'paint', R.sh);
   }
+  if (R && R.items && R.held && R.items[R.held]) { const it = R.items[R.held], a = atkCurve(R, R.held); if (R.held === 'gun') { if (a.on) { it.rotation.x += a.rot; it.position.z += a.back; } } else atkApply(it, false, a); }   // v1.97.42: their swing / kick
   if (R) {   // glide toward the latest reported spot
     const k = Math.min(1, 12 * dt); R.x += (R.tx - R.x) * k; R.y += (R.ty - R.y) * k; R.z += (R.tz - R.z) * k; R.yaw = _lerpA(R.yaw, R.tyaw, k);
     if (R.mow && O.shedMower) { const g = O.shedMower.g, M = R.mow, k = Math.min(1, rdt * 10), ox = g.position.x, oz = g.position.z;
@@ -14365,8 +14371,30 @@ function updateSelfAv() {
   VIEW.legs.forEach((l, i) => { const t = i ? -sw : sw; limb(l, t, 0.3); });
   const ksw = moving ? Math.min(0.55, sp * 14) : 0, kc = Math.cos(VIEW.ph);   // knees bend mid-swing (foot clears the ground), straighten at heel-strike
   VIEW.knees.forEach((k, i) => { const t = Math.max(0, i ? kc : -kc) * ksw; limb(k, t, 0.4); });
-  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.7 : (i === 0 && SR.carry === 'me' ? -2.2 : (i ? sw : -sw) * 0.6); limb(a, legs ? FP_BODY.armsUp : hold, 0.3); });   // right arm forward with a gun or a tool, left arm up holding the boom box
+  const atk = atkCurve(VIEW, held);   // v1.97.42: a swing / a shot's kick moves the right arm too
+  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.7 + atk.arm : (i === 0 && SR.carry === 'me' ? -2.2 : (i ? sw : -sw) * 0.6); limb(a, legs ? FP_BODY.armsUp : hold, atk.on ? 0.7 : 0.3); });   // right arm forward with a gun or a tool, left arm up holding the boom box
   for (const k in VIEW.items) VIEW.items[k].visible = show && k === held;
+  if (show && VIEW.items[held]) atkApply(VIEW.items[held], held === 'gun', atk);
+}
+// ---------- v1.97.42: ATTACKS SEEN FROM OUTSIDE (owner: "3rd person has no animations for any weapons or attacks ... synced with 2player
+// so both players see each others attacks"). A swing: the tool winds up back over the shoulder, comes down hard in front and
+// settles (0.5 s), the right arm with it; a shot: the gun kicks up and back. Your own avatar in third person plays it from fire(),
+// the other player's from the 'atk' / 'shot' messages, so each of you sees the other's.
+function atkStart(o, k) { o.atk = { k, t0: performance.now() }; }
+function atkCurve(o, held) {
+  const A = o.atk; if (!A) return { on: false, rot: 0, arm: 0, back: 0 };
+  const t = (performance.now() - A.t0) / 1000;
+  if (A.k === 'shot') { if (t > 0.3) { o.atk = null; return { on: false, rot: 0, arm: 0, back: 0 }; } const e = Math.exp(-t * 14); return { on: true, rot: -0.35 * e, arm: -0.25 * e, back: 0.07 * e }; }
+  if (t > 0.5) { o.atk = null; return { on: false, rot: 0, arm: 0, back: 0 }; }
+  const ss = x => x * x * (3 - 2 * x);
+  const c = t < 0.13 ? -1.7 * ss(t / 0.13) : t < 0.27 ? -1.7 + 3.0 * ss((t - 0.13) / 0.14) : 1.3 * (1 - ss((t - 0.27) / 0.23));   // wind up, strike, settle
+  return { on: true, rot: c, arm: c * 0.75, back: 0 };
+}
+function atkApply(g, gun, a) {   // offset the held item from its resting pose (remembered the first time)
+  const u = g.userData; if (!u.atkBase) u.atkBase = { x: g.rotation.x, py: g.position.y, pz: g.position.z };
+  const B = u.atkBase; if (!a.on && !u.atkOn) return; u.atkOn = a.on;
+  if (gun) { g.rotation.x = B.x + a.rot; g.position.z = B.pz + a.back; }
+  else { g.rotation.x = B.x + a.rot; g.position.y = B.py + Math.max(0, -a.rot) * 0.12; }
 }
 
 function focusUnit(id) {
@@ -15607,7 +15635,7 @@ function cycleItem(d) { return setItem(ITEMS[(ITEMS.indexOf(held) + d + ITEMS.le
 function fire() {
   if (!walk.on || walk.dead) return false;
   if (walk.mow) { const t = performance.now(); if (t - MOW.fireT > 300) mowBlade(); MOW.fireT = t; return true; }   // on the mower: fire toggles the blades
-  if (TOOLS[held]) { if (swipe <= 0) { swipe = 1; toolHit(); } return true; }
+  if (TOOLS[held]) { if (swipe <= 0) { swipe = 1; atkStart(VIEW, 'swing'); netSend({ t: 'atk', k: 'swing' }); toolHit(); } return true; }   // v1.97.42: the swing shows in third person, and on the other player's screen
   if (held === 'ext') { EXT.sprayT = 0.25; return true; }   // hold to spray   // a push stroke; cleaning up messes comes later
   if (held !== 'gun') return false;
   if (!gun) gun = makeGun();
@@ -15628,7 +15656,7 @@ function fire() {
   m.userData.noHit = true; m.position.copy(muzzle); scene.add(m);
   gunPop();
   const bv = target.sub(muzzle).normalize().multiplyScalar(65); balls.push({ m, v: bv, c, life: 0 });
-  netSend({ t: 'shot', p: [muzzle.x, muzzle.y, muzzle.z], v: [bv.x, bv.y, bv.z], c });
+  netSend({ t: 'shot', p: [muzzle.x, muzzle.y, muzzle.z], v: [bv.x, bv.y, bv.z], c }); atkStart(VIEW, 'shot');   // (their game plays the recoil from the 'shot' itself)
   gunKick = 1; return true;
 }
 // ---------- PAINTBALL DECALS (v1.97.118): the owner's PSX splats, 32 px, five shapes in each paint colour. One material per
