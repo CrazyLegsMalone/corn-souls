@@ -626,7 +626,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes('if (o !== root) o.matrixAutoUpdate = false; })'), 'and stops walking static matrices every frame');
   assert.ok(!html.includes("'BOILER A'") && !html.includes('15.5 - H'), 'the old procedural boilers and their rooftop stacks are gone');
   // ---------------------------------------------------------------- the players wear their own wardrobe builds (v1.97.185)
-  assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("'/corn-souls/assets/models/squeeg1_2_0.glb'") && html.includes("'/corn-souls/assets/models/squeeg2_2_0.glb'"), 'Player 1 wears squeeg1, Player 2 wears squeeg2');
+  assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("'/corn-souls/assets/models/player1_3_0.glb'") && html.includes("'/corn-souls/assets/models/player2_3_0.glb'"), 'Player 1 wears squeeg1, Player 2 wears squeeg2');
   assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 8, 'one definition + seven avatars: 2P remote, own 3rd person, Ranger driver, mower rider, passenger seat, the other player seated in a car, and the idle Player 2 at the smoking area (v1.97.190)');
   for (const call of ['dressPlayerSkin(av, VEST_COL[other], {});', 'dressPlayerSkin(d, vest, { sit: true });', 'dressPlayerSkin(av, VEST_COL[me], { onRig: (R, root, swing) => {'])
 
@@ -728,11 +728,11 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     const lib4 = { window: {}, console };
     vm.runInNewContext(scripts.find(x => x.includes('window.THREE=eu')), lib4);
     const T4 = Object.create(lib4.window.THREE, { TextureLoader: { value: class { load() { return new lib4.window.THREE.Texture(); } } } });   // no DOM images in node (both player builds have embedded maps)
-    const bytes = [fs.readFileSync('assets/models/squeeg1_2_0.glb'), fs.readFileSync('assets/models/squeeg2_2_0.glb')];
+    const bytes = [fs.readFileSync('assets/models/player1_3_0.glb'), fs.readFileSync('assets/models/player2_3_0.glb')];
     const buf = b => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
     const thenable = v => ({ then: cb => { const r = cb(v); return (r && r.then) ? r : thenable(r); }, catch: () => thenable(v) });
     const pctx = { T: T4, console, TextDecoder, VEST_COL: [0xff7a1a, 0xc6e41f], Blob: class { constructor(p) { this.size = p && p[0] ? p[0].length : 0; } }, URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
-      fetch: url => thenable({ ok: true, arrayBuffer: () => thenable(buf(/squeeg1/.test(url) ? bytes[0] : bytes[1])) }) };
+      fetch: url => thenable({ ok: true, arrayBuffer: () => thenable(buf(/squeeg1|player1/.test(url) ? bytes[0] : bytes[1])) }) };
     vm.createContext(pctx);
     vm.runInContext(reader2 + '\n' + skinSrc + '\n' + playerSrc + '\nthis.dressPlayerSkin = dressPlayerSkin; this.skinBox = skinBox; this.skinSwing = skinSwing; this.skinBone = skinBone;', pctx);
     const avatar = () => { const av = new T4.Group(); const box = new T4.Mesh(new T4.BoxGeometry(0.4, 0.6, 0.3), new T4.MeshLambertMaterial({ color: 0xffffff }));
@@ -752,8 +752,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.ok(g1 && g2, 'a model was added to each avatar');
     assert.equal(a1.children.some(c => c.userData.body), false, 'the box body is gone, the model stands in for it');
     const H = g => pctx.skinBox(g).max.y - pctx.skinBox(g).min.y;
-    assert.ok(Math.abs(H(g1) - 1.78) < 0.04, 'Player 1 is 1.78 m tall (' + H(g1).toFixed(2) + ')');
-    assert.ok(Math.abs(H(g2) - 1.65) < 0.04, 'Player 2 is 1.65 m tall (' + H(g2).toFixed(2) + ')');
+    assert.ok(H(g1) > 1.74 && H(g1) < 1.86, 'Player 1 is 1.78 m tall, up to 8 cm more to the top of the 3.0 build\'s hard hat (' + H(g1).toFixed(2) + ')');
+    assert.ok(H(g2) > 1.61 && H(g2) < 1.73, 'Player 2 is 1.65 m tall, plus her hard hat (' + H(g2).toFixed(2) + ')');
     assert.ok(g1 !== g2, 'the two players are built from different files');
     assert.ok(Math.abs(g1.rotation.y - Math.PI) < 1e-6, 'and turned to face the way the box avatars face');
     let shadows = 0; g1.traverse(o => { if (o.isMesh && o.castShadow) shadows++; }); assert.equal(shadows, 0, 'no shadow casting on the skinned player');

@@ -1,3 +1,12 @@
+## TEST v1.97.41 — 3.0 models for Player 1, Player 2, Tammy and Vern (2026-11-07)
+- Owner: *"time to upgrade the models again"*, with four Corn Souls Crew 2.5 exports (each zip: GLB + CREDITS.txt + .wardrobe.json).
+- `assets/models/player1_3_0.glb` (long hair, hard hat, belt, boots), `player2_3_0.glb`, `tammy3_0.glb`, `vern3_0.glb` (hard hat, safety glasses, full beard, hi-vis vest, fingerless gloves), stored byte-for-byte. All are on the 66/71-joint Mixamo rig with every finger bone, so the first-person hands are still baked from the players' own hands. `PLAYER_SKIN.url`, `NPC_TAMMY` and `NPC_VERN` now point at them. Brenda and Rick keep their 2.0 builds, and the old files stay in the repo.
+- Registered `in-use` and credited in `CREDITS.md`, with each zip's CREDITS.txt text as the modification notice.
+- The 3.0 player builds paint skin, boots and jeans in three textures, so the first-person body is one draw more: the `validate-fp-body.cjs` budget goes from 6 to 7.
+- Checked in headless Chromium: first-person hands on the gun and wrench, Player 1 in third person, Vern in his vest and beard at receiving, and Tammy typing at her window.
+- New `validate-models-3-0.cjs` (in CI). The content suites for the 2.0 files keep testing those files, with their wiring checks moved to the 3.0 names.
+- Bumped TEST to `1.97.41` / `corn-souls-test-shell-v247`.
+
 ## TEST v1.97.40 — corn zombie prototype (2026-11-07)
 - Owner: *"lets add a basic corn zombie or something to test the weapons and player movement. it spawns randomly inside any building but moves slow once found or something im open to ideas this is just a prototype"*.
 - **The zombie** (`ZOMB`, `zombSpawn` / `zombUpdate`): Loves_Art's base male (already shipped, CC BY) recoloured at runtime as green skin, corn-silk yellow hair and dirty olive clothes, with its arms out in front and its head lolled. It is merged to one skinned draw, with a simple shamble: legs swing, knees bend, the body rocks and the arms bob. A green box stands in until the model loads.

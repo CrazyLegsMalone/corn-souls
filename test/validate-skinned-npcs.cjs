@@ -114,7 +114,7 @@ for (const [id, file, p] of [['vern', 'NPC_VERN', 'stand'], ['op', 'NPC_RICK', '
   const line = table.split('\n').find(l => l.trim().startsWith(id + ':')); assert.ok(line, id + ' is in NPC_MODELS');
   assert.ok(line.includes('url: ' + file) && line.includes('skin: true') && line.includes("pose: '" + p + "'"), id + ' wears ' + file + ', ' + p);
 }
-for (const [name, file] of [['NPC_VERN', VERN], ['NPC_RICK', RICK], ['NPC_BRENDA', BRENDA], ['NPC_TAMMY', TAMMY]])
+for (const [name, file] of [['NPC_VERN', 'vern3_0.glb'], ['NPC_RICK', RICK], ['NPC_BRENDA', BRENDA], ['NPC_TAMMY', 'tammy3_0.glb']])   // v1.97.41: Vern and Tammy wear their 3.0 builds
   assert.ok(html.includes("const " + name + " = '/corn-souls/assets/models/" + file + "';"), name + ' points at ' + file);
 assert.ok(!html.includes('NPC_MALE') && !html.includes('NPC_FEMALE'), 'the plain male and female are no longer wired anywhere: all four NPCs wear their own builds');
 assert.ok(!/colors:/.test(table), 'no NPC is repainted in game: every wardrobe colour is in its own file');

@@ -1039,6 +1039,90 @@
       "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
       "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
       "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-male-player1-3-0",
+      "title": "Low Poly Male — player1 3.0 (Corn Souls Crew 2.5 build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3",
+      "evidence": "The owner's drop (player1_3_0.zip): CREDITS.txt naming Loves_Art, the source URL and CC BY 4.0, and a .wardrobe.json; embedded asset.extras: {\"title\": \"player1 3.0 (Corn Souls character)\", \"author\": \"Loves_Art (https://sketchfab.com/Loves_Art)\", \"license\": \"CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)\", \"source\": \"https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3\", \"changes\": \"Changes made in Corn",
+      "notes": "Worn by Player 1 (Squeeg) in the TEST channel from v1.97.41, in place of its 2.0 build (kept in the repo).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Corn Souls Crew 2.5: recoloured (skin, eyes, hair and eyebrows, clothing, shoes, lips, nails); edited: clothing split into separate top and bottom parts, the built-in beard split into its own part; added new parts made in Corn Souls Crew (not part of the original model): long hair (hair cards), hard hat, belt; painted onto the original surfaces: work boots, waistband raised to the belt.",
+      "files": [
+        "assets/models/player1_3_0.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the CREDITS.txt and wardrobe file in the owner's drop and the GLB's embedded metadata",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-female-player2-3-0",
+      "title": "Low Poly Female — player2 3.0 (Corn Souls Crew 2.5 build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1",
+      "evidence": "The owner's drop (player2_3_0.zip): CREDITS.txt naming Loves_Art, the source URL and CC BY 4.0, and a .wardrobe.json; embedded asset.extras: {\"title\": \"player2 3.0 (Corn Souls character)\", \"author\": \"Loves_Art (https://sketchfab.com/Loves_Art)\", \"license\": \"CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)\", \"source\": \"https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1\", \"changes\": \"Changes made in Co",
+      "notes": "Worn by Player 2 in the TEST channel from v1.97.41, in place of its 2.0 build (kept in the repo).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Corn Souls Crew 2.5: recoloured (skin, eyes, hair and eyebrows, clothing, shoes, lips, nails); edited: clothing split into separate top and bottom parts, the model’s own short hair flattened to the scalp, expression set to “angry” (brows, lips and the skin round the mouth moved); added new parts made in Corn Souls Crew (not part of the original model): curly pixie, hard hat, stud earrings, pendant necklace, bracelet, belt; painted onto the original surfaces: fingerless gloves, hi-vis vest, work boots, long shirt, long pants, nail polish, waistband raised to the belt.",
+      "files": [
+        "assets/models/player2_3_0.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the CREDITS.txt and wardrobe file in the owner's drop and the GLB's embedded metadata",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-female-tammy3-0",
+      "title": "Low Poly Female — tammy3.0 (Corn Souls Crew 2.5 build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1",
+      "evidence": "The owner's drop (tammy3_0.zip): CREDITS.txt naming Loves_Art, the source URL and CC BY 4.0, and a .wardrobe.json; embedded asset.extras: {\"title\": \"tammy3.0 (Corn Souls character)\", \"author\": \"Loves_Art (https://sketchfab.com/Loves_Art)\", \"license\": \"CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)\", \"source\": \"https://sketchfab.com/3d-models/low-poly-female-07eeb124d210402bbc061e543d0b97a1\", \"changes\": \"Changes made in Corn ",
+      "notes": "Worn by the NPC Tammy (scale house, outbound) in the TEST channel from v1.97.41, in place of its 2.0 build (kept in the repo).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Corn Souls Crew 2.5: recoloured (skin, eyes, hair and eyebrows, clothing, shoes, lips, nails); edited: clothing split into separate top and bottom parts, expression set to “angry” (brows, lips and the skin round the mouth moved); added new parts made in Corn Souls Crew (not part of the original model): bun, square glasses, hoop earrings, pendant necklace, watch, belt; painted onto the original surfaces: work boots, long shirt, long pants, nail polish, waistband raised to the belt.",
+      "files": [
+        "assets/models/tammy3_0.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the CREDITS.txt and wardrobe file in the owner's drop and the GLB's embedded metadata",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-loves-art-low-poly-male-vern3-0",
+      "title": "Low Poly Male — vern3.0 (Corn Souls Crew 2.5 build)",
+      "creator": "Loves_Art",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3",
+      "evidence": "The owner's drop (vern3_0.zip): CREDITS.txt naming Loves_Art, the source URL and CC BY 4.0, and a .wardrobe.json; embedded asset.extras: {\"title\": \"vern3.0 (Corn Souls character)\", \"author\": \"Loves_Art (https://sketchfab.com/Loves_Art)\", \"license\": \"CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/)\", \"source\": \"https://sketchfab.com/3d-models/low-poly-male-7d601a034c1c45e68151bddf386e48b3\", \"changes\": \"Changes made in Corn Sou",
+      "notes": "Worn by the NPC Vern (grain receiving) in the TEST channel from v1.97.41, in place of its 2.0 build (kept in the repo).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Stored byte-for-byte as the owner exported it. Corn Souls Crew 2.5: recoloured (skin, eyes, hair and eyebrows, clothing, shoes, lips, nails); edited: clothing split into separate top and bottom parts, the built-in beard split into its own part and painted; added new parts made in Corn Souls Crew (not part of the original model): hard hat, safety glasses, belt, full beard; painted onto the original surfaces: beard shading under it, fingerless gloves, hi-vis vest, work boots, waistband raised to the belt.",
+      "files": [
+        "assets/models/vern3_0.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the CREDITS.txt and wardrobe file in the owner's drop and the GLB's embedded metadata",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
     }
   ]
 }

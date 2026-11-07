@@ -27,7 +27,7 @@ for (const [f, joints, skinned, rigid, tri] of [[S1, 66, 15, 1, [6000, 6400]], [
   }
 }
 // wiring
-assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("url: ['/corn-souls/assets/models/squeeg1_2_0.glb', '/corn-souls/assets/models/squeeg2_2_0.glb']") && html.includes('h: [1.78, 1.65]'), 'P1 wears squeeg1 at 1.78 m, P2 wears squeeg2 at 1.65 m');
+assert.ok(html.includes("const PLAYER_SKIN = {") && html.includes("url: ['/corn-souls/assets/models/player1_3_0.glb', '/corn-souls/assets/models/player2_3_0.glb'],") /* v1.97.41: the 3.0 builds; the 2.0 files checked below stay in the repo */ && html.includes('h: [1.78, 1.65]'), 'P1 wears squeeg1 at 1.78 m, P2 wears squeeg2 at 1.65 m');
 assert.ok(html.includes('slot = vest === VEST_COL[1] ? 1 : 0'), 'the vest colour picks the slot');
 assert.equal((html.match(/dressPlayerSkin\(/g) || []).length, 8, 'one definition + seven avatars (the two players, four seated, and the idle Player 2 at the smoking area)');
 assert.ok(html.includes('function loadPlayerSkin(slot, cb)') && html.includes('glbBuild(S.bytes[slot])'), 'raw bytes are cached and glbBuild runs per avatar (no skeleton sharing)');

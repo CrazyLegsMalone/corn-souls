@@ -24,7 +24,7 @@ const ctx = {
   T, console, TextDecoder, VEST_COL: [0xff7a1a, 0xc6e41f],
   Blob: class { constructor(p) { this.size = p && p[0] ? p[0].length : 0; } },
   URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
-  fetch: url => thenable({ ok: true, arrayBuffer: () => thenable(/squeeg1/.test(url) ? sq1 : sq2) })
+  fetch: url => thenable({ ok: true, arrayBuffer: () => thenable(/squeeg1|player1/.test(url) ? sq1 : sq2) })
 };
 vm.createContext(ctx);
 vm.runInContext(reader + '\n' + npcSrc + '\n' + playerSrc + '\nthis.glbBuild = glbBuild; this.skinnedNpc = skinnedNpc; this.dressPlayerSkin = dressPlayerSkin; this.skinBox = skinBox;', ctx);

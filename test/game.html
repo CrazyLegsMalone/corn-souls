@@ -5675,10 +5675,10 @@ function characterRig(av, opt) {
 // v1.97.180-184: all four now wear their own Crew Wardrobe builds of those models (brenda_2_0 / tammy_2_0 / vern_2_0 / rick_2_0):
 // every colour, hair shape and accessory is already in each file, so none of them has a `colors` entry to repaint it with. The
 // plain male and female files stay in the repo as the base files the builds were made from; no NPC wears either of them now.
-const NPC_VERN = '/corn-souls/assets/models/vern_2_0.glb';       // the owner's Crew Wardrobe build of him (Loves_Art male, CC BY 4.0, recoloured + accessorised)
+const NPC_VERN = '/corn-souls/assets/models/vern3_0.glb';   /* v1.97.41: the owner's 3.0 build (hard hat, safety glasses, full beard, hi-vis vest, fingerless gloves) */       // the owner's Crew Wardrobe build of him (Loves_Art male, CC BY 4.0, recoloured + accessorised)
 const NPC_RICK = '/corn-souls/assets/models/rick_2_0.glb';       // and Rick's (same base model, his own wardrobe build)
 const NPC_BRENDA = '/corn-souls/assets/models/brenda_2_0.glb';   // Brenda's (Loves_Art female)
-const NPC_TAMMY = '/corn-souls/assets/models/tammy_2_0.glb';     // and Tammy's (same base model, her own wardrobe build)
+const NPC_TAMMY = '/corn-souls/assets/models/tammy3_0.glb';   /* v1.97.41: her 3.0 build */     // and Tammy's (same base model, her own wardrobe build)
 const NPC_MODELS = {
   vern:   { url: NPC_VERN, skin: true, h: 1.78, pose: 'stand', x: -232 },   // off the loop track (it runs at x -240)
   op:     { url: NPC_RICK, skin: true, h: 1.78, pose: 'sit' },              // Rick, the board operator
@@ -5981,7 +5981,7 @@ function idlePlayer2() {
 // v1.97.185: standing pose only - arms down, feet on the floor, no walk cycle yet (the hip/shoulder swing and the held-item arms
 // that drove the old rigid rig are gone for now); seated avatars fold their legs exactly like skinnedNpc() does.
 const PLAYER_SKIN = {
-  url: ['/corn-souls/assets/models/squeeg1_2_0.glb', '/corn-souls/assets/models/squeeg2_2_0.glb'],
+  url: ['/corn-souls/assets/models/player1_3_0.glb', '/corn-souls/assets/models/player2_3_0.glb'],   // v1.97.41: the owner's 3.0 builds
   h: [1.78, 1.65],
   bytes: [null, null], loading: [false, false], wait: [[], []]
 };

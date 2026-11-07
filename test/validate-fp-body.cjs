@@ -15,7 +15,7 @@ const readModel = name => {
   const b = fs.readFileSync('../assets/models/' + name);
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 };
-const models = ['squeeg1_2_0.glb', 'squeeg2_2_0.glb'].map(readModel);
+const models = ['player1_3_0.glb', 'player2_3_0.glb'].map(readModel);
 const thenable = value => ({
   then(fn) { const result = fn(value); return result && result.then ? result : thenable(result); },
   catch() { return this; }
@@ -130,7 +130,7 @@ for (let slot = 0; slot < 2; slot++) {
   assert.equal(casters.length, 1);
   updateGun(0);
   assert.equal(ctx.test.hands.length, 2);
-  assert.ok(visible.length + casters.length + ctx.test.hands.length <= 6, 'world + shadow + HUD draw budget');
+  assert.ok(visible.length + casters.length + ctx.test.hands.length <= 7, 'world + shadow + HUD draw budget (v1.97.41: 7 - the 3.0 builds paint skin, boots and jeans in three textures, one draw each): ' + visible.length + ' + ' + casters.length + ' + ' + ctx.test.hands.length + ' ' + visible.map(m => m.material.map ? 'tex' : 'flat'));
   scene.updateMatrixWorld(true);
   assert.ok(bootsInView(visible) > 20, 'both player models show boots when looking down');
   walk.x += 0.06;
