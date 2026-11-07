@@ -1,3 +1,10 @@
+## TEST v1.97.36 — owner's Lesion Toolbox placements: ammonia windsock and the Pink Sedan (2026-11-07)
+- Owner sent a placement report (made on v1.97.33) and noted that the collision boxes didn't move with the objects in the live test. Both are now moved in the source, so collision is built in the new spots:
+  - **Ammonia windsock** (the `CylinderGeometry` pole + its sock `group`): pole 39.30, -56.50 → **41.16, -58.53** (its collision circle moves with it); sock head 39.30, 6.00, -56.50 → **41.23, 6.25, -58.32**. Turn is unchanged: the sock's yaw is live wind.
+  - **Pink Sedan** (`O.cars[2]`): lot stall 6 (109.55, -96.45) → **136.42, -76.14**, same heading. Its drivable wrapper and collision boxes come from that spot.
+- `validate-windsocks.cjs` pins the new sock position. All suites pass.
+- Bumped TEST to `1.97.36` / `corn-souls-test-shell-v242`.
+
 ## TEST v1.97.35 — basic damage system: health, and damage between player 1 and 2 (2026-11-07)
 - Owner: *"add a basic damage system to start with. including damage between player 1 and 2"*.
 - **Health:** 100 HP (`HP`, `playerHurt(n, cause, kx, kz, msg)`). A hit takes HP off, knocks you back, flashes the screen edge red, vibrates the phone and says what hit you with the HP left. At 0 you go down with that cause (the usual death scene). After 6 quiet seconds it heals at 8 HP a second, and you are full again after a death. A thin bar at the top centre shows only while hurt (green, then yellow, then red).

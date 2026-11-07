@@ -8431,7 +8431,7 @@ function init(container) {
     silverado(0xb3161b, 2, 0); jeep(0x2c4a30, 5, 0); equinox(0x16181b, 9, 1); renegade(0xf2f3f1, 3, 2); crownVic(0xf1f2ef, 12, 1); ranger90(0xf2f2ee, 7, 2); denali(11, 0);
     // a brand-new pink Kia sedan (K5-style fastback): long low body, sloping roofline into a short deck, slim LED lights, the wide
     // "tiger nose" grille, full-width LED tail bar, black roof and two-tone wheels. X / E at it works the stereo: hip hop → Mexican → off.
-    { const V = veh(6, 1), W = 1.86, blk = 0x111214;
+    { const V = veh(6, 1, [136.42, -76.14, Math.PI]), W = 1.86, blk = 0x111214;   // v1.97.36: the owner's spot for it (Lesion Toolbox), out of lot stall 6
       const paint = new T.MeshPhongMaterial({ color: 0xf28ab8, shininess: 90, specular: 0xd8b0c4 });   // pink
       const side = (pts, w, m) => { const sh = new T.Shape(pts.map(([a2, b2]) => new T.Vector2(a2, b2))); const geo = new T.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2); V.g.add(new T.Mesh(geo, m)); };
       cabin(V.g, { W, low: [[2.42, 0.28], [2.45, 0.66], [2.3, 0.78], [1.2, 0.88], [-1.75, 1.0], [-2.38, 0.94], [-2.45, 0.7], [-2.42, 0.28]], gh: [[1.2, 0.88], [0.45, 1.42], [-0.6, 1.44], [-1.75, 1.0]], win: [[[1.16, 0.91], [0.47, 1.38], [-0.58, 1.4], [-1.68, 1.0], [-1.62, 0.92]]], bp: [-0.4], paint, eye: 1.17 });   // fastback: the long back glass is the rear window
@@ -8684,9 +8684,10 @@ function init(container) {
     // weather and fills out with the wind speed (limp and hanging when it's calm), fluttering a little.
     // Keep the wet cake windsock; add an identical one northeast of ammonia, clear of the tank, valves and south pump rack.
     O.windsocks = [];
-    for (const [WX, WZ] of [[E1 - 67 - 4, EZ1 + 3], [NH3.x + 4, NH3.z - 8]]) {
+    // v1.97.36: the ammonia one placed by the owner with the Lesion Toolbox (pole 41.16, -58.53; sock head 41.23, 6.25, -58.32)
+    for (const [WX, WZ, SX, SY, SZ] of [[E1 - 67 - 4, EZ1 + 3], [41.16, -58.53, 41.23, 6.25, -58.32]]) {
       cyl(0.07, 6.0, mat(0xd8dcdf), WX, 0, WZ, null, 10); box(0.5, 0.2, 0.5, mat(0x9a9fa4), WX, 0.1, WZ); extraCols.push([WX, WZ, 0.3]);
-      const piv = new T.Group(); piv.position.set(WX, 6.0, WZ); scene.add(piv);
+      const piv = new T.Group(); piv.position.set(SX === undefined ? WX : SX, SY === undefined ? 6.0 : SY, SZ === undefined ? WZ : SZ); scene.add(piv);
       const ring = new T.Mesh(new T.TorusGeometry(0.28, 0.025, 6, 16), mat(0x9aa0a6)); ring.position.set(0, 0, 0.12); piv.add(ring);
       const segs = []; let parent = piv, z0 = 0.12;
       for (let i = 0; i < 5; i++) { const r0 = 0.28 - i * 0.034, r1 = r0 - 0.034, L = 0.46, sg = new T.Group(); sg.position.set(0, 0, z0); parent.add(sg);
