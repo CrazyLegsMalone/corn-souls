@@ -36,12 +36,15 @@ for (const name of ['hand', 'washer', 'wrench', 'crowbar', 'ext']) {
   hudScene.add(item);
 }
 const SR = { carry: null, g: new T.Group() };
+// v1.97.31: the hands are baked from the player models' own colour maps; here every map reads back as one skin tone
+T.TextureLoader.prototype.load = function () { const t = new T.Texture(); t.image = { width: 4, height: 4 }; return t; };
+const fakeDocument = { createElement: () => ({ getContext: () => ({ drawImage() {}, getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4).fill(150) }) }) }) };
 const ctx = {
   T, console, TextDecoder, performance: { now: () => 100 }, walk, NET, SR, VEST_COL: [0xff7a1a, 0xc6e41f],
   scene, hudScene, fpGun, camera, TOOLS, heldG, held: 'gun', heldDead: null, SQ_K: 1.68 / 1.8, clock: 1,
   TUNE: { fogNear: 120, fogFar: 900 }, EYE: 1.57, POWER: { fov: 0 },
   gun: fpGun.g, aimK: 0, aimWant: false, reloadT: 0, reloadTo: 'paint', reloadFill: true, pumpT: 0,
-  ensureHud: () => hudScene,
+  ensureHud: () => hudScene, document: fakeDocument, setTimeout() {},
   hudMat: () => new T.MeshBasicMaterial(),
   toolMat: () => new T.MeshBasicMaterial(),
   crowbarSlot: () => new T.Group(),
@@ -75,7 +78,7 @@ vm.runInContext([
   cut('const HIP = {', '// EVERY first-person item'),
   cut('function buildFpHands(', 'let fpHands = null'),
   cut('let fpHands = null', '// ---------- LESION TOOLBOX'),
-  'this.test = { FP_BODY, FP_WAIST, VIEW, setView, walkCam, updateSelfAv, updateGun, toggleFpBody, dressPlayerSkin, makeTool, get hands() { return fpHands; } };'
+  'this.test = { buildFpHands, FP_MHAND, get modelHands() { return fpModelHands; }, FP_BODY, FP_WAIST, VIEW, setView, walkCam, updateSelfAv, updateGun, toggleFpBody, dressPlayerSkin, makeTool, get hands() { return fpHands; } };'
 ].join('\n'), ctx);
 const { FP_BODY, FP_WAIST, VIEW, setView, walkCam, updateSelfAv, updateGun, toggleFpBody, dressPlayerSkin } = ctx.test;
 for (const name of Object.keys(TOOLS)) {
@@ -158,7 +161,21 @@ const [right, left] = ctx.test.hands;
 assert.equal(right.parent, fpGun.stock);
 assert.equal(left.parent, fpGun.pump);
 assert.equal(right.material, left.material);
-assert.equal(right.geometry.attributes.color.count, 252);
+assert.ok(right.userData.model && left.userData.model, 'v1.97.31: the hands are the player model\'s own, not box gloves');
+assert.ok(right.geometry.attributes.position.count > 1500 && right.geometry.attributes.color, 'a real hand and forearm, with its colours baked in');
+assert.notEqual(right.geometry, left.geometry);
+{ // the fist sits round the grip point: the hand's origin is inside it, and the forearm runs back toward the elbow (+z)
+  const bb = new T.Box3().setFromBufferAttribute(right.geometry.attributes.position), c = bb.getCenter(new T.Vector3());
+  assert.ok(bb.min.z < -0.03 && bb.max.z > 0.3, 'fist ahead of the origin, forearm well behind it: ' + bb.min.z.toFixed(2) + '..' + bb.max.z.toFixed(2));
+  assert.ok(Math.abs(c.x) < 0.06 && Math.abs(c.y) < 0.06, 'centred on the handle');
+  // the fist's handle axis (+y) lies along the item's grip direction
+  const y = new T.Vector3(0, 1, 0).applyQuaternion(right.quaternion), u = new T.Vector3(0, 0.35, -1).normalize();
+  assert.ok(y.dot(u) > 0.999, 'thumb along the stock wrist');
+}
+{ // until the model loads (or if it never does) the box gloves stand in
+  const box = ctx.test.buildFpHands(0xff7a1a);
+  assert.equal(box[0].geometry.attributes.color.count, 252); assert.ok(!box[0].userData.model);
+}
 const before = left.getWorldPosition(new T.Vector3());
 ctx.pumpT = 0.5; updateGun(0);
 assert.ok(before.distanceTo(left.getWorldPosition(new T.Vector3())) > 0.07, 'support hand follows the pump stroke');

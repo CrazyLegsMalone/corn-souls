@@ -15438,7 +15438,118 @@ function buildFpHands(vest) {
     return hand;
   });
 }
+// v1.97.31: first-person hands baked from the player's own model (squeeg1 / squeeg2): their real hand, skin, nails and
+// sleeve, fingers curled into a grip, in the same hand frame the box gloves use, so every grip pose below still fits.
+// The box gloves stay as the stand-in until the model has loaded. One vertex-coloured mesh per hand (the draw budget).
+// Baked in the fist's own frame: origin inside the fist where the handle runs, +y along the handle toward the thumb, +z back
+// along the forearm. A grip then only needs a point and a direction on the item, and the forearm is aimed at an elbow off
+// the bottom corner of the screen (where a real first-person arm comes from).
+const FP_MHAND = { k: 1, curl: 1.2, curl1: 0.9, thumb: 0.9, thumbIn: -0.5, fore: 1.08, stretch: 1.6, rodD: 0.075, rodN: 0.03,
+  rx: 0, ry: 0, rz: 0, elbow: [[0.34, -0.5, -0.05], [-0.45, -0.42, -0.15]] };
+const fpModelHands = [null, null];   // per player slot: 'loading', or [right, left]
+const FP_IMG_PX = new WeakMap();
+function fpTexPixels(tex) {   // the decoded colour map, read back once so the hand can carry it as vertex colours
+  const im = tex && tex.image; if (!im) return null;
+  if (FP_IMG_PX.has(im)) return FP_IMG_PX.get(im);
+  const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+  if (!w || !h || (im.complete === false)) return null;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0);
+  const px = { w, h, d: cx.getImageData(0, 0, w, h).data }; FP_IMG_PX.set(im, px); return px;
+}
+function fpLin(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function bakeModelHand(g, side) {
+  const root = g.root, S = side > 0 ? 'Right' : 'Left', P = FP_MHAND;
+  root.updateMatrixWorld(true);
+  const inv = new T.Matrix4().copy(root.matrixWorld).invert();
+  const bone = n => skinBone(root, S + n), pos = b => b.getWorldPosition(new T.Vector3()).applyMatrix4(inv);
+  const hand = bone('Hand'), fore = bone('ForeArm'), upper = bone('Arm'), mid = bone('HandMiddle1');
+  if (!hand || !fore || !mid) return null;
+  const hp = pos(hand), fp = pos(fore), mp = pos(mid), D = mp.clone().sub(hp).normalize();
+  const mu = 0.095 / (mp.distanceTo(hp) || 1);   // the models come in their own units: wrist to middle knuckle is about 9.5 cm
+  const N = new T.Vector3(0, -1, 0); N.addScaledVector(D, -N.dot(D)).normalize();   // a T-posed Mixamo palm faces down
+  const A = new T.Vector3().crossVectors(D, N).normalize();                         // turning about A brings a finger to the palm
+  for (const f of ['Index', 'Middle', 'Ring', 'Pinky'])
+    for (let j = 1; j <= 3; j++) skinTurn(root, bone('Hand' + f + j), A, P.curl * (j === 1 ? P.curl1 : 1));
+  skinTurn(root, bone('HandThumb1'), D, -side * P.thumbIn);
+  for (let j = 2; j <= 3; j++) skinTurn(root, bone('HandThumb' + j), A, P.thumb);
+  root.updateMatrixWorld(true);
+  const keep = new Set(); hand.traverse(o => { if (o.isBone) keep.add(o); });
+  const foreLen = hp.distanceTo(fp) || 1, foreDir = hp.clone().sub(fp).normalize();
+  // the fist's frame: y along the handle toward the thumb (the index side: +A on a right hand, -A on a left), z up the forearm
+  const Y = A.clone().multiplyScalar(side), Z = D.clone().negate(), X = new T.Vector3().crossVectors(Y, Z);
+  const rot = new T.Matrix4().makeBasis(X, Y, Z).transpose();
+  rot.premultiply(new T.Matrix4().makeRotationFromEuler(new T.Euler(P.rx, P.ry * side, P.rz * side)));
+  const centre = hp.clone().addScaledVector(D, P.rodD / mu).addScaledVector(N, P.rodN / mu);
+  const out = rot.multiply(new T.Matrix4().makeScale(mu, mu, mu)).multiply(new T.Matrix4().makeTranslation(-centre.x, -centre.y, -centre.z));
+  const nrm = new T.Matrix3().getNormalMatrix(out);
+  const pp = [], nn = [], cc = [], v = new T.Vector3(), b0 = new T.Vector3(), vn = new T.Vector3(), n0 = new T.Vector3(), t = new T.Vector3(), c = new T.Color();
+  const meshes = []; root.traverse(o => { if (o.isSkinnedMesh && o.skeleton) meshes.push(o); });
+  for (const o of meshes) {
+    const sk = o.skeleton, bm = sk.bones.map((bn, j) => new T.Matrix4().multiplyMatrices(inv, bn.matrixWorld).multiply(sk.boneInverses[j]));
+    const ge = o.geometry, ap = ge.attributes.position, an = ge.attributes.normal, au = ge.attributes.uv, si = ge.attributes.skinIndex, sw = ge.attributes.skinWeight;
+    const mat = o.material, px = mat.map ? fpTexPixels(mat.map) : null;
+    if (mat.map && !px) return 'wait';   // the colour map is still decoding
+    const cnt = ap.count, ok = new Uint8Array(cnt), P3 = new Float32Array(cnt * 3), N3 = new Float32Array(cnt * 3), C3 = new Float32Array(cnt * 3);
+    for (let i = 0; i < cnt; i++) {
+      let best = -1, bw = 0;
+      for (let r = 0; r < 4; r++) { const w = sw.getComponent(i, r); if (w > bw) { bw = w; best = si.getComponent(i, r); } }
+      const bb = sk.bones[best];
+      b0.fromBufferAttribute(ap, i).applyMatrix4(o.bindMatrix);
+      if (!keep.has(bb) && bb !== fore && bb !== upper) continue;
+      v.set(0, 0, 0); n0.fromBufferAttribute(an, i); vn.set(0, 0, 0);   // skinned: the model's own space, fingers curled
+      for (let r = 0; r < 4; r++) { const w = sw.getComponent(i, r); if (!w) continue; const m = bm[si.getComponent(i, r)];
+        v.addScaledVector(t.copy(b0).applyMatrix4(m), w); vn.addScaledVector(t.copy(n0).transformDirection(m), w); }
+      // the forearm, up to the elbow (its rings at the elbow belong to the upper arm, so those count too, that far and no further)
+      const fd = keep.has(bb) ? 0 : Math.min(0, t.copy(v).sub(hp).dot(foreDir));
+      if (keep.has(bb) || -fd < P.fore * foreLen) ok[i] = 1; else continue;
+      if (fd) v.addScaledVector(foreDir, fd * (P.stretch - 1));   // reach the edge of the screen: a longer forearm
+      v.applyMatrix4(out); vn.applyMatrix3(nrm).normalize();
+      P3.set([v.x, v.y, v.z], i * 3); N3.set([vn.x, vn.y, vn.z], i * 3);
+      c.copy(mat.color);
+      if (px && au) {
+        let u = au.getX(i) % 1, w2 = au.getY(i) % 1; if (u < 0) u += 1; if (w2 < 0) w2 += 1;
+        const k = ((Math.min(px.h - 1, w2 * px.h | 0)) * px.w + Math.min(px.w - 1, u * px.w | 0)) * 4;
+        c.r *= fpLin(px.d[k]); c.g *= fpLin(px.d[k + 1]); c.b *= fpLin(px.d[k + 2]);
+      }
+      C3.set([c.r, c.g, c.b], i * 3);
+    }
+    const idx = ge.index, tri = idx ? idx.count : cnt;
+    for (let q = 0; q < tri; q += 3) {
+      const a = idx ? idx.getX(q) : q, b = idx ? idx.getX(q + 1) : q + 1, e = idx ? idx.getX(q + 2) : q + 2;
+      if (!ok[a] || !ok[b] || !ok[e]) continue;
+      for (const j of [a, b, e]) { pp.push(P3[j * 3], P3[j * 3 + 1], P3[j * 3 + 2]); nn.push(N3[j * 3], N3[j * 3 + 1], N3[j * 3 + 2]); cc.push(C3[j * 3], C3[j * 3 + 1], C3[j * 3 + 2]); }
+    }
+  }
+  if (!pp.length) return null;
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.BufferAttribute(new Float32Array(pp), 3));
+  geo.setAttribute('normal', new T.BufferAttribute(new Float32Array(nn), 3));
+  geo.setAttribute('color', new T.BufferAttribute(new Float32Array(cc), 3));
+  return geo;
+}
+function buildModelHands(slot) {
+  if (fpModelHands[slot]) return;
+  fpModelHands[slot] = 'loading';
+  const tryBake = (tries) => {
+    const geos = [];
+    for (const side of [1, -1]) {
+      const r = bakeModelHand(glbBuild(PLAYER_SKIN.bytes[slot]), side);   // a clean T-pose for each side
+      if (r === 'wait') { if (tries < 40) setTimeout(() => tryBake(tries + 1), 250); else fpModelHands[slot] = null; return; }
+      if (!r) { fpModelHands[slot] = null; return; }
+      geos.push(r);
+    }
+    const material = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
+    fpModelHands[slot] = geos.map(geo => { const m = new T.Mesh(geo, material); m.userData.noHit = true; m.userData.model = true; return m; });
+  };
+  loadPlayerSkin(slot, () => tryBake(0));
+}
+function rebuildModelHands() {   // the Lesion Toolbox / tuning: bake again with the current FP_MHAND numbers
+  for (let s = 0; s < 2; s++) { const h = fpModelHands[s]; if (Array.isArray(h)) { h[0].material.dispose(); for (const m of h) { m.removeFromParent(); m.geometry.dispose(); } } fpModelHands[s] = null; }
+  if (fpHands && fpHands[0].userData.model) fpHands = null;
+}
 let fpHands = null, fpVest = null;
+const T_V1 = new T.Vector3(), T_V2 = new T.Vector3(), T_V3 = new T.Vector3();
 function updateFpHands(fp, reloadOut) {
   const radio = SR.carry === 'me' && SR.g && SR.g.parent === hudScene;
   const item = radio ? 'radio' : held;
@@ -15448,39 +15559,50 @@ function updateFpHands(fp, reloadOut) {
     if (fpHands) for (const hand of fpHands) hand.removeFromParent();
     return;
   }
-  const vest = VEST_COL[NET.conn && !NET.host ? 1 : 0];
-  if (!fpHands || fpVest !== vest) {
+  const vest = VEST_COL[NET.conn && !NET.host ? 1 : 0], slot = vest === VEST_COL[1] ? 1 : 0;
+  if (!fpModelHands[slot]) buildModelHands(slot);
+  const model = Array.isArray(fpModelHands[slot]) ? fpModelHands[slot] : null;
+  if (!fpHands || fpVest !== vest || (model && fpHands !== model)) {
     if (fpHands) {
-      fpHands[0].material.dispose();
-      for (const hand of fpHands) { hand.removeFromParent(); hand.geometry.dispose(); }
+      for (const hand of fpHands) hand.removeFromParent();
+      if (!fpHands[0].userData.model) { fpHands[0].material.dispose(); for (const hand of fpHands) hand.geometry.dispose(); }
     }
-    fpHands = buildFpHands(vest); fpVest = vest;
+    fpHands = model || buildFpHands(vest); fpVest = vest;
   }
   const [right, left] = fpHands;
-  function grip(hand, parent, x, y, z, rx, ry, rz) {
+  const isModel = !!right.userData.model, wq = new T.Quaternion(), ws = new T.Vector3(), wp = new T.Vector3(), mb = new T.Matrix4();
+  // u: the handle direction the thumb points along, in the item's space. Box gloves (until the model loads) keep their old poses.
+  function grip(hand, parent, x, y, z, rx, ry, rz, u) {
     if (hand.parent !== parent) parent.add(hand);
     hand.position.set(x, y, z);
-    hand.rotation.set(rx, ry, rz);
-    hand.scale.setScalar(FP_BODY.handScale);
+    if (!isModel || !u) { hand.rotation.set(rx, ry, rz); hand.scale.setScalar(FP_BODY.handScale); return; }
+    parent.updateWorldMatrix(true, false); parent.matrixWorld.decompose(wp, wq, ws);
+    const side = hand === right ? 0 : 1, el = FP_MHAND.elbow[side];
+    const U = T_V1.set(u[0], u[1], u[2]).normalize();
+    const F = parent.worldToLocal(T_V2.set(el[0], el[1], el[2])).sub(hand.position);   // the HUD scene is camera space
+    F.addScaledVector(U, -F.dot(U)).normalize();
+    hand.quaternion.setFromRotationMatrix(mb.makeBasis(T_V3.crossVectors(U, F), U, F));
+    hand.scale.setScalar(FP_BODY.handScale * FP_MHAND.k / ws.x);
   }
   if (item === 'gun') {
     // Keep the wrist attached to the stock even when ADS hides the butt pad.
-    grip(right, fpGun.stock, 0.004, -0.025, 0.133, 0.2, -0.37, 0.2);
+    grip(right, fpGun.stock, 0.004, -0.025, 0.133, 0.2, -0.37, 0.2, [0, 0.35, -1]);
     // This shotgun swaps a right-side magazine. Reach across, travel with the magazine, then return to the pump.
     const reach = Math.min(1, reloadOut * 4);
     grip(left, fpGun.pump, reach * (fpGun.mag.position.x + 0.11), -0.017 - reach * 0.03,
-      reach * (0.012 - fpGun.pump.position.z), 0.16, 0.28 + reach * 1.1, -0.42 - reach * 0.65);
+      reach * (0.012 - fpGun.pump.position.z), 0.16, 0.28 + reach * 1.1, -0.42 - reach * 0.65, [0, reach, -1 + reach]);
   } else if (item === 'ext') {
-    grip(right, heldG.ext, 0.253, -0.09, -0.5, 0.38, -0.36, 0.35);
-    grip(left, heldG.ext, 0.162, -0.177, -0.506, 0.38, 0.52, -0.48);
+    grip(right, heldG.ext, 0.253, -0.09, -0.5, 0.38, -0.36, 0.35, [-1, 0, 0]);
+    grip(left, heldG.ext, 0.162, -0.177, -0.506, 0.38, 0.52, -0.48, [0, 1, 0]);
   } else if (item === 'radio') {
-    grip(right, SR.g, 0.155, 0.266, 0.025, 0.42, -0.35, 0.28);
-    grip(left, SR.g, -0.162, 0.074, 0.086, 0.45, 0.48, -0.5);
+    grip(right, SR.g, 0.155, 0.266, 0.025, 0.42, -0.35, 0.28, [-1, 0, 0]);
+    grip(left, SR.g, -0.162, 0.074, 0.086, 0.45, 0.48, -0.5, [0, 1, 0]);
   } else {
     const tool = heldG[item];
     const [primary, support] = tool.userData.gripPoints;
-    grip(right, tool, primary.x, primary.y, primary.z, 0.48, -0.46, 0.4);
-    grip(left, tool, support.x, support.y, support.z, 0.42, 0.55, -0.5);
+    const ax = [support.x - primary.x, support.y - primary.y, support.z - primary.z];   // up the handle, toward the head
+    grip(right, tool, primary.x, primary.y, primary.z, 0.48, -0.46, 0.4, ax);
+    grip(left, tool, support.x, support.y, support.z, 0.42, 0.55, -0.5, ax);
   }
 }
 function updateGun(dt) {
@@ -15771,7 +15893,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
