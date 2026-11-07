@@ -150,13 +150,13 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   const roadsSrc = html.slice(html.indexOf('const DIRT_ROADS = ['), html.indexOf('];', html.indexOf('const DIRT_ROADS = [')) + 1)
     .replace('const DIRT_ROADS = ', '').replace(/(\w+):/g, '"$1":');
   const roads = JSON.parse(roadsSrc);
-  assert.ok(roads.length === 3, 'three tracks: the north run, the south run and the forecourt apron');
+  assert.ok(roads.length === 4, 'v1.97.44 (re-laid where the owner drew it): the loop\'s north side, its east / south / west side, the run out to the north-west, the substation spur');
   let nodes = 0;
   for (const r of roads) {
     for (const [x, z] of r.pts) {
       nodes++;
       assert.ok(clearOfPonds(x, z, 8), 'road node clears both ponds by 8 m: ' + x + ',' + z);
-      assert.ok(nearTrack(x, z) >= 10, 'road node clears the loop track by 10 m: ' + x + ',' + z + ' (' + nearTrack(x, z).toFixed(1) + ' m)');
+      assert.ok(nearTrack(x, z) >= 10, 'road node clears the loop track by 10 m (v1.97.44: the north-west run follows the rail 12 m off): ' + x + ',' + z + ' (' + nearTrack(x, z).toFixed(1) + ' m)');
     }
   }
   assert.ok(nodes >= 18, 'the tracks have enough nodes to curve round the ponds');
@@ -571,7 +571,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   {   // the tracks are drawn from the same numbers the game builds from, so this cannot drift
     const blk = html.slice(html.indexOf('const DIRT_ROADS = ['), html.indexOf('];', html.indexOf('const DIRT_ROADS = [')));
     const legs = [...blk.matchAll(/pts: \[\[(.*?)\]\]/g)].map(m => [...m[1].matchAll(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/g)].map(p => [+p[1], +p[2]]));
-    assert.ok(legs.length >= 3 && legs[0].length > 10, 'the pond loop legs are where they are expected');
+    assert.ok(legs.length >= 4 && legs[0].length >= 5, 'the pond loop legs are where they are expected');
     assert.deepEqual(legs[0][0], [-225, 185], 'the loop starts on the paved south road, not short of it');
     const PC = [-675, -99], PR = 344;                                    // centre-pivot corn circle
     const phi = Math.atan(0.756), c = Math.cos(phi), s2 = Math.sin(phi), PONDS = [[-603, 429], [-451, 309]], HALF = 67.4;

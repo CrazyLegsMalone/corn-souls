@@ -1,3 +1,15 @@
+## TEST v1.97.44 — the pond dirt road re-laid where the owner drew it (2026-11-07)
+- The owner drew the route in purple on an overhead screenshot: *"thats where the dirt road should be instead of where it currently is"*. The drawing was mapped to world coordinates from three known points: both pond centres and the substation forecourt.
+- `DIRT_ROADS` now has four legs:
+  - a straight-sided loop hugging the two retention ponds: the north side from the paved road by Fire & Process Water (-225, 185) across to the west corner (-734, 433);
+  - the loop's east side down to the south corner by the substation, then back up the west side;
+  - a run out to the north-west alongside the rail line, kept 12 m east of the track (the drawing ran almost on top of it);
+  - the substation spur.
+  The old curving tracks are gone.
+- `validate-power-outage-machines.cjs`: four legs; every node 8 m clear of both ponds and 10 m clear of the rail, and the loop still clear of the corn circle. The road table no longer has inline comments (the suite parses it). Checked from overhead in headless Chromium.
+- `Plant3D.dbg.cam` exposes the overview camera (for overhead checks).
+- Bumped TEST to `1.97.44` / `corn-souls-test-shell-v250`.
+
 ## TEST v1.97.43 — drivers' hands on the steering wheel (2026-11-07)
 - Owner: *"hands on steering wheel"*.
 - `armsToWheel()` runs while a seated driver is dressed (`dressPlayerSkin(..., { wheel })`). Each hand goes to its side of the rim (9 and 3 o'clock, a little toward the driver), using a two-bone reach in the body's fore-and-aft plane: the shoulder and elbow angles come from the triangle of upper arm, forearm and shoulder-to-grip distance. Then the arm swings in about the vertical to the rim's width. When the wheel is out of reach sitting straight, the driver leans in from the waist (up to 0.45 rad), and the Ranger driver sits 8 cm further up the seat.
