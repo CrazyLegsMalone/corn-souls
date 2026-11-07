@@ -1,3 +1,15 @@
+## TEST v1.97.35 — basic damage system: health, and damage between player 1 and 2 (2026-11-07)
+- Owner: *"add a basic damage system to start with. including damage between player 1 and 2"*.
+- **Health:** 100 HP (`HP`, `playerHurt(n, cause, kx, kz, msg)`). A hit takes HP off, knocks you back, flashes the screen edge red, vibrates the phone and says what hit you with the HP left. At 0 you go down with that cause (the usual death scene). After 6 quiet seconds it heals at 8 HP a second, and you are full again after a death. A thin bar at the top centre shows only while hurt (green, then yellow, then red).
+- **Between players:**
+  - The other player's paintball now takes 34 (three tags), not an instant kill. You are only knocked out of a vehicle if it kills you.
+  - A tool swing with the other player in front of you and in reach (1.2 m + 80% of the tool's length, not in a vehicle) sends `mh` with the tool's damage (`TOOL_DMG`): sledgehammer 40, war pick 35, crowbar / pitchfork / machete / pipe / bat 25, the rest 15–20. Their game applies it. Death by it is "Squeeg got beaten down by the other player!" (KNOCKED OUT / LIGHTS OUT …).
+- **Creatures:** a cob stalker or Daddy bite takes 34, a nibble 17, so three bites still kill but now heal back. `CREEP.bites` is still counted for the field pacing and the two-player sync.
+- **Falls:** a landing above 62% of the fatal height hurts, up to 60 HP. The fatal heights are unchanged.
+- The sure-death hazards (train, pond, acid, ammonia, mower, big falls) still kill outright.
+- New `validate-player-health.cjs` (in CI): hits, knock-back, three tags, healing timing, melee in front and in reach only, not through vehicles or alone, and the game wiring. The four suites that run the bite / fall / network code now load the health section; message checks were updated to the HP wording.
+- Bumped TEST to `1.97.35` / `corn-souls-test-shell-v241`.
+
 ## TEST v1.97.34 — ten weapons from the Survival Melee Weapon Pack, placed round the plant (2026-11-07)
 - Owner asked, piece by piece: *"replace the pick with the war pick"*, sickle and machete in grain receiving, pipe in the turbine room, frying pan + kitchen knife + cleaver in the maintenance break room, stun baton at the main power station, aluminum bat at the back of the second-to-last train car (reachable while riding the last car), golf club in the scale house manager's office.
 - `scripts/slim_tool_glb.py` gained a 4th argument: take one mesh by name out of a pack and crop its part of the shared atlas. Plain tubes (vertices only at the ends) are handled too. Files are 22–74 KB each.

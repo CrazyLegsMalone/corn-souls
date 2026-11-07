@@ -24,7 +24,7 @@ const ctx = { T, Math, console, Infinity, walk: { on: true, dead: null, drive: f
   wallSegs: [], colliders: [], O: {}, NET: {}, utv: {}, vehPush() {}, BODY_R: 0.28, MOW: {}, CHUTE: { state: null }, chuteDeploy: () => false, rideOff() {}, onLadder: () => null, layBody() {},
   tsnd: { ctx: null }, DMG_NOTIFY: m => notes.push(m), flutter() {}, camera: { position: new T.Vector3() }, document: undefined, performance: { now: () => 0 } };
 vm.createContext(ctx);
-vm.runInContext(roofDecl + '\n' + floorSrc + '\n' + pushSrc + '\n' + powerSrc + '\n' + roofAtSrc + '\n' + moveSrc + '\n' + jumpSrc + '\n' + physSrc + `
+vm.runInContext(html.slice(html.indexOf('const HP = { max'), html.indexOf('function takeSquish(')) + roofDecl + '\n' + floorSrc + '\n' + pushSrc + '\n' + powerSrc + '\n' + roofAtSrc + '\n' + moveSrc + '\n' + jumpSrc + '\n' + physSrc + `
   this.ROOFMAP = ROOFMAP; this.POWER = POWER; this.floorAt = floorAt; this.pushOut = pushOut; this.walkMove = walkMove; this.walkJump = walkJump; this.walkPhysics = walkPhysics;
   this.powerGive = powerGive; this.powerUpdate = powerUpdate; this.powerKindOf = powerKindOf; this.roofAt = roofAt;`, ctx);
 const W = ctx.walk, P = ctx.POWER;

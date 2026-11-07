@@ -26,7 +26,7 @@ const ctx = { T, Math, NROAD: -134, scene, walk, camera: new T.PerspectiveCamera
   floorAt: () => 0, pushOut() {}, puff() {}, layBody(...a) { ctx.died = a; }, DMG_NOTIFY: m => notes.push(m), tsnd: { ctx: null }, kiaNoise() {}, utv: { g: null },
   loadGlbModel: (url, cb) => cb(mkModel(/daddy/.test(url) ? 'Daddy_Cob_Torso' : 'Cob_Body')), CORN_PROPS_STATE: { items: ears, cans }, NET: { conn: null, host: false, rp: null }, netSend() {} };   // single player
 vm.createContext(ctx);
-vm.runInContext(html.slice(a, b) + '\nthis.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.inCField = inCField; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepPaintHit = creepPaintHit; this.creepToolHit = creepToolHit; this.creepDebug = creepDebug; this.foldModel = foldModel;', ctx);
+vm.runInContext(html.slice(html.indexOf('const HP = { max'), html.indexOf('function takeSquish(')) + html.slice(a, b) + '\nthis.HP = HP; this.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.inCField = inCField; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepPaintHit = creepPaintHit; this.creepToolHit = creepToolHit; this.creepDebug = creepDebug; this.foldModel = foldModel;', ctx);
 const C = ctx.CREEP, F = ctx.CFIELD, run = (sec, dt = 0.05, each) => { for (let t = 0; t < sec; t += dt) { ctx.updateCreeps(dt); if (each) each(); } };
 const S = () => C.list.filter(c => c.kind === 'stalker' && c.hp > 0);
 
@@ -53,7 +53,7 @@ assert.equal(C.bites, 0, 'and cannot reach you');
 walk.z = F.z1 - 3; run(1.2);
 assert.equal(A.state, 'hunt', 'you are in its corn: it hunts');
 run(6); assert.ok(ctx.died && walk.dead === 'cob', 'three bites and you are dead (' + notes.slice(-2).join(' | ') + ')');
-assert.ok(notes.some(n => /A cob stalker bit you! \(1\/3\)/.test(n)), 'bites are announced');
+assert.ok(notes.some(n => /A cob stalker bit you!.*· 66 HP/.test(n)), 'bites are announced, with the health left (v1.97.35: a bite is 34 of 100 HP)');
 walk.dead = null; ctx.died = null; C.bites = 0;
 // bites heal
 C.bites = 2; walk.x = 300; walk.z = 300; run(26); assert.equal(C.bites, 1, 'one bite heals every 25 s');
@@ -169,7 +169,7 @@ assert.ok(html.includes('P3.dmgNotify = m => toast(m);'), 'bite (and vehicle / a
 // v1.97.160, owner: "add a spawn cob walker to debug so we can spawn it nearby player" - a free cob stalker, put down next to you
 ctx.wallSegs = [];
 { walk.on = false; assert.match(ctx.creepDebug('near'), /Start walking/, 'only while walking (it comes out next to you)'); walk.on = true; }
-walk.x = 300; walk.z = 300; walk.yaw = 0; walk.dead = null; run(0.2);
+walk.x = 300; walk.z = 300; walk.yaw = 0; walk.dead = null; ctx.HP.hp = ctx.HP.max; run(0.2);   // (v1.97.35: back on your feet at full health, as takeSquish does)
 const ph0 = C.phase, n0 = C.list.length;
 assert.match(ctx.creepDebug('near'), /cob stalker/); const FR = C.list[C.list.length - 1];
 assert.equal(C.list.length, n0 + 1); assert.ok(FR.kind === 'stalker' && FR.free && FR.hp === 10, 'a full-health stalker, not tied to the field');

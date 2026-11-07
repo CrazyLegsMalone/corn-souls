@@ -16,7 +16,7 @@ const ctx = { T, Math, NROAD: -134, scene, walk, camera: new T.PerspectiveCamera
   floorAt: () => 0, pushOut() {}, puff() {}, layBody(...x) { ctx.died = x; }, DMG_NOTIFY: m => notes.push(m), tsnd: { ctx: null }, kiaNoise() {}, utv: { g: null },
   loadGlbModel: (url, cb) => { urls.push(url); cb(mkModel(/daddy/.test(url) ? 'Daddy_Cob_Torso' : 'Cob_Body')); }, CORN_PROPS_STATE: { items: [], cans: [] }, NET: { conn: null, host: false, rp: null }, netSend() {} };
 vm.createContext(ctx);
-vm.runInContext(html.slice(a, b) + '\nthis.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepHurt = creepHurt; this.creepPaintHit = creepPaintHit; this.creepSnapshot = creepSnapshot; this.creepApplySnapshot = creepApplySnapshot; this.NIB_FACES = NIB_FACES; this.nibFace = nibFace; this.nibView = nibView; this.NIB_REAR = NIB_REAR;', ctx);
+vm.runInContext(html.slice(html.indexOf('const HP = { max'), html.indexOf('function takeSquish(')) + html.slice(a, b) + '\nthis.HP = HP; this.CREEP = CREEP; this.CFIELD = CFIELD; this.CREEP_K = CREEP_K; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps; this.creepHurt = creepHurt; this.creepPaintHit = creepPaintHit; this.creepSnapshot = creepSnapshot; this.creepApplySnapshot = creepApplySnapshot; this.NIB_FACES = NIB_FACES; this.nibFace = nibFace; this.nibView = nibView; this.NIB_REAR = NIB_REAR;', ctx);
 const C = ctx.CREEP, F = ctx.CFIELD, run = (sec, dt = 0.05) => { for (let t = 0; t < sec; t += dt) ctx.updateCreeps(dt); };
 const N = () => C.list.filter(c => c.kind === 'nibbler'), live = () => N().filter(c => c.hp > 0);
 
@@ -36,7 +36,7 @@ run(6); assert.equal(C.phase, 'boss', 'Daddy comes even with nibblers still abou
 // they hunt you, outside the field too, and nibble half a bite
 const n0 = live()[0]; for (const o of live()) if (o !== n0) { o.x += 200; o.hx += 200; } for (const o of C.list) if (o.kind !== 'nibbler') o.x += 400; walk.x = n0.x + 6; walk.z = n0.z + 4; C.bites = 0;
 for (let i = 0; i < 200 && C.bites === 0; i++) { run(0.05); walk.x = n0.x + 0.5; walk.z = n0.z + 0.3; }
-assert.equal(n0.state, 'hunt'); assert.equal(C.bites, 0.5, 'a nibble is half a stalker bite'); assert.ok(notes.some(n => /A nibbler nibbled you! \(0\.5\/3\)/.test(n)), 'and says so');
+assert.equal(n0.state, 'hunt'); assert.equal(C.bites, 0.5, 'a nibble is half a stalker bite'); assert.ok(notes.some(n => /A nibbler nibbled you!.*· 83 HP/.test(n)), 'and says so (v1.97.35: 17 of 100 HP)');
 assert.ok(ctx.CREEP_K.nibbler.run < 8.91, 'slower than you walk: you can outrun them');
 // two paint hits: the first sends it running, the second kills it; its friends nearby go sad, then furious
 const nb = live()[1]; walk.x = 900; walk.z = 900; run(0.2);

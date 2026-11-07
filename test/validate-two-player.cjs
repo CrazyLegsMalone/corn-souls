@@ -33,7 +33,7 @@ const make = host => {
   ctx.rollStates = () => ctx.rd || ''; ctx.rollApply = s => { ctx.rdApplied = s; };   // roll-up / mesh door states ride the world sync (v1.97.137; validate-mesh-doors.cjs)
   ctx.lightsDark = (a, f, h) => { ctx.LIGHT.darkTo = a; ctx.LIGHT.darkRate = 3 / (f || 1.5); ctx.LIGHT.darkHold = h || 0; return a; };
   vm.createContext(ctx);
-  vm.runInContext('let dayT = 0;\n' + clockSrc + '\n' + creepSrc + '\n' + syncSrc + '\n' + recvSrc + `
+  vm.runInContext(html.slice(html.indexOf('const HP = { max'), html.indexOf('function takeSquish(')) + 'let dayT = 0;\n' + clockSrc + '\n' + creepSrc + '\n' + syncSrc + '\n' + recvSrc + `
     this.GT = GT; this.gameDate = gameDate; this.gameTimeSet = gameTimeSet; this.CREEP = CREEP; this.CFIELD = CFIELD; this.loadCreeps = loadCreeps; this.updateCreeps = updateCreeps;
     this.creepHurt = creepHurt; this.creepGuest = creepGuest; this.wsState = wsState; this.wsLock = wsLock; this.WSYNC = WSYNC; this.netRecv = netRecv; this.wsClock = wsClock; this.creepEars = creepEars;`, ctx);
   return ctx;
