@@ -70,4 +70,7 @@ assert.ok(html.includes("if (down && respawnUp() && (n === 'A' || n === 'START')
 assert.ok(html.includes("atkStart(VIEW, 'swing'); netSend({ t: 'atk', k: 'swing' });"), 'my swing plays on my avatar and is sent');
 assert.ok(html.includes("} else if (m.t === 'atk') { if (NET.rp) atkStart(NET.rp,") && html.includes("} else if (m.t === 'shot') { if (NET.rp) atkStart(NET.rp, 'shot');"), 'their swings and shots play on their avatar');
 assert.ok(html.includes('atkApply(VIEW.items[held], held === \'gun\', atk);'), 'my third-person item moves');
-console.log('PASS: player health (third-person swings and shots, synced; respawn button near where you fell, jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');
+// v1.97.43: drivers' hands on the wheel (checked in the browser: both hands within 1 cm of the rim)
+assert.ok(html.includes('function armsToWheel(av, root, R, wheel, r)') && html.includes("if (o.wheel) { try { const t = o.wheel(); if (t) armsToWheel("), 'a seated driver reaches the wheel');
+assert.ok(html.includes("dressPlayerSkin(d, vest, { sit: true, wheel: () => {") && html.includes("wheel: sw && sw.isObject3D ?"), 'in the Rangers and at the wheel of a car');
+console.log('PASS: player health (drivers hold the wheel, third-person swings and shots, synced; respawn button near where you fell, jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');

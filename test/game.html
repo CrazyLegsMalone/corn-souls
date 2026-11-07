@@ -5998,6 +5998,37 @@ function loadPlayerSkin(slot, cb) {
 }
 // vest: the player's VEST_COL (the slot). opts.sit folds the legs for a vehicle seat; opts.onRig hands back the model group so a
 // caller can animate it (unused for now: the players stand still).
+// v1.97.43 (owner: "hands on steering wheel"): a seated driver's arms reach the wheel. Two-bone reach in the body's own
+// fore-and-aft plane: each hand goes to its side of the rim (9 and 3 o'clock, a few cm toward the driver); the shoulder and
+// elbow angles come from the triangle the upper arm, forearm and shoulder-to-grip distance make, the elbow hanging low.
+// wheel: its centre in the avatar's own space; r: the rim radius in metres.
+function armsToWheel(av, root, R, wheel, r) {
+  // R is not on the avatar yet (it is added after dressing), so R's own frame IS the avatar's: the wheel goes straight in
+  av.updateWorldMatrix(true, false); R.updateMatrixWorld(true);
+  const X = new T.Vector3(1, 0, 0), inv = new T.Matrix4().copy(root.matrixWorld).invert(), at = b => b.getWorldPosition(new T.Vector3()).applyMatrix4(inv);
+  const c = wheel.clone().applyMatrix4(inv), rr = r / (av.getWorldScale(new T.Vector3()).x || 1) / (root.getWorldScale(new T.Vector3()).x || 1);
+  const toward = at(skinBone(root, 'Spine2') || skinBone(root, 'Spine')).sub(c); toward.y = 0; toward.normalize();
+  { // out of reach sitting straight: lean in from the waist (up to 0.45 rad), as a driver does
+    const sp = skinBone(root, 'Spine'), la = skinBone(root, 'LeftArm'), le = skinBone(root, 'LeftForeArm'), lh = skinBone(root, 'LeftHand');
+    if (sp && la && le && lh) { const S = at(la), reach = (S.distanceTo(at(le)) + at(le).distanceTo(at(lh))) * 0.97, short = Math.hypot(S.y - c.y, S.z - c.z) - reach;
+      if (short > 0) { const len = at(sp).distanceTo(S); skinTurn(root, sp, X, Math.min(0.45, Math.asin(Math.min(1, short / len)) * 1.15)); root.updateMatrixWorld(true); } }
+  }
+  for (const s of ['Left', 'Right']) {
+    const a = skinBone(root, s + 'Arm'), e = skinBone(root, s + 'ForeArm'), h = skinBone(root, s + 'Hand'); if (!a || !e || !h) continue;
+    const S = at(a), side = Math.sign(S.x) || (s === 'Left' ? 1 : -1);
+    const tgt = c.clone().add(new T.Vector3(side * rr * 0.95, 0, 0)).addScaledVector(toward, rr * 0.25);
+    const L1 = S.distanceTo(at(e)), L2 = at(e).distanceTo(at(h)), v = tgt.clone().sub(S), dd = Math.min(Math.hypot(v.y, v.z), (L1 + L2) * 0.995);
+    const fwd = ang => Math.atan2(ang.z, -ang.y);   // forward (+z, the way the model faces) from straight down
+    const th = Math.atan2(v.z, -v.y), al = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + dd * dd - L2 * L2) / (2 * L1 * dd))));
+    const be = Math.PI - Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - dd * dd) / (2 * L1 * L2))));
+    const up = th - al; skinTurn(root, a, X, fwd(at(e).sub(S)) - up); root.updateMatrixWorld(true);
+    const fe = at(e); skinTurn(root, e, X, fwd(at(h).sub(fe)) - (up + be)); root.updateMatrixWorld(true);
+    { // then in toward the rim: swing the whole arm about the vertical through the shoulder
+      const H = at(h), hx = H.x - S.x, hz = H.z - S.z, R0 = Math.hypot(hx, hz), want = tgt.x - S.x;
+      if (R0 > 1e-3 && Math.abs(want) < R0) { const a0 = Math.atan2(hx, hz), a1 = Math.asin(want / R0); skinTurn(root, a, new T.Vector3(0, 1, 0), a1 - a0); root.updateMatrixWorld(true); } }
+    (av.userData.wheelDbg = av.userData.wheelDbg || {})[s] = { S: S.toArray(), tgt: tgt.toArray(), hand: at(h).toArray(), miss: at(h).distanceTo(tgt) };
+  }
+}
 function dressPlayerSkin(av, vest, opts) {
   const o = opts || {}, slot = vest === VEST_COL[1] ? 1 : 0;
   loadPlayerSkin(slot, ({ root }) => { try {
@@ -6024,6 +6055,7 @@ function dressPlayerSkin(av, vest, opts) {
       for (const l of leg) { const kneeY = wp(l.kn).y + base, phi = Math.acos(Math.max(-1, Math.min(1, (kneeY - P.ankle) / l.shin))); skinTurn(root, l.kn, X, P.thigh - phi); }
     }
     R.position.set(0, base, 0);
+    if (o.wheel) { try { const t = o.wheel(); if (t) armsToWheel(av, root, R, t, o.wheelR || 0.15); } catch (e) { console.warn('[skin] hands to the wheel:', e && e.message); } }   // v1.97.43
     root.traverse(o2 => { o2.userData.noHit = true; if (o2.isMesh) { o2.castShadow = false; o2.receiveShadow = false; } });
     if (o.onRig) mergeSkinnedFlat(root); else bakeStaticSkin(R, false);   // animating 3P keeps 1 shared skeleton; static/seated avatars bake to plain meshes
     // The box body is REMOVED, not hidden: a stray visible=true anywhere else must never be able to resurrect it, and a
@@ -13344,8 +13376,8 @@ const VEST_COL = [0xff7a1a, 0xc6e41f];     // Player 1 orange vest, Player 2 lim
 // underside 0.47 avatar-units above the avatar's origin, so the origin goes 0.59 m up: sitting ON the cushion, boots on the floor
 // (at 0.12 he sat 0.47 m low, his boots through the floor and only his head over the dash).
 const RANGER_SEAT_Y = 0.59;
-function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, RANGER_SEAT_Y, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
-  dressPlayerSkin(d, vest, { sit: true }); return d; }
+function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, RANGER_SEAT_Y, -0.1);   /* v1.97.43: 8 cm up the seat toward the wheel */ d.scale.setScalar(0.95 * SQ_K); g.add(d);
+  dressPlayerSkin(d, vest, { sit: true, wheel: () => { const q = [utv, NET.rr].find(o => o && o.g === g && o.sw); g.updateWorldMatrix(true, true); return d.worldToLocal(q ? q.sw.getWorldPosition(new T.Vector3()) : g.localToWorld(new T.Vector3(-0.3, 1.18, -0.44))); } }); return d; }   // v1.97.43: hands on the wheel (the model's own wheel when it has one)
 function seatPassenger(g, vest) { const d = makeCharacter(vest, true); d.position.set(0.34, RANGER_SEAT_Y, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
   dressPlayerSkin(d, vest, { sit: true }); return d; }
 // ---------- RIDING ALONG: X beside the other player's moving Ranger and you hop into the passenger seat. Your own controls
@@ -13386,7 +13418,9 @@ function passExit() {
 // the people you can see in a car: the other player at the wheel of a car they drive, and the other player riding with you
 function carFigure(c, key, side) {
   if (!c[key]) { const d = makeCharacter(VEST_COL[NET.host ? 1 : 0], true); d.scale.setScalar(0.95 * SQ_K); const e = c.eye || [0.42, 1.2, 0];
-    d.position.set(e[0] * side, e[1] - 1.12, e[2] + 0.05); d.rotation.y = Math.PI; c.inner.add(d); dressPlayerSkin(d, VEST_COL[NET.host ? 1 : 0], { sit: true }); c[key] = d; }
+    d.position.set(e[0] * side, e[1] - 1.12, e[2] + 0.05); d.rotation.y = Math.PI; c.inner.add(d);
+    const sw = key === 'drvFig' && (c.sw || (c.inner.userData && c.inner.userData.sw) || (c.g && c.g.userData && c.g.userData.sw));   // v1.97.43: the driver's hands on the car's wheel
+    dressPlayerSkin(d, VEST_COL[NET.host ? 1 : 0], { sit: true, wheel: sw && sw.isObject3D ? () => d.worldToLocal(sw.getWorldPosition(new T.Vector3())) : null }); c[key] = d; }
   return c[key];
 }
 

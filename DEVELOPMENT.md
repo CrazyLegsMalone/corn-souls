@@ -1,3 +1,9 @@
+## TEST v1.97.43 — drivers' hands on the steering wheel (2026-11-07)
+- Owner: *"hands on steering wheel"*.
+- `armsToWheel()` runs while a seated driver is dressed (`dressPlayerSkin(..., { wheel })`). Each hand goes to its side of the rim (9 and 3 o'clock, a little toward the driver), using a two-bone reach in the body's fore-and-aft plane: the shoulder and elbow angles come from the triangle of upper arm, forearm and shoulder-to-grip distance. Then the arm swings in about the vertical to the rim's width. When the wheel is out of reach sitting straight, the driver leans in from the waist (up to 0.45 rad), and the Ranger driver sits 8 cm further up the seat.
+- This applies to your Ranger and the other player's (using the model's own wheel when it has one, otherwise the box Ranger's at -0.3, 1.18, -0.44) and to a car's driver figure (the cabin's wheel). Checked in headless Chromium: both hands within 1 cm of the rim, and a side shot of Squeeg driving with both hands on the wheel.
+- Bumped TEST to `1.97.43` / `corn-souls-test-shell-v249`.
+
 ## TEST v1.97.42 — third-person attacks (synced), labels back on their buildings, trucks talk at the scale window (2026-11-07)
 - **Third-person attacks** (owner: *"3rd person has no animations for any weapons or attacks ... synced with 2player so both players see each others attacks"*):
   - A tool swing winds up back over the shoulder, strikes down in front and settles (0.5 s), and the right arm follows it. A shot kicks the gun up and back.
