@@ -13206,9 +13206,13 @@ function npcAt() {
 }
 const RANGER_COL = [0xc0221c, 0x1f63c8];   // Player 1 red, Player 2 blue
 const VEST_COL = [0xff7a1a, 0xc6e41f];     // Player 1 orange vest, Player 2 lime vest
-function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
+// v1.97.32: the Ranger's seat cushion is 1.01 m up and its footwell floor 0.68 m (both models). The seated fold puts the
+// underside 0.47 avatar-units above the avatar's origin, so the origin goes 0.59 m up: sitting ON the cushion, boots on the floor
+// (at 0.12 he sat 0.47 m low, his boots through the floor and only his head over the dash).
+const RANGER_SEAT_Y = 0.59;
+function seatDriver(g, vest) { const d = makeCharacter(vest, true); d.position.set(-0.3, RANGER_SEAT_Y, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
   dressPlayerSkin(d, vest, { sit: true }); return d; }
-function seatPassenger(g, vest) { const d = makeCharacter(vest, true); d.position.set(0.34, 0.12, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
+function seatPassenger(g, vest) { const d = makeCharacter(vest, true); d.position.set(0.34, RANGER_SEAT_Y, -0.02); d.scale.setScalar(0.95 * SQ_K); g.add(d);
   dressPlayerSkin(d, vest, { sit: true }); return d; }
 // ---------- RIDING ALONG: X beside the other player's moving Ranger and you hop into the passenger seat. Your own controls
 // go quiet, your body is pinned to that seat with the camera riding with it, and the other PC puts you in its own passenger

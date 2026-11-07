@@ -1,3 +1,9 @@
+## TEST v1.97.32 — Squeeg sits on the Ranger's seat, boots on the floor (2026-11-07)
+- Owner (screenshot, third person in the Ranger): he sat far too low, with only his head over the dash and his boots poking through the floor under the cab.
+- Measured the Ranger model with raycasts: seat cushion 1.01 m, footwell floor 0.68 m. The seated driver and passenger origin was at 0.12, which put his underside at 0.54 m, 0.47 m below the cushion. It is now `RANGER_SEAT_Y = 0.59`, so he sits on the cushion, his torso shows above the dash, his knees go under the wheel and his soles end in the floor slab. This covers your Ranger, the other player's Ranger and the passenger seat. Checked in headless Chromium from behind and from the side.
+- `SKIN_POSE.seatTop` (desk NPCs) is untouched. `validate-power-outage-machines.cjs` now pins the shared constant. All CI suites, launcher anchors and LIVE consistency pass.
+- Bumped TEST to `1.97.32` / `corn-souls-test-shell-v238`.
+
 ## TEST v1.97.31 — first-person hands are the player model's own hands and arms (2026-11-07)
 - Owner: *"thes look nothing like the hands of the models"*, with reference shots of first-person shotguns (support forearm rising from the bottom-left to cup the pump, fingers wrapped round it).
 - The box gloves are replaced by each player's own hand and forearm, baked from `squeeg1_2_0.glb` / `squeeg2_2_0.glb`: the T-posed rig has its finger bones curled into a fist and the thumb wrapped over. The hand, the forearm up to the elbow, skin and nails are cut out by bone weight and skinned in the model's space. The colour map is sampled into vertex colours, so it is still one mesh and one draw per hand (the six-draw budget holds). The forearm is stretched a little so it reaches the edge of the screen.

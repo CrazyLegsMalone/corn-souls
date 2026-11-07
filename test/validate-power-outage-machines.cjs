@@ -700,7 +700,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     }
   }
   // ---------------------------------------------------------------- riding along: one drives, one sits beside them
-  assert.ok(html.includes('function seatPassenger(g, vest)') && html.includes('d.position.set(0.34, 0.12, -0.02)'), 'a passenger seat on the other half of the bench (the driver sits at -0.3)');
+  assert.ok(html.includes('function seatPassenger(g, vest)') && html.includes('d.position.set(0.34, RANGER_SEAT_Y, -0.02)'), 'a passenger seat on the other half of the bench (the driver sits at -0.3)');
   assert.ok(html.includes('y: 0, vy: 0, pass: false }'), 'the walk state carries the ride-along flag');
   assert.ok(html.includes('else if (walk.pass) passUpdate(dt); else walkPhysics(dt);'), 'riding along replaces walking, so you are carried rather than walking inside the car');
   assert.ok(html.includes("return (out || V3()).set(0.34, 0.78, -0.02).applyMatrix4(g.matrixWorld);"), 'the seat position comes from the vehicle transform');
