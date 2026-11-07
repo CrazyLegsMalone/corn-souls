@@ -1,3 +1,9 @@
+## TEST v1.97.45 — signpost at the pond-loop fork (2026-11-07)
+- Owner: *"the small circle was the positioning of a sign that points left to main power station and '?' to the right"*. The circle mapped to (-295, 207), the fork where the loop splits, coming in from the paved road heading west.
+- `fingerpost(x, z, arms)`: a wooden post with pointed arm boards (canvas text on both faces, readable from either side), each turned to point at a spot down its branch. **MAIN POWER STATION** (green) points left, down the east side toward the substation; **?** (brown) points right, along the north side toward the rail. The post has a small collision circle. Checked in headless Chromium coming up the road.
+- `validate-power-outage-machines.cjs` pins it.
+- Bumped TEST to `1.97.45` / `corn-souls-test-shell-v251`.
+
 ## TEST v1.97.44 — the pond dirt road re-laid where the owner drew it (2026-11-07)
 - The owner drew the route in purple on an overhead screenshot: *"thats where the dirt road should be instead of where it currently is"*. The drawing was mapped to world coordinates from three known points: both pond centres and the substation forecourt.
 - `DIRT_ROADS` now has four legs:

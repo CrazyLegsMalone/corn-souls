@@ -6288,6 +6288,26 @@ const DIRT_ROADS = [
   { w: 5.5, pts: [[-734, 433], [-875, 348], [-902, 302], [-930, 254], [-964, 193], [-983, 158], [-1004, 120]] },
   { w: 7.0, pts: [[-610, 538], [-610, 553.6]] }
 ];
+function fingerpost(x, z, arms) {   // a wooden post with pointed arm boards; each arm points from the post toward 'to'
+  const g = new T.Group(); g.position.set(x, 0, z); scene.add(g); extraCols.push([x, z, 0.18]);
+  const post = new T.Mesh(new T.BoxGeometry(0.14, 2.5, 0.14), mat(0x6b4f30)); post.position.y = 1.25; post.castShadow = true; g.add(post);
+  for (const A of arms) {
+    const L = A.text.length > 3 ? 1.9 : 0.75, H = 0.36, cv = document.createElement('canvas'); cv.width = 512; cv.height = Math.round(512 * H / L);
+    const tex = flip => { const c2 = document.createElement('canvas'); c2.width = cv.width; c2.height = cv.height; const c = c2.getContext('2d'), W = c2.width, Hh = c2.height, tip = Hh * 0.55;
+      c.fillStyle = A.col || '#1d5c2e'; c.beginPath();
+      if (!flip) { c.moveTo(0, 0); c.lineTo(W - tip, 0); c.lineTo(W, Hh / 2); c.lineTo(W - tip, Hh); c.lineTo(0, Hh); } else { c.moveTo(W, 0); c.lineTo(tip, 0); c.lineTo(0, Hh / 2); c.lineTo(tip, Hh); c.lineTo(W, Hh); }
+      c.closePath(); c.fill(); c.strokeStyle = '#f2efe4'; c.lineWidth = Math.max(4, Hh * 0.06); c.stroke();
+      c.fillStyle = '#f2efe4'; c.font = 'bold ' + Math.round(Hh * 0.52) + 'px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(A.text, flip ? W / 2 + tip / 2 : W / 2 - tip / 2, Hh / 2 + 2);
+      const t = new T.CanvasTexture(c2); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; return t; };
+    const arm = new T.Group(); arm.position.y = A.y; arm.rotation.y = Math.atan2(-(A.to[1] - z), A.to[0] - x); g.add(arm);   // local +x toward 'to'
+    for (const [flip, ry, oz] of [[false, 0, 0.026], [true, Math.PI, -0.026]]) {
+      const m = new T.Mesh(new T.PlaneGeometry(L, H), new T.MeshLambertMaterial({ map: tex(flip), transparent: true, alphaTest: 0.5 }));
+      m.position.set(L / 2 + 0.05, 0, oz); m.rotation.y = ry; m.userData.noHit = true; arm.add(m);
+    }
+  }
+  return g;
+}
 function exitSignMat() {
   if (EXIT_SIGN.mat) return EXIT_SIGN.mat;
   const cv = document.createElement('canvas'); cv.width = 128; cv.height = 56;
@@ -8926,6 +8946,10 @@ function init(container) {
   // turned to face north, reached by the Ranger's dirt tracks. Its MAIN BREAKER is the master reset for a power outage.
   {
     for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w);
+    // v1.97.45 (owner: "the small circle was the positioning of a sign that points left to main power station and '?' to the right"):
+    // a fingerpost in the fork where the pond loop splits, as you come in from the paved road heading west: left (down the east side)
+    // to the substation, right (along the north side, out toward the rail) "?".
+    fingerpost(-295, 207, [{ text: 'MAIN POWER STATION', to: [-311, 313], y: 2.05, col: '#1d5c2e' }, { text: '?', to: [-442, 193], y: 1.7, col: '#5b4a2e' }]);
     add(new T.PlaneGeometry(22, 16, GSEG(22), GSEG(16)).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, GY('dirtroad'), 545);   // forecourt / turnaround
     loadSubstation();
   }
