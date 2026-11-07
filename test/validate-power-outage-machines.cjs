@@ -160,7 +160,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     }
   }
   assert.ok(nodes >= 18, 'the tracks have enough nodes to curve round the ponds');
-  assert.ok(html.includes('for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w)'), 'the tracks are built');
+  assert.ok(html.includes('DIRT_ROADS.forEach((r, i) => dirtRoad(r.pts, r.w, 1 - i * 0.5));') && html.includes('fm.polygonOffsetUnits -= 1;'), 'the tracks are built, each overlapping surface with its own depth pull (v1.97.47: they flickered where they overlap)');
   assert.ok(html.includes("fingerpost(-295, 207, [{ text: 'MAIN POWER STATION', to: [-311, 313]") && html.includes("{ text: '?', to: [-442, 193]"), 'v1.97.45: the owner\'s signpost in the fork: left to the main power station, right "?"');
   assert.ok(html.includes("groundMat('dirtroad', true)"), 'dirt texture with UVs in metres');
 }

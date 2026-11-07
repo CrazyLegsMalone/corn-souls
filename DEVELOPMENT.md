@@ -1,3 +1,8 @@
+## TEST v1.97.47 — no more flicker on the substation forecourt (2026-11-07)
+- Owner (screenshot of the forecourt in front of the substation): *"flickering at the ground here"*. The forecourt plane, the substation spur and the pond loop's south corner overlap there, and all three lay at the same height (`GY('dirtroad')`) with the same depth pull (`GB('dirtroad')` = -10), so the depth test could not choose and they took turns: z-fighting.
+- Each dirt-road leg now gets its own half-step of pull (-9, -9.5, -10, -10.5) through `dirtRoad(pts, w, pull)`, and the forecourt sits on top at -11. That is all still between the dirt yard (-8) and asphalt (-12), so the ground layer order is unchanged. This also cures the same fight at the loop's two junctions.
+- Bumped TEST to `1.97.47` / `corn-souls-test-shell-v253`.
+
 ## TEST v1.97.46 — stun baton moved to the owner's spot (2026-11-07)
 - Lesion Toolbox placement (made on v1.97.44): the stun baton by the substation's RESET PLANT POWER button goes from -607.70, 1.22, 565.15 to **-609.82, 1.22, 565.08**, turn unchanged (180°). It is still placed relative to the button, which the model sits at -608.60, 565.30, so the offset is now (-1.22, -0.22) instead of (+0.90, -0.15). Its pick-up spot moves with it, since it is built there.
 - Bumped TEST to `1.97.46` / `corn-souls-test-shell-v252`.

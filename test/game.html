@@ -8945,12 +8945,15 @@ function init(container) {
   // ---------- MAIN SUBSTATION south of the retention ponds: the owner's main_power_building.glb, its compound gate
   // turned to face north, reached by the Ranger's dirt tracks. Its MAIN BREAKER is the master reset for a power outage.
   {
-    for (const r of DIRT_ROADS) dirtRoad(r.pts, r.w);
+    // v1.97.47 (owner: "flickering at the ground here", the substation forecourt): every leg and the forecourt lay at the same
+    // height with the same depth pull, so where they overlap they fought. Each now has its own half-step (all still between the
+    // dirt yard's -8 and the asphalt's -12): legs +1, +0.5, 0, -0.5; the forecourt on top at -1.
+    DIRT_ROADS.forEach((r, i) => dirtRoad(r.pts, r.w, 1 - i * 0.5));
     // v1.97.45 (owner: "the small circle was the positioning of a sign that points left to main power station and '?' to the right"):
     // a fingerpost in the fork where the pond loop splits, as you come in from the paved road heading west: left (down the east side)
     // to the substation, right (along the north side, out toward the rail) "?".
     fingerpost(-295, 207, [{ text: 'MAIN POWER STATION', to: [-311, 313], y: 2.05, col: '#1d5c2e' }, { text: '?', to: [-442, 193], y: 1.7, col: '#5b4a2e' }]);
-    add(new T.PlaneGeometry(22, 16, GSEG(22), GSEG(16)).rotateX(-Math.PI / 2), groundMat('dirtroad', false, 22, 16), -610, GY('dirtroad'), 545);   // forecourt / turnaround
+    { const fm = groundMat('dirtroad', false, 22, 16); fm.polygonOffsetUnits -= 1; add(new T.PlaneGeometry(22, 16, GSEG(22), GSEG(16)).rotateX(-Math.PI / 2), fm, -610, GY('dirtroad'), 545); }   // forecourt / turnaround
     loadSubstation();
   }
 
@@ -9450,7 +9453,7 @@ function trackPath(pts, closed) {
 }
 // Dust track for the Ranger: the same offset-ribbon trick as the ballast, with UVs in metres so the dirt texture
 // never stretches round a bend. No collider: it is ground you can drive on, nothing more.
-function dirtRoad(pts, w) {
+function dirtRoad(pts, w, pull) {   // pull: extra depth pull so legs that overlap (junctions, the substation forecourt) don't fight
   const P = pts.map(p => new T.Vector3(p[0], 0, p[1])), pos = [], uv = [], idx = []; let dist = 0;
   for (let i = 0; i < P.length; i++) {
     const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], t = b.clone().sub(a).normalize(), n = V3(-t.z, 0, t.x);
@@ -9462,7 +9465,8 @@ function dirtRoad(pts, w) {
   const g = new T.BufferGeometry();
   g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  const mesh = new T.Mesh(g, groundMat('dirtroad', true)); mesh.receiveShadow = true; mesh.userData.noHit = true; scene.add(mesh);
+  const gm = groundMat('dirtroad', true); if (pull) gm.polygonOffsetUnits += pull;
+  const mesh = new T.Mesh(g, gm); mesh.receiveShadow = true; mesh.userData.noHit = true; scene.add(mesh);
 }
 function buildRail() {
   trackPath(LSAMP.filter((p, i) => i % 2 === 0).map(p => ({ x: p.x, z: p.z })), true);   // the loop (points every ~4 m)
