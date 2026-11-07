@@ -158,7 +158,7 @@ assert.ok(html.includes("pumpModel('large', BPX, BPZ, 'x', 1, 'beer', 0.9);"), '
 assert.ok(html.includes('  loadPumpModels();') && html.includes('  loadCreeps();'), 'both load at start-up');
 assert.ok(html.includes("stepSafe('creeps', () => updateCreeps(dt));"), 'creatures update every frame');
 assert.ok(html.includes('if (!done && CREEP.list.length && creepPaintHit(p, dir, len, B.c)) { splatSnd(p); done = true; }'), 'paintballs hit them');
-assert.ok(html.includes("creepToolHit(o, dir, held === 'pick' || held === 'crowbar' ? 3 : 2)"), 'so do swung tools');
+assert.ok(html.includes("creepToolHit(o, dir, held === 'pick' || held === 'crowbar' || held === 'sledge' ? 3 : 2)"), 'so do swung tools (the sledgehammer hits as hard as the pick)');
 assert.ok(html.includes("hit === 'cob' ? 'Squeeg got eaten by the cob stalkers.") && html.includes("hit === 'daddy' ? 'Daddy Cob Legs got Squeeg.'"), 'death messages');
 assert.ok(html.includes("['🌽 Corn field: kill the stalkers (Daddy comes)', () => toast(P3.creeps('boss'))]"), 'debug menu row');
 assert.ok(html.includes('P3.dmgNotify = m => toast(m);'), 'bite (and vehicle / acid / extinguisher) messages reach the screen');

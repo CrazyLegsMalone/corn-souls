@@ -29,9 +29,9 @@ const hudCam = new T.PerspectiveCamera(42, 1005 / 411, 0.01, 5);
 const fpGun = { g: new T.Group(), stock: new T.Group(), pump: new T.Group(), mag: new T.Group(), setRounds() {} };
 fpGun.g.add(fpGun.stock, fpGun.pump, fpGun.mag); hudScene.add(fpGun.g);
 fpGun.stock.add(new T.Mesh(new T.BoxGeometry(), new T.MeshLambertMaterial()));
-const TOOLS = { wrench: { L: 0.55 }, crowbar: { L: 0.95 } };
+const TOOLS = { wrench: { L: 0.55 }, crowbar: { L: 0.95 }, sledge: { L: 0.9 } };
 const heldG = {};
-for (const name of ['hand', 'washer', 'wrench', 'crowbar', 'ext']) {
+for (const name of ['hand', 'washer', 'wrench', 'crowbar', 'sledge', 'ext']) {
   const item = heldG[name] = new T.Group();
   hudScene.add(item);
 }
@@ -45,6 +45,8 @@ const ctx = {
   TUNE: { fogNear: 120, fogFar: 900 }, EYE: 1.57, POWER: { fov: 0 },
   gun: fpGun.g, aimK: 0, aimWant: false, reloadT: 0, reloadTo: 'paint', reloadFill: true, pumpT: 0,
   ensureHud: () => hudScene, document: fakeDocument, setTimeout() {},
+  // v1.97.33: the pipe wrench / sledgehammer models, read from disk and built by the game's own reader
+  loadGlbModel: (url, cb) => { const b = fs.readFileSync('..' + url.replace('/corn-souls', '')); cb(ctx.glbBuild(b.buffer.slice(b.byteOffset, b.byteOffset + b.length))); },
   hudMat: () => new T.MeshBasicMaterial(),
   toolMat: () => new T.MeshBasicMaterial(),
   crowbarSlot: () => new T.Group(),
@@ -70,6 +72,7 @@ const makeToolSource = cut('function makeTool(k)', 'function toolItem(');
 assert.ok(makeToolSource.includes(crowbarAnchor));
 vm.runInContext([
   cut('function hudPart(', '\n'),
+  cut('const TOOL_GLB = {', 'function toolTex('),
   makeToolSource.replace(crowbarAnchor, crowbarReplacement),
   cut('const GLB_CT = {', 'function loadGlbModel('),
   cut('// ---------- SKINNED NPCs', 'function loadNpcModels() {'),
@@ -216,6 +219,16 @@ for (const name of ['wrench', 'crowbar', 'ext', 'hand']) {
   }
 }
 assert.equal(heldG.hand.visible, false, 'empty hands stay hidden on foot');
+{ // v1.97.33: the pipe wrench and the sledgehammer are the owner's models, not pictures, and the fists sit on their handles
+  for (const k of ['wrench', 'sledge']) {
+    const G = heldG[k]; let model = null, pic = null;
+    G.traverse(o => { if (o.isMesh && o.geometry.attributes.position.count > 400) model = o; if (o.isMesh && o.geometry.type === 'PlaneGeometry') pic = o; });
+    assert.ok(model, k + ': the model is in the first-person hand'); assert.equal(pic.material.visible, false, k + ': and the flat picture is hidden');
+    G.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(model), [p, s2] = G.userData.gripPoints;
+    assert.ok(p.distanceTo(s2) > 0.08, k + ': two grips apart on the handle');
+    for (const q of [p, s2]) assert.ok(bb.distanceToPoint(G.localToWorld(q.clone())) < 1e-6, k + ': each grip is on the tool');
+  }
+}
 hudScene.add(SR.g); SR.carry = 'me'; updateGun(0);
 assert.ok([right, left].every(h => h.parent === SR.g));
 ctx.heldDead = {}; updateGun(0);
