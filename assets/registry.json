@@ -1148,6 +1148,28 @@
       "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
       "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
       "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "sketchfab-tyler-lazzareschi-low-poly-rat",
+      "title": "Low Poly Rat",
+      "creator": "Tyler Lazzareschi",
+      "source_url": "https://sketchfab.com/3d-models/low-poly-rat-dd63402df69742e39e989801f282e58a",
+      "evidence": "The owner's download (low_poly_rat.glb): embedded asset.extras {\"author\": \"Tyler Lazzareschi (https://sketchfab.com/tylerlazzareschi)\", \"license\": \"CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\", \"title\": \"Low Poly Rat\"}; the Sketchfab page (owner's screenshot) shows CC Attribution and \"Free to use with credit given\".",
+      "notes": "The plant's rat critter in the TEST channel from v1.97.50, in place of the code-drawn sphere rat.",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Baked to one mesh with only its base colour map (resized to 256 px; normal and roughness maps dropped), turned head toward -z, stood on y 0 and scaled to 0.5 m long (scripts/slim_creature_glb.py); tinted red at runtime when hit.",
+      "files": [
+        "assets/models/critters/rat.glb",
+        "assets/models/source/low_poly_rat.glb"
+      ],
+      "checked_on": "2026-11-07",
+      "reviewer": "Claude, from the GLB's embedded metadata and the owner's screenshot of the Sketchfab page",
+      "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
+      "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
+      "required_notice": "No endorsement by the creator is implied."
     }
   ]
 }

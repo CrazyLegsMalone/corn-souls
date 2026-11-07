@@ -14657,6 +14657,7 @@ function scareNear(p, r) { if (birds) for (const b of birds) if (b.state === 'pe
 // They run from Squeeg, and a paintball knocks them over (they disappear a few seconds later and come back somewhere else).
 let critters = null, critterHits = 0, crSolids = [], crSolidsT = 99;
 const CR_AREA = [[-73.5, -12, -31.5, WEST_WING.officeNorth - 0.5], [-73.5, WEST_WING.officeNorth + 7.5, -31.5, WEST_WING.south - 0.5]];   // cook alley, evap alley (not the office block)
+const RAT_GLB = '/corn-souls/assets/models/critters/rat.glb';   /* v1.97.50: Tyler Lazzareschi's Low Poly Rat, CC BY 4.0 */
 function makeCritter(kind) {
   const g = new T.Group(), mats = [], m = c => { const x = new T.MeshLambertMaterial({ color: c }); mats.push(x); return x; };
   const part = (geo, mt, x, y, z, sx, sy, sz) => { const o = new T.Mesh(geo, mt); o.position.set(x, y, z); if (sx) o.scale.set(sx, sy, sz); g.add(o); return o; };
@@ -14667,6 +14668,15 @@ function makeCritter(kind) {
     part(sph, fur, 0, 0.07, -0.14, 0.045, 0.04, 0.06);            // head
     part(sph, pink, 0.03, 0.12, -0.12, 0.018, 0.018, 0.008); part(sph, pink, -0.03, 0.12, -0.12, 0.018, 0.018, 0.008);   // ears
     part(new T.CylinderGeometry(0.008, 0.004, 0.22, 5).rotateX(Math.PI / 2), pink, 0, 0.04, 0.23);                      // tail
+    // v1.97.50, owner: "replace rat model with this" - Tyler Lazzareschi's Low Poly Rat (CC BY 4.0), baked to one mesh 0.5 m nose to
+    // tail tip, head toward -z like the spheres above. Those stay only until it loads (and if it can't). The model gets its own copy
+    // of the material, added to this rat's tint list, so hitting or eating still turns just this rat red.
+    const rec = {}; g.userData.rec = rec;
+    if (typeof document !== 'undefined') loadGlbModel(RAT_GLB, ({ root }) => {
+      for (const o of g.children.slice()) g.remove(o); rec.mats.length = 0; rec.cols.length = 0;   // the spheres and their materials go
+      root.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); rec.mats.push(o.material); rec.cols.push(o.material.color.getHex()); o.castShadow = true; } o.userData.noHit = true; });
+      g.add(root);
+    }, 'rat');
   } else {   // lizard: a flat 2D sprite (billboard) that always faces the camera, drawn in code
     const cv = document.createElement('canvas'); cv.width = 128; cv.height = 48; const c = cv.getContext('2d');
     c.fillStyle = '#6f9a3c'; c.beginPath(); c.ellipse(60, 30, 26, 8, 0, 0, Math.PI * 2); c.fill();          // body
@@ -14679,7 +14689,7 @@ function makeCritter(kind) {
     const sp = new T.Sprite(sm); sp.scale.set(0.3, 0.11, 1); sp.position.y = 0.055; g.add(sp); g.userData.sprite = sp;
   }
   g.traverse(o => { o.userData.noHit = true; }); g.userData.noHit = true; g.visible = false; scene.add(g);
-  return { kind, g, mats, cols: mats.map(x => x.color.getHex()), state: 'gone', t: 3 + Math.random() * 10, speed: kind === 'rat' ? 3.2 : 1.6 };
+  return Object.assign(g.userData.rec || {}, { kind, g, mats, cols: mats.map(x => x.color.getHex()), state: 'gone', t: 3 + Math.random() * 10, speed: kind === 'rat' ? 3.2 : 1.6 });
 }
 function crSolidsNear(all) {   // only meshes whose bounds reach into a critter area (plus 2 m): the probes skip the rest of the plant
   const out = [], sp = new T.Sphere(), sc = new T.Vector3();
