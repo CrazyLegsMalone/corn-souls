@@ -10389,7 +10389,9 @@ const boxDist = (e, x, z) => Math.hypot(Math.max(e.x0 - x, 0, x - e.x1), Math.ma
    yard props, ground cells) and the grass chunks outside it cannot be on screen. They are hidden for the draw only and
    shown again straight after it (indoorCullHide / indoorCullShow round renderer.render), so no game code ever sees a
    changed .visible. Dynamic things (vehicles, creatures, players) are never touched. */
-const INDOOR = { e: null, list: [], hid: [], t: -1e9, on: false, hidden: 0, margin: 1, cone: 0.3, enabled: true };
+// v1.97.27: OFF by default. It hid walls you could see (owner: "walls still disappear and reappear"); made safe it culls almost
+// nowhere (7 of 720 sampled views), so it is not worth the risk. The Lesion Toolbox's "Indoor culling" slider can still turn it on.
+const INDOOR = { e: null, list: [], hid: [], t: -1e9, on: false, hidden: 0, margin: 1, cone: 0.3, enabled: false };
 const _icV = new T.Vector3(), _icB = new T.Box3();
 function indoorOpeningsHidden(cam) {   // true when no opening of any envelope holding the camera can be in view
   const fwd = cam.getWorldDirection(_icV), half = Math.atan(Math.tan(cam.fov * Math.PI / 360) * Math.hypot(1, cam.aspect || 1));
@@ -10408,10 +10410,30 @@ function indoorOpeningsHidden(cam) {   // true when no opening of any envelope h
 function indoorCullWant(cam) {   // the envelope to cull round, or null
   cam = cam || camera;
   if (!INDOOR.enabled || !cam || !walk.on || walk.dead || walk.drive || walk.mow || walk.ride || walk.pass || VIEW.third) return null;
-  const p = cam.position, e = enclAt(p.x, p.y, p.z);
-  if (!e || !e.wins.length) return null;   // no listed openings: we cannot tell what can be seen, so draw everything
+  /* v1.97.27, owner: "walls still disappear and reappear". The plant registers smaller lighting rooms inside the big halls, and
+     culling round the smallest one hid the hall's own walls and equipment. Now: the OUTERMOST envelope holding you, and only if
+     its walls really are closed - every gap round its edge must be a listed window or doorway (open sides and canopies never
+     cull). */
+  const p = cam.position; let e = null;
+  for (const E of ENCL) if (p.x >= E.x0 && p.x <= E.x1 && p.z >= E.z0 && p.z <= E.z1 && p.y <= E.top && (!e || E.area > e.area)) e = E;
+  if (!e || !e.wins.length || !indoorSealed(e)) return null;   // no listed openings, or gaps we cannot account for: draw everything
   if (Math.min(p.x - e.x0, e.x1 - p.x, p.z - e.z0, e.z1 - p.z) < 1.5 || e.top - p.y < 0.5) return null;
   return indoorOpeningsHidden(cam) ? e : null;
+}
+function indoorSealed(e) {   // walk the envelope's edge every 0.5 m at head height: each point must be on a wall line or at a listed opening
+  if (e.sealed !== undefined && e.sealedN === e.wins.length) return e.sealed;
+  let open = 0, n = 0;
+  const onWall = (x, z) => { for (const w of wallSegs) {
+      if (w.length > 4 && (w[4] > 1.6 || w[5] < Math.min(2.4, e.top - 0.2))) continue;   // a low barrier or a high beam is not a wall
+      const vx = w[2] - w[0], vz = w[3] - w[1], L = vx * vx + vz * vz || 1, f = Math.max(0, Math.min(1, ((x - w[0]) * vx + (z - w[1]) * vz) / L));
+      if (Math.hypot(x - (w[0] + f * vx), z - (w[1] + f * vz)) < 0.45) return true; }
+    return false; };
+  const atOpening = (x, z) => e.wins.some(w => Math.hypot(w[0] - x, w[2] - z) < Math.max(1.5, w[3]));
+  const edge = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), k = Math.max(1, Math.round(L / 0.5));
+    for (let i = 0; i <= k; i++) { const x = x0 + (x1 - x0) * i / k, z = z0 + (z1 - z0) * i / k; n++; if (!onWall(x, z) && !atOpening(x, z)) open++; } };
+  edge(e.x0, e.z0, e.x1, e.z0); edge(e.x1, e.z0, e.x1, e.z1); edge(e.x1, e.z1, e.x0, e.z1); edge(e.x0, e.z1, e.x0, e.z0);
+  e.sealedN = e.wins.length; e.sealedOpen = open / Math.max(1, n);
+  return (e.sealed = open === 0);
 }
 function indoorOutside(e, b) {   // is a world box wholly outside the envelope (or above its roof)?
   const M = INDOOR.margin;

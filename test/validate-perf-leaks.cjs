@@ -32,10 +32,14 @@ const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); 
 {
   const src = cut('function enclAt(x, y, z) {', 'function indoorCullShow(hid) {') + fnSrc(html, 'indoorCullShow');
   const scene = new T.Scene();
-  const ctx = { T, scene, ENCL: [], walk: { on: true }, VIEW: { third: false }, GRASS: { chunk: 64, chunks: new Map() }, renderer: { shadowMap: { needsUpdate: false } }, performance: { now: () => 0 }, Math, console };
+  // the shop's walls: closed all round except the 4 m doorway in the east wall at z 15 (listed as an opening below)
+  const wallSegs = [[0, 0, 40, 0], [40, 0, 40, 13], [40, 17, 40, 30], [40, 30, 0, 30], [0, 30, 0, 0]];
+  const ctx = { T, scene, ENCL: [], wallSegs, walk: { on: true }, VIEW: { third: false }, GRASS: { chunk: 64, chunks: new Map() }, renderer: { shadowMap: { needsUpdate: false } }, performance: { now: () => 0 }, Math, console };
   ctx.camera = new T.PerspectiveCamera(70, 16 / 9, 0.1, 2000);
   vm.createContext(ctx);
   vm.runInContext(src + '\nthis.INDOOR = INDOOR; this.indoorCullHide = indoorCullHide; this.indoorCullShow = indoorCullShow; this.indoorCullWant = indoorCullWant;', ctx);
+  assert.equal(ctx.INDOOR.enabled, false, 'v1.97.27: indoor culling is off unless switched on (it hid walls the owner could see)');
+  ctx.INDOOR.enabled = true;   // the rest of this block tests it switched on
   const shop = { x0: 0, x1: 40, z0: 0, z1: 30, top: 8, area: 1200, wins: [[40, 1.7, 15, 4]] };   // one doorway, in the east wall
   ctx.ENCL.push(shop);
   const box = (x, z, still) => { const m = new T.Mesh(new T.BoxGeometry(2, 2, 2), new T.MeshBasicMaterial()); m.position.set(x, 1, z); m.updateMatrix(); m.updateMatrixWorld(true); if (still) m.matrixAutoUpdate = false; scene.add(m); return m; };
@@ -64,6 +68,15 @@ const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); 
   look(12, 15, Math.PI / 2); ctx.VIEW.third = true; assert.equal(ctx.indoorCullHide(0), null, 'third person: nothing is culled');
   ctx.VIEW.third = false; ctx.walk.drive = true; assert.equal(ctx.indoorCullHide(0), null, 'driving: nothing is culled'); ctx.walk.drive = false;
   look(-30, 15, Math.PI / 2); assert.equal(ctx.indoorCullHide(0), null, 'outdoors: nothing is culled');
+  { // v1.97.27: a small lighting room inside the hall must not be the one culled round (that hid the hall's own walls)
+    const room = { x0: 5, x1: 20, z0: 10, z1: 20, top: 4, area: 150, wins: [[20, 1.7, 15, 3]] }; ctx.ENCL.push(room);
+    look(12, 15, Math.PI / 2); ctx.renderer.shadowMap.needsUpdate = false; const h = ctx.indoorCullHide(0);
+    assert.ok(h && !h.includes(inside) && h.includes(outside), 'it culls round the outer hall: the hall\'s own things stay drawn'); ctx.indoorCullShow(h);
+    ctx.ENCL.pop(); }
+  { // a gap in the walls that is not a listed opening (an open side) means it never culls
+    wallSegs.splice(3, 1); const S2 = { ...shop, wins: shop.wins.slice() }; delete S2.sealed;   /* (the sealed check is cached per envelope) */ ctx.ENCL[0] = S2;
+    look(12, 15, Math.PI / 2); assert.equal(ctx.indoorCullHide(0), null, 'an open side we cannot account for: draw everything');
+    wallSegs.splice(3, 0, [40, 30, 0, 30]); ctx.ENCL[0] = shop; }
   shop.wins.length = 0; look(12, 15, Math.PI / 2); assert.equal(ctx.indoorCullHide(0), null, 'a room with no listed openings is never culled');
   // wired round the world render, inside the title guard, without moving the pinned lines
   const r = html.indexOf('    const _ic = indoorCullHide();\n    const _rt = performance.now();\n    renderer.render(scene, camera);\n    indoorCullShow(_ic);\n');

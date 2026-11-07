@@ -1,3 +1,11 @@
+## TEST v1.97.27 — walls no longer disappear: indoor culling off by default (2026-11-06)
+- Owner: *"Wall still disappear and reappear. Frame rate is steadier and closer to 30"* (second Lesion Toolbox recording: avg 30.1 fps, typical frame 33.2 ms, hitches 7 → 4, critters 4.6 → 0.55 ms).
+- Cause: the v1.97.196 indoor culling. The plant registers smaller lighting rooms inside the big halls, and culling round the smallest room you stood in hid the hall's own walls and equipment, so they vanished and came back as you turned. Reproduced at the owner's recorded spots: up to 17% of the picture changed with culling on.
+- Made it safe (cull round the outermost envelope only, and only when every gap in its walls is a listed window or doorway), then swept all 18 envelopes × 5 spots × 8 directions with in-page renders: it culled in only 7 of 720 views. Not worth the risk, so **indoor culling is off by default**. The Lesion Toolbox "Indoor culling" slider can still switch on the safer version for testing.
+- Draw calls in enclosed rooms go back up; the safe fix for those is merging the ~2,300 separate meshes (proposed next).
+- `validate-perf-leaks.cjs` now checks: off by default; the outer hall is culled round, not a room inside it; an unlisted gap (open side) never culls. All 70 CI suites, launcher anchors, LIVE consistency and script syntax pass. LIVE is untouched.
+- Bumped TEST to `1.97.27` / `corn-souls-test-shell-v233`.
+
 ## TEST v1.97.26 — even frame pacing on phones, cheaper critters (2026-11-06)
 - From the owner's first Lesion Toolbox recording (Razr, Low): avg 32 fps swinging 29-45, worst 1% 20 fps, the screen read as "30 Hz", critters 4.6 ms a frame (19 ms worst), world render CPU 18.5 ms at 775 draw calls (1,420 max in the big open building facing west).
 - **Pacing:**
