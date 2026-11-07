@@ -40,4 +40,11 @@ assert.ok(html.includes("playerHurt(Math.round(dmg * 34),"), 'creature bites are
 assert.ok(html.includes("if (drop > fatal * 0.62 && drop <= fatal && !walk.dead) playerHurt("), 'hard landings hurt');
 assert.ok(html.includes("stepSafe('hp', () => hpUpdate(dt));") && html.includes("function takeSquish() { const k = walk.dead; if (k) { HP.hp = HP.max;"), 'heals each frame, full again after a death');
 assert.ok(html.includes("hit === 'melee' ? 'Squeeg got beaten down by the other player!'"), 'its own death message');
-console.log('PASS: player health (100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');
+// v1.97.37 (owner: "jumping shouldnt cause fall damage"): a jump on flat ground went 1.8 m up and landed as a 1.8 m "fall" (hurt from 1.49 m)
+assert.ok(html.includes("walk.vy = POWER.kind === 'frog' ? 8.4 : 5.94; walk.jumpFrom = walk.y;"), 'a jump remembers the floor it left');
+assert.ok(html.includes('const drop = walk.jumpFrom != null ? Math.max(0, walk.jumpFrom - f) : walk.peakY - f;'), 'and only the height below that floor counts');
+assert.ok(!html.includes('walk.peakY = null;') && html.split('walk.peakY = walk.jumpFrom = null').length > 10, 'cleared wherever the fall is reset (ladders, climbs, chutes)');
+{ const drop = (jumpFrom, f) => Math.max(0, jumpFrom - f), hurtAt = 2.4 * 0.62;
+  assert.ok(drop(0, 0) < hurtAt && drop(0, 1.2) === 0, 'a jump on flat ground, or up onto a ledge: nothing');
+  assert.ok(drop(2, 0) > hurtAt, 'jumping off a 2 m ledge still hurts'); }
+console.log('PASS: player health (jumps never count as falls, 100 HP, knock-back, three paint tags, tool damage between players in front and in reach, 6 s then 8 HP/s healing, bites and hard landings, full after a death)');

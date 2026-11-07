@@ -1,3 +1,10 @@
+## TEST v1.97.37 — windsock back, knife and cleaver held by the handle, jumps never count as falls (2026-11-07)
+- Owner: *"put sock back where it used to be my mistake"*. The ammonia windsock (pole and sock) is back at NH3 + (4, -8) = 39.3, -56.5, i.e. v1.97.36's windsock move is undone. The Pink Sedan stays at its new spot.
+- Owner: *"the cleaver and knife are being held by the blade"*. The slimming script puts the thicker end at +X as the head. On the knife and the cleaver that end is the handle, so the fist closed on the blade. `TOOL_GLB[k].flip` turns the model end for end. Checked on screen: the fist is on the handle with the blade up.
+- Owner: *"jumping shouldnt cause fall damage"*. A jump goes 1.8 m up, and the v1.97.35 hard-landing damage started at 1.49 m measured from the highest point, so every jump on flat ground hurt. A jump now remembers the floor it left (`walk.jumpFrom`), and only the height you come down below that floor counts. A jump on flat ground or up onto a ledge does nothing; jumping off a 2 m ledge still counts 2 m. Falls you didn't jump into still count from the highest point. Jump height and the fatal heights are unchanged. This also fixes an older problem: jumping off a 0.7 m ledge used to count 2.5 m, which was fatal.
+- `validate-player-health.cjs` covers the jump rule; `validate-windsocks.cjs` pins the original spot again.
+- Bumped TEST to `1.97.37` / `corn-souls-test-shell-v243`.
+
 ## TEST v1.97.36 — owner's Lesion Toolbox placements: ammonia windsock and the Pink Sedan (2026-11-07)
 - Owner sent a placement report (made on v1.97.33) and noted that the collision boxes didn't move with the objects in the live test. Both are now moved in the source, so collision is built in the new spots:
   - **Ammonia windsock** (the `CylinderGeometry` pole + its sock `group`): pole 39.30, -56.50 → **41.16, -58.53** (its collision circle moves with it); sock head 39.30, 6.00, -56.50 → **41.23, 6.25, -58.32**. Turn is unchanged: the sock's yaw is live wind.

@@ -8684,10 +8684,9 @@ function init(container) {
     // weather and fills out with the wind speed (limp and hanging when it's calm), fluttering a little.
     // Keep the wet cake windsock; add an identical one northeast of ammonia, clear of the tank, valves and south pump rack.
     O.windsocks = [];
-    // v1.97.36: the ammonia one placed by the owner with the Lesion Toolbox (pole 41.16, -58.53; sock head 41.23, 6.25, -58.32)
-    for (const [WX, WZ, SX, SY, SZ] of [[E1 - 67 - 4, EZ1 + 3], [41.16, -58.53, 41.23, 6.25, -58.32]]) {
+    for (const [WX, WZ] of [[E1 - 67 - 4, EZ1 + 3], [NH3.x + 4, NH3.z - 8]]) {
       cyl(0.07, 6.0, mat(0xd8dcdf), WX, 0, WZ, null, 10); box(0.5, 0.2, 0.5, mat(0x9a9fa4), WX, 0.1, WZ); extraCols.push([WX, WZ, 0.3]);
-      const piv = new T.Group(); piv.position.set(SX === undefined ? WX : SX, SY === undefined ? 6.0 : SY, SZ === undefined ? WZ : SZ); scene.add(piv);
+      const piv = new T.Group(); piv.position.set(WX, 6.0, WZ); scene.add(piv);
       const ring = new T.Mesh(new T.TorusGeometry(0.28, 0.025, 6, 16), mat(0x9aa0a6)); ring.position.set(0, 0, 0.12); piv.add(ring);
       const segs = []; let parent = piv, z0 = 0.12;
       for (let i = 0; i < 5; i++) { const r0 = 0.28 - i * 0.034, r1 = r0 - 0.034, L = 0.46, sg = new T.Group(); sg.position.set(0, 0, z0); parent.add(sg);
@@ -11862,7 +11861,7 @@ function pickChute() {
 function chuteDeploy() {
   if (!CHUTE.held || CHUTE.state || !walk.on || walk.dead) return false;
   const f = floorAt(walk.x, walk.z, walk.y); if (walk.y - f < 3 || walk.vy > 0.5) return false;   // only in the air, with room to open
-  CHUTE.state = 'open'; CHUTE.held = false; CHUTE.t = 0; walk.peakY = null;
+  CHUTE.state = 'open'; CHUTE.held = false; CHUTE.t = 0; walk.peakY = walk.jumpFrom = null;
   if (!CHUTE.canopy) {   // striped canopy (red / white panels) on a flattened dome, suspension lines down to the harness
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 8; const c = cv.getContext('2d');
     for (let i = 0; i < 16; i++) { c.fillStyle = i % 2 ? '#f4f4f2' : '#d4242a'; c.fillRect(i * 16, 0, 16, 8); }
@@ -11881,12 +11880,12 @@ function chuteDeploy() {
 }
 function chuteFly(dt, f) {
   CHUTE.t += dt; const C = CHUTE.canopy; C.scale.setScalar(Math.min(1, 0.2 + CHUTE.t * 2.5));   // pops open over ~0.3 s
-  walk.vy += (-4.2 - walk.vy) * Math.min(1, dt * 3); walk.peakY = null;                          // slows to ~4 m/s down
+  walk.vy += (-4.2 - walk.vy) * Math.min(1, dt * 3); walk.peakY = walk.jumpFrom = null;                          // slows to ~4 m/s down
   walk.x += -Math.sin(walk.yaw) * 2.2 * dt; walk.z += -Math.cos(walk.yaw) * 2.2 * dt;               // glides the way you face
   walk.y = Math.max(f, walk.y + walk.vy * dt); C.position.set(walk.x, walk.y, walk.z); C.rotation.y = walk.yaw;
   pushOut();
   if (walk.y <= f + 0.001) {   // touchdown: canopy drops behind you, a new pack shows up on the beer well a bit later
-    walk.vy = 0; CHUTE.state = null; walk.peakY = null;
+    walk.vy = 0; CHUTE.state = null; walk.peakY = walk.jumpFrom = null;
     const dropAt = C.position.clone(); let k = 0; const sink = () => { k += 0.05; C.position.set(dropAt.x + Math.sin(walk.yaw) * k * 2, dropAt.y + 4.2 * (1 - k) - 4.2, dropAt.z + Math.cos(walk.yaw) * k * 2); C.scale.y = Math.max(0.05, 1 - k); if (k < 1) setTimeout(sink, 40); else C.visible = false; }; sink();
     setTimeout(chutePack, 8000);
     if (CHUTE_NOTIFY) CHUTE_NOTIFY('Landed!');
@@ -12156,8 +12155,8 @@ const TOOL_GLB = {
   machete: { url: '/corn-souls/assets/models/machete.glb', grip: [-0.38], hud: [0.16, -0.16, -0.55] },
   pipe: { url: '/corn-souls/assets/models/pipe.glb', grip: [-0.4, -0.12] },
   pan: { url: '/corn-souls/assets/models/frying_pan.glb', grip: [-0.4], hud: [0.24, -0.2, -0.55] },
-  knife: { url: '/corn-souls/assets/models/kitchen_knife.glb', grip: [-0.34], hud: [0.12, -0.12, -0.45] },
-  cleaver: { url: '/corn-souls/assets/models/cleaver.glb', grip: [-0.36], hud: [0.12, -0.12, -0.45] },
+  knife: { url: '/corn-souls/assets/models/kitchen_knife.glb', grip: [-0.34], hud: [0.12, -0.12, -0.45], flip: true },   // flip: the file's thick end is the handle
+  cleaver: { url: '/corn-souls/assets/models/cleaver.glb', grip: [-0.36], hud: [0.12, -0.12, -0.45], flip: true },
   baton: { url: '/corn-souls/assets/models/stun_baton.glb', grip: [-0.38], hud: [0.16, -0.16, -0.55] },
   bat: { url: '/corn-souls/assets/models/aluminum_bat.glb', grip: [-0.42, -0.29], hud: [0.2, -0.2, -0.6] },
   golf: { url: '/corn-souls/assets/models/golf_club.glb', grip: [-0.44, -0.33], hud: [0.22, -0.24, -0.62] }
@@ -12167,7 +12166,7 @@ function toolModelOn(k, holder, L) {   // put tool k's model on a picture mesh (
   loadGlbModel(spec.url, ({ root }) => {
     root.updateMatrixWorld(true);
     const bb = new T.Box3().setFromObject(root), len = bb.max.x - bb.min.x;
-    root.scale.multiplyScalar(L / (len || 1)); holder.add(root);
+    root.scale.multiplyScalar(L / (len || 1)); if (spec.flip) root.rotation.y = Math.PI; holder.add(root);   // v1.97.37: blade away from the fist
     root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.castShadow = false; if (holder.renderOrder) o.renderOrder = holder.renderOrder; } });
     holder.material.visible = false;
   }, 'tool');
@@ -12892,9 +12891,9 @@ function lizardClimb(fx, fz, want, got, dt) {   // pushing forward but held back
   if (walk.drive || walk.mow || walk.ride || walk.dead || want <= 0.0005 || got > want * 0.35) return;
   walk.slide = false;
   const h = roofAt(walk.x + fx * 0.7, walk.z + fz * 0.7);
-  if (h >= 2 && h <= walk.y + 0.3) { walk.x += fx * 0.7; walk.z += fz * 0.7; walk.y = h; walk.vy = 0; walk.peakY = null; walk.climbT = 0; return; }   // over the top: step onto it
+  if (h >= 2 && h <= walk.y + 0.3) { walk.x += fx * 0.7; walk.z += fz * 0.7; walk.y = h; walk.vy = 0; walk.peakY = walk.jumpFrom = null; walk.climbT = 0; return; }   // over the top: step onto it
   if (walk.y > 90) return;
-  walk.y += 2.6 * dt; walk.vy = 0; walk.peakY = null; walk.climbT = 0.6;   // (keeps hold for a moment if the stick slips)
+  walk.y += 2.6 * dt; walk.vy = 0; walk.peakY = walk.jumpFrom = null; walk.climbT = 0.6;   // (keeps hold for a moment if the stick slips)
 }
 // ---------- ROOF MAP (v1.97.113): "make sure all roofs have collision". One top-down render of every still, solid thing in the plant
 // (buildings, tanks, bins, equipment - not vehicles, trains, people, animals or the sky) with a little shader that writes each
@@ -13161,7 +13160,7 @@ function walkMove(fwd, strafe, dt, run) {
   { const L = !walk.mow && !walk.ride && onLadder();   // ladders: face the ladder and push forward to climb, back off to climb down
     if (L && Math.abs(fwd) > 0.3) { const face = -Math.sin(walk.yaw) * L.dx - Math.cos(walk.yaw) * L.dz, dir = Math.sign(fwd * face), fl = floorAt(walk.x, walk.z, 0);
       if (Math.abs(face) > 0.3 && (dir > 0 || walk.y > fl + 0.02)) {
-        walk.y = Math.max(fl, Math.min(L.top, walk.y + dir * 2.2 * dt)); walk.vy = 0; walk.peakY = null;
+        walk.y = Math.max(fl, Math.min(L.top, walk.y + dir * 2.2 * dt)); walk.vy = 0; walk.peakY = walk.jumpFrom = null;
         if (walk.y >= L.top - 0.01 && dir > 0) { walk.x = L.x + L.dx * 0.95; walk.z = L.z + L.dz * 0.95; }   // step off onto the walkway
         return; } } }
   if (walk.mow) { MOW.f = fwd; MOW.s = strafe; MOW.inT = performance.now(); return; }   // on the mower: the stick works the lap bars
@@ -13299,7 +13298,7 @@ function passUpdate(dt) {
   if (!walk.on || walk.dead || !V) { passExit(); return; }            // the driver got out, or the vehicle is gone
   if (V.car) { const s = carSeat(V.car, -1); walk.x = s.x; walk.z = s.z; walk.y = s.y - EYE; }   // eye at the passenger's eye
   else { const s = passSeat(V.g); walk.x = s.x; walk.y = s.y; walk.z = s.z; }
-  walk.yaw = V.a; walk.vy = 0; walk.peakY = null;
+  walk.yaw = V.a; walk.vy = 0; walk.peakY = walk.jumpFrom = null;
 }
 function passExit() {
   if (!walk.pass) return;
@@ -13459,14 +13458,14 @@ function pvpMelee(dir) {
 }
 function takeSquish() { const k = walk.dead; if (k) { HP.hp = HP.max; HP.calmT = 99; HP.flash = 0; walk.dead = null; if (walk.drive) { walk.drive = false; utvSound(0, 0); if (utv.driver) utv.driver.visible = false; } } return k; }
 // jump: simple hop with gravity
-function walkJump() { if (walk.drive) return; if (walk.ride) { rideOff(); return; } if (chuteDeploy()) return; if (walk.on && !walk.dead && walk.y <= (walk.floor || 0) + 0.001) { walk.vy = POWER.kind === 'frog' ? 8.4 : 5.94; walk.slide = false; walk.climbT = 0; return; } pigeonFlap(); }   // frog legs: twice as high
+function walkJump() { if (walk.drive) return; if (walk.ride) { rideOff(); return; } if (chuteDeploy()) return; if (walk.on && !walk.dead && walk.y <= (walk.floor || 0) + 0.001) { walk.vy = POWER.kind === 'frog' ? 8.4 : 5.94; walk.jumpFrom = walk.y; walk.slide = false; walk.climbT = 0; return; } pigeonFlap(); }   // frog legs: twice as high
 // riding the train: X / E next to the rider car hops on; X / E again or jump hops off beside the track
 function rideCar() { return train.cars.find(c => c.ride); }
 function rideToggle() {
   if (!walk.on || walk.dead) return null;
   if (walk.pass) { passExit(); return 'Stepped out of the passenger seat'; }
   { const V = passRide(); if (V && !walk.ride && !walk.drive && Math.hypot(walk.x - V.x, walk.z - V.z) < (V.car ? 3.6 : 3.4)) {
-    walk.pass = true; walk.vy = 0; walk.peakY = null; netSend({ t: 'ps', on: true });   // ride shotgun (their Ranger or the car they are driving)
+    walk.pass = true; walk.vy = 0; walk.peakY = walk.jumpFrom = null; netSend({ t: 'ps', on: true });   // ride shotgun (their Ranger or the car they are driving)
     return 'Riding along beside them: X to step out'; } }
   if (walk.drive) { const nm = CAR_ON ? CAR_ON.name : 'Ranger'; utvExit(); return 'Got out of the ' + nm; }
   if (NET.rr && !walk.ride && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2 && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < Math.hypot(walk.x - utv.x, walk.z - utv.z)) { swapRangers(); netSend({ t: 'swap' }); }   // the other player's Ranger is closer: take it
@@ -13490,19 +13489,21 @@ function walkPhysics(dt) {
   const f = walk.floor = floorAt(walk.x, walk.z, walk.y);
   const hm = Math.hypot(walk.x - (walk.lx ?? walk.x), walk.z - (walk.lz ?? walk.z)); walk.lx = walk.x; walk.lz = walk.z;   // how far we stepped since last frame
   const stick = Math.max(0.35, Math.min(2, hm * 1.05 + 0.1));   // going down stairs: follow slopes up to ~45° even when a slow frame takes a big step
-  if (walk.y > f + 0.02 && onLadder()) { walk.vy = 0; walk.peakY = null; return; }   // hanging on a ladder: no falling
-  if (walk.climbT > 0 && walk.y > f + 0.02) { walk.climbT -= dt; walk.vy = 0; walk.peakY = null; if (walk.climbT <= 0) walk.slide = true; return; }   // lizard grip: holding on to the wall
-  if (walk.slide) { if (walk.y > f + 0.02 && !CHUTE.state) { walk.y = Math.max(f, walk.y - 3 * dt); walk.vy = 0; walk.peakY = null; return; } walk.slide = false; }   // let go: slide gently down the wall
-  if (walk.y < f) { walk.y = f; walk.vy = 0; walk.peakY = null; return; }                // walking up stairs / onto a deck
+  if (walk.y > f + 0.02 && onLadder()) { walk.vy = 0; walk.peakY = walk.jumpFrom = null; return; }   // hanging on a ladder: no falling
+  if (walk.climbT > 0 && walk.y > f + 0.02) { walk.climbT -= dt; walk.vy = 0; walk.peakY = walk.jumpFrom = null; if (walk.climbT <= 0) walk.slide = true; return; }   // lizard grip: holding on to the wall
+  if (walk.slide) { if (walk.y > f + 0.02 && !CHUTE.state) { walk.y = Math.max(f, walk.y - 3 * dt); walk.vy = 0; walk.peakY = walk.jumpFrom = null; return; } walk.slide = false; }   // let go: slide gently down the wall
+  if (walk.y < f) { walk.y = f; walk.vy = 0; walk.peakY = walk.jumpFrom = null; return; }                // walking up stairs / onto a deck
   if (walk.y > f + 0.001 || walk.vy > 0) {                                                // jumping or falling (off an edge, or down stairs)
     if (CHUTE.state === 'open') { chuteFly(dt, f); return; }
-    if (walk.vy <= 0 && walk.y - f < stick && (walk.peakY ?? walk.y) - f < stick + 0.25) { walk.y = f; walk.vy = 0; walk.peakY = null; return; }   // stick to the stairs going down
+    if (walk.vy <= 0 && walk.y - f < stick && (walk.peakY ?? walk.y) - f < stick + 0.25) { walk.y = f; walk.vy = 0; walk.peakY = walk.jumpFrom = null; return; }   // stick to the stairs going down
     walk.peakY = Math.max(walk.peakY ?? walk.y, walk.y);                                  // highest point since leaving the ground
     walk.vy -= 9.8 * dt;
     if (POWER.kind === 'pigeon' && POWER.jump && walk.vy < -1.6) { walk.vy = -1.6; walk.peakY = walk.y; }   // pigeon wings: hold jump to glide down
     walk.y = Math.max(f, walk.y + walk.vy * dt);
     if (walk.y === f) {   // landed: a drop of more than ~8 ft (2.4 m) from the highest point is fatal (a normal jump off a ledge is fine)
-      const drop = walk.peakY - f; walk.peakY = null;
+      // v1.97.37 (owner: "jumping shouldn't cause fall damage"): your own jump never counts, only the height you came down below where
+      // you jumped from (a jump on flat ground is 0; off a 2 m ledge is 2 m). Falls you didn't jump into count from the highest point.
+      const drop = walk.jumpFrom != null ? Math.max(0, walk.jumpFrom - f) : walk.peakY - f; walk.peakY = walk.jumpFrom = null;
       const fatal = POWER.kind === 'frog' ? 4.6 : POWER.kind === 'pigeon' ? Infinity : 2.4;
       if (drop > fatal * 0.62 && drop <= fatal && !walk.dead) playerHurt(Math.round((drop - fatal * 0.62) / (fatal * 0.38) * 60), 'fall', 0, 0, '🦵 Hard landing');   // v1.97.35
       if (drop > fatal && !walk.dead) { walk.dead = 'fall'; layBody(walk.x, walk.z, walk.yaw, -Math.sin(walk.yaw) * 1.5, -walk.vy * 0.15, -Math.cos(walk.yaw) * 1.5, 3, true); walk.diedAt = { x: walk.x, z: walk.z }; }   // (frog legs land a frog jump)
