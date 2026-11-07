@@ -5585,7 +5585,7 @@ function loadSubstation() {
       wallSegs.push([bb.min.x, bb.min.z, gx - gw / 2, bb.min.z], [gx + gw / 2, bb.min.z, bb.max.x, bb.min.z],
         [bb.min.x, bb.max.z, bb.max.x, bb.max.z], [bb.min.x, bb.min.z, bb.min.x, bb.max.z], [bb.max.x, bb.min.z, bb.max.x, bb.max.z]);
       mergeModel(root, true, o => { for (const f of [R.handle, R.gate, R.door]) if (f) { let q = o; while (q) { if (q === f) return true; q = q.parent; } } return false; });
-      if (R.y !== undefined && !SUBSTATION.baton) { SUBSTATION.baton = true; toolSpot('baton', R.x + 0.9, R.y, R.z - 0.15, SUBSTATION_BATON_RY); }   // v1.97.34: the stun baton beside the reset button
+      if (R.y !== undefined && !SUBSTATION.baton) { SUBSTATION.baton = true; toolSpot('baton', R.x - 1.22, R.y, R.z - 0.22, SUBSTATION_BATON_RY);   /* v1.97.46: the owner's spot (Lesion Toolbox): -609.82, 1.22, 565.08 */ }   // v1.97.34: the stun baton beside the reset button
       SUBSTATION.ready = true;
   }, 'substation');
 }

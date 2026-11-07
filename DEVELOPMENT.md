@@ -1,3 +1,7 @@
+## TEST v1.97.46 — stun baton moved to the owner's spot (2026-11-07)
+- Lesion Toolbox placement (made on v1.97.44): the stun baton by the substation's RESET PLANT POWER button goes from -607.70, 1.22, 565.15 to **-609.82, 1.22, 565.08**, turn unchanged (180°). It is still placed relative to the button, which the model sits at -608.60, 565.30, so the offset is now (-1.22, -0.22) instead of (+0.90, -0.15). Its pick-up spot moves with it, since it is built there.
+- Bumped TEST to `1.97.46` / `corn-souls-test-shell-v252`.
+
 ## TEST v1.97.45 — signpost at the pond-loop fork (2026-11-07)
 - Owner: *"the small circle was the positioning of a sign that points left to main power station and '?' to the right"*. The circle mapped to (-295, 207), the fork where the loop splits, coming in from the paved road heading west.
 - `fingerpost(x, z, arms)`: a wooden post with pointed arm boards (canvas text on both faces, readable from either side), each turned to point at a spot down its branch. **MAIN POWER STATION** (green) points left, down the east side toward the substation; **?** (brown) points right, along the north side toward the rail. The post has a small collision circle. Checked in headless Chromium coming up the road.
