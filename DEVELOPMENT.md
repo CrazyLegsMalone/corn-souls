@@ -1,3 +1,7 @@
+## TEST v1.97.48 — the shed's lawn mower is there before you walk in (2026-11-07)
+- Owner: *"the lawn mower in the shed should spawn in before player opens door right now it looks empty until player crosses threshold"*. To save draws, the parked mower was only drawn while the roll-up door was open or once you were inside the shed's walls, so looking in through the door showed an empty shed. It is now drawn whenever you're within 30 m of the shed (and, as before, while the roll-up is open, while you're mowing, or once it's been taken out).
+- Bumped TEST to `1.97.48` / `corn-souls-test-shell-v254`.
+
 ## TEST v1.97.47 — no more flicker on the substation forecourt (2026-11-07)
 - Owner (screenshot of the forecourt in front of the substation): *"flickering at the ground here"*. The forecourt plane, the substation spur and the pond loop's south corner overlap there, and all three lay at the same height (`GY('dirtroad')`) with the same depth pull (`GB('dirtroad')` = -10), so the depth test could not choose and they took turns: z-fighting.
 - Each dirt-road leg now gets its own half-step of pull (-9, -9.5, -10, -10.5) through `dirtRoad(pts, w, pull)`, and the forecourt sits on top at -11. That is all still between the dirt yard (-8) and asphalt (-12), so the ground layer order is unchanged. This also cures the same fight at the loop's two junctions.

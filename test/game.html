@@ -11132,7 +11132,7 @@ function update(sim, dt, events) {
   for (const d of O.rollDoors || []) rollDoorStep(d, dt);   // v1.97.137: they follow their wall switch (rollSwitchSet)
   if (walk.on) {
     if (walk.drive) utvUpdate(dt); else if (walk.ride) rideUpdate(); else if (walk.mow) mowUpdate(dt); else if (walk.pass) passUpdate(dt); else walkPhysics(dt);
-    if (O.shedMower) { const m = O.shedMower; m.g.visible = m.out || walk.mow || m.door.open > 0.02 || (walk.x > m.X0 && walk.x < m.X1 && walk.z > m.Z0 && walk.z < m.Z1); }   // mower drawn from inside the shed or while the roll-up is open
+    if (O.shedMower) { const m = O.shedMower; m.g.visible = m.out || walk.mow || m.door.open > 0.02 || Math.hypot(walk.x - (m.X0 + m.X1) / 2, walk.z - (m.Z0 + m.Z1) / 2) < 30; }   // mower drawn while the roll-up is open or you're within 30 m (v1.97.48, owner: it looked empty through the door until you stepped in)
     // toxic retention pond: standing in the water slowly poisons Squeeg (the screen turns green over 20 s); get out and it wears off
     const inWater = !walk.dead && !walk.ride && walk.y < PONDS.water && inPond(walk.x, walk.z);
     walk.toxic = inWater ? (walk.toxic || 0) + dt : Math.max(0, (walk.toxic || 0) - dt * 2);
