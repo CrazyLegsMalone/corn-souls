@@ -1,3 +1,12 @@
+## TEST v1.97.39 — scale house techs stand at their windows with a computer; knife edges lead the slash (2026-11-07)
+- Owner (screenshot of Tammy sitting below the counter): *"remove the chair and have them stand maybe add a keyboard and computer for them to use at window and some basic arm and head animations"*.
+  - Brenda and Tammy now stand (`standingPerson`, no chair) just behind the counter's back edge, facing their drive-through windows. `NPC_MODELS` sets `pose: 'stand'`, and `keepY` keeps them on the raised scale-house floor.
+  - Each counter has a keyboard in front of the tech and a monitor beside it, angled toward her and clear of the window, with a lit blue screen.
+  - `npcTypePose`: upper arms a little forward and forearms bent level, so the hands sit over the keys. These two keep their skeleton (not baked), and `npcAnimRig` / `npcAnimUpdate` (stepSafe 'npcAnim') animate them: forearms tap out of step while typing, and every few seconds they glance at the window or the screen (head + neck) and back. Animation is skipped when you're more than 40 m away.
+- Owner: *"the sharp side of blade on both knives is facing the wrong way according to slash direction"*. v1.97.37 turned them end for end about y, which kept the edge on the wrong side. They're now turned about z, which flips the edge too.
+- `validate-seating.cjs` / `validate-skinned-npcs.cjs` updated: the techs stand (no chairs at the windows) and are animated.
+- Bumped TEST to `1.97.39` / `corn-souls-test-shell-v245`.
+
 ## TEST v1.97.38 — Respawn button, back near where you went down (2026-11-07)
 - Owner: *"should be able to press a button to respawn a few seconds after death"*, then *"should respawn nearby death area"*.
 - When the death scene ends (4.9 s), a red **↻ Respawn** button comes up. It, E / Enter / Space / R, or A / Start on a controller puts you straight back on foot at full health. Starting Squeeg mode any other way hides it.

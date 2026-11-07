@@ -110,7 +110,7 @@ for (const [f, h, who] of [[RICK, 1.78, 'Rick'], [BRENDA, 1.65, 'Brenda'], [TAMM
 
 // ---------------------------------------------------------------- wiring, files, credits
 const table = cut('const NPC_MODELS = {', '};');
-for (const [id, file, p] of [['vern', 'NPC_VERN', 'stand'], ['op', 'NPC_RICK', 'sit'], ['brenda', 'NPC_BRENDA', 'sit'], ['tammy', 'NPC_TAMMY', 'sit']]) {
+for (const [id, file, p] of [['vern', 'NPC_VERN', 'stand'], ['op', 'NPC_RICK', 'sit'], ['brenda', 'NPC_BRENDA', 'stand'], ['tammy', 'NPC_TAMMY', 'stand']]) {
   const line = table.split('\n').find(l => l.trim().startsWith(id + ':')); assert.ok(line, id + ' is in NPC_MODELS');
   assert.ok(line.includes('url: ' + file) && line.includes('skin: true') && line.includes("pose: '" + p + "'"), id + ' wears ' + file + ', ' + p);
 }
@@ -118,7 +118,7 @@ for (const [name, file] of [['NPC_VERN', VERN], ['NPC_RICK', RICK], ['NPC_BRENDA
   assert.ok(html.includes("const " + name + " = '/corn-souls/assets/models/" + file + "';"), name + ' points at ' + file);
 assert.ok(!html.includes('NPC_MALE') && !html.includes('NPC_FEMALE'), 'the plain male and female are no longer wired anywhere: all four NPCs wear their own builds');
 assert.ok(!/colors:/.test(table), 'no NPC is repainted in game: every wardrobe colour is in its own file');
-assert.ok(/brenda:\s*\{[^}]*dy: 0.1524/.test(table) && /tammy:\s*\{[^}]*dy: 0.1524/.test(table), 'Brenda and Tammy sit 6 inches (0.1524 m) higher');
+assert.ok(/brenda:\s*\{[^}]*anim: 'type', keepY: true/.test(table) && /tammy:\s*\{[^}]*anim: 'type', keepY: true/.test(table), 'v1.97.39: Brenda and Tammy stand typing on the raised scale-house floor (keepY), animated');
 assert.ok(!/vern:\s*\{[^}]*dy:/.test(table) && !/op:\s*\{[^}]*dy:/.test(table), 'Vern and Rick are not moved');
 assert.ok(html.includes("  if (cfg.skin) return loadGlbModel(cfg.url, m => skinnedNpc(npc, cfg, m), 'npc:' + id);"), 'loadCharacter hands a skinned model to skinnedNpc');
 const reg = JSON.parse(fs.readFileSync(path.join('..', 'assets', 'registry.json'), 'utf8')), credits = fs.readFileSync(path.join('..', 'CREDITS.md'), 'utf8');
