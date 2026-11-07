@@ -34,7 +34,7 @@ assert.equal(phone.fps, 30, 'and a steady 30 fps cap (v1.97.21, owner: the frame
     assert.ok(hz / kk <= 41.5 && Number.isInteger(kk), hz + ' Hz runs at ' + (hz / kk).toFixed(1) + ' fps, evenly paced, not above ~40');
   }
   assert.equal(run(120, { fps: 144 }), k(120, 144), 'tiers without fpsHi are unchanged');
-  assert.ok(html.includes('PACE.k = paceHi(PACE.hz, PACE.k); }'), 'and the pacing uses it');
+  assert.ok(html.includes('const kHi = paceHi(PACE.hz, PACE.k)') && html.includes('if (useHi) { PACE.k = kHi; PACE.hiBudget = 1000 * kHi / PACE.hz; }'), 'and the pacing uses it (v1.97.26: only while the device keeps up)');
 }
 const desktop = pick({ nav: { maxTouchPoints: 0, deviceMemory: 8, hardwareConcurrency: 16 }, win: { innerWidth: 1920 } });
 assert.equal(desktop.name, 'high', 'a desktop picks the high tier');

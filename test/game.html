@@ -10181,7 +10181,7 @@ function buildSky() {
 const _skyZ = new T.Color(), _deep = new T.Color(0x2c63b8), _night = new T.Color(0x0b1430);
 function updateSky(dt) {
   if (!SKY.dome) return;
-  for (const o of [SKY.dome, SKY.clouds, SKY.stars]) o.position.copy(camera.position);
+  for (const o of [SKY.dome, SKY.clouds, SKY.stars]) { o.position.copy(camera.position); o.scale.setScalar(Math.min(1, camera.far * 0.9 / 8000)); }   // v1.97.26: the sky shrinks with the draw distance (centred on you, so it looks the same)
   const U = SKY.dome.material.uniforms, hor = scene.background, lum = hor.r * 0.3 + hor.g * 0.55 + hor.b * 0.15, grayW = weather.kind !== 'sunny';
   U.hor.value.copy(hor); _skyZ.copy(hor).lerp(lum < 0.35 ? _night : _deep, grayW ? 0.18 : 0.5); U.zen.value.copy(_skyZ);   // overhead: deeper than the horizon
   U.sunDir.value.copy(SUN_DIR); U.sunCol.value.copy(sunL.color); U.sunK.value = grayW ? 0.15 : Math.min(1, sunL.intensity / 1.6);
@@ -10998,6 +10998,11 @@ function update(sim, dt, events) {
     camera.position.set(cam.tx + Math.sin(cam.yaw) * cp * cam.dist, cam.ty + Math.sin(cam.pitch) * cam.dist, cam.tz + Math.cos(cam.yaw) * cp * cam.dist);
     camera.lookAt(cam.tx, cam.ty, cam.tz);
   }
+  { /* v1.97.26: on foot nothing past the fog can be seen (it is fully fog-coloured there), so it is not drawn either; the
+       Lesion Toolbox's "Fog solid at" slider therefore moves the draw distance too. Driving keeps its 900 m fog; the free camera
+       keeps its long view. */
+    const far = walk.on ? (walk.drive ? 930 : TUNE.fogFar + 30) : 9000;
+    if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); } }
   stepSafe('lighting', () => lightUpdate(dt));
   // v1.97.148: the title is covering the window, so the shadow pass, the world and the HUD are not drawn (see TITLE_WARM).
   // Everything above still ran: the plant is simulated behind the title exactly as before.
@@ -14158,10 +14163,18 @@ function crWallSpot() {
 function crWallStep(c, dt) {   // crawl along the face and keep hugging it; turn round where it ends
   const w = c.wall, p = c.g.position;
   if ((w.t -= dt) <= 0) { w.t = 1.4 + Math.random() * 2.6; w.up = (Math.random() - 0.35) * 0.6; if (Math.random() < 0.18) w.dir = -w.dir; }
+  /* v1.97.26 (owner's Razr recording: critters 4.6 ms a frame): the lizard crawls every frame, but checks the face with a ray
+     only 5 times a second. Each ray tests the merged buildings of the cook and evap alleys, and four lizards were firing four a
+     frame. At 0.5 m/s it moves 0.1 m between checks; if the face has run out it steps back to the last checked spot and turns. */
+  if (w.gx === undefined) { w.gx = p.x; w.gy = p.y; w.gz = p.z; w.pt = 0; }
   const nx = p.x + w.tx * 0.5 * dt * w.dir, ny = p.y + (w.up || 0) * dt, nz = p.z + w.tz * 0.5 * dt * w.dir;
-  const probe = crRay(V3(nx + w.nx * 0.3, ny, nz + w.nz * 0.3), V3(-w.nx, 0, -w.nz), 0.8), n = probe && upNormal(probe);
-  if (probe && n && Math.abs(n.y) < 0.45) { p.set(probe.point.x + w.nx * 0.07, ny, probe.point.z + w.nz * 0.07); }
-  else w.dir = -w.dir;   // ran off the top, the bottom or an end: turn round
+  if ((w.pt -= dt) > 0) p.set(nx, ny, nz);
+  else {
+    w.pt = 0.2;
+    const probe = crRay(V3(nx + w.nx * 0.3, ny, nz + w.nz * 0.3), V3(-w.nx, 0, -w.nz), 0.8), n = probe && upNormal(probe);
+    if (probe && n && Math.abs(n.y) < 0.45) { p.set(probe.point.x + w.nx * 0.07, ny, probe.point.z + w.nz * 0.07); w.gx = p.x; w.gy = p.y; w.gz = p.z; }
+    else { p.set(w.gx, w.gy, w.gz); w.dir = -w.dir; }   // ran off the top, the bottom or an end: back to solid face, turn round
+  }
   const sp = c.g.userData.sprite; if (sp) sp.material.rotation = 0.06 * Math.sin(clock * 22);
 }
 // v1.97.92: one ground probe per frame at most. Spawning used to try up to 20 spots in one frame and picking a run up to 8
@@ -14201,6 +14214,12 @@ function crLeg(c, away) {   // pick a clear straight run along the floor (one di
   }
   return false;
 }
+function crFar(p) {   // more than 45 m from both players
+  const d = (x, z) => Math.hypot(p.x - x, p.z - z) < 45;
+  if (walk.on && d(walk.x, walk.z)) return false;
+  const R = typeof NET !== 'undefined' && NET.rp; if (R && NET.conn && NET.conn.open && isFinite(R.x) && d(R.x, R.z)) return false;
+  return walk.on;   // (in the free camera nobody is near anything; keep the old behaviour there)
+}
 function updateCritters(dt) {
   // v1.97.170, owner: "increase lizard number to 4" - four lizards and the one rat, each with its own sprite material (the hit /
   // eat tint is per creature, so a shared material would turn all four belly-up red when you shoot one).
@@ -14212,6 +14231,7 @@ function updateCritters(dt) {
     const p = c.g.position;
     if (c.state === 'gone') { if ((c.t -= dt) <= 0 && crBudget > 0) { crBudget--; crSpawn(c); } continue; }   // no budget left: t stays under 0, so it asks again next frame
     if (c.state === 'hit') { if (!c.held && !c.thrown && (c.t -= dt) <= 0) { c.g.visible = false; c.state = 'gone'; c.t = 10 + Math.random() * 30; } continue; }
+    if (crFar(p)) continue;   // v1.97.26: nobody within 45 m - it waits where it is (no probes, no crawling)
     c.life -= dt;
     const near = walk.on && !walk.dead && Math.hypot(p.x - walk.x, p.z - walk.z) < 4;
     if (c.state === 'idle') {
@@ -16940,14 +16960,31 @@ const FPS_CAP = (window.Plant3D && window.Plant3D.tier && window.Plant3D.tier.fp
 // rounded to a whole number. The old time accumulator compared each refresh gap against 1000 / cap, so ordinary timing
 // jitter made it skip a frame it should have drawn (a visible hitch even on a 60 Hz screen) and gave 90 / 120 Hz screens
 // uneven gaps. Now a 60 Hz screen draws every refresh, 120 Hz under a 60 cap draws every 2nd, and the gaps are always even.
-const PACE = { gaps: [], hz: 0, k: 1, n: 0, prev: 0, t: 0 };
+const PACE = { gaps: [], hz: 0, k: 1, n: 0, prev: 0, t: 0, minGap: 0, last: 0, dg: [], cap: 0, hold: 0, demotes: 0 };
 if (typeof window !== 'undefined') window.CS_PACE = PACE;   // v1.97.24: the Lesion Toolbox recorder reports the measured refresh and divisor
 function paceUpdate(now) {   // keeps a rolling median of the refresh gap; re-picks k every couple of seconds (screens can change rate)
   if (PACE.prev) { const g = now - PACE.prev; if (g > 2 && g < 50) { PACE.gaps.push(g); if (PACE.gaps.length > 90) PACE.gaps.shift(); } }
   PACE.prev = now;
-  if (now - PACE.t > 2000 && PACE.gaps.length >= 30) { PACE.t = now; const s = PACE.gaps.slice().sort((a, b) => a - b), med = s[s.length >> 1]; PACE.hz = 1000 / med;
+  if (now - PACE.t > 2000 && PACE.gaps.length >= 30) { PACE.t = now; const s = PACE.gaps.slice().sort((a, b) => a - b), med = s[(s.length * 0.1) | 0]; PACE.hz = 1000 / med;   // v1.97.26: the 10th percentile, not the median - a busy device misses refreshes, so its gaps are 2-3 refreshes long; the short ones are the real refresh
     PACE.k = FPS_CAP > 0 ? Math.max(1, Math.round(PACE.hz / FPS_CAP - 0.15)) : 1;   // -0.15: a 70 Hz screen under a 60 cap still draws every refresh
-    PACE.k = paceHi(PACE.hz, PACE.k); }
+    /* v1.97.26, owner's Razr recording: frames swung 29-45 fps and the "40 on 120 Hz" step never held. The faster cap is used only
+       while the device keeps up with it: if a quarter of the recent frames run 10% over its budget, it drops back to the plain cap
+       for a minute (and for good after the second time). A time gate (minGap) then keeps frames from coming early, so a frame
+       that finishes fast waits for the next refresh at the cap instead of bursting ahead: an even 30 rather than 29-45. */
+    const kHi = paceHi(PACE.hz, PACE.k);
+    /* Judge only the frames drawn at the faster cap: over budget, or so busy that the screen no longer reads as fast (it was
+       missing refreshes) - either way the device did not keep up, so drop to the plain cap for a minute, for good the 2nd time. */
+    if (PACE.hiRan && PACE.dg.length >= 30) {
+      const d = PACE.dg.slice().sort((a, b) => a - b), p75 = d[(d.length * 0.75) | 0];
+      if (p75 > PACE.hiBudget * 1.1 || kHi === PACE.k) { PACE.demotes++; PACE.hold = now + 60000; }
+    }
+    const useHi = kHi !== PACE.k && PACE.demotes < 2 && now >= PACE.hold;
+    if (useHi) { PACE.k = kHi; PACE.hiBudget = 1000 * kHi / PACE.hz; }
+    PACE.hiRan = useHi;
+    PACE.cap = FPS_CAP > 0 ? (useHi ? PACE.hz / PACE.k : FPS_CAP) : 0;
+    // k refreshes, and never under the cap's own frame time: a busy phone shows fewer refreshes than it has (the owner's Razr read
+    // as "30 Hz"), so the measured rate alone would let it burst. Less a little slack for timer jitter.
+    PACE.minGap = FPS_CAP > 0 ? Math.max(1000 * PACE.k / PACE.hz, 1000 / (useHi ? PACE.hz / PACE.k : FPS_CAP)) - 3 : 0; PACE.dg.length = 0; }
 }
 /* v1.97.22, owner (Razr 2025, 120 Hz): a tier with fpsHi may run faster on a fast screen, as long as frames still land on whole
    refreshes and never above fpsHi: 120 Hz -> every 3rd refresh (40 fps); 144 Hz -> every 4th (36); 60 or 90 Hz keep the plain cap
@@ -16959,7 +16996,10 @@ function paceHi(hz, k) {
 }
 function frame(now) {
   paceUpdate(now);
-  if (PACE.k > 1 && (++PACE.n % PACE.k) !== 0) { requestAnimationFrame(frame); return; }
+  /* v1.97.26: draw when k refreshes' worth of time has passed (minGap), not on every k-th callback. A phone still busy drawing
+     misses callbacks, so counting them skipped too many: every 5th or 6th refresh (20-24 fps) where every 4th (30) was possible. */
+  if (PACE.minGap && now - PACE.last < PACE.minGap) { requestAnimationFrame(frame); return; }
+  if (PACE.last) { PACE.dg.push(now - PACE.last); if (PACE.dg.length > 120) PACE.dg.shift(); } PACE.last = now;
   // frames actually drawn: the title gate's warm-up counts these, not screen refreshes (v1.97.148). The counter is a `let` in
   // the engine block, which this block cannot see - v1.97.149 read it directly and threw a ReferenceError here every frame,
   // which killed the loop until v1.97.153. It goes through the bridge now (frameDrawn), like renderer/scene have to.

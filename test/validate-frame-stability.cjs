@@ -50,7 +50,7 @@ assert.ok(html.includes('crSolids = crSolidsNear(collectSolids(true));'), 'the p
   const src = fn(html, 'updateCritters');
   const mk = () => ({ state: 'gone', t: -1, life: 100, g: { position: { x: 0, y: 0, z: 0 }, visible: false }, mats: [], cols: [] });
   const ctx = { dt: 0, calls: 0, critters: [mk(), mk(), mk(), mk(), mk()], crSolids: [1], crSolidsT: 0, collectSolids: () => [], crSolidsNear: () => [1],
-    critNetGuest: () => false, crSpawn: c => { ctx.calls++; c.state = 'idle'; }, crLeg: () => true, crFloor: () => 0, walk: { on: false, dead: false }, clock: 0,
+    critNetGuest: () => false, crFar: () => false, crSpawn: c => { ctx.calls++; c.state = 'idle'; }, crLeg: () => true, crFloor: () => 0, walk: { on: false, dead: false }, clock: 0,
     Math, V3: (x = 0, y = 0, z = 0) => ({ x, y, z }), makeCritter: () => mk() };
   vm.createContext(ctx);
   vm.runInContext(src + '\nthis.updateCritters = updateCritters;', ctx);
