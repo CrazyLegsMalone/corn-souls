@@ -15,14 +15,14 @@ const src = html.slice(a, b).replace(/\nif \(typeof document !== 'undefined'\)[^
 const make = (path) => {
   const scene = new T.Scene(), camera = new T.PerspectiveCamera(60, 1.5, 0.1, 500);
   const store = new Map();
-  const c = { T, scene, camera, Math, console, performance: { now: () => c.now }, now: 0,
+  const c = { T, scene, camera, Math, console, FP_BODY: { back: 0.06, waist: 1, armsUp: -1.3, handScale: 1 }, performance: { now: () => c.now }, now: 0,
     location: { pathname: path }, localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) }, navigator: { userAgent: 'Mozilla/5.0 (Linux; Android 15; motorola razr 2025) Mobile' },
     window: { APP_VERSION: '1.97.24', devicePixelRatio: 3, innerWidth: 892, innerHeight: 412, CS_PACE: { hz: 120, k: 3 } },
     walk: { on: true, x: 141, z: -80, y: 0, yaw: -Math.PI / 2, lamp: true }, PERF: { dc: 0, tri: 0, draw: 0, errs: 0 }, TIER: { name: 'low' }, INDOOR: { on: false, enabled: true },
     GRASS: { dist: 96, density: 0.00825 }, grassSet: o => Object.assign(c.GRASS, o), SH: { R: 28, on: true, moved: false }, sunL: { shadow: { camera: { updateProjectionMatrix() {} } } },
     headlamp: { intensity: 28 }, LIGHT: { bright: 1 }, lightBrightness: i => { c.LIGHT.bright = i; }, TUNE: { walk: 8.91, sprint: 17.01, fogNear: 120, fogFar: 900, lamp: 28 },
     O: {}, NPCS: [], VEND: { machines: [] }, utv: {}, NET: {}, DEVT: { on: false, sum: {}, max: {} }, enclAt: () => null, floorAt: () => 0.2,
-    renderer: { px: 1, getPixelRatio() { return this.px; }, setPixelRatio(v) { this.px = v; }, info: { memory: { geometries: 10, textures: 4 }, programs: [1, 2] } } };
+    renderer: { px: 1, getPixelRatio() { return this.px; }, setPixelRatio(v) { this.px = v; }, info: { render: { calls: 0, triangles: 0 }, memory: { geometries: 10, textures: 4 }, programs: [1, 2] } } };
   vm.createContext(c);
   vm.runInContext(src + '\nthis.L = { LESION, DEVR, lesionAllowed, lesionPick, lesionSelect, lesionMove, lesionTurn, lesionHere, lesionUndo, lesionPlaceText, lesionTuneSet, lesionTuneText, lesionTuneReset, devRecStart, devRecSample, devRecStop, devRecReport, lesionCompass, lesionName };', c);
   return c;
@@ -61,6 +61,8 @@ assert.ok(html.includes("body:not(.walking) #lzBtn,body:not(.walking) #lzPanel{d
   const c = make('/corn-souls/test/'), L = c.L;
   L.lesionTuneSet('fogFar', 400); L.lesionTuneSet('walk', 10.5); L.lesionTuneSet('scale', 1.5); L.lesionTuneSet('shadow', 40); L.lesionTuneSet('cull', 0); L.lesionTuneSet('grassDist', 120);
   assert.equal(c.TUNE.fogFar, 400); assert.equal(c.TUNE.walk, 10.5); assert.equal(c.renderer.px, 1.5); assert.equal(c.SH.R, 40); assert.equal(c.INDOOR.enabled, false); assert.equal(c.GRASS.dist, 120);
+  L.lesionTuneSet('fpBack', 0.25); L.lesionTuneSet('fpWaist', 0.9); L.lesionTuneSet('fpArms', -1.5); L.lesionTuneSet('fpHands', 1.2);
+  assert.deepEqual(c.FP_BODY, { back: 0.25, waist: 0.9, armsUp: -1.5, handScale: 1.2 });
   L.lesionTuneSet('lamp', 50); assert.equal(c.headlamp.intensity, 50, 'the headlamp changes live while it is on');
   const t = L.lesionTuneText();
   for (const s of ['Fog solid at (m): 400   [was 900]', 'Walk speed: 10.5   [was 8.91]', 'Shadow distance (m): 40   [was 28]', 'Indoor culling (1 on, 0 off): 0   [was 1]'])
@@ -68,6 +70,7 @@ assert.ok(html.includes("body:not(.walking) #lzBtn,body:not(.walking) #lzPanel{d
   assert.ok(!t.includes('Sprint speed'), 'and only what changed'); assert.ok(t.includes('quality low'), 'with the quality setting it was tried on');
   L.lesionTuneReset();
   assert.ok(c.TUNE.fogFar === 900 && c.TUNE.walk === 8.91 && c.renderer.px === 1 && c.SH.R === 28 && c.INDOOR.enabled && c.GRASS.dist === 96, 'Reset all restores every slider');
+  assert.deepEqual(c.FP_BODY, { back: 0.06, waist: 1, armsUp: -1.3, handScale: 1 });
   assert.equal(L.lesionTuneText(), '');
   assert.ok(html.includes('const sp = (run ? TUNE.sprint : TUNE.walk)') && html.includes('scene.fog.near = TUNE.fogNear; scene.fog.far = TUNE.fogFar;') && html.includes('headlamp.intensity = on ? TUNE.lamp : 0;'), 'the game reads the tuned values');
 }
@@ -76,7 +79,7 @@ assert.ok(html.includes("body:not(.walking) #lzBtn,body:not(.walking) #lzPanel{d
   const c = make('/corn-souls/test/'), L = c.L;
   L.devRecStart(); assert.ok(L.DEVR.on && c.DEVT.on, 'recording turns per-system timing on');
   for (let i = 0; i < 200; i++) {
-    c.now += i === 120 ? 180 : 25; c.PERF.dc = i === 120 ? 980 : 400; c.PERF.tri = 120000; c.PERF.draw = 6;
+    c.now += i === 120 ? 180 : 25; c.renderer.info.render.calls = i === 120 ? 980 : 400; c.renderer.info.render.triangles = 120000; c.PERF.draw = 6;
     c.walk.x = i === 120 ? 12 : 141; c.walk.z = i === 120 ? 30 : -80; c.walk.yaw = i === 120 ? Math.PI / 2 : 0;
     c.DEVT.sum.shadows = (c.DEVT.sum.shadows || 0) + 6; c.DEVT.max.shadows = 9; c.DEVT.sum.grass = (c.DEVT.sum.grass || 0) + 1; c.DEVT.max.grass = 2;
     L.devRecSample();

@@ -1,3 +1,10 @@
+## TEST v1.97.28 — first-person hands and legs (2026-11-06)
+- Reuses the local third-person rig for boots and legs on both player slots. A waist plane clips the colour pass and the merged body mesh casts one animated shadow. The body hides on ladders and during vehicle, riding and death views.
+- Tan gloves with vest-coloured cuffs grip the shotgun, wrench, crowbar, extinguisher and radio. The shotgun support hand follows the pump and reaches across for the side magazine during reload. The empty hand stays out of view.
+- The pause menu remembers **Body in first person** per device and defaults to on. Lesion Toolbox can tune body offset, waist, shadow arms and hand scale. The recorder includes both render passes in its draw and triangle counts.
+- `validate-fp-body.cjs` checks both actual GLBs, projected boot and ADS hand visibility, the six-draw budget including shadows, player state transitions and poses. The cloud browser could not start WebGL on the baseline. Visual checks and the 1 ms frame-time target need a device run.
+- Bumped TEST to `1.97.28` / `corn-souls-test-shell-v234`.
+
 ## TEST v1.97.27 — walls no longer disappear: indoor culling off by default (2026-11-06)
 - Owner: *"Wall still disappear and reappear. Frame rate is steadier and closer to 30"* (second Lesion Toolbox recording: avg 30.1 fps, typical frame 33.2 ms, hitches 7 → 4, critters 4.6 → 0.55 ms).
 - Cause: the v1.97.196 indoor culling. The plant registers smaller lighting rooms inside the big halls, and culling round the smallest room you stood in hid the hall's own walls and equipment, so they vanished and came back as you turned. Reproduced at the owner's recorded spots: up to 17% of the picture changed with culling on.

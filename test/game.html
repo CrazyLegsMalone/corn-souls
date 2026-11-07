@@ -6468,6 +6468,7 @@ function init(container) {
   // so redrawing the whole shadow map every frame was paying twice for the same picture. shadowRefresh() asks for a
   // pass when something actually moved, and at a floor rate so vehicles/train/NPC shadows keep up.
   renderer.shadowMap.autoUpdate = false;
+  renderer.localClippingEnabled = true;
   // and count every pass: we reset renderer.info once per frame ourselves, otherwise the fps readout only ever sees
   // the last render of the frame (the HUD), which made it useless.
   renderer.info.autoReset = false;
@@ -11010,9 +11011,10 @@ function update(sim, dt, events) {
     walk.toxic = inWater ? (walk.toxic || 0) + dt : Math.max(0, (walk.toxic || 0) - dt * 2);
     if (walk.toxic >= TOXIC_T) { walk.toxic = 0; walk.dead = 'pond'; layBody(walk.x, walk.z, walk.yaw, 0, 0.3, 0, 0.6); walk.diedAt = { x: walk.x, z: walk.z }; }
     wfxUpdate(dt);   // pond ripples and splashes
-    if (walk.drive) utvCam(dt); else walkCam();
+    if (walk.drive) { if (VIEW.av) VIEW.av.visible = false; utvCam(dt); } else walkCam();
   }
   else {
+    if (VIEW.av) VIEW.av.visible = false;
     cam.pitch = Math.max(0.15, Math.min(1.42, cam.pitch));
     cam.dist = Math.max(16, Math.min(2400, cam.dist));
     scene.fog.near = 200 + cam.dist * 0.9; scene.fog.far = 900 + cam.dist * 3;   // distant ground fades into the sky color at any zoom
@@ -12175,7 +12177,13 @@ function makeTool(k) {   // first person: the picture comes up from the bottom-r
   const g = new T.Group(); g.userData.noHit = true; const L = TOOLS[k].L * 0.62;
   const q = hudPart(g, new T.PlaneGeometry(L, L / 4), toolMat(k, true), 0.12, -0.12, -0.6); q.rotation.set(0, 0.35, 2.25);   // working end up and to the left
   const glove = hudMat(0x7b5a36), sl = hudMat(0xff7a1a);
-  hudPart(g, new T.BoxGeometry(0.085, 0.08, 0.08), glove, 0.3, -0.38, -0.55); hudPart(g, new T.CylinderGeometry(0.045, 0.05, 0.22, 8), sl, 0.35, -0.47, -0.5).rotation.x = 1.2;
+  const fist = hudPart(g, new T.BoxGeometry(0.085, 0.08, 0.08), glove, 0.3, -0.38, -0.55);
+  const cuff = hudPart(g, new T.CylinderGeometry(0.045, 0.05, 0.22, 8), sl, 0.35, -0.47, -0.5);
+  cuff.rotation.x = 1.2;
+  if (k === 'wrench' || k === 'crowbar') {
+    g.userData.legacyGrip = [fist, cuff];
+    if (q.isMesh) { q.material.depthTest = true; q.material.transparent = false; }
+  }
   g.visible = false; ensureHud().add(g); return g;
 }
 function toolItem(k, av) {   // in a character's hand (other player / third person): the same picture, sticking forward and up
@@ -13961,13 +13969,24 @@ function walkCam() {
   camera.lookAt(walk.x + fx, ey + fy, walk.z + fz);
 }
 // ---------- 1st / 3rd person: in third person Squeeg's own body is drawn (vest, hard hat, what he's holding) and the camera sits behind him
+const FP_BODY = { on: true, back: 0.06, waist: 1.0, armsUp: -1.3, handScale: 1 };
+const FP_WAIST = new T.Plane(new T.Vector3(0, -1, 0)), FP_CLIP = [FP_WAIST];
+try { FP_BODY.on = localStorage.getItem('cs_fpbody') !== '0'; } catch (e) {}
+function toggleFpBody() {
+  FP_BODY.on = !FP_BODY.on;
+  try { localStorage.setItem('cs_fpbody', FP_BODY.on ? '1' : '0'); } catch (e) {}
+  return FP_BODY.on;
+}
 const VIEW = { third: false, av: null, key: '', legs: [], arms: [], items: {}, ph: 0, lx: 0, lz: 0 };
 function setView(third) { VIEW.third = third === undefined ? !VIEW.third : !!third; try { localStorage.setItem('cs_view3', VIEW.third ? '1' : ''); } catch (e) {} return VIEW.third; }
 try { VIEW.third = localStorage.getItem('cs_view3') === '1'; } catch (e) {}
 function buildSelfAv() {
   const me = NET.conn && !NET.host ? 1 : 0, key = 'v' + me;
   if (VIEW.av && VIEW.key === key && (VIEW.av.userData.rig || VIEW.pending)) return;   // dressed, or the model is on its way
-  if (VIEW.av) scene.remove(VIEW.av);
+  if (VIEW.av) {
+    for (const m of VIEW.av.userData.fpMeshes || []) m.material.dispose();
+    scene.remove(VIEW.av);
+  }
   for (const o of scene.children.slice()) if (o.userData.selfAv) scene.remove(o);   // a stray from an earlier build must not stand there too
   const av = makeCharacter(VEST_COL[me], false); av.scale.setScalar(SQ_K); av.userData.selfAv = true; VIEW.legs = []; VIEW.arms = []; VIEW.knees = [];
   for (const m of av.children.slice()) { const P = m.geometry && m.geometry.parameters; if (!P || m.geometry.type !== 'BoxGeometry') continue;
@@ -13984,13 +14003,40 @@ function buildSelfAv() {
   dressPlayerSkin(av, VEST_COL[me], { onRig: (R, root, swing) => {   // the walk cycle drives the skinned bones once the model is on
     if (VIEW.av !== av) return;   /* v1.97.197: a model that arrives after the 8 s retry rebuilt the avatar must not bind to the old one */
     VIEW.pending = 0;
+    av.userData.fpMeshes = [];
+    R.traverse(m => {
+      if (!m.isSkinnedMesh) return;
+      const source = m.material;
+      m.material = source.clone();
+      m.material.onBeforeCompile = source.onBeforeCompile;
+      m.material.customProgramCacheKey = source.customProgramCacheKey;
+      m.material.clipShadows = false;
+      m.raycast = () => {};   // a local avatar is never a ray target
+      av.userData.fpMeshes.push(m);
+    });
     VIEW.legs = [swing.legL, swing.legR].filter(Boolean); VIEW.arms = [swing.armL, swing.armR].filter(Boolean); VIEW.knees = [swing.kneeL, swing.kneeR].filter(Boolean); } });
 }
 function updateSelfAv() {
   const show = VIEW.third && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.pass;
-  if (!show) { if (VIEW.av) VIEW.av.visible = false; return; }
+  const legs = !VIEW.third && FP_BODY.on && walk.on && !walk.dead && !walk.drive && !walk.mow && !walk.ride && !walk.pass && !onLadder();
+  if (!show && !legs) { if (VIEW.av) VIEW.av.visible = false; return; }
   if (VIEW.pending && performance.now() - VIEW.pending > 8000) VIEW.pending = 0;   // the model never arrived: try again
-  buildSelfAv(); const av = VIEW.av; av.visible = true; av.position.set(walk.x, walk.y, walk.z); av.rotation.y = walk.yaw;
+  buildSelfAv(); const av = VIEW.av;
+  av.visible = show || !!av.userData.rig;
+  const back = legs ? FP_BODY.back : 0;
+  av.position.set(walk.x + Math.sin(walk.yaw) * back, walk.y, walk.z + Math.cos(walk.yaw) * back);
+  av.rotation.y = walk.yaw;
+  if (legs) FP_WAIST.constant = walk.y + (walk.pitch <= -Math.PI * 25 / 180 ? FP_BODY.waist : -1);
+  if (av.userData.fpMeshes && av.userData.fpMode !== legs) {
+    av.userData.fpMode = legs;
+    for (const m of av.userData.fpMeshes) {
+      m.material.clippingPlanes = legs ? FP_CLIP : null;
+      // The merged flat mesh spans boots to hard hat. One caster leaves room for both HUD hands.
+      m.castShadow = legs && !m.material.map;
+      // Player 2's textured shirt starts above the waist. The flat vest and trousers stay visible.
+      m.visible = !legs || m.material.name !== 'top';
+    }
+  }
   const sp = Math.hypot(walk.x - VIEW.lx, walk.z - VIEW.lz); VIEW.lx = walk.x; VIEW.lz = walk.z;
   const moving = sp > 0.004 && sp < 1 && walk.y <= (walk.floor || 0) + 0.05; VIEW.ph += moving ? sp * 3.2 : 0;
   const sw = moving ? Math.sin(VIEW.ph) * Math.min(0.55, sp * 15) : 0;
@@ -14004,8 +14050,8 @@ function updateSelfAv() {
   VIEW.legs.forEach((l, i) => { const t = i ? -sw : sw; limb(l, t, 0.3); });
   const ksw = moving ? Math.min(0.55, sp * 14) : 0, kc = Math.cos(VIEW.ph);   // knees bend mid-swing (foot clears the ground), straighten at heel-strike
   VIEW.knees.forEach((k, i) => { const t = Math.max(0, i ? kc : -kc) * ksw; limb(k, t, 0.4); });
-  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.7 : (i === 0 && SR.carry === 'me' ? -2.2 : (i ? sw : -sw) * 0.6); limb(a, hold, 0.3); });   // right arm forward with a gun or a tool, left arm up holding the boom box
-  for (const k in VIEW.items) VIEW.items[k].visible = k === held;
+  VIEW.arms.forEach((a, i) => { const hold = i === 1 && held !== 'hand' ? -0.7 : (i === 0 && SR.carry === 'me' ? -2.2 : (i ? sw : -sw) * 0.6); limb(a, legs ? FP_BODY.armsUp : hold, 0.3); });   // right arm forward with a gun or a tool, left arm up holding the boom box
+  for (const k in VIEW.items) VIEW.items[k].visible = show && k === held;
 }
 
 function focusUnit(id) {
@@ -15350,15 +15396,101 @@ function updateBalls(dt) {
     if (done || B.life > 3) { scene.remove(B.m); balls.splice(i, 1); } else p.add(step);
   }
 }
+// One mesh per hand. The grip wraps around the origin and the sleeve extends back along +Z.
+function buildFpHands(vest) {
+  const glove = 0xa58458, fingers = 0x937347;
+  const material = new T.MeshLambertMaterial({ vertexColors: true });
+  return [1, -1].map(side => {
+    const parts = [
+      [0.036, 0.065, 0.081, side * 0.032, -0.024, 0.012, glove],
+      [0.027, 0.021, 0.048, side * 0.004, 0.015, 0.037, glove],
+      [0.073, 0.075, 0.175, side * 0.038, -0.043, 0.128, vest]
+    ];
+    for (let i = 0; i < 4; i++) parts.push([0.054, 0.014, 0.018, side * 0.004, -0.048, -0.017 + i * 0.019, fingers]);
+    const box = new T.BoxGeometry(1, 1, 1), unit = box.toNonIndexed(), p = unit.attributes.position, n = unit.attributes.normal;
+    const pos = new Float32Array(parts.length * p.count * 3), normal = new Float32Array(pos.length), color = new Float32Array(pos.length);
+    const c = new T.Color();
+    let j = 0;
+    for (const [w, h, d, x, y, z, hex] of parts) {
+      c.setHex(hex);
+      for (let i = 0; i < p.count; i++, j += 3) {
+        pos[j] = x + p.getX(i) * w; pos[j + 1] = y + p.getY(i) * h; pos[j + 2] = z + p.getZ(i) * d;
+        color[j] = c.r; color[j + 1] = c.g; color[j + 2] = c.b;
+      }
+      normal.set(n.array, j - p.count * 3);
+    }
+    box.dispose(); unit.dispose();
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute('position', new T.BufferAttribute(pos, 3));
+    geometry.setAttribute('normal', new T.BufferAttribute(normal, 3));
+    geometry.setAttribute('color', new T.BufferAttribute(color, 3));
+    const hand = new T.Mesh(geometry, material);
+    hand.userData.noHit = true;
+    return hand;
+  });
+}
+let fpHands = null, fpVest = null;
+function updateFpHands(fp, reloadOut) {
+  const radio = SR.carry === 'me' && SR.g && SR.g.parent === hudScene;
+  const item = radio ? 'radio' : held;
+  const active = fp && FP_BODY.on && !walk.ride && !walk.pass &&
+    (item === 'gun' || item === 'wrench' || item === 'crowbar' || item === 'ext' || item === 'radio');
+  if (!active) {
+    if (fpHands) for (const hand of fpHands) hand.removeFromParent();
+    return;
+  }
+  const vest = VEST_COL[NET.conn && !NET.host ? 1 : 0];
+  if (!fpHands || fpVest !== vest) {
+    if (fpHands) {
+      fpHands[0].material.dispose();
+      for (const hand of fpHands) { hand.removeFromParent(); hand.geometry.dispose(); }
+    }
+    fpHands = buildFpHands(vest); fpVest = vest;
+  }
+  const [right, left] = fpHands;
+  function grip(hand, parent, x, y, z, rx, ry, rz) {
+    if (hand.parent !== parent) parent.add(hand);
+    hand.position.set(x, y, z);
+    hand.rotation.set(rx, ry, rz);
+    hand.scale.setScalar(FP_BODY.handScale);
+  }
+  if (item === 'gun') {
+    // Keep the wrist attached to the stock even when ADS hides the butt pad.
+    grip(right, fpGun.stock, 0.004, -0.025, 0.133, 0.2, -0.37, 0.2);
+    // This shotgun swaps a right-side magazine. Reach across, travel with the magazine, then return to the pump.
+    const reach = Math.min(1, reloadOut * 4);
+    grip(left, fpGun.pump, reach * (fpGun.mag.position.x + 0.11), -0.017 - reach * 0.03,
+      reach * (0.012 - fpGun.pump.position.z), 0.16, 0.28 + reach * 1.1, -0.42 - reach * 0.65);
+  } else if (item === 'ext') {
+    grip(right, heldG.ext, 0.253, -0.09, -0.5, 0.38, -0.36, 0.35);
+    grip(left, heldG.ext, 0.162, -0.177, -0.506, 0.38, 0.52, -0.48);
+  } else if (item === 'radio') {
+    grip(right, SR.g, 0.155, 0.266, 0.025, 0.42, -0.35, 0.28);
+    grip(left, SR.g, -0.162, 0.074, 0.086, 0.45, 0.48, -0.5);
+  } else {
+    const crowbar = item === 'crowbar';
+    grip(right, heldG[item], crowbar ? 0.30 : 0.22, crowbar ? -0.30 : -0.24,
+      crowbar ? -0.60 : -0.553, 0.48, -0.46, 0.4);
+    left.removeFromParent();
+  }
+}
 function updateGun(dt) {
   if (!gun) gun = makeGun();
   if (!heldG.hand) { heldG.hand = makeHand(); heldG.washer = makeWasher(); for (const k in TOOLS) heldG[k] = makeTool(k); heldG.ext = makeExtHud(); }
   const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !heldDead;   // carrying a dead critter: both hands on it, no gun (v1.97.111)
   gun.visible = fp && held === 'gun'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
   wash.t = Math.max(0, wash.t - dt); updateWasher(dt, show && held === 'gun' && wash.t > 0);
-  if (!show) { aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
+  if (!show) { updateFpHands(false, 0); aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
   if (swipe > 0) swipe = Math.max(0, swipe - dt * 2.2);
-  if (TOOLS[held]) { const k = Math.sin(Math.PI * swipe), G = heldG[held]; G.rotation.set(-0.9 * k, 0.2 * k, 0.9 * k); G.position.set(-0.12 * k, 0.05 * k, -0.1 * k); }   // tools: chop across, down and to the left
+  const seated = !!(walk.ride || walk.pass);
+  if (TOOLS[held]) {
+    const k = Math.sin(Math.PI * swipe), G = heldG[held], legacy = G.userData.legacyGrip;
+    const lift = legacy && fp && FP_BODY.on && !seated ? (held === 'crowbar' ? 0.16 : 0.12) : 0;
+    if (legacy) for (const part of legacy) part.visible = seated;
+    G.rotation.set(-0.9 * k, 0.2 * k, 0.9 * k);
+    G.position.set(-0.12 * k, lift + 0.05 * k, -0.1 * k);
+  }
+  heldG.hand.visible = heldG.hand.visible && seated;
   heldG.hand.position.y = 0.006 * Math.sin(clock * 2);
   // aim down sights: hold right mouse / LT / the AIM button. The world zooms in, looking around slows down.
   aimK += (((aimWant && held === 'gun' && reloadT <= 0) ? 1 : 0) - aimK) * Math.min(1, dt * 12);
@@ -15390,8 +15522,9 @@ function updateGun(dt) {
   const k = aimK * aimK * (3 - 2 * aimK), L = (a, b) => a + (b - a) * k;
   gun.position.set(L(HIP.x, ADS.x) + Math.sin(sgBob) * 0.006 * bob - 0.02 * tilt, L(HIP.y, ADS.y) - Math.abs(Math.cos(sgBob)) * 0.006 * bob - 0.02 * tilt, L(HIP.z, ADS.z) + gunKick * (0.04 - 0.015 * aimK));
   gun.rotation.set(L(HIP.rx, ADS.rx) + gunKick * 0.09 + 0.06 * tilt, L(HIP.ry, ADS.ry) - 0.1 * tilt, 0.12 * tilt);
-  fpGun.stock.visible = aimK < 0.6;
+  for (const part of fpGun.stock.children) if (!fpHands || part !== fpHands[0]) part.visible = aimK < 0.6;
   fpGun.pump.position.z = -0.33 + (pumpT > 0 ? Math.sin(Math.PI * (1 - pumpT)) * 0.075 : 0);
+  updateFpHands(fp, e);
 }
 // ---------- LESION TOOLBOX (v1.97.24, TEST only): the owner's in-game dev tools. One 🛠 button opens a panel with three tabs:
 // Place (aim at a thing, nudge / turn / raise it, copy its new spot), Tune (live sliders for look, feel and speed), and
@@ -15502,6 +15635,10 @@ const LESION_TUNE = [
   ['lamp', 'Headlamp strength', 0, 80, 1, () => TUNE.lamp, v => { TUNE.lamp = v; if (walk.lamp && headlamp) headlamp.intensity = v; }],
   ['bright', 'Darkest-place brightness (0-3)', 0, 3, 1, () => LIGHT.bright, v => lightBrightness(Math.round(v))],
   ['cull', 'Indoor culling (1 on, 0 off)', 0, 1, 1, () => INDOOR.enabled ? 1 : 0, v => { INDOOR.enabled = v >= 0.5; }],
+  ['fpBack', 'Body offset back (m)', 0, 0.5, 0.01, () => FP_BODY.back, v => { FP_BODY.back = v; }],
+  ['fpWaist', 'Body waist clip height (m)', 0.7, 1.3, 0.01, () => FP_BODY.waist, v => { FP_BODY.waist = v; }],
+  ['fpArms', 'Body shadow arm angle (rad)', -1.8, -1.1, 0.05, () => FP_BODY.armsUp, v => { FP_BODY.armsUp = v; }],
+  ['fpHands', 'Body hand scale', 0.7, 1.3, 0.05, () => FP_BODY.handScale, v => { FP_BODY.handScale = v; }],
 ];
 function lesionTuneDefaults() { if (!LESION.tuneDef) { LESION.tuneDef = {}; for (const t of LESION_TUNE) { try { LESION.tuneDef[t[0]] = t[5](); } catch (e) {} } } return LESION.tuneDef; }
 function lesionTuneSet(k, v) { const t = LESION_TUNE.find(q => q[0] === k); if (!t) return; lesionTuneDefaults(); try { t[6](+v); } catch (e) { lesionSay('Could not set ' + t[1]); } }
@@ -15526,9 +15663,10 @@ function devRecStop() {
   lesionRender();
   if (LESION.el && !LESION.on) lesionOpen('rec');
 }
-function devRecSample() {   // once per drawn frame, after the world render
+function devRecSample() {   // once per drawn frame, after the world and HUD renders
   const now = performance.now(), gap = now - DEVR.last; DEVR.last = now;
-  DEVR.s.push([gap, PERF.dc, PERF.tri, PERF.draw, walk.x, walk.z, walk.yaw, INDOOR.on ? 1 : 0, walk.drive ? 1 : 0, walk.y]);
+  const { calls, triangles } = renderer.info.render;
+  DEVR.s.push([gap, calls, triangles, PERF.draw, walk.x, walk.z, walk.yaw, INDOOR.on ? 1 : 0, walk.drive ? 1 : 0, walk.y]);
   if (now - DEVR.t0 >= DEVR.dur) devRecStop();
   else if ((DEVR.s.length & 15) === 0) { const b = LESION.el && LESION.el.querySelector('#lzRecBtn'); if (b) b.textContent = '■ Stop (' + Math.ceil((DEVR.dur - (now - DEVR.t0)) / 1000) + ' s)'; }
 }
@@ -15624,7 +15762,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -16642,7 +16780,7 @@ function qualityMenu() {
 }
 function menu() {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }
-  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['⚙️ Quality: ' + qualityLabel(), () => qualityMenu()], ['Reset all setpoints', resetAll]];
+  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['🧍 Body in first person: ' + (P3.fpBody ? 'on' : 'off'), () => { P3.toggleFpBody(); menu(); }], ['⚙️ Quality: ' + qualityLabel(), () => qualityMenu()], ['Reset all setpoints', resetAll]];
   if (window.Android) b.push(['Quit', () => { try { Android.quit(); } catch (e) {} }]);
   modal('<h1>Corn Souls</h1>', b);
 }
