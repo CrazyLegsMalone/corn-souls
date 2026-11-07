@@ -1,3 +1,14 @@
+## TEST v1.97.40 — corn zombie prototype (2026-11-07)
+- Owner: *"lets add a basic corn zombie or something to test the weapons and player movement. it spawns randomly inside any building but moves slow once found or something im open to ideas this is just a prototype"*.
+- **The zombie** (`ZOMB`, `zombSpawn` / `zombUpdate`): Loves_Art's base male (already shipped, CC BY) recoloured at runtime as green skin, corn-silk yellow hair and dirty olive clothes, with its arms out in front and its head lolled. It is merged to one skinned draw, with a simple shamble: legs swing, knees bend, the body rocks and the arms bob. A green box stands in until the model loads.
+- **Spawning:** up to 3 at a time, one every 12 s, at a random spot in a random roofed building (`ENCL`, 25–6000 m²) on its ground floor. The spot is clear of walls and machines and at least 22 m from you.
+- **Behaviour:** it stands swaying until it sees you (16 m with no wall line between), you come within 5 m, or you hit it. Then it shambles after you at 1.5 m/s (you walk at 8.9) and swipes when within 1.25 m: 14 damage with knock-back, at most every 1.6 s. Being killed by one is "Squeeg got eaten by a corn zombie." (BRAINS / CORNED / HUSKED). It gives up if you get 40 m away.
+- **Fighting:** 100 HP. Tools do their `TOOL_DMG` (sledgehammer 40 … knife 15) in front of you and in reach, with a short stagger and push-back; a paintball does 15. When it dies it falls back, lies there, sinks and is replaced elsewhere later.
+- **Prototype limits:** each game runs its own zombies (in 2 player you each see and fight your own) and they don't make their own sounds beyond the creature sounds. Debug: `Plant3D.dbg.zombNear()` puts one 8 m in front of you, awake, and `ZOMB.on = false` turns them off.
+- Checked in headless Chromium: it chases, faces you, renders green with its arms out, dies to a sledgehammer, and a natural one appeared idle inside a building.
+- New `validate-zombies.cjs` (in CI): sight through walls, spawn spots, the slow chase speed, timed swipes, tool and paint damage, death / sink / gone, max 3.
+- Bumped TEST to `1.97.40` / `corn-souls-test-shell-v246`.
+
 ## TEST v1.97.39 — scale house techs stand at their windows with a computer; knife edges lead the slash (2026-11-07)
 - Owner (screenshot of Tammy sitting below the counter): *"remove the chair and have them stand maybe add a keyboard and computer for them to use at window and some basic arm and head animations"*.
   - Brenda and Tammy now stand (`standingPerson`, no chair) just behind the counter's back edge, facing their drive-through windows. `NPC_MODELS` sets `pose: 'stand'`, and `keepY` keeps them on the raised scale-house floor.
