@@ -7465,8 +7465,17 @@ function init(container) {
     // you were looking straight through it at the yard. The wall is now carried across every tank slot on both walls, behind the
     // tank: it reads as half-embedded in the wall (which it is), from inside and from the yard. That is 7 fermenters plus the
     // beer well, whose 19 m slot was open in the same way (measured: the west wall had a -54.5 .. -35.5 gap).
-    for (const [sx, sz, sr] of [[FXE, Z1, FR], [FXE, fz[0], FR], [FXE, fz[1], FR], [FXE, fz[2], FR], [FXW, fz[0], FR], [FXW, fz[1], FR], [FXW, fz[2], FR], [FXW, BWZ, BWR]])
-      wall(sx, sz - sr + 0.02, sx, sz + sr - 0.02, PH, wm, [], {});   // 2 cm inside the tank's tangent line, so the panel meets the wall ends without a sliver
+    // v1.97.52, owner (screenshot from the yard): "WALL SHOULD NOT CLIP INTO FERM". That straight panel ran through the middle of
+    // every tank. Now the wall bends round the alley side of each tank instead: a half-round panel 12 cm outside the shell, from
+    // one tangent point to the other, so a tank stands whole in front of the wall from the yard and the alley still can't see out.
+    const wmC = wm.clone(); wmC.side = T.DoubleSide; wmC.userData = Object.assign({}, wm.userData);   // (seen from both sides)
+    for (const [sx, sz, sr] of [[FXE, Z1, FR], [FXE, fz[0], FR], [FXE, fz[1], FR], [FXE, fz[2], FR], [FXW, fz[0], FR], [FXW, fz[1], FR], [FXW, fz[2], FR], [FXW, BWZ, BWR]]) {
+      const R = sr + 0.12, inX = sx === FXE ? -1 : 1;   // the alley is west of the east column, east of the west one
+      const geo = new T.CylinderGeometry(R, R, PH, 40, 1, true, inX > 0 ? 0 : Math.PI, Math.PI);   // three: x = R sin(theta), so 0..pi is the +x half
+      const uv = geo.attributes.uv, k = Math.PI * R / (wm.userData.ribbed || 1); for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * k);
+      add(geo, wmC, sx, PH / 2, sz, null, true);
+      box(0.5, 0.35, 0.5, trimM, sx, PH, sz - R); box(0.5, 0.35, 0.5, trimM, sx, PH, sz + R);   // the top trim's ends, where the straight runs stop
+    }
     wall(FXW + FR - 0.3, ZN, FXE - FR + 0.3, ZN, PH, wm, [[AC - 1.0 - (FXW + FR - 0.3), 2.95, 3.05], [AC + 2.2 - (FXW + FR - 0.3), 0.95]], { trim: true, leaf: 1 });   // north end of the ferm alley: roll-up door (west) + man door (east)
       egressStrobe(AC + 2.2, ZN, 0, 1);   // north-end man door of the ferm alley, strobe inside
     rollDoor(AC - 1.0, ZN + 0.05, true, 2.9, 3.0, -1, 'slat', 1);                                   // housing inside (south), bollards outside

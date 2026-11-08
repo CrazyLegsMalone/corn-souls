@@ -88,10 +88,14 @@ assert.ok(html.includes("groundMat('asphalt'")&&html.includes("groundMat('dirtro
 // gaps: none between the north end and the south end of the west wall, and none south of the open walkway on the east wall.
 { const wm = (next.wallMats || []).find(m => m.userData && m.userData.ribbed && m.opacity === 0.5);
   assert.ok(wm, 'the ribbed siding material is in the build');
+  // v1.97.52 ("WALL SHOULD NOT CLIP INTO FERM"): across each tank slot the wall is a half-round panel round the alley side of the
+  // tank (a cylinder segment centred on the tank), not a straight panel through it - both close the wall, only one clips the tank.
   const panels = next.scene.children.filter(o => o.material === wm && o.geometry && o.geometry.type === 'BoxGeometry');
+  const curved = next.scene.children.filter(o => o.material && o.material.userData && o.material.userData.ribbed && o.geometry && o.geometry.type === 'CylinderGeometry' && Math.abs(o.geometry.parameters.thetaLength - Math.PI) < 1e-6);
+  const span = o => o.geometry.type === 'CylinderGeometry' ? o.geometry.parameters.radiusTop : o.geometry.parameters.depth / 2;
   const gaps = (x, z0, z1) => {
-    const iv = panels.filter(o => Math.abs(o.position.x - x) < 0.6 && o.geometry.parameters.depth > o.geometry.parameters.width)
-      .map(o => [Math.max(z0, o.position.z - o.geometry.parameters.depth / 2), Math.min(z1, o.position.z + o.geometry.parameters.depth / 2)])
+    const iv = panels.filter(o => Math.abs(o.position.x - x) < 0.6 && o.geometry.parameters.depth > o.geometry.parameters.width).concat(curved.filter(o => Math.abs(o.position.x - x) < 0.6))
+      .map(o => [Math.max(z0, o.position.z - span(o)), Math.min(z1, o.position.z + span(o))])
       .filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0]);
     let at = z0; const out = [];
     for (const [a, b] of iv) { if (b <= at) continue; if (a - at > 0.3) out.push([at, a]); at = Math.max(at, b); }
@@ -101,6 +105,9 @@ assert.ok(html.includes("groundMat('asphalt'")&&html.includes("groundMat('dirtro
   const west = gaps(-31, -96.3, -12.5), east = gaps(-7.6, -96.3, -23.7);
   assert.deepEqual(west, [], 'the west wall of the ferm alley has no gap for the tanks to be seen through (' + JSON.stringify(west) + ')');
   assert.deepEqual(east, [], 'nor the east wall, north of the open walkway (' + JSON.stringify(east) + ')');
-  assert.ok(panels.filter(o => Math.abs(o.position.x + 7.6) < 0.6 && Math.abs(o.position.z - -47.1) < 0.6 && o.geometry.parameters.depth > 14).length === 1,
-    'the wall is carried across Ferm 1\'s slot, behind the tank'); }
+  assert.ok(curved.filter(o => Math.abs(o.position.x + 7.6) < 0.6 && Math.abs(o.position.z - -47.1) < 0.6 && o.geometry.parameters.radiusTop > 7.4).length === 1,
+    'the wall bends round Ferm 1 on the alley side, just outside its shell');
+  assert.equal(curved.length, 8, 'round all seven fermenters and the beer well');
+  assert.equal(panels.filter(o => Math.abs(o.position.x + 7.6) < 0.6 && o.position.z - o.geometry.parameters.depth / 2 < -47.1 && o.position.z + o.geometry.parameters.depth / 2 > -47.1).length, 0,
+    'and no straight panel runs through the middle of a tank any more'); }
 console.log('PASS: real Three.js construction, roof footprint, populated rooms centered between cook alley & evaps, Rick relocation, trench drains, doors/collision, straight east wall, flat silo roofs, flat textured roads, and all eight full-size evaporators with aisle clearance; the ferm alley walls are closed across every tank slot; all scripts parse');
