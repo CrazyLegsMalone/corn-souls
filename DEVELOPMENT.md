@@ -1,3 +1,17 @@
+## TEST v1.97.56 — the green Jeep and the three white lot cars are drivable, keys in four places (2026-11-09)
+- Owner: *"Can you make the green and the white vehicle drivable"*. There are three white ones in the lot, and asked which, the owner chose *"All three"*. Then: *"Put each key in a different place"*.
+- The green Jeep, white Jeep Renegade, white Crown Victoria and white '90 Ford Ranger pickup drive like the Silverado (`mkCar`). They're added to `O.cars` after the Pink Sedan, so its index stays 2.
+- The Jeep's older builder now tags its wheels (so they steer), records its two collision circles (so they move with it) and copies its cab's seat and steering wheel up for the first-person view.
+- **Keys:** each car has its own keychain (fuzzy dice, red heart, gold star, lucky horseshoe), or you can smash a window with the crowbar as before.
+  - green Jeep: break room north wall (-63.0)
+  - white Crown Vic: control room north wall (-38.5)
+  - white Renegade (Tammy's car): scale house, the plant manager's office south wall, beside the golf club
+  - white Ranger pickup: the end of the maintenance shop pegboard
+- **Fixed:** taking a key checked the position the hook was built at. The scale house is built and then shifted 26 m east, so its key would have been takeable from the parking lot and not where it hangs. It now checks where the key really hangs. Several hooks also no longer grab whichever is first in the list; you get the nearest.
+- Checked in the running game: all seven drivable cars have wheels, a seat and a steering wheel. Each new key comes off its hook, and the green Jeep starts and drives with its key.
+- New suite `validate-lot-cars.cjs`.
+- Bumped TEST to `1.97.56`.
+
 ## TEST v1.97.55 — every fire extinguisher is usable (2026-11-09)
 - Owner: *"Are all the fire extinguishers functional?"* No: only the two posts (maintenance shop pegboard, parking lot) gave you one. The rest were decoration: the wall mounts used the real 3D model, and four were plain red cylinders. Asked whether to make the wall mounts grab-able and swap the cylinders for the model, the owner said *"Both"*.
 - `extWall()` now registers each wall mount as a station, so `takeExtinguisher()` gives a full can from any of them, the same as from a post.

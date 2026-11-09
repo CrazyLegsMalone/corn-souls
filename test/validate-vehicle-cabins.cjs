@@ -118,7 +118,7 @@ assert.ok(html.includes('if (o.isMesh && o.userData.panes) unbreakPanes(o);'), '
 const lot = html.slice(html.indexOf("    // five employees' vehicles parked in stalls"), html.indexOf('  // ---------- ENERGY CENTER block'));
 assert.ok(!/W \+ 0\.02, (glass|glassM|mat\(glass\)|0x4a6275)\)/.test(lot), 'no stuck-on glass bands left on the vehicles');
 assert.ok(!/f150|F-150 SuperCrew|'silver F-150'|beaker/.test(html), 'the silver F-150, its key and keychain are gone');
-assert.ok(html.includes("const KEYCAR = { cross: 'black Silverado', mustard: 'yellow crossover', flower: 'Pink Sedan' };"), 'three drivable cars with keys');
+assert.ok(html.includes("const KEYCAR = { cross: 'black Silverado', mustard: 'yellow crossover', flower: 'Pink Sedan', dice: 'green Jeep', heart: 'white Renegade', badge: 'white Crown Vic', horseshoe: 'white Ranger pickup' };"), 'seven drivable cars with keys (v1.97.56: + the green Jeep and the three white lot cars)');
 assert.ok(html.includes("return { g: outer, inner: g, eye: g.userData.eye || null, sw: g.userData.sw || null,"), 'mkCar picks up the driver seat and wheel');
 assert.ok(html.includes('wheels: best.wheels, sw: best.sw || null, driver: null,'), 'getting in hands the car its steering wheel');
 assert.ok(html.includes('if (c.sw) c.sw.rotation.z = 0;'), 'parked with the wheel straight');
