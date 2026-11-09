@@ -1,3 +1,13 @@
+## TEST v1.97.54 — flat process building floor, the dead lie on it, the Ranger keeps the pixel fire (2026-11-09)
+- Owner: *"Ranger fire went back to old fire. Also in the process building can the floor be flatter. The dead critters And zombies clip into floor after you kill them."*
+- **Floor:** the process building's concrete slab (west block, ferm alley, maintenance shop, north rooms) stood 22 cm proud, but walking, landing and dropping all used ground level 0. You, ragdolls, dead zombies, and thrown or falling critters and pigeons all sat 22 cm inside it.
+  - The slab is now a flat 9 cm (`SLAB_TOP`, just over the top ground layer). The trench-drain grates are 1.5 cm proud (was 4 cm) and the office tile is 2 cm over the slab (was at 0.25).
+  - The slab top and office tile are walkable surfaces (`WALK_SURF`), so `floorAt()` lands everything on the floor you see.
+- **Zombies:** a dead zombie pivots on its heels, so it's lifted by its back's depth as it goes over and lies on the floor. After 6 s it fades out where it lies (3 s) instead of sinking through the floor. The green stand-in box's shared material is left alone.
+- **Fire:** a vehicle fire picks its art when it lights, so one lit before the pixel fire's strip had loaded kept the old code-drawn flipbook for good. More models now load at startup, so that got likelier. Burning sprites now switch to the pixel fire the moment it's in. Checked in the running game: the Ranger burns with the pixel fire.
+- `validate-west-wing.cjs` lists the office tile's drop as deliberate.
+- Bumped TEST to `1.97.54`.
+
 ## TEST v1.97.53 — the cows and sheep are where you'll come across them (2026-11-09)
 - Owner: *"I don't see the sheep or cows or the pigeons"*. All of them were loading and visible. The herds were just 500–800 m out (cows NE around 510, -210; sheep SE around 531, 572), out where the view fades (fog 380–760 m), and the pigeons, 6 since v1.97.51, perch 8–28 m up on the rooftops.
 - The cows have moved to the open grass just east of the plant, halfway between the employee parking lot and the north–south road (around 190, -88). The sheep are south of the thin diagonal road, short of the rails (around 175, 255). Both groups are about 150–250 m from the plant and checked clear from overhead. The pigeons are unchanged.

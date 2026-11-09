@@ -52,8 +52,10 @@ const resizedSign=o=>o.geometry?.type==='PlaneGeometry'&&Math.abs(o.geometry.par
 // v1.97.136: the hall door's small hand-placed EXIT sign (and its halo) gave way to the standard lit sign that exitSignsForEgress puts
 // over every exterior door when the world is built (validate-exit-signs.cjs), so those two are not in the source any more.
 const replacedExit=o=>{const g=o.geometry?.parameters||{};return (o.geometry?.type==='BoxGeometry'&&near(g.width,0.06)&&near(g.height,0.2)&&near(g.depth,0.55))||(o.geometry?.type==='PlaneGeometry'&&near(g.width,0.9)&&near(g.height,0.4)&&o.position.x<-73);};
+// v1.97.54 ("can the floor be flatter"): the office tile floor drops with the slab, from y 0.25 to 2 cm over the 9 cm slab.
+const loweredTile=o=>{const g=o.geometry?.parameters||{};return o.geometry?.type==='BoxGeometry'&&near(g.width,43)&&near(g.height,0.06)&&near(g.depth,6.95)&&near(o.position.y,0.25);};
 for(const o of office(old).filter(o=>!(o.geometry?.parameters.depth>7))) {
- if(replacedByModel(o)||replacedBySnack(o)||resizedSign(o)||replacedExit(o))continue;
+ if(replacedByModel(o)||replacedBySnack(o)||resizedSign(o)||replacedExit(o)||loweredTile(o))continue;
  assert.ok(relocated.has(signature(o,3)),'office object preserved at translated position: '+signature(o,3));
 }
 assert.deepEqual(next.NPCS.map(n=>n.id),old.NPCS.map(n=>n.id));

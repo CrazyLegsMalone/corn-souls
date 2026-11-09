@@ -7499,13 +7499,20 @@ function init(container) {
     enclosure(FXW, FXE, ZN, SZ, PH);
     // concrete floor with a trench drain down the ferm alley and along the evap alley aisle
     const conc = selfLit(new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 })), grate = mat(0x3f444a); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
-    const slab = (w, d, x, z) => { const o = add(new T.BoxGeometry(w, 0.1, d), conc, x, 0.17, z, null, true); o.receiveShadow = true; };
+    // v1.97.54, owner: "in the process building can the floor be flatter. The dead critters And zombies clip into floor after you
+    // kill them". The slab stood 22 cm proud (top 0.22) while walking, landing and dropping all used ground level 0, so you, the
+    // dead and anything thrown sat 22 cm inside it. Now it is a flat 9 cm slab (just over the top ground layer, 0.08) and its top is
+    // a walkable surface, so floorAt() - you, zombies, ragdolls, thrown and falling critters, pigeons - lands on the floor you see.
+    const SLAB_TOP = 0.09;
+    const slab = (w, d, x, z) => { const o = add(new T.BoxGeometry(w, 0.1, d), conc, x, SLAB_TOP - 0.05, z, null, true); o.receiveShadow = true;
+      WALK_SURF.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: SLAB_TOP, y1: SLAB_TOP }); };
     slab(EW - WW, WZS - NZ, (WW + EW) / 2, (NZ + WZS) / 2);
     slab(FXE - FXW, SZ - ZN, AC, (SZ + ZN) / 2);
-    box(0.45, 0.06, SZ - ZN - 1, grate, AC, 0.23, (SZ + ZN) / 2);
-    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, 0.23, OZS + 1.1);
-    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, 0.23, OZN - 2.6);
-    box(18.0 - AC, 0.06, 0.45, grate, (AC + 18.0) / 2, 0.23, OZN - 2.6);   // trench drain down the aisle, cook alley to the east wall
+    const GR = SLAB_TOP - 0.015;   // trench drain grates: 1.5 cm proud of the slab (was 4 cm)
+    box(0.45, 0.06, SZ - ZN - 1, grate, AC, GR, (SZ + ZN) / 2);
+    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, GR, OZS + 1.1);
+    box(AC - (WW + 1), 0.06, 0.45, grate, (WW + 1 + AC) / 2, GR, OZN - 2.6);
+    box(18.0 - AC, 0.06, 0.45, grate, (AC + 18.0) / 2, GR, OZN - 2.6);   // trench drain down the aisle, cook alley to the east wall
     // office block floor: tan/brown ceramic tile with darker grout
     {
       const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d');
@@ -7515,7 +7522,8 @@ function init(container) {
       const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set((EW - WW) / 1.22, (OZS - OZN) / 1.22);   // 1 ft tiles
       if (T.SRGBColorSpace) tex.colorSpace = T.SRGBColorSpace;
       officeTile = tex;
-      const o = add(new T.BoxGeometry(EW - WW, 0.06, OZS - OZN), new T.MeshLambertMaterial({ map: tex }), (WW + EW) / 2, 0.25, (OZN + OZS) / 2, null, true); o.receiveShadow = true;
+      const o = add(new T.BoxGeometry(EW - WW, 0.06, OZS - OZN), new T.MeshLambertMaterial({ map: tex }), (WW + EW) / 2, SLAB_TOP + 0.02, (OZN + OZS) / 2, null, true); o.receiveShadow = true;   // v1.97.54: 2 cm over the slab (was 0.25)
+      WALK_SURF.push({ x0: WW, x1: EW, z0: OZN, z1: OZS, y0: SLAB_TOP + 0.05, y1: SLAB_TOP + 0.05 });
     }
     // ---- office block (single story, white block with a green stripe) — west → east:
     // exit hall + lockers, men's, women's, utility locker, break room, manager's office, lab office, lab, control room
@@ -12733,7 +12741,10 @@ function updateDamage(dt) {
     if (d.fire) {
       d.burnT += dt;
       if (!d.fx) { d.fx = []; for (let i = 0; i < 5; i++) { const s = flameSprite(); scene.add(s); d.fx.push(s); } }
-      d.fx.forEach((s, i) => { const art = s.userData.art, fr = ((Math.floor(clock * (art ? FLAME_FPS : 12) + s.userData.ph) % FLAME_N) + FLAME_N) % FLAME_N, big = i === 0 ? 1.5 : 1; s.material.map.offset.x = fr / FLAME_N;   // flipbook at the art's speed
+      d.fx.forEach((s, i) => {
+        if (!s.userData.art && FLAME_ART && FLAME_ART.userData.ready) {   // v1.97.54 ("Ranger fire went back to old fire"): a fire lit before the pixel fire had loaded kept the old flipbook for good; it switches the moment the art is in
+          const t = FLAME_ART.clone(); t.needsUpdate = true; t.repeat.set(1 / FLAME_N, 1); s.material.map.dispose(); s.material.map = t; s.material.needsUpdate = true; s.userData.art = true; s.center.set(0.5, FLAME_BASE); }
+        const art = s.userData.art, fr = ((Math.floor(clock * (art ? FLAME_FPS : 12) + s.userData.ph) % FLAME_N) + FLAME_N) % FLAME_N, big = i === 0 ? 1.5 : 1; s.material.map.offset.x = fr / FLAME_N;   // flipbook at the art's speed
         const ox = i ? Math.sin(i * 2.4) * 0.7 : 0, oz = i ? Math.cos(i * 2.4) * 0.7 : 0;
         if (art) { s.position.set(p.x + ox, p.y - 0.15, p.z + oz); s.scale.set(2.0 * big, 1.5 * big, 1); }   // the owner's fire: wide and low (4:3), standing on the bed / hood of the wreck
         else { s.position.set(p.x + ox, p.y + 0.35 * big, p.z + oz); s.scale.set(0.9 * big, 1.8 * big, 1); } });
@@ -13711,6 +13722,7 @@ function zombPush(z) {   // like pushOut, for a zombie: off the wall lines and t
     const px = ax + vx * t, pz = az + vz * t, dx = z.x - px, dz = z.z - pz, d = Math.hypot(dx, dz); if (d < m && d > 0.001) { z.x = px + dx / d * m; z.z = pz + dz / d * m; } }
   for (const [cx, cz, r] of colliders || []) { const dx = z.x - cx, dz = z.z - cz, d = Math.hypot(dx, dz), mm = r + m; if (d < mm && d > 0.001) { z.x = cx + dx / d * mm; z.z = cz + dz / d * mm; } }
 }
+const ZOMB_BACK = 0.17;   // how far its back sits behind its heels (the 1.8 m model, shoulder blades and heels)
 function zombSpot() {   // a random point inside a random building, on its ground floor, away from you
   const E = ENCL.filter(e => e.area > 25 && e.area < 6000); if (!E.length) return null;
   for (let tries = 0; tries < 40; tries++) {
@@ -13779,7 +13791,10 @@ function zombUpdate(dt) {
     const dx = walk.x - z.x, dz = walk.z - z.z, d = Math.hypot(dx, dz), me = walk.on && !walk.dead && !walk.drive;
     let move = 0;
     if (z.state === 'dead') {   // falls back, lies there, sinks
-      z.deadT += dt; z.g.rotation.x = Math.max(-Math.PI / 2, -z.deadT * 4); if (z.deadT > 6) z.g.position.y = z.y - (z.deadT - 6) * 0.5;
+      // v1.97.54 ("zombies clip into floor after you kill them"): it pivots on its heels, so lift it by its back's depth as it goes
+      // over (it lies ON the floor, not half in it), and after 6 s it fades away where it lies instead of sinking through the floor.
+      z.deadT += dt; const fall = Math.min(1, z.deadT * 4 / (Math.PI / 2)); z.g.rotation.x = -fall * Math.PI / 2; z.g.position.y = z.y + Math.sin(fall * Math.PI / 2) * ZOMB_BACK;
+      if (z.deadT > 6) { const k = Math.max(0, 1 - (z.deadT - 6) / 3); z.g.traverse(o => { if (o.isMesh && o.material && o !== z.box) { if (!o.material.transparent) { o.material.transparent = true; o.material.needsUpdate = true; } o.material.opacity = k; o.castShadow = k > 0.5; } }); }
       if (z.deadT > 9) { z.state = 'gone'; scene.remove(z.g); z.g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); } }); }
       continue;
     }
