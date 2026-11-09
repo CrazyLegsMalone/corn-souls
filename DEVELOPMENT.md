@@ -1,3 +1,9 @@
+## TEST v1.97.53 — the cows and sheep are where you'll come across them (2026-11-09)
+- Owner: *"I don't see the sheep or cows or the pigeons"*. All of them were loading and visible. The herds were just 500–800 m out (cows NE around 510, -210; sheep SE around 531, 572), out where the view fades (fog 380–760 m), and the pigeons, 6 since v1.97.51, perch 8–28 m up on the rooftops.
+- The cows have moved to the open grass just east of the plant, halfway between the employee parking lot and the north–south road (around 190, -88). The sheep are south of the thin diagonal road, short of the rails (around 175, 255). Both groups are about 150–250 m from the plant and checked clear from overhead. The pigeons are unchanged.
+- `validate-farm-animals.cjs`: the herds must be within 420 m of the plant and out east of it.
+- Bumped TEST to `1.97.53`.
+
 ## TEST v1.97.52 — the ferm alley wall goes round the fermenters, not through them (2026-11-07)
 - Owner (screenshot from the yard): *"WALL SHOULD NOT CLIP INTO FERM"*. Since v1.97.156 the ferm alley's two outside walls were carried straight across every tank slot along the column line, through the middle of each fermenter and the beer well, so you couldn't see the yard through the glass from inside. The tanks are translucent, so that panel showed clearly cutting through them from outside.
 - Each slot now gets a half-round panel instead. It wraps the alley side of the tank 12 cm outside the shell, from one tangent point to the other, with the top trim's ends capped where the straight runs stop. From the yard each tank stands whole in front of the wall; from inside, the wall bulges round the tanks and there's still no gap to see out through. That covers 7 fermenters plus the beer well.

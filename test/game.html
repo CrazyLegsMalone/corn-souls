@@ -5577,8 +5577,10 @@ function hydrantModel(x, z, yaw) {
 // The dog stands by Vern at grain receiving; the cat is the shed jump scare (below).
 const ANIMAL_URL = k => '/corn-souls/assets/models/animals/' + k + '.glb';
 const ANIMAL_SCALE = { cow: 0.75, sheep: 1.0, dog: 0.63, cat: 0.78 };   // model units to metres: cow ~1.4 m at the shoulder, sheep ~0.8, dog ~0.6, cat ~0.27
-const COW_HERD = [[505, -212, 0.4], [512, -205, 2.1], [500, -200, -1.2], [517, -216, 3.0]];                 // x, z, yaw
-const SHEEP_FLOCK = [[528, 568, 0.2], [532, 572, 1.6], [525, 575, -0.8], [535, 566, 2.7], [530, 579, -2.2], [538, 574, 0.9]];
+// v1.97.53, owner: "I don't see the sheep or cows": they were 500-800 m out, past where the view fades. Now in the open grass just
+// east of the plant: cows halfway between the employee lot and the north-south road, sheep south of the diagonal road (each ~100-200 m out).
+const COW_HERD = [[188, -92, 0.4], [195, -85, 2.1], [183, -80, -1.2], [200, -96, 3.0]];                 // x, z, yaw
+const SHEEP_FLOCK = [[172, 251, 0.2], [176, 255, 1.6], [169, 258, -0.8], [179, 249, 2.7], [174, 262, -2.2], [182, 257, 0.9]];
 const ANIMALS = { dog: null, cat: null };
 function animalModel(k, x, z, yaw, col) {
   loadGlbModel(ANIMAL_URL(k), ({ root }) => {

@@ -18,10 +18,11 @@ assert.ok(!fs.existsSync('../assets/models/animals/elephant.glb'), 'no elephant'
 const arr = name => JSON.parse(html.match(new RegExp('const ' + name + ' = (\\[\\[.*?\\]\\]);'))[1]);
 const herd = arr('COW_HERD'), flock = arr('SHEEP_FLOCK');
 assert.ok(herd.length >= 3 && flock.length >= 4, 'a few cows and a flock of sheep');
-const far = ([x, z]) => Math.hypot(x - -675, z - -99) > 344 + 60 && Math.hypot(x - -603, z - 429) > 150 && Math.hypot(x - -451, z - 309) > 150 && Math.hypot(x - 0, z - 30) > 300;
+const far = ([x, z]) => Math.hypot(x - -675, z - -99) > 344 + 60 && Math.hypot(x - -603, z - 429) > 150 && Math.hypot(x - -451, z - 309) > 150 && x > 120;   /* v1.97.53: out east of the plant, which ends near x 70 */
 for (const p of herd.concat(flock)) assert.ok(far(p), 'away from the corn circle, the ponds and the plant: ' + p);
 const cx = a => [a.reduce((s, p) => s + p[0], 0) / a.length, a.reduce((s, p) => s + p[1], 0) / a.length], hc = cx(herd), fc = cx(flock);
-assert.ok(Math.hypot(hc[0] - fc[0], hc[1] - fc[1]) > 300, 'sheep in a different field from the cows');
+assert.ok(Math.hypot(hc[0] - fc[0], hc[1] - fc[1]) > 250, 'sheep in a different field from the cows');
+for (const p of herd.concat(flock)) assert.ok(Math.hypot(p[0] - -30, p[1] - 0) < 420, 'close enough to the plant to come across (v1.97.53: "I don\'t see the sheep or cows"): ' + p);
 assert.ok(/loadSubstation\(\); loadAnimals\(\);/.test(html) && html.includes("stepSafe('animals', () => animalsStep(dt))"), 'loaded and stepped');
 assert.ok(html.includes("NPCS.find(n => n.id === 'vern')"), 'the dog stands by Vern');
 const step = html.slice(html.indexOf('function animalsStep('), html.indexOf('function animalsStep(') + 2600);
@@ -31,4 +32,4 @@ assert.ok(/catYowl\(\)/.test(step) && /c\.state = 'gone'/.test(step), 'yowls, ru
 assert.ok(html.includes('O.shedManDoor = O.swingDoors[O.swingDoors.length - 1];'), 'the shed man door is known to the cat');
 assert.ok(/density: 0\.004125,/.test(html), 'grass tufts halved');
 assert.ok(/!rd\.awake && now - rd\.born > 60\)/.test(html), 'buzzard after one minute');
-console.log('PASS: farm animals (cows NE, sheep SE across the rails, dog by Vern, shed cat jump scare), grass halved, buzzard at 1 min');
+console.log('PASS: farm animals (cows east of the employee lot, sheep south of the diagonal road, dog by Vern, shed cat jump scare), grass halved, buzzard at 1 min');
