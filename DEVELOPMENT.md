@@ -1,3 +1,11 @@
+## TEST v1.97.57 — the cows and sheep are solid and call out; the dog's out of the trucks' way (2026-11-09)
+- Owner: *"Give cows and sheep collision and sound. Move dog it's in way of the grain haulers"*.
+- **Collision:** each animal's round collider was added when its model finished loading. By then the collider list had already been built when you started walking, so it never counted. Now every cow and sheep gets two circles along its body (nose and rump: cows ±0.75 m, r 0.62; sheep ±0.3 m, r 0.38) as soon as the herd is placed, and they go into the live list if it already exists (`animalCol`). Checked in the running game: walking into a cow stops you and slides you around it.
+- **Sound:** within 70 m of a herd, one animal calls now and then: cows every 7–18 s, sheep every 5–13 s. Each call comes from that animal's spot, quieter with distance and panned to the side it's on. It's synthesised: the moo is a low sawtooth through a vowel filter that opens and closes, the baa a higher bleat with a fast wobble.
+- **Dog:** it stood at Vern's side, out in the grain receiving lanes. It now sits on the dirt west of the rail spur (-246.5, 5), facing over toward Vern and the trucks, clear of the road and the track, with a small collider of its own. Checked from overhead.
+- `validate-farm-animals.cjs` covers the colliders, the calls and the dog's spot.
+- Bumped TEST to `1.97.57`.
+
 ## TEST v1.97.56 — the green Jeep and the three white lot cars are drivable, keys in four places (2026-11-09)
 - Owner: *"Can you make the green and the white vehicle drivable"*. There are three white ones in the lot, and asked which, the owner chose *"All three"*. Then: *"Put each key in a different place"*.
 - The green Jeep, white Jeep Renegade, white Crown Victoria and white '90 Ford Ranger pickup drive like the Silverado (`mkCar`). They're added to `O.cars` after the Pink Sedan, so its index stays 2.

@@ -24,7 +24,11 @@ const cx = a => [a.reduce((s, p) => s + p[0], 0) / a.length, a.reduce((s, p) => 
 assert.ok(Math.hypot(hc[0] - fc[0], hc[1] - fc[1]) > 250, 'sheep in a different field from the cows');
 for (const p of herd.concat(flock)) assert.ok(Math.hypot(p[0] - -30, p[1] - 0) < 420, 'close enough to the plant to come across (v1.97.53: "I don\'t see the sheep or cows"): ' + p);
 assert.ok(/loadSubstation\(\); loadAnimals\(\);/.test(html) && html.includes("stepSafe('animals', () => animalsStep(dt))"), 'loaded and stepped');
-assert.ok(html.includes("NPCS.find(n => n.id === 'vern')"), 'the dog stands by Vern');
+assert.ok(html.includes('const DOG_SPOT = [-246.5, 5.0, Math.PI / 2];') && !html.includes("NPCS.find(n => n.id === 'vern')"), 'the dog sits west of the rail spur, out of the receiving lanes (v1.97.57: "Move dog it\'s in way of the grain haulers")');
+// v1.97.57: "Give cows and sheep collision and sound" - two circles per animal straight away (not after the collider list is built), moos and baas
+assert.ok(/function animalModel\(k, x, z, yaw\) \{\n  const B = ANIMAL_BODY\[k\]; if \(B\) for \(const s of \[-1, 1\]\) animalCol\(/.test(html), 'colliders go in as the herd is placed');
+assert.ok(html.includes("function animalCol(c) { extraCols.push(c); if (typeof colliders !== 'undefined' && colliders) colliders.push(c); }"), 'into the live collider list too');
+assert.ok(html.includes("herdCall(COW_HERD, 'cow')") && html.includes("herdCall(SHEEP_FLOCK, 'sheep')"), 'cows moo, sheep baa');
 const step = html.slice(html.indexOf('function animalsStep('), html.indexOf('function animalsStep(') + 2600);
 assert.ok(/c\.state === 'hide'/.test(step) && /O\.shedManDoor\.open > 0\.1/.test(step) && /M\.door\.open > 0\.15/.test(step), 'cat waits for either shed door');
 assert.ok(/titleEl\.isConnected/.test(step), 'not set off behind the title screen');
@@ -32,4 +36,4 @@ assert.ok(/catYowl\(\)/.test(step) && /c\.state = 'gone'/.test(step), 'yowls, ru
 assert.ok(html.includes('O.shedManDoor = O.swingDoors[O.swingDoors.length - 1];'), 'the shed man door is known to the cat');
 assert.ok(/density: 0\.004125,/.test(html), 'grass tufts halved');
 assert.ok(/!rd\.awake && now - rd\.born > 60\)/.test(html), 'buzzard after one minute');
-console.log('PASS: farm animals (cows east of the employee lot, sheep south of the diagonal road, dog by Vern, shed cat jump scare), grass halved, buzzard at 1 min');
+console.log('PASS: farm animals (cows east of the employee lot, sheep south of the diagonal road, dog by the rail spur, colliders, moos and baas, shed cat jump scare), grass halved, buzzard at 1 min');
