@@ -7422,7 +7422,7 @@ function init(container) {
         pumpSet(PX, PZ, 'x', 1, null, k); extraCols.push([PX + 0.5, PZ, 0.65]);
         pipe([[sx, FH + 0.45, wz], [sx, FH + 0.45, PZ], [sx, Y, PZ], [PX - 0.13, Y, PZ]], null, 0.12); });
       for (const [w, d, x, z] of [[X1 - BX0, 0.25, (BX0 + X1) / 2, ZN], [0.25, BZ1 - ZN, BX0, (ZN + BZ1) / 2]]) box(w, 0.3, d, yel, x, 0.15, z);
-      box(0.3, 6.5, 0.3, mat(0x7f8a95), X1, 3.25, ZN - 0.25); cyl(0.09, 0.5, mat(0xc8211c), X1 + 0.2, 0.75, ZN - 0.45, null, 8);   // steel column + extinguisher at the berm's east end
+      box(0.3, 6.5, 0.3, mat(0x7f8a95), X1, 3.25, ZN - 0.25); extWall(X1 + 0.2, 0.8, ZN - 0.47, Math.PI);   // steel column + extinguisher at the berm's east end (v1.97.55: the real, usable one)
       box(X1 - BX0, 0.35, 0.35, mat(0x6f7378), (BX0 + X1) / 2, 6.3, ZN - 0.25);                                         // pipe rack beam along the berm
     }
     // 10 ft concrete path along the outside of the south wall, SW corner to SE corner: DISTILLATION ALLEY west of the south roll-up, CMT ALLEY east of it
@@ -7938,7 +7938,7 @@ function init(container) {
           const ext = (c2, Wd, Hd) => { c2.fillStyle = '#fff'; c2.fillRect(0, 0, Wd, Hd); c2.strokeStyle = '#a8231c'; c2.lineWidth = 6; c2.strokeRect(3, 3, Wd - 6, Hd - 6); c2.fillStyle = '#a8231c'; c2.font = 'bold 20px Arial'; c2.textAlign = 'center';
             'FIRE'.split('').forEach((ch, k) => c2.fillText(ch, Wd / 2, 28 + k * 22)); c2.font = 'bold 15px Arial'; 'EXTINGUISHER'.split('').forEach((ch, k) => c2.fillText(ch, Wd / 2, 130 + k * 17)); };
           for (const sx of [-1, 1]) pl(ext, 0.09, 0.4, px + 0.62 + sx * 0.035, 1.65, fz - 0.06, Math.PI + sx * 0.6);        // V-shaped (two-sided) sign
-          add(new T.CylinderGeometry(0.09, 0.09, 0.5, 10), mat(0xc8211c), px + 0.62, 0.72, fz - 0.12); box(0.1, 0.07, 0.1, mat(0x222222), px + 0.62, 1.0, fz - 0.12);
+          extWall(px + 0.62, 0.8, fz - 0.14, Math.PI);   // v1.97.55: the real, usable extinguisher (was a red cylinder + black valve)
           for (const sx of [-0.35, 0.35]) { add(new T.CylinderGeometry(0.08, 0.08, 1.4, 8), mat(0x50555a), px + sx, H + 0.5, fz + 1.8); add(new T.CylinderGeometry(0.1, 0.1, 0.12, 8), mat(0x3a3e42), px + sx, H + 1.2, fz + 1.8); }   // vent pipes
           wallSegs.push([px - W / 2, fz, DX0, fz], [DX1, fz, px + W / 2, fz], [px - W / 2, fz, px - W / 2, BSZ], [px + W / 2, fz, px + W / 2, BSZ]); }
         { // 4 CORN OIL TANKS (photos + nameplate: 8 ft dia x 23 ft straight wall, 8,800 gal, all identical): insulated ribbed stainless shells with bands,
@@ -8102,7 +8102,7 @@ function init(container) {
     add(new T.CylinderGeometry(0.4, 0.4, 1.2, 12), blue, -149.8, 0.7, ZS); add(new T.CylinderGeometry(0.12, 0.12, 2.8, 8), ss, -150.4, 1.4, ZS + 0.5);
     box(0.7, 0.9, 0.3, mat(0x9aa0a6), -151.6, 1.3, ZS - 0.2); box(0.08, 1.0, 0.08, mat(0x5a5f66), -151.6, 0.5, ZS - 0.2);
     box(0.3, 0.2, 0.02, gridLight(new T.MeshBasicMaterial({ color: 0x9fe08a })), -151.6, 1.5, ZS - 0.36);
-    add(new T.CylinderGeometry(0.08, 0.08, 0.5, 8), mat(0xc8211c), -152.4, 0.4, ZS - 0.4);
+    extWall(-152.4, 0.46, ZS - 0.4, Math.PI);   // v1.97.55: the real, usable extinguisher, standing by the wall (was a red cylinder)
     // west: blue truck-loading skid: meter/filter vessel, U-shaped vapor arm, control box with red lights, yellow hose on the ground
     box(4.2, 0.15, 1.8, blue, -156.5, 0.08, ZS);
     add(new T.CylinderGeometry(0.35, 0.35, 1.6, 12), blue, -158.2, 0.95, ZS);
@@ -8858,7 +8858,7 @@ function init(container) {
       box(1.4, 0.9, 0.75, gry, E1 - RB - 0.8, 0.67, bz); box(1.45, 0.04, 0.8, mat(0x6f7a85), E1 - RB - 0.8, 1.13, bz); solid(E1 - RB - 1.5, E1 - RB - 0.1, bz - 0.4, bz + 0.4);   // lab bench
       box(1.2, 0.7, 0.35, wht, E1 - RB - 0.8, 2.15, Z0 + RB + 0.2); box(1.1, 0.55, 0.02, glassM, E1 - RB - 0.8, 2.15, Z0 + RB + 0.38);   // water test cabinet (on the restroom wall)
       cyl(0.13, 0.3, wht, E1 - RB - 0.5, 1.15, bz, null, 10); box(0.35, 0.12, 0.2, wht, E1 - RB - 1.1, 1.21, bz);   // RO WATER jug, sample tray
-      cyl(0.09, 0.5, mat(0xc8211c), EX - 0.12, 0.6, Z0 + 5.3, null, 8); box(0.02, 0.4, 0.08, mat(0xf4f4f0), EX - 0.06, 1.65, Z0 + 5.3); box(0.12, 0.1, 0.03, wht, EX - 0.06, 1.5, Z0 + 5.6);   // extinguisher + sign, thermostat
+      extWall(EX - 0.14, 0.75, Z0 + 5.3, -Math.PI / 2); box(0.02, 0.4, 0.08, mat(0xf4f4f0), EX - 0.06, 1.65, Z0 + 5.3);   // v1.97.55: the real, usable extinguisher (was a red cylinder) box(0.12, 0.1, 0.03, wht, EX - 0.06, 1.5, Z0 + 5.6);   // extinguisher + sign, thermostat
       for (const z of [Z0 + 6.25, Z0 + 7.35]) { box(0.3, 1.3, 0.95, lgry, EX - 0.2, 1.45, z); for (const dz of [-0.4, 0.4]) box(0.06, 0.8, 0.06, gry, EX - 0.2, 0.62, z + dz); }   // panels on stands
       box(0.02, 0.08, 0.5, mat(0xd02020), EX - 0.36, 1.85, Z0 + 6.25); for (let i = 0; i < 4; i++) box(0.02, 0.05, 0.05, [0xd02020, 0xd02020, 0xf2c200, 0x2fae4f][i], EX - 0.36, 1.55, Z0 + 6.0 + i * 0.17);   // pilot lights + buttons
       solid(EX - 0.35, EX, Z0 + 5.75, Z1);
@@ -12766,7 +12766,7 @@ function dmgTarget() {
     for (const off of [-1.1, 0, 1.1]) { const dd = Math.hypot(px - (gx - Math.sin(a) * off), pz - (gz - Math.cos(a) * off)) - 0.75; if (dd < bd) { bd = dd; best = k; } } }
   return best;
 }
-// ---------- FIRE EXTINGUISHER: red ones on a post by the shop pegboard and in the parking lot (always restocked). Hold fire to spray a
+// ---------- FIRE EXTINGUISHER: red ones on a post by the shop pegboard and in the parking lot, and every one on a wall (v1.97.55) - always restocked. Hold fire to spray a
 // white cloud (about 12 s in a can); the spray puts out a vehicle fire in a couple of seconds. Grab a fresh one when it runs dry.
 const EXT = { stations: [], charge: 1, sprayT: 0, parts: [], hiss: null };
 let EXT_TEX = null;
@@ -12779,11 +12779,12 @@ function extTex() {   // the extinguisher, upright: red can, black valve + handl
   c.strokeStyle = '#151618'; c.lineWidth = 7; c.beginPath(); c.moveTo(44, 50); c.bezierCurveTo(10, 60, 8, 140, 30, 150); c.stroke(); c.fillStyle = '#151618'; c.fillRect(22, 146, 16, 22);   // hose + nozzle
   EXT_TEX = new T.CanvasTexture(cv); if (T.SRGBColorSpace) EXT_TEX.colorSpace = T.SRGBColorSpace; return EXT_TEX;
 }
-function extWall(x, y, z, ry) {   // decorative wall mount, using the same GLB as the usable extinguisher stations
+function extWall(x, y, z, ry) {   // wall mount, same GLB as the posts - and since v1.97.55 (owner: "Are all the fire extinguishers functional?" ... "Both") just as usable: take a full can from any of them
   const m = new T.Group(); m.position.set(x, y, z); m.rotation.y = ry; m.userData.noHit = true;
   const fallback = new T.Mesh(new T.PlaneGeometry(0.3, 0.6), new T.MeshLambertMaterial({ map: extTex(), transparent: true, alphaTest: 0.4, side: T.DoubleSide }));
   fallback.userData.noHit = true; m.add(fallback); scene.add(m);
   if (typeof extModelInto === 'function') extModelInto(m, 0.62, false);
+  EXT.stations.push(m);
   return m;
 }
 function extStation(x, y, z, ry) {   // a short red post with an extinguisher hanging on it

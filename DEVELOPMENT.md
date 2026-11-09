@@ -1,3 +1,11 @@
+## TEST v1.97.55 — every fire extinguisher is usable (2026-11-09)
+- Owner: *"Are all the fire extinguishers functional?"* No: only the two posts (maintenance shop pegboard, parking lot) gave you one. The rest were decoration: the wall mounts used the real 3D model, and four were plain red cylinders. Asked whether to make the wall mounts grab-able and swap the cylinders for the model, the owner said *"Both"*.
+- `extWall()` now registers each wall mount as a station, so `takeExtinguisher()` gives a full can from any of them, the same as from a post.
+- The four red cylinders are now real wall mounts: by the steel column at the east end of the berm, beside the door with the FIRE EXTINGUISHER sign, standing by the south wall at -152.4, and on the lab's east wall. The red arrow sign at the pump house stays as it was.
+- Checked in the running game: 13 stations (2 posts + 11 wall mounts) and no errors. Taking one off a wall gives a full can.
+- New suite `validate-extinguishers.cjs`.
+- Bumped TEST to `1.97.55`.
+
 ## TEST v1.97.54 — flat process building floor, the dead lie on it, the Ranger keeps the pixel fire (2026-11-09)
 - Owner: *"Ranger fire went back to old fire. Also in the process building can the floor be flatter. The dead critters And zombies clip into floor after you kill them."*
 - **Floor:** the process building's concrete slab (west block, ferm alley, maintenance shop, north rooms) stood 22 cm proud, but walking, landing and dropping all used ground level 0. You, ragdolls, dead zombies, and thrown or falling critters and pigeons all sat 22 cm inside it.
