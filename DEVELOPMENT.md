@@ -1,3 +1,11 @@
+## TEST v1.97.68 — the dog's feet stay on the ground (2026-11-10)
+- Owner: *"dogs feet clip through flor"*. Three causes, measured off the rig (`scripts/rig_animal_glb.py`'s pose on the real mesh):
+  - **Sitting:** the body came down a straight 0.31 while the legs folded, so the hind legs went ~4 cm under the ground sat and up to ~7 cm under while sitting down or getting up. New sit pose (body 0.55, fore legs 0.65, hips −1.7, knees 1.2) puts the fore paws, the folded hind legs and the rump all on the ground, and `ANIMAL_SIT.drop` is now a table of how far the body may come down at each tenth of the way (the lowest point on the ground at every step, within 1.5 mm).
+  - **Walking:** the cow's and the dog's hoof / paw tips dipped 2.6 and 2.2 model-cm below at the bottom of a stride; a walker is lifted by that (`HERD.*.lift`). The sheep never dipped.
+  - **The ground itself:** every animal stood at y 0, but the dog sits on the dirt layer (1.6 cm) and parts of the yard are asphalt (4 cm) or pad (8 cm) — so its paws were inside the dirt even standing. `animalGround()` finds the top of whatever is under it (a walk surface, or the ground layer, by a short ray), re-checked every half metre it moves.
+- Tests: `validate-farm-animals.cjs` checks the sit table, the table-driven drop, the walking lifts and the ground probe. Checked in the running game: sat, getting up, standing — paws on top of the dirt.
+- Bumped TEST to `1.97.68`.
+
 ## TEST v1.97.67 — first-person arms in your own skin (2026-11-10)
 - Owner sent **Drillimpact's "PSX First Person Arms"** (free; *"You can use it commercially without the need to credit me"* — credited anyway) and asked *"can you make it work with the player models matching skin tone"*.
 - **The empty hand (✋) now shows both forearms** in first person: hands down and relaxed; a **guard** while you hold aim; a **jab** on fire, left and right in turn (a press during one queues the other) that lands a light hit (10) on zombies, critters, birds, cob stalkers and the other player (*"👊 The other player punched you"*); and a **reach-and-grab** when X / E picks something up. The swing also shows in third person / on the other player's screen. Seated, carrying the radio, or holding anything else: as before.

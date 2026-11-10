@@ -39,6 +39,15 @@ for (const a of ['cow', 'sheep', 'dog']) {
   assert.equal(d.accessors[at.JOINTS_0].count, d.accessors[at.POSITION].count); assert.match(d.asset.extras.modifications, /rigged for Corn Souls/);
 }
 assert.ok(fs.existsSync('../scripts/rig_animal_glb.py'), 'the rigging script is kept');
+// v1.97.68 ("dogs feet clip through flor"): the sit only comes down as far as the folding legs allow, walkers are lifted by their
+// deepest hoof dip, and every animal stands on the top of the ground layer under it (dirt 1.6 cm, asphalt 4 cm, pads 8 cm), not in it
+{ const m = html.match(/const ANIMAL_SIT = \{ body: ([0-9.]+), front: ([0-9.]+), hip: (-[0-9.]+), knee: ([0-9.]+), neck: [0-9.]+, drop: \[([^\]]+)\] \};/);
+  assert.ok(m, 'the sit pose with its measured drop table'); const D = m[5].split(',').map(Number);
+  assert.equal(D.length, 11, 'one value per tenth of the way down'); assert.equal(D[0], 0, 'standing: no drop'); assert.ok(Math.abs(D[10] - 0.302) < 0.01, 'sat: the rump and paws just on the ground');
+  assert.ok(D.slice(0, 4).some(v => v < 0), 'early on the folding legs push the body up a little, so it rises instead of sinking'); }
+assert.ok(/sitY = sd\[si\] \+ \(sd\[si \+ 1\] - sd\[si\]\) \* \(st \* \(sd\.length - 1\) - si\);/.test(html), 'the drop follows the table, not a straight line');
+assert.ok(/lift: 0\.026, rest: 'graze'/.test(html) && /lift: 0, rest: 'graze'/.test(html) && /lift: 0\.022, rest: 'sit'/.test(html), 'cow 2.6 / sheep 0 / dog 2.2 model-cm hoof dip lifted while walking');
+assert.ok(html.includes('a.gy = animalGround(a.x, a.z);') && /g\.position\.set\(a\.x, a\.gy \+ \(/.test(html) && html.includes('function animalGround(x, z) {'), 'stands on the ground layer it is on');
 assert.ok(html.includes('animalCalls(dt); herdStep(dt);') && /if \(pd > 160\) continue; animalThink\(a, H, dt, pd\); animalPose\(a, H, dt, pd\);/.test(html), 'the herd is stepped, near animals only');
 assert.ok(/a\.cols\[i\]\[0\] = a\.x \+ Math\.sin\(a\.yaw\) \* B\[0\] \* s;/.test(html), 'colliders follow the animal');
 { // run the wander logic for ten minutes: everyone stays in the pen and they do not walk through each other
