@@ -1135,7 +1135,7 @@
       "license_name": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
       "status": "in-use",
-      "modifications": "Elephant left out; cow, sheep, dog and cat split into separate GLBs with their vertex colours, each centred on x/z and stood on y 0 (scripts/split_flat_glb.py); scaled at runtime.",
+      "modifications": "Elephant left out; cow, sheep, dog and cat split into separate GLBs with their vertex colours, each centred on x/z and stood on y 0 (scripts/split_flat_glb.py); scaled at runtime. From v1.97.61 the cow, sheep and dog also carry a 13-bone skeleton and skin weights added for Corn Souls (scripts/rig_animal_glb.py); geometry and colours unchanged.",
       "files": [
         "assets/models/animals/cow.glb",
         "assets/models/animals/sheep.glb",

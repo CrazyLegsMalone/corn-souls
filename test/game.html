@@ -5580,7 +5580,7 @@ function hydrantModel(x, z, yaw) {
 // ---------- FARM ANIMALS (v1.97.49, owner: "could we use thes except the elephant" - ranaaunhaider12's Low poly animals pack,
 // CC BY 4.0; the elephant left out). Each animal is its own flat-colour GLB (scripts/split_flat_glb.py), head toward +z, feet on
 // y 0. "a few cows in the green fields away from everything same for sheep but in a different area. we can fence them in later
-// and add some animation": they stand still for now, cows out in the open grass NE of the plant, sheep SE across the rails.
+// and add some animation": cows out in the open grass NE of the plant, sheep SE across the rails (animated since v1.97.61, below).
 // The dog stands by Vern at grain receiving; the cat is the shed jump scare (below).
 const ANIMAL_URL = k => '/corn-souls/assets/models/animals/' + k + '.glb';
 const ANIMAL_SCALE = { cow: 0.75, sheep: 1.0, dog: 0.63, cat: 0.78 };   // model units to metres: cow ~1.4 m at the shoulder, sheep ~0.8, dog ~0.6, cat ~0.27
@@ -5592,14 +5592,35 @@ const ANIMALS = { dog: null, cat: null, mooT: 4, baaT: 6 };
 const DOG_SPOT = [-246.5, 5.0, Math.PI / 2];   // x, z, yaw (facing east, toward Vern)
 // v1.97.57, owner: "Give cows and sheep collision and sound": the round collider used to go in when the model arrived - after the
 // collider list was built, so it never counted. Now each animal gets two circles along its body (nose and rump) straight away.
-const ANIMAL_BODY = { cow: [0.75, 0.62], sheep: [0.3, 0.38] };   // circle centres +-this far along the body, radius
+const ANIMAL_BODY = { cow: [0.75, 0.62], sheep: [0.3, 0.38], dog: [0.2, 0.3] };   // circle centres +-this far along the body, radius
 function animalCol(c) { extraCols.push(c); if (typeof colliders !== 'undefined' && colliders) colliders.push(c); }
+// v1.97.61, owner: "How difficult would it be to animate the cows and sheep maybe the dog" / "You can't make skeletons for them?":
+// the pack's animals are plain statues, so scripts/rig_animal_glb.py gives each a 13-bone skeleton (body, neck, head, tail, an upper
+// and a lower bone per leg; every bone un-rotated at rest, so turning a bone about its own x / y / z is a turn about the animal's
+// side / up / nose axis). The herd now lives: each animal grazes (head down, chewing), stands and looks about, or walks a few metres
+// to a new spot inside an invisible round pen about where its herd was placed - legs stepping in diagonal pairs, tail swishing -
+// keeping clear of the others and of you. Its two collider circles move with it, and the moos and baas come from where it is now.
+// The dog sits by the rail spur panting, watches you when you come near (tail going faster), and gets up for a short wander.
+// Only animals within 160 m of you are stepped; the rest stand as they were. Each player's herd is their own (not networked).
+const ANIMAL_BONES = ['body', 'neck', 'head', 'tail', 'fl_up', 'fl_low', 'fr_up', 'fr_low', 'bl_up', 'bl_low', 'br_up', 'br_low'];
+/* r pen radius m, sp walk speed m/s, gap how close two may come, gait leg cycle (radians per metre), leg swing, graze [neck, head] (radians), drop: neck lowered when grazing (model units) */
+const HERD = {
+  cow: { list: [], c: [0, 0], r: 11, sp: 0.7, turn: 0.9, gap: 2.4, gait: 4.2, leg: 0.36, graze: [1.15, 0.5], drop: 0.3, rest: 'graze' },
+  sheep: { list: [], c: [0, 0], r: 9, sp: 0.6, turn: 1.4, gap: 1.2, gait: 9.5, leg: 0.42, graze: [1.1, 0.45], drop: 0.14, rest: 'graze' },
+  dog: { list: [], c: [0, 0], r: 2.2, sp: 0.9, turn: 2.6, gap: 1.0, gait: 7.5, leg: 0.5, graze: [0, 0], drop: 0, rest: 'sit' },
+};
 function animalModel(k, x, z, yaw) {
-  const B = ANIMAL_BODY[k]; if (B) for (const s of [-1, 1]) animalCol([x + Math.sin(yaw) * B[0] * s, z + Math.cos(yaw) * B[0] * s, B[1]]);
+  const a = { k, x, z, yaw, g: null, b: null, cols: [], st: HERD[k].rest, t: 2 + Math.random() * 12, tx: x, tz: z, ph: Math.random() * 6, v: 0, hd: 0, sit: 0, lk: 0, sw: Math.random() * 20, ny: 0, nz: 0 };
+  const B = ANIMAL_BODY[k]; if (B) for (const s of [-1, 1]) { const c = [x + Math.sin(yaw) * B[0] * s, z + Math.cos(yaw) * B[0] * s, B[1]]; a.cols.push(c); animalCol(c); }
+  HERD[k].list.push(a);
   loadGlbModel(ANIMAL_URL(k), ({ root }) => {
     root.scale.setScalar(ANIMAL_SCALE[k]); root.position.set(x, 0, z); root.rotation.y = yaw; root.name = k;
-    mergeModel(root, true); scene.add(root);
+    root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });   /* skinned: its bounds are the rest pose */
+    const b = {}; for (const n of ANIMAL_BONES) b[n] = skinBone(root, n);
+    if (ANIMAL_BONES.every(n => b[n])) { a.b = b; a.ny = b.neck.position.y; a.nz = b.neck.position.z; }
+    scene.add(root); a.g = root; if (k === 'dog') ANIMALS.dog = root;
   }, 'animal');
+  return a;
 }
 function loadAnimals() {
   if (typeof document === 'undefined') return;
@@ -5607,10 +5628,65 @@ function loadAnimals() {
   for (const [x, z, a] of SHEEP_FLOCK) animalModel('sheep', x, z, a);
   // the dog (v1.97.57, owner: "Move dog it's in way of the grain haulers"): it stood at Vern's side, out in the receiving lanes. Now it
   // sits on the dirt west of the rail spur, looking over at Vern and the trucks, clear of the road and the track.
-  animalCol([DOG_SPOT[0], DOG_SPOT[1], 0.35]);
-  loadGlbModel(ANIMAL_URL('dog'), ({ root }) => { root.scale.setScalar(ANIMAL_SCALE.dog); root.name = 'dog'; root.position.set(DOG_SPOT[0], 0, DOG_SPOT[1]); root.rotation.y = DOG_SPOT[2]; mergeModel(root, true); scene.add(root); ANIMALS.dog = root; }, 'animal');
+  animalModel('dog', DOG_SPOT[0], DOG_SPOT[1], DOG_SPOT[2]);
+  for (const k in HERD) { const L = HERD[k].list; HERD[k].c = [L.reduce((s, a) => s + a.x, 0) / L.length, L.reduce((s, a) => s + a.z, 0) / L.length]; }
   loadGlbModel(ANIMAL_URL('cat'), ({ root }) => { root.scale.setScalar(ANIMAL_SCALE.cat); root.name = 'cat'; root.visible = false; mergeModel(root, false); scene.add(root);
     ANIMALS.cat = { g: root, state: 'hide', path: null, i: 0, t: 0 }; }, 'animal');
+}
+const angWrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+function animalThink(a, H, dt, pd) {
+  a.t -= dt;
+  const toP = Math.atan2(walk.x - a.x, walk.z - a.z);
+  if (a.st === 'walk') {
+    const dx = a.tx - a.x, dz = a.tz - a.z, d = Math.hypot(dx, dz), da = angWrap(Math.atan2(dx, dz) - a.yaw), facing = Math.abs(da) < 0.7;
+    const tr = H.turn * dt; a.yaw += Math.max(-tr, Math.min(tr, da)); if (!facing) a.ph += dt * 3;   /* shuffles round on the spot first */
+    let blocked = facing && pd < H.gap + 0.5 && Math.abs(angWrap(toP - a.yaw)) < 1.2;
+    if (facing) for (const o of H.list) if (o !== a) { const ox = o.x - a.x, oz = o.z - a.z; if (Math.hypot(ox, oz) < H.gap && ox * Math.sin(a.yaw) + oz * Math.cos(a.yaw) > 0) blocked = true; }
+    const ready = a.sit < 0.08;   /* (the dog stands up before it sets off) */
+    a.v += ((facing && !blocked && ready ? H.sp : 0) - a.v) * Math.min(1, dt * 3);
+    if (d < 0.3 || blocked || a.t <= 0) { a.st = blocked || Math.random() < 0.35 ? 'idle' : H.rest; a.t = a.st === 'idle' ? 2 + Math.random() * 5 : 7 + Math.random() * 14; }
+  } else {
+    a.v += (0 - a.v) * Math.min(1, dt * 4);
+    if (a.k === 'dog' && a.st === 'idle' && pd < 10) { const da = angWrap(toP - a.yaw); if (Math.abs(da) > 0.9) { const tr = H.turn * dt; a.yaw += Math.max(-tr, Math.min(tr, da)); a.ph += dt * 5; } }   /* turns to face you */
+    if (a.t <= 0) {
+      const r = Math.random();
+      if (a.st === H.rest ? r < 0.6 : r < 0.45) {   /* off to a new spot: near where it is, inside the pen, clear of the others */
+        for (let i = 0; i < 8; i++) { const an = Math.random() * 6.283, rd = H.r * (0.25 + 0.75 * Math.random()) * 0.6, tx = a.x + Math.sin(an) * rd, tz = a.z + Math.cos(an) * rd;
+          if (Math.hypot(tx - H.c[0], tz - H.c[1]) > H.r) continue;
+          if (H.list.some(o => o !== a && (Math.hypot(o.x - tx, o.z - tz) < H.gap * 1.3 || Math.hypot(o.tx - tx, o.tz - tz) < H.gap * 1.3))) continue;
+          a.tx = tx; a.tz = tz; a.st = 'walk'; a.t = 30; break; }
+        if (a.st !== 'walk') a.t = 2;
+      } else { a.st = a.st === 'idle' ? H.rest : 'idle'; a.t = a.st === 'idle' ? 2 + Math.random() * 5 : 7 + Math.random() * 14; }
+    }
+  }
+  a.x += Math.sin(a.yaw) * a.v * dt; a.z += Math.cos(a.yaw) * a.v * dt; a.ph += a.v * dt * H.gait;
+  /* looks at you when you are close and it is not eating */
+  const see = pd < (a.k === 'dog' ? 14 : 7) && a.st !== 'graze' && a.st !== 'walk' ? Math.max(-1.1, Math.min(1.1, angWrap(toP - a.yaw))) : 0;
+  a.lk += (see - a.lk) * Math.min(1, dt * 2.5);
+}
+function animalPose(a, H, dt, pd) {
+  const b = a.b, g = a.g, B = ANIMAL_BODY[a.k];
+  for (let i = 0; i < a.cols.length; i++) { const s = i ? 1 : -1; a.cols[i][0] = a.x + Math.sin(a.yaw) * B[0] * s; a.cols[i][1] = a.z + Math.cos(a.yaw) * B[0] * s; }
+  a.sw += dt; a.hd += ((a.st === 'graze' ? 1 : 0) - a.hd) * Math.min(1, dt * 1.4); a.sit += ((a.st === 'sit' ? 1 : 0) - a.sit) * Math.min(1, dt * 2.2);
+  const mv = Math.min(1, a.v / (H.sp * 0.5) + (a.st === 'walk' && a.v < 0.1 ? 0.5 : 0)), sn = Math.sin(a.ph), cs = Math.cos(a.ph), A = H.leg * mv, st = a.sit;
+  g.position.set(a.x, Math.abs(Math.sin(a.ph * 2)) * 0.012 * mv - st * ANIMAL_SIT.drop * g.scale.x, a.z); g.rotation.y = a.yaw;
+  if (!b) return;
+  /* legs: diagonal pairs; a negative turn about x swings the foot forward, the knee folds as the leg comes forward */
+  const leg = (n, s, c, front) => { b[n + '_up'].rotation.x = -A * s + st * (front ? ANIMAL_SIT.front : ANIMAL_SIT.hip); b[n + '_low'].rotation.x = A * 1.1 * Math.max(0, c) + st * (front ? 0 : ANIMAL_SIT.knee); };
+  leg('fl', sn, cs, true); leg('br', sn, cs, false); leg('fr', -sn, -cs, true); leg('bl', -sn, -cs, false);
+  b.body.rotation.x = -st * ANIMAL_SIT.body;
+  const hd = a.hd, chew = Math.sin(a.sw * 5.5) * 0.035 * hd, pant = a.k === 'dog' ? Math.sin(a.sw * 9) * 0.03 * (0.4 + st * 0.6) : 0;
+  b.neck.rotation.set(H.graze[0] * hd + Math.sin(a.ph * 2) * 0.05 * mv + st * ANIMAL_SIT.neck + pant, a.lk * 0.55, 0); b.head.rotation.set(H.graze[1] * hd + chew, a.lk * 0.45, 0);
+  b.neck.position.y = a.ny - H.drop * hd; b.neck.position.z = a.nz + H.drop * 0.35 * hd;
+  if (a.k === 'cow') { const f = Math.max(0, Math.sin(a.sw * 0.41) - 0.75) * 4; b.tail.rotation.set(0.06 * mv, 0, Math.sin(a.sw * 1.4) * 0.1 + Math.sin(a.sw * 8) * 0.55 * f); }   /* a lazy sway, and a fly-flick now and then */
+  else if (a.k === 'sheep') { const f = Math.max(0, Math.sin(a.sw * 0.6) - 0.6) * 2.5; b.tail.rotation.set(0, Math.sin(a.sw * 13) * 0.5 * f, 0); }
+  else { const near = pd < 14 ? 1 : 0.35; b.tail.rotation.set(0, 0, Math.sin(a.sw * (6 + near * 8)) * (0.25 + near * 0.4)); }
+}
+const ANIMAL_SIT = { body: 0.6, front: 0.6, hip: -1.5, knee: 1.0, neck: 0.5, drop: 0.31 };   /* the dog's sit: rump down, fore legs straight, hind legs folded under */
+function herdStep(dt) {
+  if (!walk.on) return;
+  for (const k in HERD) { const H = HERD[k];
+    for (const a of H.list) { if (!a.g) continue; const pd = Math.hypot(a.x - walk.x, a.z - walk.z); if (pd > 160) continue; animalThink(a, H, dt, pd); animalPose(a, H, dt, pd); } }
 }
 // The shed cat (v1.97.49, owner: "can we use the cat in a jump scare. it runs out the first time you open the lawnmower shed"):
 // hidden (not drawn) in the dark corner behind the mower until the first time either shed door opens with you at it, then it yowls
@@ -5657,11 +5733,11 @@ function herdCall(list, kind) {
 }
 function animalCalls(dt) {
   if (!walk.on || walk.dead) return;
-  if ((ANIMALS.mooT -= dt) <= 0) ANIMALS.mooT = herdCall(COW_HERD, 'cow') ? 7 + Math.random() * 11 : 3;
-  if ((ANIMALS.baaT -= dt) <= 0) ANIMALS.baaT = herdCall(SHEEP_FLOCK, 'sheep') ? 5 + Math.random() * 8 : 3;
+  if ((ANIMALS.mooT -= dt) <= 0) ANIMALS.mooT = herdCall(HERD.cow.list.map(a => [a.x, a.z]), 'cow') ? 7 + Math.random() * 11 : 3;
+  if ((ANIMALS.baaT -= dt) <= 0) ANIMALS.baaT = herdCall(HERD.sheep.list.map(a => [a.x, a.z]), 'sheep') ? 5 + Math.random() * 8 : 3;
 }
 function animalsStep(dt) {
-  animalCalls(dt);
+  animalCalls(dt); herdStep(dt);
   const c = ANIMALS.cat, M = O.shedMower; if (!c || !M) return;
   if (c.state === 'hide') {
     if (!walk.on || walk.dead || walk.mow || walk.drive || (titleEl && titleEl.isConnected && !titleEl.classList.contains('out'))) return;   // not behind the title screen
@@ -16616,7 +16692,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },

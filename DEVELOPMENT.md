@@ -1,3 +1,12 @@
+## TEST v1.97.61 — the cows, sheep and dog are alive (2026-11-09)
+- Owner: *"How difficult would it be to animate the cows and sheep maybe the dog"* / *"You can't make skeletons for them?"* / *"Yes continue and push."*
+- **Skeletons.** The pack's animals are static statues. New `scripts/rig_animal_glb.py` gives the cow, sheep and dog a 13-bone skeleton each (body, neck, head, tail, an upper and lower bone per leg) and weights every vertex to the bones it should follow, blended across each joint. Bones are un-rotated at rest, so the game turns them about their own x / y / z. Geometry, colours and the CC BY extras are unchanged; `assets/models/animals/{cow,sheep,dog}.glb` are now skinned. The cat stays as it was.
+- **Cows and sheep.** Each one grazes (head down, chewing), stands and looks about (it looks at you if you are within 7 m), or walks a few metres to a new spot: legs step in diagonal pairs, the head nods, the cow's tail sways with an occasional flick, the sheep's tail wiggles. They stay inside an invisible round pen about where the herd was placed (cows 11 m, sheep 9 m), keep clear of each other and stop rather than walk into you. Their collider circles move with them, and moos and baas come from where they are now.
+- **Dog.** Sits by the rail spur panting, watches you when you come within 14 m (tail wagging faster), stands and turns to face you, and takes short wanders within 2 m of its spot.
+- Only animals within 160 m of you are stepped. Each player's animals are their own (not networked).
+- Tests: `validate-farm-animals.cjs` now checks the three skinned models (13 named bones, un-rotated) and runs the wander logic for ten simulated minutes (stay in the pen, keep apart, do move). Poses checked in the running game (dog sit and stand, cow walk and graze, sheep graze).
+- Bumped TEST to `1.97.61`.
+
 ## TEST v1.97.60 — the blender's sign says SLURRY BLENDER (2026-11-09)
 - Owner: *"Yes should say Slurry Blender only no number"*. The nameplate on the slurry blender's trough read "TS-2831 / BLEND TANK"; it now reads "SLURRY BLENDER", one line with no tag number. Checked in the running game.
 - Bumped TEST to `1.97.60`.

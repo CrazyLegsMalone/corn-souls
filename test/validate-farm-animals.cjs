@@ -26,9 +26,34 @@ for (const p of herd.concat(flock)) assert.ok(Math.hypot(p[0] - -30, p[1] - 0) <
 assert.ok(/loadSubstation\(\); loadAnimals\(\);/.test(html) && html.includes("stepSafe('animals', () => animalsStep(dt))"), 'loaded and stepped');
 assert.ok(html.includes('const DOG_SPOT = [-246.5, 5.0, Math.PI / 2];') && !html.includes("NPCS.find(n => n.id === 'vern')"), 'the dog sits west of the rail spur, out of the receiving lanes (v1.97.57: "Move dog it\'s in way of the grain haulers")');
 // v1.97.57: "Give cows and sheep collision and sound" - two circles per animal straight away (not after the collider list is built), moos and baas
-assert.ok(/function animalModel\(k, x, z, yaw\) \{\n  const B = ANIMAL_BODY\[k\]; if \(B\) for \(const s of \[-1, 1\]\) animalCol\(/.test(html), 'colliders go in as the herd is placed');
+assert.ok(/function animalModel\(k, x, z, yaw\) \{\n  const a = [^\n]*\n  const B = ANIMAL_BODY\[k\]; if \(B\) for \(const s of \[-1, 1\]\) \{ const c = \[[^\n]*a\.cols\.push\(c\); animalCol\(c\); \}/.test(html), 'colliders go in as the herd is placed');
 assert.ok(html.includes("function animalCol(c) { extraCols.push(c); if (typeof colliders !== 'undefined' && colliders) colliders.push(c); }"), 'into the live collider list too');
-assert.ok(html.includes("herdCall(COW_HERD, 'cow')") && html.includes("herdCall(SHEEP_FLOCK, 'sheep')"), 'cows moo, sheep baa');
+assert.ok(html.includes("herdCall(HERD.cow.list.map(a => [a.x, a.z]), 'cow')") && html.includes("herdCall(HERD.sheep.list.map(a => [a.x, a.z]), 'sheep')"), 'cows moo, sheep baa, from where they are now');
+// v1.97.61: "You can't make skeletons for them?" - cow, sheep and dog are rigged (scripts/rig_animal_glb.py) and alive
+const BONES = ['root', 'body', 'neck', 'head', 'tail', 'fl_up', 'fl_low', 'fr_up', 'fr_low', 'bl_up', 'bl_low', 'br_up', 'br_low'];
+for (const a of ['cow', 'sheep', 'dog']) {
+  const b = fs.readFileSync('../assets/models/animals/' + a + '.glb'), d = JSON.parse(b.toString('utf8', 20, 20 + b.readUInt32LE(12))), at = d.meshes[0].primitives[0].attributes;
+  assert.ok(at.JOINTS_0 !== undefined && at.WEIGHTS_0 !== undefined && d.skins && d.skins.length === 1, a + ' is skinned');
+  assert.deepEqual(d.skins[0].joints.map(i => d.nodes[i].name), BONES, a + ' has the 13 bones');
+  assert.ok(d.skins[0].joints.every(i => !d.nodes[i].rotation && !d.nodes[i].scale), a + ': bones un-rotated at rest (the game turns them about their own axes)');
+  assert.equal(d.accessors[at.JOINTS_0].count, d.accessors[at.POSITION].count); assert.match(d.asset.extras.modifications, /rigged for Corn Souls/);
+}
+assert.ok(fs.existsSync('../scripts/rig_animal_glb.py'), 'the rigging script is kept');
+assert.ok(html.includes('animalCalls(dt); herdStep(dt);') && /if \(pd > 160\) continue; animalThink\(a, H, dt, pd\); animalPose\(a, H, dt, pd\);/.test(html), 'the herd is stepped, near animals only');
+assert.ok(/a\.cols\[i\]\[0\] = a\.x \+ Math\.sin\(a\.yaw\) \* B\[0\] \* s;/.test(html), 'colliders follow the animal');
+{ // run the wander logic for ten minutes: everyone stays in the pen and they do not walk through each other
+  const src = html.slice(html.indexOf('const ANIMAL_BONES ='), html.indexOf('function animalModel(')) + html.slice(html.indexOf('const angWrap ='), html.indexOf('function animalPose('));
+  const walk = { x: 1e4, z: 1e4 }, { HERD, animalThink } = new Function('walk', src + '; return { HERD, animalThink };')(walk);
+  for (const [k, tab] of [['cow', herd], ['sheep', flock]]) { const H = HERD[k];
+    for (const [x, z, yaw] of tab) H.list.push({ k, x, z, yaw, st: H.rest, t: 1 + Math.random() * 5, tx: x, tz: z, ph: 0, v: 0, hd: 0, sit: 0, lk: 0, sw: 0 });
+    H.c = cx(tab); let moved = 0, minGap = 99, walked = 0;
+    const start = H.list.map(a => [a.x, a.z]);
+    for (let i = 0; i < 600 * 30; i++) { for (const a of H.list) { animalThink(a, H, 1 / 30, 1e4); if (a.st === 'walk') walked++; assert.ok(Math.hypot(a.x - H.c[0], a.z - H.c[1]) < H.r + 1.5, k + ' stays in its pen'); }
+      for (const a of H.list) for (const o of H.list) if (a !== o) minGap = Math.min(minGap, Math.hypot(a.x - o.x, a.z - o.z)); }
+    H.list.forEach((a, i) => { if (Math.hypot(a.x - start[i][0], a.z - start[i][1]) > 1) moved++; assert.ok(Number.isFinite(a.x + a.z + a.yaw + a.ph)); });
+    assert.ok(moved >= 2 && walked > 300, k + 's wander (' + moved + ' moved)'); assert.ok(minGap > H.gap * 0.45, k + 's keep apart (closest ' + minGap.toFixed(2) + ' m)');
+  }
+}
 const step = html.slice(html.indexOf('function animalsStep('), html.indexOf('function animalsStep(') + 2600);
 assert.ok(/c\.state === 'hide'/.test(step) && /O\.shedManDoor\.open > 0\.1/.test(step) && /M\.door\.open > 0\.15/.test(step), 'cat waits for either shed door');
 assert.ok(/titleEl\.isConnected/.test(step), 'not set off behind the title screen');
@@ -36,4 +61,4 @@ assert.ok(/catYowl\(\)/.test(step) && /c\.state = 'gone'/.test(step), 'yowls, ru
 assert.ok(html.includes('O.shedManDoor = O.swingDoors[O.swingDoors.length - 1];'), 'the shed man door is known to the cat');
 assert.ok(/density: 0\.004125,/.test(html), 'grass tufts halved');
 assert.ok(/!rd\.awake && now - rd\.born > 60\)/.test(html), 'buzzard after one minute');
-console.log('PASS: farm animals (cows east of the employee lot, sheep south of the diagonal road, dog by the rail spur, colliders, moos and baas, shed cat jump scare), grass halved, buzzard at 1 min');
+console.log('PASS: farm animals (cows east of the employee lot, sheep south of the diagonal road, dog by the rail spur, colliders, moos and baas, shed cat jump scare), cow / sheep / dog rigged and wandering, grass halved, buzzard at 1 min');
