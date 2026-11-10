@@ -4969,6 +4969,106 @@ const selfLit = m => { m.userData.csGlow = true; return m; };
 // additive glow ramps stay untagged on purpose: they are luminance ramps, not colour, and brightening them is the
 // whole point.
 const srgbTex = t => { if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; };
+// ---------- PSX TEXTURES (v1.97.65, owner sent "PSX Textures Free" by heyheythere, CC BY 4.0, and picked "Everything they fit"):
+// 16-colour dithered PS1 textures at 128 px a metre, in assets/textures/psx/. The grass and the asphalt, the concrete pads and
+// slabs, the metal siding and roofs (rusty corrugated), the office drop ceiling and tile floors (ceiling tiles, lino) and the
+// scale house's wood doors wear them, and a corn zombie leaves a blood splatter where it falls.
+//  - A surface keeps the colour it had: the texture's own average colour is measured when it loads and the material is tinted by
+//    old colour / that average, so the plant's colour scheme stays and the texture brings the detail.
+//  - Every textured material gets a 1 px white map from the start, so when the PNG lands it is a texture swap, not a new shader
+//    (and until then it looks exactly as it did).
+//  - Walls, floors and roofs get their texture coordinates from the world (metres / tile, by which way the face points: psxUVAll,
+//    run once before the meshes are merged), so the texture is the same size on a 1 m pad and a 100 m wall and lines up across pieces.
+//  - Nearest-pixel when close (the crunchy texels) but with mipmaps, so the ground does not shimmer out to the horizon.
+const PSX = { dir: '/corn-souls/assets/textures/psx/', tex: {}, avg: {}, wait: {}, white: null, list: [], uvs: 0, loaded: 0 };
+const PSX_TILE = { grass: 2, asphalt: 2, concrete: 2, corrugated_rusty: 1.5, ceiling_tiles: 1.22, tiles_lino: 0.61 };   // metres one copy of the texture covers
+const PSX_TALL = { corrugated_rusty: 4 };   // on a wall, metres one copy covers UP the wall (rust streaks run 4 m, not a row of drips every 1.5 m)
+function psxWhite() {
+  if (PSX.white) return PSX.white;
+  const t = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); t.needsUpdate = true; return (PSX.white = t);
+}
+function psxLoad(name, cb) {   // cb(texture, average linear [r, g, b]) once it is in (at once if it already is)
+  if (PSX.tex[name]) { cb(PSX.tex[name], PSX.avg[name]); return; }
+  const W = PSX.wait[name] || (PSX.wait[name] = []); W.push(cb); if (W.length > 1) return;
+  if (typeof document === 'undefined' || typeof Image === 'undefined') return;
+  const img = new Image();
+  img.onload = () => {
+    const t = new T.Texture(img); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; t.minFilter = T.NearestMipmapLinearFilter; t.generateMipmaps = true;
+    if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace;
+    t.anisotropy = Math.min(4, (renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy()) || 1); t.needsUpdate = true;
+    let avg = [0.5, 0.5, 0.5];
+    try {   // the average colour, in linear light, of its opaque pixels
+      const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, img.width, img.height).data, lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 128) continue; r += lin(d[i]); gg += lin(d[i + 1]); b += lin(d[i + 2]); n++; }
+      if (n) avg = [r / n, gg / n, b / n];
+    } catch (e) {}
+    PSX.tex[name] = t; PSX.avg[name] = avg; PSX.loaded++;
+    const L = PSX.wait[name]; PSX.wait[name] = null; for (const f of L) { try { f(t, avg); } catch (e) {} }
+  };
+  img.src = PSX.dir + name + '.png';
+}
+function psxTint(m, base, avg, max) {   // tint = the colour it had / the texture's average (linear), so its overall colour stays
+  const o = new T.Color(base), k = max || 2;
+  m.color.setRGB(Math.min(k, o.r / Math.max(0.01, avg[0])), Math.min(k, o.g / Math.max(0.01, avg[1])), Math.min(k, o.b / Math.max(0.01, avg[2])));
+}
+function psxMat(m, name, tile, opt) {   // a material that tiles a PSX texture in world metres (psxUVAll gives its meshes the UVs)
+  opt = opt || {}; const base = opt.base !== undefined ? opt.base : m.color.getHex();
+  m.userData.psx = { name, tile: tile || PSX_TILE[name] || 1.5, tall: PSX_TALL[name] || tile || PSX_TILE[name] || 1.5 };
+  if (!m.map) { m.map = psxWhite(); m.needsUpdate = true; }
+  PSX.list.push(m);
+  psxLoad(name, (t, avg) => { m.map = t; if (m.emissiveMap) m.emissiveMap = t;   /* a self-lit wall glows in the same picture */
+    if (opt.tint !== undefined) m.color.set(opt.tint); else psxTint(m, base, avg); m.needsUpdate = true; });
+  return m;
+}
+function psxFace(m, name, opt) {   // a material that shows one whole PSX picture on each face (a door): its own UVs, no world tiling
+  opt = opt || {}; if (!m.map) { m.map = psxWhite(); m.needsUpdate = true; }
+  psxLoad(name, (t) => { m.map = t; m.color.set(opt.tint !== undefined ? opt.tint : 0xffffff); m.needsUpdate = true; });
+  return m;
+}
+function psxUVAll() {   // world-space texture coordinates for every mesh drawn with a psxMat (box projection by face direction)
+  if (!scene) return 0;
+  scene.updateMatrixWorld(true);
+  const owner = new Map(), p = new T.Vector3(), n = new T.Vector3(), nm = new T.Matrix3(); let done = 0;
+  scene.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.userData.merged) return;
+    const m = o.material, P = m && !Array.isArray(m) && m.userData && m.userData.psx; if (!P) return;
+    let g = o.geometry; if (!g || !g.attributes.position || !g.attributes.normal) return;
+    if (g.userData.psxUV === o.uuid) return;
+    if (g.userData.psxUV || (owner.has(g) && owner.get(g) !== o)) { g = o.geometry = g.clone(); }   // shared with another mesh: this one gets its own
+    owner.set(g, o);
+    const pos = g.attributes.position, nor = g.attributes.normal, N = pos.count, k = 1 / P.tile, kv = 1 / (P.tall || P.tile);
+    let uv = g.attributes.uv; if (!uv || uv.count !== N) { uv = new T.BufferAttribute(new Float32Array(N * 2), 2); g.setAttribute('uv', uv); }
+    nm.getNormalMatrix(o.matrixWorld);
+    for (let i = 0; i < N; i++) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); n.fromBufferAttribute(nor, i).applyMatrix3(nm);
+      const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+      if (ay >= ax && ay >= az) uv.setXY(i, p.x * k, -p.z * k);          // floors, roofs, pads: looking down
+      else if (ax >= az) uv.setXY(i, p.z * k, p.y * kv);                // walls facing east / west
+      else uv.setXY(i, p.x * k, p.y * kv);                              // walls facing north / south
+    }
+    uv.needsUpdate = true; g.userData.psxUV = o.uuid; done++;
+  });
+  PSX.uvs += done; return done;
+}
+// a corn zombie bleeds where it falls (blood_splatter, on/off alpha): a few at a time, each fading after a minute and a half
+const BLOOD = { list: [], max: 14, life: 90, mat: null, geo: null };
+function bloodSplat(x, y, z) {
+  if (typeof document === 'undefined' || !scene) return null;
+  if (!BLOOD.mat) { BLOOD.mat = new T.MeshLambertMaterial({ map: psxWhite(), color: 0x000000, alphaTest: 0.5, transparent: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB('paint') - 2 });
+    BLOOD.mat.visible = false; psxLoad('blood_splatter', t => { BLOOD.mat.map = t; BLOOD.mat.color.set(0xffffff); BLOOD.mat.visible = true; BLOOD.mat.needsUpdate = true; });
+    BLOOD.geo = new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2); }
+  const d = new T.Mesh(BLOOD.geo, BLOOD.mat), s = 1.3 + Math.random() * 0.7;
+  d.position.set(x, y + 0.012, z); d.rotation.y = Math.random() * 6.283; d.scale.set(s, 1, s); d.userData.noHit = true; d.renderOrder = 1; scene.add(d);
+  BLOOD.list.push({ m: d, t: BLOOD.life });
+  while (BLOOD.list.length > BLOOD.max) scene.remove(BLOOD.list.shift().m);
+  return d;
+}
+function bloodStep(dt) {
+  for (let i = BLOOD.list.length - 1; i >= 0; i--) { const b = BLOOD.list[i]; b.t -= dt;
+    if (b.t < 3) b.m.scale.y = 1, b.m.position.y -= dt * 0.004;   // sinks out of sight in its last seconds (it shares one material, so no fade)
+    if (b.t <= 0) { scene.remove(b.m); BLOOD.list.splice(i, 1); } }
+}
 const GROUND = {};
 function groundTex(kind) {
   if (GROUND[kind]) return GROUND[kind];
@@ -5095,6 +5195,11 @@ function groundMat(kind, worldUV, w, d) {   // worldUV: the geometry's UVs are a
   // floor) appeared to simply stop a certain distance away. Slope is now always zero.
   const gm = new T.MeshLambertMaterial({ map: t, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: GB(kind) });
   gm.userData.ground = kind;   // the grass tufts place themselves with a downward probe: only a 'grass' hit takes them
+  if (kind === 'grass' || kind === 'asphalt') {   // v1.97.65: the PSX grass / asphalt, at its own scale, in the colour the canvas one had
+    const TL = PSX_TILE[kind];
+    psxLoad(kind, (pt, avg) => { const c = pt.clone(); c.needsUpdate = true; if (worldUV) c.repeat.set(1 / TL, 1 / TL); else c.repeat.set(w / TL, d / TL);
+      gm.map = c; psxTint(gm, kind === 'grass' ? 0x76bd62 : 0x474c53, avg, kind === 'grass' ? 3.5 : 2); gm.needsUpdate = true; });   // (the PSX grass is a dark picture: it may be lifted further)
+  }
   return gm;
 }
 const GLASS_MATS = {}, glass = (c, op) => { const k = c + ':' + (op || 0.25); return GLASS_MATS[k] || (GLASS_MATS[k] = new T.MeshLambertMaterial({ color: c, transparent: true, opacity: op || 0.25, depthWrite: false, side: T.DoubleSide })); };
@@ -5187,7 +5292,7 @@ function ribTexture() {
   const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return RIB_TEX = t;
 }
 const ribMats = [];
-function ribWall(m) { m.map = ribTexture(); m.userData.ribSiding = true; m.needsUpdate = true; ribMats.push(m); return m; }
+function ribWall(m) { psxMat(m, 'corrugated_rusty'); ribMats.push(m); return m; }   // v1.97.65: rusty corrugated (PSX), in the wall's own colour; was the painted rib canvas (ribTexture, kept)
 function ribGeo(geo) {   // a box: each face gets one texture repeat per foot along its width (the ribs run up the wall)
   if (!geo || geo.userData.ribbed || geo.type !== 'BoxGeometry') return; geo.userData.ribbed = true;
   const P = geo.parameters, uv = geo.attributes.uv, n = geo.attributes.normal;
@@ -5221,7 +5326,7 @@ function building(x0, x1, z0, z1, h, northOpen, eastOpen, westOpen, southOpen) {
   { let at = x0; for (const [c, w, , sill] of nop) { if (sill) continue; wallSegs.push([at, z0, c - w / 2, z0]); at = c + w / 2; } wallSegs.push([at, z0, x1, z0]); }
   const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const wall = ribWall(new T.MeshLambertMaterial({ color: 0xa7afb8, transparent: true, opacity: 0.5, depthWrite: false }));   // ribbed metal siding
-  const roof = new T.MeshLambertMaterial({ color: 0x4a5058, transparent: true, opacity: 0.42, depthWrite: false });
+  const roof = psxMat(new T.MeshLambertMaterial({ color: 0x4a5058, transparent: true, opacity: 0.42, depthWrite: false }), 'corrugated_rusty');
   wallMats.push(wall, roof);
   { let at = x0; for (const [c, ow, oh, sill] of nop) { const a = c - ow / 2, y0 = sill || 0; if (a - at > 0.05) add(new T.BoxGeometry(a - at, h, 0.3), wall, (at + a) / 2, h / 2, z0, null, true);
       if (y0) add(new T.BoxGeometry(ow, y0, 0.3), wall, c, y0 / 2, z0, null, true);
@@ -6895,7 +7000,8 @@ function exitSignsForEgress() {
   return n;
 }
 const EXIT_Y = 2.47;   // between the door head (2.21) and the strobe (2.78), like the owner's photo
-function concreteFloor(x0, x1, z0, z1) { box(x1 - x0 - 0.3, 0.1, z1 - z0 - 0.3, mat(0x8d9196), (x0 + x1) / 2, 0.16, (z0 + z1) / 2); }
+const CONC_MATS = {}, concM = c => CONC_MATS[c] || (CONC_MATS[c] = psxMat(matU(c), 'concrete'));   // v1.97.65: concrete, one material per colour
+function concreteFloor(x0, x1, z0, z1) { box(x1 - x0 - 0.3, 0.1, z1 - z0 - 0.3, concM(0x8d9196), (x0 + x1) / 2, 0.16, (z0 + z1) / 2); }
 // ---------- pipe-rack support: a steel post with a short cross-arm under an overhead pipe ----------
 function tpost(x, z, y, alongX) {
   const steel = mat(0x6f7a85);
@@ -7141,7 +7247,7 @@ function init(container) {
   // A pad is a thin flat plane lying on the ground, so it needs the same protection the ground textures have: its own
   // material (so the shared `mat(c)` stays untouched), polygon offset pulling it forward, and a real gap above the
   // grass. The offset is resolution steps only - a slope factor here is what made the pad vanish in the distance.
-  const padMat = c => PAD_MATS[c] || (PAD_MATS[c] = (() => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; m.userData.ground = 'pad'; return m; })());
+  const padMat = c => PAD_MATS[c] || (PAD_MATS[c] = (() => { const m = mat(c).clone(); m.polygonOffset = true; m.polygonOffsetFactor = 0; m.polygonOffsetUnits = GLAYER.pad[1]; m.userData.ground = 'pad'; return psxMat(m, 'concrete'); })());
   const pad = (x, z, w, d, c) => { const p = add(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2), padMat(c), x, GY('pad'), z, null); p.castShadow = false; };
   // dirt in the blocks between the roads (to be built on later), and in the tank farm square
   { const p = add(new T.PlaneGeometry(EXR - WXR, SZR - NROAD, GSEG(EXR - WXR), GSEG(SZR - NROAD)).rotateX(-Math.PI / 2), groundMat('dirt', false, EXR - WXR, SZR - NROAD), (EXR + WXR) / 2, GY('dirt'), (SZR + NROAD) / 2, null); p.castShadow = false; p.receiveShadow = true; }
@@ -7426,7 +7532,7 @@ function init(container) {
   }
   O.st1 = tank(-70.88, -8.5, ST1R, ST1H, 0xe3b04b, 0xe8c88a, 'st1', { level: 0.6 });
   nameplate('SLURRY TANK #1', -70.88, 2.1, -8.5, ST1R, 0, 1);   // faces the cook alley aisle
-  add(new T.CylinderGeometry(ST1R + 0.3, ST1R + 0.3, 0.6, 32), mat(0xb5b0a6), -70.88, 0.3, -8.5, null);   // concrete curb ring around the tank base (photo)
+  add(new T.CylinderGeometry(ST1R + 0.3, ST1R + 0.3, 0.6, 32), concM(0xb5b0a6), -70.88, 0.3, -8.5, null);   // concrete curb ring around the tank base (photo)
   // Slurry Pump 1 (photo, facing north): E-W on a yellow pad just south of the tank, motor west, Sulzer pump east;
   // suction comes in from the east (insulated line from the tank bottom), discharge goes straight up with a handwheel valve
   {
@@ -7609,7 +7715,7 @@ function init(container) {
   fx.forEach(([x, z], i) => {
     const t = tank(x, z, FR, FH, 0x3ddc84, 0xd9a441, 'f' + i, { level: 0.8, dome: false, noRail: true });   // flat top (deck + guardrail added below)
     nameplate(['TF-3110', 'TF-3120', 'TF-3130', 'TF-3140', 'TF-3210', 'TF-3220', 'TF-3230'][i] + '|FERM ' + (i + 1), x, 3.0, z, FR, x > AC ? -1 : 1, 0);   // on the side facing the ferm alley
-    cyl(FR * 1.02, 2.4, mat(0x45494d), x, 0, z, null, 28);                                       // dark concrete foundation ring (photo)
+    cyl(FR * 1.02, 2.4, concM(0x45494d), x, 0, z, null, 28);                                       // dark concrete foundation ring (photo)
     const foam = add(new T.CylinderGeometry(FR * 0.92, FR * 0.92, 0.6, 28), matU(0xfff6d8), x, 8, z, null, true);
     const bm = new T.InstancedMesh(bubbleGeo, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 }), 36);
     bm.instanceMatrix.setUsage(T.DynamicDrawUsage); scene.add(bm);
@@ -7721,14 +7827,14 @@ function init(container) {
       g.fillStyle = '#f3f4f3'; g.fillRect(0, 0, 64, 4); g.fillStyle = '#cfd3d7'; g.fillRect(0, 0, 3, 4); g.fillStyle = '#e4e7e9'; g.fillRect(3, 0, 3, 4); g.fillRect(30, 0, 2, 4);
       const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; })();
     const wm = selfLit(new T.MeshLambertMaterial({ color: 0xffffff, map: ribTex, emissive: 0x7a7d80, emissiveMap: ribTex, transparent: true, opacity: 0.5, depthWrite: false }));
-    wm.userData.ribbed = 0.3048;
+    wm.userData.ribbed = 0.3048; psxMat(wm, 'corrugated_rusty', 0, { base: 0xeceeef });   // v1.97.65: rusty corrugated (PSX) like every other metal wall, as white as the old ribs
     // roof deck seen from inside: light-medium gray metal with gray lines running east–west every 2 ft
     const roofTex = (() => { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 64; const g = cv.getContext('2d');
       g.fillStyle = '#c4c8cc'; g.fillRect(0, 0, 4, 64); g.fillStyle = '#979ca2'; g.fillRect(0, 0, 4, 4); g.fillStyle = '#b3b7bc'; g.fillRect(0, 4, 4, 3);
       const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; })();
     const roofM = selfLit(new T.MeshLambertMaterial({ color: 0xffffff, map: roofTex, emissive: 0x606366, emissiveMap: roofTex, transparent: true, opacity: 0.35, depthWrite: false }));
     const blockM = new T.MeshLambertMaterial({ color: 0xf1efe8, transparent: true, opacity: 0.55, depthWrite: false });   // office: white concrete block
-    const ceilM = selfLit(new T.MeshLambertMaterial({ color: 0xe9e9e4, emissive: 0x8a8a86, transparent: true, opacity: 0.3, depthWrite: false }));   // lit drop ceiling
+    const ceilM = selfLit(new T.MeshLambertMaterial({ color: 0xe9e9e4, emissive: 0x8a8a86, transparent: true, opacity: 0.3, depthWrite: false })); psxMat(ceilM, 'ceiling_tiles');   // v1.97.65: PSX drop-ceiling tiles, 2 ft   // lit drop ceiling
     wallMats.push(wm, roofM, blockM, ceilM);
     const trimM = mat(0x8a96a3), leafM = mat(0x3a4a5c), stripeM = mat(0x2f5d3f), frameM = mat(0x56606b);
     // a straight wall with door openings: doors = [[position along the wall, width], ...]; lintel above each opening
@@ -7900,7 +8006,7 @@ function init(container) {
     add(new T.BoxGeometry(FXE - FXW + 0.6, 0.3, SZ - ZN + 0.6), roofM, AC, PH + 0.15, (SZ + ZN) / 2, null, true);
     enclosure(FXW, FXE, ZN, SZ, PH);
     // concrete floor with a trench drain down the ferm alley and along the evap alley aisle
-    const conc = selfLit(new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 })), grate = mat(0x3f444a); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
+    const conc = selfLit(new T.MeshLambertMaterial({ color: 0x6f757a, emissive: 0x4a4f54 })), grate = mat(0x3f444a); psxMat(conc, 'concrete'); let officeTile = null;   // cool gray + a little self-light so it reads as concrete under the warm lights and the roof let officeTile = null;   // gray concrete floor, sits above the dirt and the old area pads
     // v1.97.54, owner: "in the process building can the floor be flatter. The dead critters And zombies clip into floor after you
     // kill them". The slab stood 22 cm proud (top 0.22) while walking, landing and dropping all used ground level 0, so you, the
     // dead and anything thrown sat 22 cm inside it. Now it is a flat 9 cm slab (just over the top ground layer, 0.08) and its top is
@@ -7924,7 +8030,7 @@ function init(container) {
       const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set((EW - WW) / 1.22, (OZS - OZN) / 1.22);   // 1 ft tiles
       if (T.SRGBColorSpace) tex.colorSpace = T.SRGBColorSpace;
       officeTile = tex;
-      const o = add(new T.BoxGeometry(EW - WW, 0.06, OZS - OZN), new T.MeshLambertMaterial({ map: tex }), (WW + EW) / 2, SLAB_TOP + 0.02, (OZN + OZS) / 2, null, true); o.receiveShadow = true;   // v1.97.54: 2 cm over the slab (was 0.25)
+      const o = add(new T.BoxGeometry(EW - WW, 0.06, OZS - OZN), psxMat(new T.MeshLambertMaterial({ map: tex }), 'tiles_lino', 0.61, { base: 0xb4975f }), (WW + EW) / 2, SLAB_TOP + 0.02, (OZN + OZS) / 2, null, true);   // v1.97.65: PSX lino, 1 ft tiles, in the old tile's tan o.receiveShadow = true;   // v1.97.54: 2 cm over the slab (was 0.25)
       WALK_SURF.push({ x0: WW, x1: EW, z0: OZN, z1: OZS, y0: SLAB_TOP + 0.05, y1: SLAB_TOP + 0.05 });
     }
     // ---- office block (single story, white block with a green stripe) — west → east:
@@ -8321,7 +8427,7 @@ function init(container) {
           const sm = new T.MeshLambertMaterial({ map: sid }), DX0 = px - 0.08 - 0.47, DX1 = px - 0.08 + 0.47;   // hollow now: walls with a doorway, so the door can open
           for (const sx of [-1, 1]) box(0.08, H, D, sm, px + sx * W / 2, H / 2, pz);
           box(DX0 - (px - W / 2), H, 0.08, sm, (px - W / 2 + DX0) / 2, H / 2, fz); box(px + W / 2 - DX1, H, 0.08, sm, (DX1 + px + W / 2) / 2, H / 2, fz); box(DX1 - DX0, H - 2.15, 0.08, sm, px - 0.08, (H + 2.15) / 2, fz);
-          box(W - 0.06, 0.14, D, mat(0x8d9196), px, 0.1, pz); for (const lz of [fz + 3.5, fz + 9.0]) box(0.35, 0.06, 1.1, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xfff5d6 })), 5, 2.5), px, H - 0.05, lz);   // concrete floor + hallway ceiling lights
+          box(W - 0.06, 0.14, D, concM(0x8d9196), px, 0.1, pz); for (const lz of [fz + 3.5, fz + 9.0]) box(0.35, 0.06, 1.1, lampLight(gridLight(new T.MeshBasicMaterial({ color: 0xfff5d6 })), 5, 2.5), px, H - 0.05, lz);   // concrete floor + hallway ceiling lights
           const grn = mat(0x23584a), wht = mat(0xf0f0ea);
           for (const sx of [-1, 1]) box(0.1, H, 0.1, grn, px + sx * (W / 2 + 0.01), H / 2, fz + 0.04);                       // green corner trim
           const sh = new T.Shape([new T.Vector2(-W / 2, 0), new T.Vector2(W / 2, 0), new T.Vector2(0, 0.6)]);
@@ -8395,7 +8501,7 @@ function init(container) {
   const DISTX = (WEST_WING.west + WEST_WING.east) / 2, DISTD = 11.5, DISTZ = WEST_WING.south + 3.3 + DISTD / 2, DISTW = WEST_WING.east - WEST_WING.west, DISTZ0 = DISTZ - DISTD / 2;   // starts south of the 10 ft walkway along the building
   for (const [w, d, x, z] of [[DISTW, 0.6, DISTX, DISTZ0], [DISTW, 0.6, DISTX, DISTZ0 + DISTD], [0.6, DISTD, DISTX - DISTW / 2, DISTZ], [0.6, DISTD, DISTX + DISTW / 2, DISTZ]])
     box(w, 0.35, d, mat(0xa0a6ad), x, 0.2, z, 'col');                                              // curb
-  box(DISTW, 0.25, DISTD, mat(0xc9ccd1), DISTX, 0.15, DISTZ, 'col');                              // concrete pad
+  box(DISTW, 0.25, DISTD, concM(0xc9ccd1), DISTX, 0.15, DISTZ, 'col');                              // concrete pad
   // beer well pump inside the building (east side of the beer well); beer goes overhead to distillation
   pumpModel('large', BPX, BPZ, 'x', 1, 'beer', 0.9);   // the owner's big teal motor pump, motor toward the alley
   const BRX = FXW + BWR + 1.1;   // the beer line runs south just clear of the beer well (it used to clip its side)
@@ -8602,24 +8708,24 @@ function init(container) {
     for (const x of [74, 68, 62]) wall(false, x, HS, ZS, [], iw, 0.15);                                // manager | HR | reception | open area
     toolSpot('golf', 79.5, FY + 1.05, ZS - 0.3, Math.PI); keyHook('heart', 78.5, ZS - 0.13, Math.PI);   // v1.97.34: the plant manager's golf club, leaning on his office's south wall
     // floor slab, roof
-    add(new T.BoxGeometry(X1 - X0, FY, ZS - ZN), mat(0xb5b0a6), (X0 + X1) / 2, FY / 2, HZ, null);
-    add(new T.BoxGeometry(X1 - X0 - 0.2, 0.02, ZS - ZN - 0.2), mat(0x8a7f6c), (X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor, 5 mm clear of the slab top so it cannot z-fight
+    add(new T.BoxGeometry(X1 - X0, FY, ZS - ZN), concM(0xb5b0a6), (X0 + X1) / 2, FY / 2, HZ, null);
+    add(new T.BoxGeometry(X1 - X0 - 0.2, 0.02, ZS - ZN - 0.2), psxMat(matU(0x8a7f6c), 'tiles_lino', 0.61), (X0 + X1) / 2, FY + 0.025, HZ, null, true);   // darker tile floor, 5 mm clear of the slab top so it cannot z-fight
     const rm = new T.MeshLambertMaterial({ color: 0x3d6b4a, transparent: true, opacity: 0.5, depthWrite: false }); wallMats.push(rm);
     add(new T.BoxGeometry(X1 - X0 + 0.8, 0.25, ZS - ZN + 0.8), rm, (X0 + X1) / 2, FY + H + 0.12, HZ, null, true);
     WALK_SURF.push({ x0: X0, x1: X1, z0: ZN, z1: ZS, y0: FY, y1: FY });
     // west entrance: landing, two steps in front of the doors, wheelchair ramp along the north part
-    add(new T.BoxGeometry(2, FY, ZS - ZN - 0.6), mat(0xb5b0a6), X0 - 1, FY / 2, HZ, null);
+    add(new T.BoxGeometry(2, FY, ZS - ZN - 0.6), concM(0xb5b0a6), X0 - 1, FY / 2, HZ, null);
     WALK_SURF.push({ x0: X0 - 2, x1: X0, z0: ZN + 0.3, z1: ZS - 0.3, y0: FY, y1: FY });
-    for (const k of [0, 1]) box(0.4, FY * (k + 1) / 2, 2.2, mat(0xb5b0a6), X0 - 2.2 - (1 - k) * 0.4, FY * (k + 1) / 4, HZ);
+    for (const k of [0, 1]) box(0.4, FY * (k + 1) / 2, 2.2, concM(0xb5b0a6), X0 - 2.2 - (1 - k) * 0.4, FY * (k + 1) / 4, HZ);
     WALK_SURF.push({ x0: X0 - 3, x1: X0 - 2, z0: HZ - 1.1, z1: HZ + 1.1, y0: FY / 2, y1: FY / 2 });
-    { const RL = 3.6, rz = ZN + 1.0, r = add(new T.BoxGeometry(Math.hypot(RL, FY), 0.12, 1.3), mat(0xb5b0a6), X0 - 2 - RL / 2, FY / 2, rz, null); r.rotation.z = Math.atan2(FY, RL);   // 1:12 ramp
+    { const RL = 3.6, rz = ZN + 1.0, r = add(new T.BoxGeometry(Math.hypot(RL, FY), 0.12, 1.3), concM(0xb5b0a6), X0 - 2 - RL / 2, FY / 2, rz, null); r.rotation.z = Math.atan2(FY, RL);   // 1:12 ramp
       box(RL, 0.05, 0.05, mat(0xc0c8d0), X0 - 2 - RL / 2, FY / 2 + 0.9, rz - 0.7);
       WALK_SURF.push({ x0: X0 - 2 - RL, x1: X0 - 2, z0: rz - 0.65, z1: rz + 0.65, y0: 0, y1: FY, ax: 'x' }); }
     // doors: glass entrance pair, and the inside doors (they vanish when Squeeg is near, like the plant's)
     const leaf = (x, z, alongX, w, m) => { const g = new T.Group(); g.position.set(x, FY, z); const d = new T.Mesh(new T.BoxGeometry(alongX ? w : 0.05, DH, alongX ? 0.05 : w), m); d.position.y = DH / 2; g.add(d); scene.add(g); (O.swingDoors = O.swingDoors || []).push({ g, rot: 0, dir: 1, x, z, open: 0 }); };
     leaf(X0, HZ - 0.45, false, 0.9, glassM); leaf(X0, HZ + 0.45, false, 0.9, glassM);   // (v1.97.119: the glass pair meets in the middle and at the frame)
       egressStrobe(X0, HZ, 1, 0);   // glass entrance pair: one strobe inside
-    const doorM = mat(0x8a6a45);
+    const doorM = psxFace(matU(0x8a6a45), 'door_wood');   // v1.97.65: the PSX wood door, one per leaf face
     leaf(TX, HZ, false, DOOR + 0.04, doorM);   // (v1.97.119: inside doors run 2 cm into the frame each side, no light round them)
     for (const x of [80, 75, 67]) leaf(x, HN, true, DOOR + 0.04, doorM);
     for (const x of [78, 71, 65]) leaf(x, HS, true, DOOR + 0.04, doorM);
@@ -8772,7 +8878,7 @@ function init(container) {
   // A steel mast with a swing boom reaching over the lane, and the probe tube hanging down into where a trailer would be.
   {
     const PX = SCXI + 18, LZ = SCZ_IN, MZ = SCZ_IN + 5.4, steel = mat(0x5f6b73), yel = mat(0xf2c200);
-    box(1.6, 0.4, 1.6, mat(0xb5b0a6), PX, 0.2, MZ);                                    // concrete footing
+    box(1.6, 0.4, 1.6, concM(0xb5b0a6), PX, 0.2, MZ);                                    // concrete footing
     cyl(0.28, 7.5, steel, PX, 0.4, MZ, null, 12);                                      // mast
     box(0.9, 0.9, 0.9, mat(0x3a4048), PX, 6.2, MZ - 0.3);                              // hydraulic power unit at the top of the mast
     box(0.35, 0.35, 7.6, yel, PX, 7.4, (MZ + LZ) / 2 - 0.6);                          // boom out over the lane
@@ -8802,7 +8908,7 @@ function init(container) {
     for (const x of [X0, X1]) { add(new T.BoxGeometry(0.3, H, Z1 - Z0), wm, x, H / 2, (Z0 + Z1) / 2, null, true); wallSegs.push([x, Z0, x, Z1]); }
     add(new T.BoxGeometry(X1 - X0 + 1, 0.3, Z1 - Z0 + 1), rm, (X0 + X1) / 2, H + 0.15, (Z0 + Z1) / 2, null, true);   // roof
     enclosure(X0, X1, Z0, Z1, H);   // roofed: dark inside except its doorways (the lighting pass adds the doors and high-bays)
-    add(new T.BoxGeometry(X1 - X0, 0.12, Z1 - Z0), mat(0x8f949a), (X0 + X1) / 2, 0.06, (Z0 + Z1) / 2, null, true);   // concrete floor
+    add(new T.BoxGeometry(X1 - X0, 0.12, Z1 - Z0), concM(0x8f949a), (X0 + X1) / 2, 0.06, (Z0 + Z1) / 2, null, true);   // concrete floor
     // roll-up door (opens when Squeeg walks up, like the plant's) and the two man doors (vanish when Squeeg is near)
     rollUpDoor(GX, Z1, true, GW, GH, { side: 1 });   // the plant's one roll-up design (v1.97.119), hood inside
     for (const [x, z] of [[MX, Z1], [NX, Z0]]) {
@@ -9133,7 +9239,7 @@ function init(container) {
     // exhaust fan up by the corner and a red pipe along the wall. Inside: just an empty building with a gray concrete floor.
     const RUX = E1 - 7.16 - 1.52, MDX = RUX - 2.75, RW = 3.05, RH = 3.0;   // 23.5 paces from the NE corner to the roll-up (paced)
     building(E0, E1, EZ0, EZ1, 12, [[RUX, RW, RH], [MDX, 0.95, 2.13]], [[EZ0 + 3.95, 1.8, 2.13], [EZ0 + 23.7, 0.95, 2.13], [EZ0 + 27.7, 0.95, 2.13], [EZ0 + 30.8, 3.8, 4.0], [EZ0 + 72.5, 0.95, 2.13]], [[EZ0 + 14, 0.95, 2.13], [EZ0 + 28.9, 19.4, 12], [EZ0 + 67.4, 4.8, 4.4]]);   // energy center (34 x 76 m); west wall open into the bump-out
-    box(E1 - E0 - 0.3, 0.1, EZ1 - EZ0 - 0.3, mat(0x8d9196), (E0 + E1) / 2, 0.16, (EZ0 + EZ1) / 2);   // concrete floor
+    box(E1 - E0 - 0.3, 0.1, EZ1 - EZ0 - 0.3, concM(0x8d9196), (E0 + E1) / 2, 0.16, (EZ0 + EZ1) / 2);   // concrete floor
     { const z = EZ0; rollUpDoor(RUX, z, true, RW, RH, { side: -1 });   // roll-up (opens when Squeeg walks up): the plant's one design (v1.97.119)
       for (const x of [RUX + RW / 2 + 0.6, RUX - RW / 2 - 0.4]) { cyl(0.15, 1.1, mat(0xf2c200), x, 0, z - 0.45, null, 10); extraCols.push([x, z - 0.45, 0.2]); } }
     { const z = EZ0, lw = 0.97, g = new T.Group(); g.position.set(MDX - 0.485, 0, z); scene.add(g);   // hinged on the west; fills its 0.95 m opening (v1.97.119)                       // green man door (vanishes as Squeeg walks up)
@@ -9329,7 +9435,7 @@ function init(container) {
       louver(1.4, 2.85, TX0 - 0.17, 1.85, TZ0 + 1.36, -Math.PI / 2, false);                                    // west louver
       { const z = WRU; rollUpDoor(TX0, z, false, RUW, RUH, { side: 1 });   // west roll-up (opens when Squeeg walks up): the plant's one design (v1.97.119)
         for (const dz of [-RUW / 2 - 0.25, RUW / 2 + 0.25]) { cyl(0.15, 1.1, mat(0xf2c200), TX0 - 0.5, 0, z + dz, null, 10); extraCols.push([TX0 - 0.5, z + dz, 0.2]); } }
-      box(4, 0.08, 5, mat(0xa3a39c), TX0 - 2.6, 0.05, WRU);                                                   // concrete walk to the roll-up
+      box(4, 0.08, 5, concM(0xa3a39c), TX0 - 2.6, 0.05, WRU);                                                   // concrete walk to the roll-up
       // south wall (~45 paces): pad-mount transformer + yellow blocks, small vent; two exhaust fans high on the turbine room's south face
       box(1.6, 1.6, 1.3, mat(0x2c4a38), TX0 + 8.6, 0.85, TZ1 + 0.9); box(2.0, 0.1, 1.7, mat(0x9a9fa4), TX0 + 8.6, 0.05, TZ1 + 0.9); extraCols.push([TX0 + 8.6, TZ1 + 0.9, 1.0]);
       for (const dx of [4.0, 9.7, 12.2]) { box(1.1, 0.65, 0.6, mat(0xe3c22a), TX0 + dx, 0.33, TZ1 + 2.0); extraCols.push([TX0 + dx, TZ1 + 2.0, 0.6]); }
@@ -9496,7 +9602,7 @@ function init(container) {
     { const gx = cx + 5.6, gz = cz + 3.2, sh = new T.Group(); sh.position.set(gx, 0, gz); scene.add(sh);
       const B = (w, h, d, m, x, y, z) => { const q = new T.Mesh(new T.BoxGeometry(w, h, d), m); q.position.set(x, y, z); q.castShadow = true; q.userData.noHit = true; sh.add(q); return q; };
       const enc = mat(0x3f5a44), steel2 = mat(0x8f979e), tankM = mat(0x5d636a);
-      B(3.6, 0.14, 2.3, mat(0x8d9196), 0, 0.07, 0);                                    // concrete pad
+      B(3.6, 0.14, 2.3, concM(0x8d9196), 0, 0.07, 0);                                    // concrete pad
       B(1.7, 0.85, 1.05, enc, -0.75, 0.57, 0);                                         // engine enclosure
       B(1.2, 0.6, 0.05, mat(0x1f2427), -0.75, 0.6, 0.54);                              // radiator grille
       for (const y of [0.42, 0.62, 0.82]) B(1.0, 0.035, 0.02, steel2, -0.75, y, 0.56);  // grille slats
@@ -9569,7 +9675,7 @@ function init(container) {
   const rm = new T.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.9, depthWrite: false });
   selRing = add(new T.TorusGeometry(1, 0.08, 8, 48), rm, 0, 0.6, 0, null, true); selRing.rotation.x = Math.PI / 2; selRing.visible = false;
   selRing2 = add(new T.TorusGeometry(1, 0.06, 8, 48), rm, 0, 0.6, 0, null, true); selRing2.rotation.x = Math.PI / 2; selRing2.visible = false; selRing.userData.noHit = selRing2.userData.noHit = true;
-  buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
+  buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); psxUVAll(); mergeStatic();   // (ribAll: siding ribs on every outside wall, v1.97.117)
   // how many objects the shadow map has to draw, and warm every shader once so the first paintball / fire / outage
   // does not compile a program in the middle of a frame and drop it
   if (TIER.minCaster > 0) { const sp = new T.Sphere(), wsc = new T.Vector3(); let off = 0;   // cheaper shadow pass: little things (bolts, signs, lamps, rails) stop casting
@@ -10433,7 +10539,7 @@ function buildRailPhone() {
   const g = new T.Group(); g.position.set(x, 0, z);
   const cab = mat(0x4c5c54), trim = mat(0x2b3238), pale = mat(0xd8dbd5), dark = mat(0x14171a);
   const B = (w, h, d, m, ox, oy, oz) => { const q = new T.Mesh(new T.BoxGeometry(w, h, d), m); q.position.set(ox, oy, oz); q.castShadow = true; q.userData.noHit = true; g.add(q); return q; };
-  B(0.52, 0.16, 0.52, mat(0x8d8d86), 0, 0.08, 0);            // concrete pad
+  B(0.52, 0.16, 0.52, concM(0x8d8d86), 0, 0.08, 0);            // concrete pad
   B(0.14, 0.92, 0.14, trim, 0, 0.62, 0);                     // post
   B(0.52, 0.76, 0.30, cab, 0, 1.44, 0);                      // cabinet
   B(0.46, 0.68, 0.02, mat(0x56665d), 0, 1.44, 0.16);         // door
@@ -11687,7 +11793,7 @@ function update(sim, dt, events) {
   updatePuffs(dt); updateWeather(dt);
   // every cosmetic / gameplay sub-update in the frame tail is guarded: one throw must not take the render, the
   // first-person gun and the paintball pump cooldown down with it (see stepSafe)
-  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('animals', () => animalsStep(dt)); stepSafe('fish', () => fishStep(dt)); stepSafe('flies', () => fliesStep(dt)); stepSafe('lizPose', () => lizPose(dt)); stepSafe('ping', () => pingStep(dt)); stepSafe('horde', () => hordeStep(dt)); stepSafe('pball', () => pbStep(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt)); stepSafe('hp', () => hpUpdate(dt)); stepSafe('npcAnim', () => npcAnimUpdate(dt)); stepSafe('zombies', () => zombUpdate(dt));
+  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('animals', () => animalsStep(dt)); stepSafe('fish', () => fishStep(dt)); stepSafe('flies', () => fliesStep(dt)); stepSafe('lizPose', () => lizPose(dt)); stepSafe('ping', () => pingStep(dt)); stepSafe('horde', () => hordeStep(dt)); stepSafe('pball', () => pbStep(dt)); stepSafe('blood', () => bloodStep(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt)); stepSafe('hp', () => hpUpdate(dt)); stepSafe('npcAnim', () => npcAnimUpdate(dt)); stepSafe('zombies', () => zombUpdate(dt));
   stepSafe('vehTops', () => updateVehTops());
   stepSafe('deadDrop', () => { if (heldDead && (walk.dead || walk.drive)) deadDrop(); });   // dying or getting in puts the corpse down
   stepSafe('ducks', () => updateDucks(dt)); stepSafe('cornBrush', () => cornBrushUpdate(dt)); stepSafe('haulers', () => haulerUpdate(dt)); stepSafe('windsock', () => updateWindsock(dt)); stepSafe('pivot', () => updatePivot(dt));
@@ -12227,7 +12333,7 @@ function mergeGroup(g, keep) {   // inside one moving/toggled group: fold its pl
   }
 }
 function mergeStatic() {
-  const shared = new Set([...Object.values(MATS), ...Object.values(MARK_MATS), ...Object.values(PAD_MATS), ...Object.values(GLASS_MATS), ...wallMats, ...ribMats, EXIT_SIGN.mat, EXIT_SIGN.halo, EGRESS.lens].filter(Boolean)), keep = new Set();
+  const shared = new Set([...Object.values(MATS), ...Object.values(MARK_MATS), ...Object.values(PAD_MATS), ...Object.values(GLASS_MATS), ...wallMats, ...ribMats, ...PSX.list, EXIT_SIGN.mat, EXIT_SIGN.halo, EGRESS.lens].filter(Boolean)), keep = new Set();
   for (const s of spinners) keep.add(s.o);
   { // groups: fold their static parts together (train wheels and anything kept in O stay separate)
     train.wheels.length = 0;   // wheel spin isn't noticeable at train speed; folding the wheels into the cars saves ~200 draw calls
@@ -14260,6 +14366,7 @@ function zombUpdate(dt) {
     if (z.state === 'dead') {   // falls back, lies there, sinks
       // v1.97.54 ("zombies clip into floor after you kill them"): it pivots on its heels, so lift it by its back's depth as it goes
       // over (it lies ON the floor, not half in it), and after 6 s it fades away where it lies instead of sinking through the floor.
+      if (!z.blood) { z.blood = true; if (typeof bloodSplat === 'function') bloodSplat(z.x, z.y, z.z); }   /* v1.97.65 */
       z.deadT += dt; const fall = Math.min(1, z.deadT * 4 / (Math.PI / 2)); z.g.rotation.x = -fall * Math.PI / 2; z.g.position.y = z.y + Math.sin(fall * Math.PI / 2) * ZOMB_BACK;
       if (z.deadT > 6) { const k = Math.max(0, 1 - (z.deadT - 6) / 3); z.g.traverse(o => { if (o.isMesh && o.material && o !== z.box) { if (!o.material.transparent) { o.material.transparent = true; o.material.needsUpdate = true; } o.material.opacity = k; o.castShadow = k > 0.5; } }); }
       if (z.deadT > 9) { z.state = 'gone'; scene.remove(z.g); z.g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); } }); }
@@ -16986,7 +17093,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, paintball: () => pbToggle(), get pbOn() { return PBM.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, PBM, pbTagged, pbRecv, pbToggle, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, paintball: () => pbToggle(), get pbOn() { return PBM.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, PBM, PSX, BLOOD, psxUVAll, pbTagged, pbRecv, pbToggle, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },

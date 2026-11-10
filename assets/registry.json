@@ -1199,6 +1199,38 @@
       "commercial_use_review": "allowed under CC BY 4.0 with creator attribution, license link, and modification notice",
       "public_repository_redistribution_review": "allowed under CC BY 4.0 with public attribution in credits.html and CREDITS.md",
       "required_notice": "No endorsement by the creator is implied."
+    },
+    {
+      "id": "itch-heyheythere-psx-textures-free",
+      "title": "PSX Textures Free",
+      "creator": "heyheythere",
+      "source_url": "https://heyheythere.itch.io/psx-textures-free",
+      "evidence": "The owner's download (psx-textures-free-assets.zip): LICENSE.txt \"Made and licensed by heyheythere (https://heyheythere.itch.io). PSX Textures Free is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)\" with the credit line \"PSX Textures Free by heyheythere - https://heyheythere.itch.io/psx-textures-free - CC BY 4.0\" (kept as assets/textures/psx/LICENSE.txt).",
+      "notes": "In the TEST channel from v1.97.65: grass and asphalt ground, concrete pads and slabs, rusty corrugated metal siding and roofs, office drop ceiling (ceiling tiles), office and scale-house floors (lino), the scale house's inside doors (wood door), and blood splatter where a corn zombie falls. Brick, cracked plaster, mint paint, dirty white tiles, wainscot, wood floor, rusty steel and the EXIT sign are kept, unused.",
+      "source_platform": "itch.io",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "Pictures unchanged (16-colour indexed PNGs, 128 px a metre). In the game: tiled in world metres by face direction, tinted so each surface keeps its previous average colour, nearest-pixel with mipmaps.",
+      "files": [
+        "assets/textures/psx/asphalt.png",
+        "assets/textures/psx/blood_splatter.png",
+        "assets/textures/psx/brick_red.png",
+        "assets/textures/psx/ceiling_tiles.png",
+        "assets/textures/psx/concrete.png",
+        "assets/textures/psx/corrugated_rusty.png",
+        "assets/textures/psx/door_wood.png",
+        "assets/textures/psx/grass.png",
+        "assets/textures/psx/paint_mint.png",
+        "assets/textures/psx/plaster_cracked.png",
+        "assets/textures/psx/sign_exit.png",
+        "assets/textures/psx/steel_rusty.png",
+        "assets/textures/psx/tiles_lino.png",
+        "assets/textures/psx/tiles_white_dirty.png",
+        "assets/textures/psx/wainscot_tiles.png",
+        "assets/textures/psx/wood_floor.png",
+        "assets/textures/psx/LICENSE.txt"
+      ]
     }
   ]
 }

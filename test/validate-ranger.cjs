@@ -170,7 +170,7 @@ assert.ok(airSrc.includes('function vehVertical(u, dt)') && hillSrc.includes('fu
   assert.ok(wallSegs.some(w => w[1] === 32 && w[3] === 32 && w[5] >= 1.6), "the kicker's sheer face blocks you from the far side");
   assert.ok(wallSegs.filter(w => w[0] === w[2]).length > 0 && wallSegs.every(w => w[4] < 0 && w[5] > 0.6), "tall sides block you below the top only (so you can still drive off an edge)");
   for (const h of H) { assert.ok(h.x0 >= 110 && h.x1 <= 190 && Math.min(...h.p.map(q => q[0])) >= 0 && Math.max(...h.p.map(q => q[0])) <= 52, 'the hills stay in the open grass east of the plant'); } }
-assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); mergeStatic();'), 'the hills are built with the world (and merged like the rest of the static scenery)');
+assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); psxUVAll(); mergeStatic();'), 'the hills are built with the world (and merged like the rest of the static scenery)');
 assert.ok(html.includes('vehVertical(u, dt);   // ride the ground, or fly') && !html.includes('u.y += (fl - u.y) * Math.min(1, 8 * dt);'), 'the driven vehicle uses the air physics');
 assert.ok(html.includes('const ga = u.air ? 0.12 : 1;') && html.includes('* thr * dt * ga;') && html.includes('ls *= Math.exp(-(u.air ? 0.3'), 'in the air: little gas, brake, steering or grip');
 assert.ok(html.includes('if (fN < u.y - 0.8 && fN <= -5)') && !html.includes('fN < -0.5)'), 'only a drop into no ground at all (a dug hole) is refused: the pond banks and bottom are ground, so you can drive into the ponds again (v1.97.95)');

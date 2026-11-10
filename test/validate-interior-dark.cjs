@@ -28,7 +28,7 @@ assert.ok(!html.includes('function applyInteriorDark(') && !html.includes('dimme
 assert.ok(html.includes('scene = new T.Scene(); lightInstall();'), 'the shader patch is installed before anything compiles');
 assert.ok(!/new T\.SpotLight\(/.test(html.slice(html.indexOf('function init('), html.indexOf('function init(') + 8000)) && html.includes("headlamp = { intensity: 0, color: new T.Color(0xfff1d6) };"),
   'the headlamp is no longer a three.js SpotLight (that put a light loop on every pixel in the game)');
-assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); mergeStatic();'), 'lamps are collected before the static merge folds their meshes away');
+assert.ok(html.includes('buildBillboards(); buildDirtHills(); buildGrainPiles(); exitSignsForEgress(); meshDoorsBuild(); lightBuild(); ribAll(); psxUVAll(); mergeStatic();'), 'lamps are collected before the static merge folds their meshes away');
 { const i = html.indexOf("stepSafe('lighting', () => lightUpdate(dt));"), j = html.indexOf('renderer.render(scene, camera);', i), between = html.slice(i, j);
   const code = between.split('\n').filter(l => l.trim() && !l.trim().startsWith('//'));
   assert.ok(i > 0 && j > i && code.length <= 7 && !/renderer\.render\(/.test(between), 'the lighting is updated every frame, after the camera and right before the one render (' + code.length + ' code lines apart)');
