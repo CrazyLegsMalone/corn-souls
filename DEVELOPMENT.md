@@ -1,3 +1,11 @@
+## TEST v1.97.59 — aiming at the slurry blender shows the Slurry Blender (2026-11-09)
+- Owner: *"The slurry blender is labeled slurry tank I believe and it shouldnt"*.
+- Only tagged parts can be aimed at, and the look-at label takes the first tagged part along the line. Only the blender's trough and drive were tagged. Aiming at its white lid rim, its steel stand (legs, braces, platform) or its turning auger went straight through to Slurry Tank 1 behind and below it, and its discharge chute was tagged as Slurry Tank 1's.
+- Every part of the blender is now tagged as the blender (`blend`): the lid rim, the stand, the auger shaft and flights, and the chute that drops from its side into the tank roof. Slurry Tank 1 keeps its own shell, nameplate and suction piping.
+- Checked in the running game: aiming at the blender's stand with the tank behind it picks the Slurry Blender.
+- `pick` is on `Plant3D.dbg`.
+- Bumped TEST to `1.97.59`.
+
 ## TEST v1.97.58 — smoother start: the minimap and roof map are baked once per version, late models warm their shaders (2026-11-09)
 - Owner: *"Let's check and see if the code can be improved for better performance. It's still very choppy at the beginning."*
 - **Measured** in the headless profiler, over the first 45 s of walking:
