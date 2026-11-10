@@ -12038,7 +12038,7 @@ function netRecv(m) {
       else { const h = Math.hypot(m.v[0], m.v[1]) || 1; playerHurt(34, 'paint', m.v[0] / h * 0.3, m.v[1] / h * 0.3, '🎯 Tagged by the other player'); } }   // v1.97.35: three tags, not one
   } else if (m.t === 'mh') {   // v1.97.35: the other player's swing got me
     if (walk.on && !walk.dead) { const n = Math.max(1, Math.min(60, m.n | 0)), v = Array.isArray(m.v) ? m.v : [0, 0], name = (TOOLS[m.k] && TOOLS[m.k].name || 'tool').toLowerCase();
-      playerHurt(n, 'melee', (+v[0] || 0) * 0.5, (+v[1] || 0) * 0.5, '💥 The other player hit you with a ' + name); }
+      playerHurt(n, 'melee', (+v[0] || 0) * 0.5, (+v[1] || 0) * 0.5, m.k === 'hand' ? '👊 The other player punched you' : '💥 The other player hit you with a ' + name); }
   } else if (m.t === 'vd') { dmgNet(m);
   } else if (m.t === 'cb') { smashNet(m);
   } else if (m.t === 'gk') { crackAt(V3(m.p[0], m.p[1], m.p[2]), V3(m.n[0], m.n[1], m.n[2]), false);
@@ -16406,7 +16406,7 @@ function snapshot(w) {   // a small JPEG of the game view right now (for notes /
     c.getContext('2d').drawImage(src, 0, 0, W, H); return c.toDataURL('image/jpeg', 0.6); } catch (e) { return null; }
 }
 function drawHudGun() {
-  let any = SR.carry === 'me' || (gun && gun.visible);
+  let any = SR.carry === 'me' || (gun && gun.visible) || (typeof FPA !== 'undefined' && FPA.g && FPA.g.visible);   // (v1.97.67: the first-person arms)
   if (!any) for (const k in heldG) if (heldG[k] && heldG[k].visible) { any = true; break; }
   if (!any) return;
   hudCam.aspect = camera.aspect; hudCam.view = camera.view ? Object.assign({}, camera.view) : null; hudCam.updateProjectionMatrix();
@@ -16435,6 +16435,95 @@ function toggleAmmo() {   // swaps in the other magazine; pressing again mid-swa
   return to; }   // swaps in the other magazine
 function hudPart(g, geo, mt, x, y, z) { const o = new T.Mesh(geo, mt); o.position.set(x, y, z); o.renderOrder = 20 + g.children.length; g.add(o); return o; }
 const hudMat = (c, o) => new T.MeshLambertMaterial(Object.assign({ color: c, depthTest: false }, o || {}));
+// ---------- FIRST-PERSON ARMS (v1.97.67, owner sent Drillimpact's "PSX First Person Arms", free: "You can use it commercially
+// without the need to credit me" - credited anyway): "can you make it work with the player models matching skin tone". With the
+// empty hand (✋) out you see both forearms: hands down and relaxed, up in a guard while you hold aim, a jab (left and right in
+// turn) on fire - it hits like a light tool: zombies, critters, birds, the other player - and a reach-and-grab when X / E picks
+// something up. The skin is the player's own: the arms' texture is tinted by (the hand colour of your Squeeg model, host or guest) /
+// (the texture's own average), so the knuckles and nails stay and the tone matches the body you see in third person.
+// assets/models/fp/arms.glb comes from the pack's arms_rig.glb (scripts/slim_fp_arms.py: knife and finger-gun sets dropped).
+// The rig was made for a ~60 degree camera at its "camera" bone (1.743 m up, looking +z); the HUD camera is 42 degrees, so the arms
+// are turned to face -z, put on the HUD camera and squeezed by tan(21)/tan(30) across the view (x and y), which draws them exactly
+// as that wider lens would.
+const FPA = { url: '/corn-souls/assets/models/fp/arms.glb', state: null, g: null, r: null, clips: {}, bones: [], snapQ: [], snapP: [],
+  cur: 'relax', t: 0, prev: null, pt: 0, bl: 1, once: null, side: 1, hit: false, queued: false, skinSlot: -1, avg: null,
+  k: Math.tan(21 * Math.PI / 180) / Math.tan(30 * Math.PI / 180), camY: 1.743, dx: 0, dy: 0, dz: 0,
+  speed: { jab_R: 1.8, jab_L: 1.8, grab_R: 1.4, guard_draw: 1.3, push_R: 1.4 }, impact: 0.42, loop: { relax: 1, guard_idle: 1 } };
+const FP_SKIN = [null, null];   // per player slot: the linear colour of that Squeeg model's hand (set when its first-person hands bake)
+function fpArmsLoad() {
+  if (FPA.state || typeof document === 'undefined') return; FPA.state = 'loading';
+  loadGlbModel(FPA.url, r => {
+    const g = new T.Group(); g.userData.noHit = true; g.add(r.root);
+    g.rotation.y = Math.PI; g.scale.set(FPA.k, FPA.k, 1);
+    r.root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.renderOrder = 30;
+      const m = o.material = o.material.clone(); if (m.map) { m.map.magFilter = T.NearestFilter; m.map.minFilter = T.NearestMipmapLinearFilter; m.map.needsUpdate = true; } FPA.mat = m; } });
+    for (const a of r.anims || []) FPA.clips[a.name] = a;
+    const seen = new Set(); for (const a of r.anims || []) for (const c of a.channels) if (!seen.has(c.obj)) { seen.add(c.obj); FPA.bones.push(c.obj); FPA.snapQ.push(new T.Quaternion()); FPA.snapP.push(new T.Vector3()); }
+    FPA.r = r; FPA.g = g; g.visible = false; ensureHud().add(g); FPA.state = 'ready';
+  }, 'fp-arms');
+}
+function fpArmsPlay(name) {   // start a clip, blending from the pose you are in
+  if (!FPA.clips[name]) return false;
+  if (FPA.cur !== name || !FPA.loop[name]) { FPA.prev = FPA.cur; FPA.pt = FPA.t; FPA.bl = 0; }
+  FPA.cur = name; FPA.t = 0; FPA.hit = false; return true;
+}
+function fpArmsTint(slot) {   // the arms in the player's own skin
+  const s = FP_SKIN[slot], m = FPA.mat; if (!s || !m || !m.map) return false;
+  if (!FPA.avg) { const px = fpTexPixels(m.map); if (!px) return false;
+    let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < px.d.length; i += 4) { if (px.d[i + 3] < 128) continue; r += fpLin(px.d[i]); g += fpLin(px.d[i + 1]); b += fpLin(px.d[i + 2]); n++; }
+    if (!n) return false; FPA.avg = [r / n, g / n, b / n]; }
+  m.color.setRGB(Math.min(3, s[0] / FPA.avg[0]), Math.min(3, s[1] / FPA.avg[1]), Math.min(3, s[2] / FPA.avg[2])); FPA.skinSlot = slot; return true;
+}
+function fpArmsPunch() {   // fire with the empty hand: a jab, left and right in turn (a press during one queues the next)
+  if (FPA.state !== 'ready') { fpArmsLoad(); return false; }
+  const busy = FPA.once && FPA.once.startsWith('jab') && FPA.t < 0.6 * fpArmsLen(FPA.cur);
+  if (busy) { FPA.queued = true; return true; }
+  FPA.side = -FPA.side; FPA.once = FPA.side > 0 ? 'jab_R' : 'jab_L'; fpArmsPlay(FPA.once);
+  atkStart(VIEW, 'swing'); netSend({ t: 'atk', k: 'swing' }); return true;
+}
+function fpArmsGrab() { if (FPA.state === 'ready' && held === 'hand' && !(FPA.once && FPA.once.startsWith('jab'))) { FPA.once = 'grab_R'; fpArmsPlay('grab_R'); } }
+function fpArmsLen(name) { const a = FPA.clips[name]; if (!a) return 1; if (a.len === undefined) { let L = 0; for (const c of a.channels) L = Math.max(L, c.times[c.times.length - 1]); a.len = L; } return a.len; }
+function punchHit() {   // the fist lands: like a light tool, but it only hurts things that are alive
+  const o = V3(walk.x, walk.y + EYE, walk.z), dir = V3(); camera.getWorldDirection(dir);
+  const R = NET.rp;
+  if (NET.conn && NET.conn.open && R && R.walk && !R.drive) { const dx = R.x - walk.x, dz = R.z - walk.z, d = Math.hypot(dx, dz), h = Math.hypot(dir.x, dir.z) || 1;
+    if (d < 1.4 && Math.abs(R.y - walk.y) < 1.6 && (d < 0.3 || (dx * dir.x + dz * dir.z) / (d * h) > 0.7)) { netSend({ t: 'mh', n: 10, k: 'hand', v: [+(dx / (d || 1)).toFixed(2), +(dz / (d || 1)).toFixed(2)] }); gunClick(120, 0.1, 0.25); return 'player'; } }
+  if (zombToolHit(dir, 10)) { gunClick(130, 0.09, 0.22); return 'zombie'; }
+  if (birds) for (const b of birds) if (b.state === 'perch' || b.state === 'fly') { const bc = b.g.position.clone(); bc.y += 0.25; const t = Math.max(0, Math.min(1.4, bc.clone().sub(o).dot(dir)));
+    if (bc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.6) { hitBird(b, null); splatSnd(bc); return 'bird'; } }
+  if (critters) for (const c of critters) if (c.state === 'idle' || c.state === 'run' || c.state === 'climb') { const cc = c.g.position.clone(); cc.y += 0.06; const t = Math.max(0, Math.min(1.4, cc.clone().sub(o).dot(dir)));
+    if (cc.distanceTo(o.clone().addScaledVector(dir, t)) < 0.45) { hitCritter(c, null); splatSnd(cc); return 'critter'; } }
+  if (CREEP.list.length && creepToolHit(o, dir, 1)) { gunClick(140, 0.08, 0.22); return 'creep'; }
+  return null;
+}
+function fpArmsStep(dt, on) {
+  if (!on) { if (FPA.g) FPA.g.visible = false; return; }
+  if (FPA.state !== 'ready') { fpArmsLoad(); return; }
+  const G = FPA.g; G.visible = true;
+  const slot = VEST_COL[NET.conn && !NET.host ? 1 : 0] === VEST_COL[1] ? 1 : 0;
+  if (FPA.skinSlot !== slot) { if (!FP_SKIN[slot] && !fpModelHands[slot]) buildModelHands(slot); fpArmsTint(slot); }
+  // which clip: a one-shot plays out (a queued jab follows), else a guard while you hold aim, else hands down
+  const want = aimWant ? 'guard_idle' : 'relax';
+  if (FPA.once) {
+    const L = fpArmsLen(FPA.cur);
+    if (FPA.cur.startsWith('jab') && !FPA.hit && FPA.t >= FPA.impact * L) { FPA.hit = true; punchHit(); }
+    if (FPA.queued && FPA.cur.startsWith('jab') && FPA.t >= 0.6 * L) { FPA.queued = false; FPA.once = null; fpArmsPunch(); }
+    else if (FPA.t >= L) { FPA.once = null; fpArmsPlay(want === 'guard_idle' && FPA.cur !== 'guard_idle' ? 'guard_idle' : want); }
+  } else if (FPA.cur !== want) { if (want === 'guard_idle' && FPA.clips.guard_draw) { FPA.once = 'guard_draw'; fpArmsPlay('guard_draw'); } else fpArmsPlay(want); }
+  FPA.t += dt * (FPA.speed[FPA.cur] || 1);
+  if (FPA.loop[FPA.cur]) FPA.t %= fpArmsLen(FPA.cur);
+  // the pose, blended over 0.15 s out of the last one
+  FPA.bl = Math.min(1, FPA.bl + dt / 0.15);
+  if (FPA.bl < 1 && FPA.prev && FPA.clips[FPA.prev]) {
+    glbPose(FPA.clips[FPA.prev], Math.min(FPA.pt, fpArmsLen(FPA.prev)));
+    FPA.bones.forEach((b, i) => { FPA.snapQ[i].copy(b.quaternion); FPA.snapP[i].copy(b.position); });
+  }
+  glbPose(FPA.clips[FPA.cur], Math.min(FPA.t, fpArmsLen(FPA.cur)));
+  if (FPA.bl < 1 && FPA.prev) { const w = FPA.bl * FPA.bl * (3 - 2 * FPA.bl); FPA.bones.forEach((b, i) => { b.quaternion.slerpQuaternions(FPA.snapQ[i], b.quaternion, w); b.position.lerpVectors(FPA.snapP[i], b.position, w); }); }
+  // on the HUD camera, with a little walk bob
+  const bob = Math.sin(sgBob || 0) * 0.004;
+  G.position.set(FPA.dx, -FPA.camY * FPA.k + FPA.dy + bob, FPA.dz);
+}
 function makeHand() {
   const g = new T.Group(); g.userData.noHit = true;
   const sleeve = hudPart(g, new T.CylinderGeometry(0.035, 0.04, 0.22, 10), hudMat(0xff7a1a), 0.17, -0.17, -0.3); sleeve.rotation.x = 1.25;   // hi-vis sleeve
@@ -16495,7 +16584,8 @@ function fire() {
   if (!walk.on || walk.dead) return false;
   if (walk.mow) { const t = performance.now(); if (t - MOW.fireT > 300) mowBlade(); MOW.fireT = t; return true; }   // on the mower: fire toggles the blades
   if (TOOLS[held]) { if (swipe <= 0) { swipe = 1; atkStart(VIEW, 'swing'); netSend({ t: 'atk', k: 'swing' }); toolHit(); } return true; }   // v1.97.42: the swing shows in third person, and on the other player's screen
-  if (held === 'ext') { EXT.sprayT = 0.25; return true; }   // hold to spray   // a push stroke; cleaning up messes comes later
+  if (held === 'ext') { EXT.sprayT = 0.25; return true; }
+  if (held === 'hand' && !walk.ride && !walk.pass && fpArmsPunch()) return true;   // v1.97.67: the empty hand punches   // hold to spray   // a push stroke; cleaning up messes comes later
   if (held !== 'gun') return false;
   if (!gun) gun = makeGun();
   if (pumpT > 0 || reloadT > 0) return true;                     // still racking the pump / changing the magazine
@@ -16686,6 +16776,7 @@ function bakeModelHand(g, side) {
     const ge = o.geometry, ap = ge.attributes.position, an = ge.attributes.normal, au = ge.attributes.uv, si = ge.attributes.skinIndex, sw = ge.attributes.skinWeight;
     const mat = o.material, px = mat.map ? fpTexPixels(mat.map) : null;
     if (mat.map && !px) return 'wait';   // the colour map is still decoding
+    o.userData.skinSum = o.userData.skinSum || [0, 0, 0, 0];
     const cnt = ap.count, ok = new Uint8Array(cnt), P3 = new Float32Array(cnt * 3), N3 = new Float32Array(cnt * 3), C3 = new Float32Array(cnt * 3);
     for (let i = 0; i < cnt; i++) {
       let best = -1, bw = 0;
@@ -16709,6 +16800,7 @@ function bakeModelHand(g, side) {
         c.r *= fpLin(px.d[k]); c.g *= fpLin(px.d[k + 1]); c.b *= fpLin(px.d[k + 2]);
       }
       C3.set([c.r, c.g, c.b], i * 3);
+      if (keep.has(bb)) { const S = o.userData.skinSum; S[0] += c.r; S[1] += c.g; S[2] += c.b; S[3]++; }   // v1.97.67: the hand's own colour, for the first-person arms
     }
     const idx = ge.index, tri = idx ? idx.count : cnt;
     for (let q = 0; q < tri; q += 3) {
@@ -16719,6 +16811,7 @@ function bakeModelHand(g, side) {
   }
   if (!pp.length) return null;
   const geo = new T.BufferGeometry();
+  { let S = [0, 0, 0, 0]; for (const o of meshes) { const q = o.userData.skinSum; if (q) for (let k = 0; k < 4; k++) S[k] += q[k]; } if (S[3]) geo.userData.skin = [S[0] / S[3], S[1] / S[3], S[2] / S[3]]; }
   geo.setAttribute('position', new T.BufferAttribute(new Float32Array(pp), 3));
   geo.setAttribute('normal', new T.BufferAttribute(new Float32Array(nn), 3));
   geo.setAttribute('color', new T.BufferAttribute(new Float32Array(cc), 3));
@@ -16737,6 +16830,7 @@ function buildModelHands(slot) {
     }
     const material = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
     fpModelHands[slot] = geos.map(geo => { const m = new T.Mesh(geo, material); m.userData.noHit = true; m.userData.model = true; return m; });
+    if (geos[0].userData.skin && typeof FP_SKIN !== 'undefined') FP_SKIN[slot] = geos[0].userData.skin;   // v1.97.67: the first-person arms take this skin
   };
   loadPlayerSkin(slot, () => tryBake(0));
 }
@@ -16811,7 +16905,7 @@ function updateGun(dt) {
   const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !heldDead;   // carrying a dead critter: both hands on it, no gun (v1.97.111)
   gun.visible = fp && held === 'gun'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
   wash.t = Math.max(0, wash.t - dt); updateWasher(dt, show && held === 'gun' && wash.t > 0);
-  if (!show) { updateFpHands(false, 0); aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
+  if (!show) { if (typeof fpArmsStep === 'function') fpArmsStep(dt, false); updateFpHands(false, 0); aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }
   if (swipe > 0) swipe = Math.max(0, swipe - dt * 2.2);
   const seated = !!(walk.ride || walk.pass);
   if (TOOLS[held]) {
@@ -16822,6 +16916,7 @@ function updateGun(dt) {
     G.position.set(-0.12 * k, lift + 0.05 * k, -0.1 * k);
   }
   heldG.hand.visible = heldG.hand.visible && seated;
+  if (typeof fpArmsStep === 'function') fpArmsStep(dt, fp && held === 'hand' && !seated && SR.carry !== 'me');   // v1.97.67: the PSX arms in your own skin
   heldG.hand.position.y = 0.006 * Math.sin(clock * 2);
   // aim down sights: hold right mouse / LT / the AIM button. The world zooms in, looking around slows down.
   aimK += (((aimWant && held === 'gun' && reloadT <= 0) ? 1 : 0) - aimK) * Math.min(1, dt * 12);
@@ -17093,11 +17188,13 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, paintball: () => pbToggle(), get pbOn() { return PBM.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, PBM, PSX, BLOOD, psxUVAll, pbTagged, pbRecv, pbToggle, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), fpGrab: () => fpArmsGrab(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, paintball: () => pbToggle(), get pbOn() { return PBM.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, PBM, PSX, BLOOD, psxUVAll, FPA, FP_SKIN, fpArmsPunch, fpArmsGrab, pbTagged, pbRecv, pbToggle, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     dark: (a, f, h) => { wsLock('dk'); netSend({ t: 'dk', a, f, h }); return lightsDark(a, f, h); }, brightness: i => lightBrightness(i), get brightName() { return CS_BRIGHT[LIGHT.bright][0]; } }, fire, setItem, cycleItem, get held() { return held; }, get ammo() { return ammoNext(); }, toggleAmmo, get pigeonHits() { return pigeonHits; }, get critterHits() { return critterHits; }, get critters() { return critters ? critters.map(c => ({ kind: c.kind, state: c.state, x: c.g.position.x, y: c.g.position.y, z: c.g.position.z })) : []; }, get birds() { return birds ? birds.map(b => ({ state: b.state, x: b.g.position.x, y: b.g.position.y, z: b.g.position.z })) : []; }, get splatCount() { return splats.length; }, get perchYs() { return perches ? perches.map(p => +p.y.toFixed(1)) : []; },  groundAt, shift, get vehicles() { return vehicles.map(v => ({ kind: v.kind, x: v.g.position.x, z: v.g.position.z, dumping: !!v.dumping, i: v.i })); }, STATIONS, UPOS, init, update, daylight, walkStart, walkStop, walkMove, walkLook, walkJump, jumpHold: on => { POWER.jump = !!on; }, power: k => powerGive(k), get powerState() { return { kind: POWER.kind, t: POWER.t, flaps: POWER.flaps }; }, roofMapBuild: () => roofMapBuild(), setHeadlamp, get lamp() { return !!walk.lamp; }, interactTarget, takeSquish, deathEnd, get loco() { const g = train.cars[0] && train.cars[0].g; return g ? { x: g.position.x, z: g.position.z, a: g.rotation.y } : null; }, get walking() { return walk.on; }, get walkPos() { return { ...walk }; }, setPanel, select, focusUnit, focus, orbit, zoom, pan, pick, project, cam };
+// v1.97.67: X / E taking something with the empty hand plays the first-person arms' reach-and-grab
+for (const k of ['critterPick', 'takeTool', 'takeKey', 'takeExtinguisher', 'pickChute']) { const f = root.Plant3D[k]; if (typeof f === 'function') root.Plant3D[k] = (...a) => { const r = f(...a); if (r) { try { fpArmsGrab(); } catch (e) {} } return r; }; }
 })(this);
 </script>
 <script>// =====================================================================

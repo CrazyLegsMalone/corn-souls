@@ -1231,6 +1231,22 @@
         "assets/textures/psx/wood_floor.png",
         "assets/textures/psx/LICENSE.txt"
       ]
+    },
+    {
+      "id": "itch-drillimpact-psx-first-person-arms",
+      "title": "PSX First Person Arms",
+      "creator": "Drillimpact",
+      "source_url": "https://drillimpact.itch.io/psx-first-person-arms-free",
+      "evidence": "The owner's download (psx-first-person-arms-free-game-assets.zip, no licence file inside). The itch.io page, checked 2026-11-10: \"You can use it commercially without the need to credit me (although I would greatly appreciate it if you did)\"; name-your-own-price. The page does not state redistribution terms; only the converted, trimmed GLB is committed (not the pack's .blend / .fbx / loose textures).",
+      "notes": "In the TEST channel from v1.97.67: the first-person arms with the empty hand (relax, guard while aiming, jabs on fire, grab on X / E), tinted to the player model's skin.",
+      "source_platform": "itch.io",
+      "license_name": "Custom free licence (commercial use, credit optional)",
+      "license_url": "https://drillimpact.itch.io/psx-first-person-arms-free",
+      "status": "in-use",
+      "modifications": "arms_rig.glb trimmed to the rest, relax, guard, jab, push and grab animations; bone and animation names without dots; repacked (scripts/slim_fp_arms.py). Tinted at runtime to the player's skin tone.",
+      "files": [
+        "assets/models/fp/arms.glb"
+      ]
     }
   ]
 }

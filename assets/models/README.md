@@ -26,3 +26,4 @@ Shipped 3D GLB models in `assets/models/`:
 - `pallet.glb` — "Pallet" by Thingits — CC BY 4.0.
 
 See `../../assets/registry.json`, `../../CREDITS.md`, `../../credits.html`, and `../../ASSET_POLICY.md` for full creator attribution, source URLs, license links, and modification notes.
+- `fp/arms.glb` — "PSX First Person Arms" by Drillimpact (https://drillimpact.itch.io/psx-first-person-arms-free) — free asset, commercial use allowed, credit optional (credited). Trimmed from the pack's `arms_rig.glb` by `scripts/slim_fp_arms.py` (knife / finger-gun animations dropped, bone names without dots). The first-person arms with the empty hand, tinted to the player model's skin (v1.97.67).
