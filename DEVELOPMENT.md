@@ -1,3 +1,12 @@
+## TEST v1.97.62 — radio ping: mark a spot for the other player (2026-11-09)
+- Owner: *"Anything fun or interesting we should add to 2 player"* → *"I like the ping idea"*.
+- **G** (D-pad left on a controller, the **📍** button on a phone) drops a marker where you are looking — on the ground, or on whatever you are aiming at, out to 220 m.
+- Both players get: a bright marker that shows **through** the plant (yours yellow, theirs pink) that grows with distance so it stays readable from across the site, a diamond on the minimap that pins to the rim when the spot is off the edge, a walkie-talkie chirp, and a toast with the bearing and distance ("📍 Ping from the other player — 170 m SW").
+- One marker each: a new ping replaces your last one, and it fades after 30 seconds. Added to the controls list in the in-game help.
+- Plumbing: `Plant3D.ping()`, a `pg` message over the link, `stepSafe('ping', …)`, and `window.__toast` so the game script can post a toast (the UI script is a separate scope, and `window.toast` is the toast element).
+- Tests: new `validate-radio-ping.cjs` — controls, the wire, the marker's through-the-plant material, plus the bearing function and the minimap rim clamp run for real. Checked in the running game at 23 m, 60 m and 170 m.
+- Bumped TEST to `1.97.62`.
+
 ## TEST v1.97.61 — the cows, sheep and dog are alive (2026-11-09)
 - Owner: *"How difficult would it be to animate the cows and sheep maybe the dog"* / *"You can't make skeletons for them?"* / *"Yes continue and push."*
 - **Skeletons.** The pack's animals are static statues. New `scripts/rig_animal_glb.py` gives the cow, sheep and dog a 13-bone skeleton each (body, neck, head, tail, an upper and lower bone per leg) and weights every vertex to the bones it should follow, blended across each joint. Bones are un-rotated at rest, so the game turns them about their own x / y / z. Geometry, colours and the CC BY extras are unchanged; `assets/models/animals/{cow,sheep,dog}.glb` are now skinned. The cat stays as it was.
