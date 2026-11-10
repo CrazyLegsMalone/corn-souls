@@ -564,6 +564,13 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.equal(ctx.THROWN.length, 0, 'the throw ends');
     assert.ok(g.position.x > 0.5, 'it travelled forward');
     assert.ok(Math.abs(g.position.y - 0.06) < 1e-9, 'and it is lying on the floor');
+    // v1.97.71: a real body lies with its lowest point on the floor, not 6 cm under its feet (it is belly-up: its feet are its top)
+    const body = new T3.Group(), m = new T3.Mesh(new T3.BoxGeometry(0.3, 0.2, 0.5), new T3.MeshBasicMaterial()); m.position.y = 0.1; body.add(m); body.position.set(0, 2, 0);
+    const o2 = { thrown: true, t: 0 }; ctx.THROWN.push({ g: body, o: o2, v: new T3.Vector3(1, 0.5, 0), spin: new T3.Vector3(1, 1, 1), t: 0 });
+    for (let i = 0; i < 400 && ctx.THROWN.length; i++) ctx.step(1 / 60);
+    body.updateMatrixWorld(true); const bb = new T3.Box3().setFromObject(body);
+    assert.ok(Math.abs(bb.min.y - 0.004) < 1e-6, 'a thrown body rests with its lowest point on the floor (' + bb.min.y.toFixed(3) + ')');
+    assert.ok(Math.abs(body.rotation.z - Math.PI) < 1e-9 && bb.max.y < 0.25, 'belly-up, not sunk and not floating');
     assert.equal(o.thrown, false, 'no longer exempt from the clean-up timer');
     assert.equal(o.t, 45, 'with a full timer again');
   }
