@@ -1,3 +1,7 @@
+## TEST v1.97.60 — the blender's sign says SLURRY BLENDER (2026-11-09)
+- Owner: *"Yes should say Slurry Blender only no number"*. The nameplate on the slurry blender's trough read "TS-2831 / BLEND TANK"; it now reads "SLURRY BLENDER", one line with no tag number. Checked in the running game.
+- Bumped TEST to `1.97.60`.
+
 ## TEST v1.97.59 — aiming at the slurry blender shows the Slurry Blender (2026-11-09)
 - Owner: *"The slurry blender is labeled slurry tank I believe and it shouldnt"*.
 - Only tagged parts can be aimed at, and the look-at label takes the first tagged part along the line. Only the blender's trough and drive were tagged. Aiming at its white lid rim, its steel stand (legs, braces, platform) or its turning auger went straight through to Slurry Tank 1 behind and below it, and its discharge chute was tagged as Slurry Tank 1's.
