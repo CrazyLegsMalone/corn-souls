@@ -1,3 +1,12 @@
+## TEST v1.97.63 — co-op zombie horde (2026-11-09)
+- Owner: *"paintball match or maybe coop zombie horde"* → horde first.
+- **Pause menu → 🧟 Zombie horde here.** Wherever you are standing becomes the spot you defend. After a short breather, waves of corn zombies come in from 26–44 m out: **wave n is 3 + 2n of them**, each wave with more health (+18) and a little more speed (capped at 2.7 m/s, still slower than a sprint). At most 7 are on their feet at once, the rest arrive as you drop them. 22 seconds between waves. A banner at the top of the screen shows the wave, how many are left and your count, and your best wave is kept on the device.
+- **One horde, not two.** In 2 player the host owns the zombies and sends where they are 12 times a second; the guest draws them as puppets and reports its hits back for the host to apply. They come for whichever of you is nearer, and a zombie that reaches the guest tells that player's game to hurt them. Either of you can start it (the guest asks the host) and it ends when either of you goes down.
+- The drifting zombies that wander the buildings stop spawning while a horde is on, and the leftovers are cleared when it ends.
+- Plumbing: `Plant3D.horde()`, five messages over the link (`hs` ask, `hd` round, `hz` zombies, `hh` hit, `hx` damage), `stepSafe('horde', …)`, and a `#hordeHud` banner.
+- Tests: new `validate-zombie-horde.cjs` runs a whole round in a sandbox — wave sizes, the spawn ring, clearing, the break, the best wave, going down — plus the guest path (asking, puppets, relayed hits) and host target picking. Played a round in the running game: five spawned at 31–42 m, closed to 26 m, all dropped, wave cleared into the break.
+- Bumped TEST to `1.97.63`.
+
 ## TEST v1.97.62 — radio ping: mark a spot for the other player (2026-11-09)
 - Owner: *"Anything fun or interesting we should add to 2 player"* → *"I like the ping idea"*.
 - **G** (D-pad left on a controller, the **📍** button on a phone) drops a marker where you are looking — on the ground, or on whatever you are aiming at, out to 220 m.

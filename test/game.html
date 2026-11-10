@@ -124,7 +124,7 @@ body.driving #carBtn{right:auto;left:calc(18px + env(safe-area-inset-left,0px));
 #hbBtn{right:calc(36px + env(safe-area-inset-right,0px));bottom:calc(124px + env(safe-area-inset-bottom,0px));width:52px;height:52px;font-size:12px;font-weight:800}
 #camBtn{right:calc(120px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));width:44px;height:44px;font-size:20px}#radioBtn{right:calc(172px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));width:44px;height:44px;font-size:20px}body.kia:not(.pc) #radioBtn{display:block}
 body.driving:not(.pc) #gasBtn,body.driving:not(.pc) #brakeBtn,body.driving:not(.pc) #hbBtn,body.driving:not(.pc) #camBtn{display:block}
-#actBtn,#jumpBtn{display:none;position:fixed;bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:6;width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#actBtn{right:calc(96px + env(safe-area-inset-right,0px))}#jumpBtn{right:calc(160px + env(safe-area-inset-right,0px))}#pingBtn{display:none;position:fixed;right:calc(96px + env(safe-area-inset-right,0px));bottom:calc(94px + env(safe-area-inset-bottom,0px));z-index:6;width:48px;height:48px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:21px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}body.walking:not(.pc):not(.driving) #pingBtn{display:block}body.walking:not(.pc):not(.driving) #actBtn,body.walking:not(.pc):not(.driving) #jumpBtn{display:block}body.walking:not(.driving):not(.nearutv) #carBtn{display:none!important}#aimBtn{display:none;position:fixed;right:calc(30px + env(safe-area-inset-right,0px));bottom:calc(158px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font:bold 12px Arial;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#aimBtn.on{background:#ffcf33}body.walking:not(.pc)[data-held=gun] #aimBtn{display:block}body.driving #aimBtn,body.ads #xhair{display:none!important}#ammoBtn{display:none;position:fixed;right:calc(84px + env(safe-area-inset-right,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}body.walking:not(.pc)[data-held=gun] #ammoBtn{display:block}
+#actBtn,#jumpBtn{display:none;position:fixed;bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:6;width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#actBtn{right:calc(96px + env(safe-area-inset-right,0px))}#jumpBtn{right:calc(160px + env(safe-area-inset-right,0px))}#hordeHud{display:none;position:fixed;left:50%;transform:translateX(-50%);top:calc(44px + env(safe-area-inset-top,0px));z-index:7;padding:5px 12px;border-radius:999px;background:rgba(24,36,20,.82);color:#bff08a;font:bold 13px system-ui,sans-serif;letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.6);pointer-events:none;white-space:nowrap}#pingBtn{display:none;position:fixed;right:calc(96px + env(safe-area-inset-right,0px));bottom:calc(94px + env(safe-area-inset-bottom,0px));z-index:6;width:48px;height:48px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:21px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}body.walking:not(.pc):not(.driving) #pingBtn{display:block}body.walking:not(.pc):not(.driving) #actBtn,body.walking:not(.pc):not(.driving) #jumpBtn{display:block}body.walking:not(.driving):not(.nearutv) #carBtn{display:none!important}#aimBtn{display:none;position:fixed;right:calc(30px + env(safe-area-inset-right,0px));bottom:calc(158px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font:bold 12px Arial;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}#aimBtn.on{background:#ffcf33}body.walking:not(.pc)[data-held=gun] #aimBtn{display:block}body.driving #aimBtn,body.ads #xhair{display:none!important}#ammoBtn{display:none;position:fixed;right:calc(84px + env(safe-area-inset-right,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:6;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}body.walking:not(.pc)[data-held=gun] #ammoBtn{display:block}
 body.driving #fireBtn,body.driving #swapBtn,body.driving #ammoBtn,body.driving #xhair{display:none!important}
 /* v1.97.151: the phone's Eat button - only while something edible is in your hands, never in a vehicle (body.canEat) */
 #eatBtn{display:none;position:fixed;right:calc(96px + env(safe-area-inset-right,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));z-index:6;width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.82);font-size:26px;box-shadow:0 2px 8px rgba(0,0,0,.2);touch-action:none}
@@ -204,7 +204,7 @@ window.addEventListener('unhandledrejection', function(ev){ __showErr('Promise: 
 <div id="toast"></div><div id="iprompt"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="19.5" cy="12" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="12" cy="19.5" r="3.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="4.5" cy="12" r="3.6" fill="#fff"/></svg><span class="k">E</span><span>Interact</span></div>
 <div id="fps"></div>
 <canvas id="mmap" aria-hidden="true"></canvas>
-<div id="cornVig" aria-hidden="true"></div><div id="squish"></div><div id="fired"></div><div id="toxic"></div><div id="nh3"></div><button id="fireBtn" aria-label="Use item">🎯</button><button id="swapBtn" aria-label="Switch item">🔄</button><button id="actBtn" aria-label="Interact">✋</button><button id="eatBtn" aria-label="Eat what you are carrying">🍖</button><button id="jumpBtn" aria-label="Jump">⤴</button><button id="pingBtn" aria-label="Radio ping">📍</button><button id="aimBtn" aria-label="Aim down sights">AIM</button><button id="ammoBtn" aria-label="Switch ammo">🎨</button><button id="carBtn" class="tb" aria-label="Get in / out">🚙</button><button id="gasBtn" class="tb">GAS</button><button id="brakeBtn" class="tb">BRAKE</button><button id="hbBtn" class="tb">DRIFT</button><button id="camBtn" class="tb" aria-label="Camera">🎥</button><button id="radioBtn" class="tb" aria-label="Stereo">📻</button><button id="nosBtn" class="tb">NOS</button><div id="nosBar"><i></i></div><div id="xhair"></div>
+<div id="cornVig" aria-hidden="true"></div><div id="squish"></div><div id="fired"></div><div id="toxic"></div><div id="nh3"></div><button id="fireBtn" aria-label="Use item">🎯</button><button id="swapBtn" aria-label="Switch item">🔄</button><button id="actBtn" aria-label="Interact">✋</button><button id="eatBtn" aria-label="Eat what you are carrying">🍖</button><button id="jumpBtn" aria-label="Jump">⤴</button><button id="pingBtn" aria-label="Radio ping">📍</button><div id="hordeHud"></div><button id="aimBtn" aria-label="Aim down sights">AIM</button><button id="ammoBtn" aria-label="Switch ammo">🎨</button><button id="carBtn" class="tb" aria-label="Get in / out">🚙</button><button id="gasBtn" class="tb">GAS</button><button id="brakeBtn" class="tb">BRAKE</button><button id="hbBtn" class="tb">DRIFT</button><button id="camBtn" class="tb" aria-label="Camera">🎥</button><button id="radioBtn" class="tb" aria-label="Stereo">📻</button><button id="nosBtn" class="tb">NOS</button><div id="nosBar"><i></i></div><div id="xhair"></div>
 <audio id="music" loop preload="auto"></audio>
 <div id="tl"><span id="sky" aria-hidden="true"></span><span id="wx" style="display:none"></span><span id="clock"></span><span id="birdCount">🐦 0</span></div>
 <button id="pauseBtn" aria-label="Pause and options">❚❚</button>
@@ -5755,6 +5755,144 @@ function animalsStep(dt) {
   const k = c.t, x = a[0] + (b[0] - a[0]) * k, z = a[2] + (b[2] - a[2]) * k, y = a[1] + (b[1] - a[1]) * k;
   const ph = (c.i + k) * L * 2.2;   // bounding gait: little hops, nose dipping
   c.g.position.set(x, y + Math.abs(Math.sin(ph)) * 0.07, z); c.g.rotation.set(Math.cos(ph) * 0.12, Math.atan2(b[0] - a[0], b[2] - a[2]), 0);
+}
+// ---------- ZOMBIE HORDE (v1.97.63, owner: "coop zombie horde"): start it from the pause menu and the spot you are standing on
+// becomes the place you defend. Waves of corn zombies come in out of the dark from 26-44 m out, more of them and tougher each
+// round, with a breather between waves. In 2 player it is ONE horde, not two: the host owns the zombies and sends where they are
+// 12 times a second, the guest draws them and reports its hits back, and they come for whichever of you is nearer. Score is the
+// wave you reach; your best is kept on the device. It ends when either of you goes down.
+const HORDE = { on: false, state: 'off', wave: 0, left: 0, kills: 0, x: 0, z: 0, t: 0, spawnT: 0, host: true, ids: 1,
+  best: 0, R0: 26, R1: 44, live: 7, brk: 22, pup: null, sendT: 0, overT: 0 };
+const hordeN = w => 3 + w * 2;                                   // zombies in wave w
+const hordeHp = w => 100 + (w - 1) * 18;                         // and how much they take
+const hordeSpd = w => Math.min(2.7, 1.5 + (w - 1) * 0.07);       // and how fast they shamble
+const hordeRun = () => !NET.conn || !NET.conn.open || NET.host;  // solo, or the host: the one who owns the horde
+function hordeBest(v) {
+  try { if (v === undefined) return +localStorage.getItem('cs_horde_best') || 0; if (v > (+localStorage.getItem('cs_horde_best') || 0)) localStorage.setItem('cs_horde_best', v); } catch (e) {}
+  return HORDE.best;
+}
+function hordeSpot() {   // open ground in a ring round the spot being defended
+  for (let i = 0; i < 50; i++) {
+    const a = Math.random() * 6.283, r = HORDE.R0 + Math.random() * (HORDE.R1 - HORDE.R0), x = HORDE.x + Math.sin(a) * r, z = HORDE.z + Math.cos(a) * r;
+    const y = floorAt(x, z, 1.5); if (!(y < 1.5)) continue;
+    const s = { x, z, y }; zombPush(s); if (Math.hypot(s.x - x, s.z - z) > 0.6) continue;   // started inside a wall or a machine
+    if (walk.on && Math.hypot(s.x - walk.x, s.z - walk.z) < 12) continue;                   // never right on top of you
+    return s;
+  }
+  return null;
+}
+function hordeSay(msg) { if (typeof window !== 'undefined' && typeof window.__toast === 'function') window.__toast(msg); }
+function hordeClear() { for (const z of ZOMB.list) if (z.horde && z.state !== 'gone' && z.state !== 'dead') { z.state = 'dead'; z.deadT = 5.5; } }
+function hordeStart(x, z, from) {
+  HORDE.on = true; HORDE.host = hordeRun(); HORDE.x = x; HORDE.z = z; HORDE.wave = 0; HORDE.left = 0; HORDE.kills = 0;
+  HORDE.state = 'break'; HORDE.t = 6; HORDE.spawnT = 0; HORDE.ids = 1; HORDE.best = hordeBest(); HORDE.pup = new Map(); HORDE.overT = 0;
+  hordeSay('🧟 Horde mode — hold this spot' + (HORDE.best ? ' (best: wave ' + HORDE.best + ')' : '') + (from ? '. The other player started it.' : ''));
+  if (HORDE.host) hordeBeam();
+}
+function hordeStop(msg) {
+  if (!HORDE.on) return; const w = Math.max(1, HORDE.wave);
+  HORDE.on = false; HORDE.state = 'over'; HORDE.overT = 6; hordeClear();
+  if (HORDE.host && HORDE.wave > HORDE.best) { HORDE.best = HORDE.wave; hordeBest(HORDE.wave); }
+  hordeSay('🧟 ' + (msg || 'Horde over') + ' — wave ' + w + ', ' + HORDE.kills + ' down' + (HORDE.wave >= HORDE.best && HORDE.wave ? ' · best yet' : ''));
+  if (HORDE.host) hordeBeam();
+}
+function hordeToggle() {   // the pause menu
+  if (!walk.on) return 'Go to Squeeg first — the horde starts where you stand';
+  if (HORDE.on) { if (!hordeRun()) { netSend({ t: 'hs', go: 0 }); return 'Asked the other player to stop the horde'; } hordeStop('Called off'); return null; }
+  if (!hordeRun()) { netSend({ t: 'hs', go: 1, x: +walk.x.toFixed(1), z: +walk.z.toFixed(1) }); return 'Asked the other player to start a horde here'; }
+  hordeStart(walk.x, walk.z); return null;
+}
+function hordeTarget(z) {   // whichever of you is nearer (the host runs this for every zombie)
+  if (!HORDE.on || !z.horde || !HORDE.host) return null;
+  const me = walk.on && !walk.dead && !walk.drive, R = NET.rp, them = !!(R && NET.conn && NET.conn.open && R.walk && !R.drive && !R.down && isFinite(R.x));
+  if (!me && !them) return null;
+  const dm = me ? Math.hypot(walk.x - z.x, walk.z - z.z) : 1e9, dt2 = them ? Math.hypot(R.x - z.x, R.z - z.z) : 1e9;
+  return dt2 < dm ? { x: R.x, z: R.z, y: R.y || 0, rp: true } : { x: walk.x, z: walk.z, y: walk.y };
+}
+function hordeHurtThem(z) { netSend({ t: 'hx', n: ZOMB.dmg }); }   // the host's zombie reached the guest
+function hordeRelayHit(z, n) {   // the guest hit one of the host's zombies: the host decides
+  if (!z.net || !NET.conn || !NET.conn.open) return false;
+  netSend({ t: 'hh', i: z.nid, n }); z.hitT = 0.35; return true;
+}
+function hordeKill(z) { if (HORDE.on && z.horde) { HORDE.kills++; if (HORDE.host) HORDE.left = Math.max(0, HORDE.left - 1); } }
+function hordeSpawnOne() {
+  const s = hordeSpot(); if (!s) return false;
+  const z = zombSpawn(s); if (!z) return false;
+  z.horde = true; z.nid = HORDE.ids++; z.hp = hordeHp(HORDE.wave); z.spd = hordeSpd(HORDE.wave); z.state = 'chase';
+  return true;
+}
+function hordeBeam() {   // the round, over the wire
+  if (!NET.conn || !NET.conn.open) return;
+  netSend({ t: 'hd', on: HORDE.on, st: HORDE.state, w: HORDE.wave, l: HORDE.left, k: HORDE.kills, x: +HORDE.x.toFixed(1), z: +HORDE.z.toFixed(1), ct: +HORDE.t.toFixed(1), b: HORDE.best });   /* ct, not t: t is the message type */
+}
+function hordeRows() {
+  const a = []; for (const z of ZOMB.list) { if (!z.horde || z.state === 'gone') continue;
+    a.push([z.nid, +z.x.toFixed(2), +z.y.toFixed(2), +z.z.toFixed(2), +z.a.toFixed(2), z.state === 'dead' ? 1 : 0, z.mv ? 1 : 0]); }
+  return a;
+}
+function hordePuppets(rows) {   // the guest: the host's zombies, made and moved here
+  if (!HORDE.pup) HORDE.pup = new Map();
+  const seen = new Set();
+  for (const r of rows) { const [id, x, y, z, a, dead, mv] = r; seen.add(id);
+    let o = HORDE.pup.get(id);
+    if (!o) { o = zombSpawn({ x, z, y }); if (!o) continue; o.horde = true; o.net = 'them'; o.nid = id; o.hp = 1e6; HORDE.pup.set(id, o); }
+    o.tx = x; o.ty = y; o.tz = z; o.ta = a; o.nmove = mv ? (o.spd || ZOMB.speed) : 0;
+    if (dead && o.state !== 'dead' && o.state !== 'gone') { o.state = 'dead'; o.deadT = 0; o.hp = 0; }
+  }
+  for (const [id, o] of HORDE.pup) if (!seen.has(id)) { if (o.state !== 'gone') { o.state = 'gone'; scene.remove(o.g); } HORDE.pup.delete(id); }
+}
+function hordeStep(dt) {
+  if (HORDE.overT > 0) { HORDE.overT -= dt; if (HORDE.overT <= 0) hordeHud(); }
+  if (!HORDE.on) { hordeHud(); return; }
+  if (!HORDE.host) {   // the guest only draws what the host sends (and reports its hits)
+    if (walk.dead) { netSend({ t: 'hs', go: 0 }); hordeStop('You went down'); }
+    hordeHud(); return;
+  }
+  if (walk.dead) { hordeStop('You went down'); return; }
+  if (HORDE.state === 'break') HORDE.t -= dt;
+  const live = ZOMB.list.filter(z => z.horde && z.state !== 'gone' && z.state !== 'dead').length;
+  if (HORDE.state === 'break') {
+    if (HORDE.t <= 0) { HORDE.wave++; HORDE.left = hordeN(HORDE.wave); HORDE.state = 'wave'; HORDE.spawnT = 0; HORDE.t = 0;
+      hordeSay('🧟 Wave ' + HORDE.wave + ' — ' + HORDE.left + ' coming'); hordeBeam(); }
+  } else if (HORDE.state === 'wave') {
+    const toMake = HORDE.left - live;   // the rest of the wave arrives as the ones out there go down
+    if (toMake > 0 && live < HORDE.live) { HORDE.spawnT -= dt; if (HORDE.spawnT <= 0) { HORDE.spawnT = 1.1; hordeSpawnOne(); } }
+    if (HORDE.left <= 0 && live === 0) { HORDE.state = 'break'; HORDE.t = HORDE.brk; hordeSay('🧟 Wave ' + HORDE.wave + ' cleared — ' + HORDE.brk + ' s'); hordeBeam(); }
+  }
+  HORDE.sendT -= dt; if (HORDE.sendT <= 0 && NET.conn && NET.conn.open) { HORDE.sendT = 1 / 12; netSend({ t: 'hz', a: hordeRows() }); }
+  hordeHud();
+}
+function hordeRecv(m) {
+  if (m.t === 'hs') {   // the other player asked for one
+    if (!hordeRun()) return;
+    if (m.go) { if (!HORDE.on) hordeStart(m.x !== undefined ? m.x : walk.x, m.z !== undefined ? m.z : walk.z, true); }
+    else if (HORDE.on) hordeStop(m.go === 0 && !walk.dead ? 'The other player went down' : 'Called off');
+    return;
+  }
+  if (m.t === 'hd') {   // the round, from the host
+    const was = HORDE.on;
+    HORDE.on = !!m.on; HORDE.host = false; HORDE.state = m.st; HORDE.wave = m.w; HORDE.left = m.l; HORDE.kills = m.k; HORDE.x = m.x; HORDE.z = m.z; HORDE.t = m.ct || 0; HORDE.best = m.b || HORDE.best;
+    if (HORDE.on && !was) { HORDE.pup = new Map(); hordeSay('🧟 Horde mode — the other player started it. Hold the spot.'); }
+    if (!HORDE.on && was) { HORDE.overT = 6; hordeSay('🧟 Horde over — wave ' + Math.max(1, HORDE.wave) + ', ' + HORDE.kills + ' down'); }
+    hordeHud(); return;
+  }
+  if (m.t === 'hz') { if (HORDE.on && !HORDE.host) hordePuppets(m.a || []); return; }
+  if (m.t === 'hh') {   // the guest hit one of mine
+    if (!HORDE.host) return; const z = ZOMB.list.find(o => o.nid === m.i && o.horde && o.state !== 'gone');
+    if (z && z.hp > 0) zombHurt(z, m.n); return;
+  }
+  if (m.t === 'hx') { playerHurt(ZOMB.dmg, 'zombie', 0, 0, '🧟 A corn zombie got you'); return; }
+}
+function hordeHud() {
+  const el = typeof document !== 'undefined' && document.getElementById('hordeHud'); if (!el) return;
+  const show = HORDE.on || HORDE.overT > 0;
+  if (el.dataset.on !== (show ? '1' : '0')) { el.dataset.on = show ? '1' : '0'; el.style.display = show ? 'block' : 'none'; }
+  if (!show) return;
+  const live = ZOMB.list.filter(z => z.horde && z.state !== 'gone' && z.state !== 'dead').length;
+  const txt = !HORDE.on ? 'HORDE OVER · wave ' + Math.max(1, HORDE.wave) + ' · ' + HORDE.kills + ' down'
+    : HORDE.state === 'break' ? 'WAVE ' + (HORDE.wave + 1) + ' IN ' + Math.max(0, Math.ceil(HORDE.t)) + 's · ' + HORDE.kills + ' down'
+    : 'WAVE ' + HORDE.wave + ' · ' + Math.max(live, HORDE.left) + ' left · ' + HORDE.kills + ' down';
+  if (el.textContent !== txt) el.textContent = txt;
 }
 // ---------- RADIO PING (v1.97.62, owner: "I like the ping idea"): the plant is a kilometre across and there is no voice chat, so
 // G (D-pad left on a controller, the 📍 button on a phone) drops a marker where you are looking - up to 220 m, on the ground or on
@@ -11479,7 +11617,7 @@ function update(sim, dt, events) {
   updatePuffs(dt); updateWeather(dt);
   // every cosmetic / gameplay sub-update in the frame tail is guarded: one throw must not take the render, the
   // first-person gun and the paintball pump cooldown down with it (see stepSafe)
-  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('animals', () => animalsStep(dt)); stepSafe('fish', () => fishStep(dt)); stepSafe('flies', () => fliesStep(dt)); stepSafe('lizPose', () => lizPose(dt)); stepSafe('ping', () => pingStep(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt)); stepSafe('hp', () => hpUpdate(dt)); stepSafe('npcAnim', () => npcAnimUpdate(dt)); stepSafe('zombies', () => zombUpdate(dt));
+  stepSafe('birds', () => updateBirds(dt)); stepSafe('critters', () => updateCritters(dt)); stepSafe('thrown', () => updateThrown(dt)); stepSafe('animals', () => animalsStep(dt)); stepSafe('fish', () => fishStep(dt)); stepSafe('flies', () => fliesStep(dt)); stepSafe('lizPose', () => lizPose(dt)); stepSafe('ping', () => pingStep(dt)); stepSafe('horde', () => hordeStep(dt)); stepSafe('eat', () => updateEat(dt)); stepSafe('powerSim', () => powerUpdate(dt)); stepSafe('minimap', () => minimapUpdate(dt)); stepSafe('critNet', () => critNetUpdate(dt)); stepSafe('creeps', () => updateCreeps(dt)); stepSafe('hp', () => hpUpdate(dt)); stepSafe('npcAnim', () => npcAnimUpdate(dt)); stepSafe('zombies', () => zombUpdate(dt));
   stepSafe('vehTops', () => updateVehTops());
   stepSafe('deadDrop', () => { if (heldDead && (walk.dead || walk.drive)) deadDrop(); });   // dying or getting in puts the corpse down
   stepSafe('ducks', () => updateDucks(dt)); stepSafe('cornBrush', () => cornBrushUpdate(dt)); stepSafe('haulers', () => haulerUpdate(dt)); stepSafe('windsock', () => updateWindsock(dt)); stepSafe('pivot', () => updatePivot(dt));
@@ -11706,6 +11844,7 @@ function netRecv(m) {
   } else if (m.t === 'cdbg') { if (NET.host) creepDebug(m.w, m.x, m.z, m.a);
   } else if (m.t === 'swap') { if (!walk.drive) swapRangers();
   } else if (m.t === 'rp') { if (NET.host) railPhoneApply(m.a);   // a guest rang the dispatcher
+  } else if (m.t === 'hs' || m.t === 'hd' || m.t === 'hz' || m.t === 'hh' || m.t === 'hx') { hordeRecv(m);   // v1.97.63: the zombie horde
   } else if (m.t === 'pg') { pingSet('theirs', m.x, m.y, m.z);   // v1.97.62: the other player's radio ping
   } else if (m.t === 'atk') { if (NET.rp) atkStart(NET.rp, m.k === 'shot' ? 'shot' : 'swing');   // v1.97.42: the other player swung
   } else if (m.t === 'shot') { if (NET.rp) atkStart(NET.rp, 'shot');
@@ -14013,9 +14152,10 @@ function zombDress(z, root) {
   z.g.remove(z.box); z.box = null; z.g.add(R);
 }
 function zombHurt(z, n, kx, kz) {
-  if (z.hp <= 0) return; z.hp -= n; z.hitT = 0.35; z.state = 'chase';
+  if (z.hp <= 0) return;
+  if (z.net === 'them' && typeof hordeRelayHit === 'function' && hordeRelayHit(z, n)) return;   /* v1.97.63: the host's zombie - it decides */ z.hp -= n; z.hitT = 0.35; z.state = 'chase';
   if (kx || kz) { z.x += kx; z.z += kz; zombPush(z); }
-  if (z.hp <= 0) { z.state = 'dead'; z.deadT = 0; ZOMB.kills++; creepSound('screech', z); if (DMG_NOTIFY) DMG_NOTIFY('🧟 Corn zombie down (' + ZOMB.kills + ')'); }
+  if (z.hp <= 0) { z.state = 'dead'; z.deadT = 0; ZOMB.kills++; if (typeof hordeKill === 'function') hordeKill(z); creepSound('screech', z); if (DMG_NOTIFY) DMG_NOTIFY('🧟 Corn zombie down (' + ZOMB.kills + ')'); }
   else creepSound('hurt', z);
 }
 function zombToolHit(dir, dmg) {   // my swing: the nearest live one in reach, in front of me
@@ -14036,10 +14176,14 @@ function zombUpdate(dt) {
   if (!ZOMB.on) return;
   ZOMB.t -= dt;
   const alive = ZOMB.list.filter(z => z.state !== 'gone').length;
-  if (walk.on && ZOMB.t <= 0 && alive < ZOMB.max && typeof ENCL !== 'undefined' && ENCL.length) { ZOMB.t = ZOMB.every; zombSpawn(); }
+  if (walk.on && ZOMB.t <= 0 && alive < ZOMB.max && typeof ENCL !== 'undefined' && ENCL.length && (typeof HORDE === 'undefined' || !HORDE.on)) { ZOMB.t = ZOMB.every; zombSpawn(); }   /* the drifters stop while a horde is on */
   for (const z of ZOMB.list) {
     z.t += dt; z.hitT = Math.max(0, z.hitT - dt); z.cd = Math.max(0, z.cd - dt);
-    const dx = walk.x - z.x, dz = walk.z - z.z, d = Math.hypot(dx, dz), me = walk.on && !walk.dead && !walk.drive;
+    /* v1.97.63: in a horde the host's zombies come for whichever player is nearer; otherwise, as before, for you */
+    let px = walk.x, pz = walk.z, py = walk.y, me = walk.on && !walk.dead && !walk.drive, rp = false;
+    const tg = typeof hordeTarget === 'function' ? hordeTarget(z) : null;
+    if (tg) { px = tg.x; pz = tg.z; py = tg.y; me = true; rp = !!tg.rp; }
+    const dx = px - z.x, dz = pz - z.z, d = Math.hypot(dx, dz);
     let move = 0;
     if (z.state === 'dead') {   // falls back, lies there, sinks
       // v1.97.54 ("zombies clip into floor after you kill them"): it pivots on its heels, so lift it by its back's depth as it goes
@@ -14049,19 +14193,24 @@ function zombUpdate(dt) {
       if (z.deadT > 9) { z.state = 'gone'; scene.remove(z.g); z.g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); } }); }
       continue;
     }
-    if (z.state === 'idle') {
-      if (me && d < ZOMB.sight && Math.abs(walk.y - z.y) < 3 && (d < ZOMB.near || zombLOS(z.x, z.z, walk.x, walk.z))) { z.state = 'chase'; creepSound('roar', z); }
+    if (z.net === 'them') {   /* a puppet: the host says where it is (v1.97.63) */
+      move = z.nmove || 0; const k = Math.min(1, dt * 12);
+      z.x += (z.tx - z.x) * k; z.y += (z.ty - z.y) * k; z.z += (z.tz - z.z) * k; z.a = z.ta;
+    } else if (z.state === 'idle') {
+      if (me && d < ZOMB.sight && Math.abs(py - z.y) < 3 && (d < ZOMB.near || zombLOS(z.x, z.z, px, pz))) { z.state = 'chase'; creepSound('roar', z); }
     } else if (z.state === 'chase') {
       if (!me || d > ZOMB.sight * 2.5) z.state = 'idle';
       else {
         z.a = Math.atan2(dx, dz);
-        if (d > ZOMB.reach * 0.85 && z.hitT <= 0) { move = ZOMB.speed;
+        if (d > ZOMB.reach * 0.85 && z.hitT <= 0) { move = z.spd || ZOMB.speed;
           const s = Math.min(d - ZOMB.reach * 0.8, move * dt); z.x += dx / d * s; z.z += dz / d * s; zombPush(z);
           const fy = floorAt(z.x, z.z, z.y + 0.6); if (fy < z.y + 0.5 && fy > z.y - 3) z.y = fy; }
-        if (d < ZOMB.reach && z.cd <= 0 && z.hitT <= 0 && Math.abs(walk.y - z.y) < 1.2) { z.cd = ZOMB.cd; creepSound('bite', z);
-          playerHurt(ZOMB.dmg, 'zombie', dx / (d || 1) * 0.5, dz / (d || 1) * 0.5, '🧟 A corn zombie got you'); }
+        if (d < ZOMB.reach && z.cd <= 0 && z.hitT <= 0 && Math.abs(py - z.y) < 1.2) { z.cd = ZOMB.cd; creepSound('bite', z);
+          if (rp) { if (typeof hordeHurtThem === 'function') hordeHurtThem(z); }
+          else playerHurt(ZOMB.dmg, 'zombie', dx / (d || 1) * 0.5, dz / (d || 1) * 0.5, '🧟 A corn zombie got you'); }
       }
     }
+    z.mv = move > 0;
     z.g.position.set(z.x, z.y, z.z); z.g.rotation.y = z.a + Math.sin(z.t * 0.9) * 0.15;
     if (z.rig && (!walk.on || d < 60)) {   // shamble: legs swing while it moves, knees bend, it rocks side to side; arms bob
       const w = move ? z.t * 3.2 : 0, sw = move ? 0.42 : 0;
@@ -16765,7 +16914,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -17786,7 +17935,7 @@ function qualityMenu() {
 }
 function menu() {
   if (!$('modal').classList.contains('open')) { window.__snap = P3.snapshot && P3.snapshot(); window.__snapT = Date.now(); }
-  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['🧍 Body in first person: ' + (P3.fpBody ? 'on' : 'off'), () => { P3.toggleFpBody(); menu(); }], ['⚙️ Quality: ' + qualityLabel(), () => qualityMenu()], ['Reset all setpoints', resetAll]];
+  const b = [['Resume', null], ['Speed: ' + Sim.SPEEDS[speedIdx][1], () => { setSpeed(speedIdx + 1); toast('Speed: ' + Sim.SPEEDS[speedIdx][1]); }], ['2 Player', twoPlayer], ['🧟 ' + (P3.hordeOn ? 'Stop the horde' : 'Zombie horde here'), () => { const m = P3.horde(); if (m) toast(m); }], ['📝 Leave a note', () => noteForm()], ['Help', help], [musicOn ? 'Music: on' : 'Music: off', toggleMusic], ['🔆 Brightness: ' + P3.lights.brightName, () => { toast('Brightness: ' + P3.lights.brightness() + ' (how dark the darkest places get)'); menu(); }], ['🗺️ Mini map: ' + (mapOn ? 'on' : 'off'), () => { mapSet(!mapOn); toast('Mini map ' + (mapOn ? 'on' : 'off')); menu(); }], ['🧍 Body in first person: ' + (P3.fpBody ? 'on' : 'off'), () => { P3.toggleFpBody(); menu(); }], ['⚙️ Quality: ' + qualityLabel(), () => qualityMenu()], ['Reset all setpoints', resetAll]];
   if (window.Android) b.push(['Quit', () => { try { Android.quit(); } catch (e) {} }]);
   modal('<h1>Corn Souls</h1>', b);
 }
