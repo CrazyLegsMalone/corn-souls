@@ -1,3 +1,20 @@
+## TEST v1.97.58 — smoother start: the minimap and roof map are baked once per version, late models warm their shaders (2026-11-09)
+- Owner: *"Let's check and see if the code can be improved for better performance. It's still very choppy at the beginning."*
+- **Measured** in the headless profiler, over the first 45 s of walking:
+  - GLB parsing is small: 108 builds of 50 files, 242 ms in total.
+  - Most of the start-up load is the two maps baked at the start of play. The minimap (56 tiles) and the roof-height map (40 tiles) each re-render the whole plant from above, one tile a frame, once at the start of walking and again ~13 s later for the late models. The minimap bake also makes a flat stand-in of every material.
+  - Switching both off left the game on ~50 shader programs instead of ~70, with ~1,000 fewer geometries and ~120 fewer textures on the GPU. On a desktop GPU each shader compile can stall a frame by tens to hundreds of ms.
+  - The Lesion Toolbox recorder showed `minimap` (22 ms/frame avg) and `powerSim` (7 ms, which runs the roof-map rebuild) as the slowest systems.
+- **Bake cache:** neither map changes within a version, so after the late (complete) bakes they're saved in this browser's IndexedDB (`corn-souls-bakes`). The keys are per version and per channel, since TEST and LIVE share an origin. The minimap is saved as its PNG bytes, the roof map as its height grid. Older versions' saves are dropped.
+  - Later starts load the saved maps and skip both bakes entirely.
+  - The first start of each new version still bakes once, then saves.
+  - With no IndexedDB (private mode, quota), it simply bakes as before.
+- **Checked** in a fresh browser profile: run 1 baked and saved both maps. On run 2 both came from the cache with no bake jobs, and the minimap drew correctly. Run 2 had 51 shader programs, 765 geometries and 75 textures (run 1: 64–76 / ~2,000 / ~230).
+- **Shader warm-up:** a model loaded after the start (NPCs, animals, critters, tools…) now compiles its shaders with `renderer.compileAsync` (in parallel where the browser supports `KHR_parallel_shader_compile`) before it's handed over and added. The first frame that draws it no longer stops to compile. There's a 1.5 s fallback, and a model whose setup throws is still reported.
+- **Profiling aids:** `PERF.glb` (per file: builds, total ms, worst ms, first build time), plus `renderer` and `BAKE` on `Plant3D.dbg`.
+- New suite `validate-bake-cache.cjs`.
+- Bumped TEST to `1.97.58`.
+
 ## TEST v1.97.57 — the cows and sheep are solid and call out; the dog's out of the trucks' way (2026-11-09)
 - Owner: *"Give cows and sheep collision and sound. Move dog it's in way of the grain haulers"*.
 - **Collision:** each animal's round collider was added when its model finished loading. By then the collider list had already been built when you started walking, so it never counted. Now every cow and sheep gets two circles along its body (nose and rump: cows ±0.75 m, r 0.62; sheep ±0.3 m, r 0.38) as soon as the herd is placed, and they go into the live list if it already exists (`animalCol`). Checked in the running game: walking into a cow stops you and slides you around it.
