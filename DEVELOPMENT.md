@@ -1,3 +1,10 @@
+## TEST v1.97.70 — PSX office chairs (2026-11-10)
+- Owner sent `psx_office_chair.glb` — **"PSX Office Chair" by emnix** (Sketchfab, CC BY 4.0, credit in the file). It is now every office chair in the plant: the four operator chairs in the energy center control room and the board operator's chair under Rick (all box chairs before).
+- The model (1.32 m tall, seat cushion top at 0.66, back toward +x) is turned so its back is toward +z like the box chairs (you sit facing −z), centred on its base on the chair's floor, and scaled by 0.47 / 0.66 so the seat top is at 0.47 m — the height seated workers are fitted to (`SKIN_POSE.seatTop`) and a normal chair, ≈ 0.94 m tall. Loaded once and cloned per chair, nearest-pixel texture. The box chair stays until the model is in, then hides; the seated worker's model load no longer hides any group in the chair (it used to hide every child group — the chair model is one).
+- File shipped unchanged as `assets/models/psx_office_chair.glb`; credited in CREDITS.md, the registry and `assets/models/README.md`.
+- Tests: new `validate-office-chair.cjs`. Checked in the running game: Rick seated in it (back behind him, seat under him), and the control room chairs at the desks.
+- Bumped TEST to `1.97.70`.
+
 ## TEST v1.97.69 — PSX fridge in the break room (2026-11-10)
 - Owner sent `psx_fridge.glb` — **"PSX Fridge" by emnix** (Sketchfab, CC BY 4.0, credit in the file). It replaces the plain steel box fridge in the process building break room, just east of the north door, door facing into the room.
 - The model (0.86 × 2.04 × 0.89 m, door toward +z) is scaled evenly so its depth fills the 0.78 m the box did (≈ 1.79 m tall), centred where the box stood and stood on the office floor; its texture is drawn nearest-pixel as the model asks. The box stays as a stand-in until the model has loaded (own materials, so the static merge doesn't fold it in), then goes. Collision unchanged. File shipped unchanged as `assets/models/psx_fridge.glb`; credited in CREDITS.md, the registry and `assets/models/README.md`.

@@ -5690,6 +5690,27 @@ function fridgeModel(x, z, y, depth, yaw, stand) {
     for (const o of stand || []) if (o) { o.visible = false; o.removeFromParent(); }
   }, 'fridge');
 }
+// ---------- PSX OFFICE CHAIR (v1.97.70, owner sent psx_office_chair.glb: "PSX Office Chair" by emnix, Sketchfab, CC BY 4.0): every office
+// chair in the plant - the four operator chairs in the energy center control room and the board operator's chair under Rick. The model
+// is 1.32 m tall with its seat cushion top at 0.66 and its back toward +x; it is turned so the back is toward +z like the box chairs it
+// replaces (you sit facing -z), stood on the chair's floor, and scaled by 0.47 / 0.66 so the seat top is at 0.47 - the height the seated
+// workers are fitted to (SKIN_POSE.seatTop), and a normal office chair: about 0.94 m tall. One load, cloned per chair (shared geometry
+// and texture, nearest-pixel). The box chair stays until the model is in, then hides; the seated NPC's own model never hides it.
+const CHAIR = { url: '/corn-souls/assets/models/psx_office_chair.glb', seat: 0.66, top: 0.47, proto: null, wait: [] };
+function chairModel(g) {
+  if (typeof document === 'undefined' || !g) return;
+  const put = proto => { const m = proto.clone(); m.userData.chairModel = true; for (const c of g.children) if (c.isMesh) c.visible = false; g.add(m); };
+  if (CHAIR.proto) { put(CHAIR.proto); return; }
+  CHAIR.wait.push(put); if (CHAIR.wait.length > 1) return;
+  loadGlbModel(CHAIR.url, ({ root }) => {
+    root.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(root);
+    const inner = new T.Group(), p = new T.Group(); inner.add(root); p.add(inner);
+    inner.position.set(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);   // centred on its base, standing on y 0
+    p.rotation.y = -Math.PI / 2; p.scale.setScalar(CHAIR.top / CHAIR.seat); p.userData.chairModel = true;
+    root.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material.map) { const t = o.material.map; t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; } } });
+    CHAIR.proto = p; const W = CHAIR.wait; CHAIR.wait = null; for (const f of W) f(p);
+  }, 'chair');
+}
 const HYDRANT_SCALE = 0.42;
 function hydrantModel(x, z, yaw) {
   if (typeof document === 'undefined') return;
@@ -6394,7 +6415,7 @@ function loadCharacter(id, cfg) {
     if (cfg.pose !== 'sit') npc.g.position.y = 0;                  // drop the box avatar's own lift
     if (cfg.x !== undefined) npc.g.position.x = cfg.x;            // world nudges, e.g. off a track
     if (cfg.z !== undefined) npc.g.position.z = cfg.z;
-    const seated = npc.g.children.filter(c => c.isGroup);          // seatedPerson() = chair meshes + one body group
+    const seated = npc.g.children.filter(c => c.isGroup && !c.userData.chairModel);          // seatedPerson() = chair meshes + one body group
     if (seated.length) for (const c of seated) c.visible = false;  // keep the chair, lose the box body
     else for (const c of npc.g.children) c.visible = false;
     npc.g.add(root); npc.model = root;                             // hidden only now: a failed load leaves the box
@@ -6591,7 +6612,7 @@ function skinnedNpc(npc, cfg, { root }) {
   if (cfg.pose !== 'sit' && !cfg.keepY) npc.g.position.y = 0;      // drop the box avatar's own lift (not indoors on a raised floor)
   if (cfg.x !== undefined) npc.g.position.x = cfg.x;
   if (cfg.z !== undefined) npc.g.position.z = cfg.z;
-  const seated = npc.g.children.filter(c => c.isGroup);           // seatedPerson() = chair meshes + one body group
+  const seated = npc.g.children.filter(c => c.isGroup && !c.userData.chairModel);           // seatedPerson() = chair meshes + one body group
   if (seated.length) for (const c of seated) c.visible = false; else for (const c of npc.g.children) c.visible = false;
   npc.g.add(R); npc.model = R;                                     // hidden only now: a failed load leaves the box
   return R;
@@ -9391,7 +9412,7 @@ function init(container) {
       const solid = (x0, x1, z0, z1) => wallSegs.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
       const chair = (x, z, ry) => { const g = new T.Group(); g.position.set(x, 0.22, z); g.rotation.y = ry; scene.add(g); const P = (w, h, d, m, px, py, pz) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(px, py, pz); g.add(o); };
         P(0.48, 0.07, 0.48, blk, 0, 0.62, 0); P(0.46, 0.55, 0.06, blk, 0, 0.95, 0.24); P(0.05, 0.58, 0.05, blk, 0, 0.32, 0); P(0.55, 0.04, 0.06, blk, 0, 0.04, 0); P(0.06, 0.04, 0.55, blk, 0, 0.04, 0);
-        const ring = new T.Mesh(new T.TorusGeometry(0.2, 0.012, 4, 14), lgry); ring.rotation.x = Math.PI / 2; ring.position.y = 0.3; g.add(ring); };
+        const ring = new T.Mesh(new T.TorusGeometry(0.2, 0.012, 4, 14), lgry); ring.rotation.x = Math.PI / 2; ring.position.y = 0.3; g.add(ring); chairModel(g); };   // (v1.97.70: the PSX chair once it is in)
       // north wall
       box(1.5, 1.6, 0.35, gry, X0 + 2.25, 1.35, Z0 + 0.2); box(0.32, 0.22, 0.02, scrM, X0 + 2.55, 1.75, Z0 + 0.38); box(0.12, 0.08, 0.02, mat(0xf2c200), X0 + 1.85, 1.75, Z0 + 0.38);   // 2-door panel, HMI, e-stop label
       for (const dx of [1.6, 2.9]) box(0.2, 0.3, 0.3, gry, X0 + dx, 0.38, Z0 + 0.2);
@@ -14128,7 +14149,7 @@ function seatedPerson(x, z, yaw, shirt, fy, opt) {
   const P = (w, h, d, m, px, py, pz) => { const q = new T.Mesh(new T.BoxGeometry(w, h, d), m); q.position.set(px, py, pz); g.add(q); };
   P(0.5, 0.08, 0.5, ch, 0, 0.43, 0); P(0.48, 0.55, 0.07, ch, 0, 0.78, 0.26); P(0.06, 0.42, 0.06, ch, 0, 0.23, 0); P(0.55, 0.04, 0.06, ch, 0, 0.03, 0); P(0.06, 0.04, 0.55, ch, 0, 0.03, 0);   // chair: seat TOP at 0.47, which is what the pelvis is anchored to
   const p = makeCharacter(shirt, true, opt); p.position.set(0, -0.37, 0.04); g.add(p);
-  g.position.set(x, fy || 0, z); g.rotation.y = yaw; scene.add(g); extraCols.push([x, z, 0.4]); return g;
+  g.position.set(x, fy || 0, z); g.rotation.y = yaw; scene.add(g); extraCols.push([x, z, 0.4]); chairModel(g); return g;   // (v1.97.70: the PSX chair)
 }
 // ---------- NPCs you can talk to (walk up, look at them, ✋ / E / X). What they say lives in ui.js (conversation trees + voice / typed questions).
 const NPCS = [];

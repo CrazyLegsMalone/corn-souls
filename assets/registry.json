@@ -1263,6 +1263,22 @@
       "files": [
         "assets/models/psx_fridge.glb"
       ]
+    },
+    {
+      "id": "sketchfab-emnix-psx-office-chair",
+      "title": "PSX Office Chair",
+      "creator": "emnix",
+      "source_url": "https://sketchfab.com/3d-models/psx-office-chair-715256fa219e46ef9e793f2a06f04904",
+      "evidence": "The owner's download (psx_office_chair.glb): embedded asset.extras {\"author\": \"emnix (https://sketchfab.com/emnix)\", \"license\": \"CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\", \"title\": \"PSX Office Chair\"}.",
+      "notes": "In the TEST channel from v1.97.70: every office chair - the four operator chairs in the energy center control room and the board operator's chair (in place of box chairs).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "File unchanged. In the game: turned so its back faces +z, centred on its base, scaled evenly so the seat top is at 0.47 m, texture drawn nearest-pixel; one load cloned per chair.",
+      "files": [
+        "assets/models/psx_office_chair.glb"
+      ]
     }
   ]
 }
