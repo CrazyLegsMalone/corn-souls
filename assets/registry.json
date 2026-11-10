@@ -1247,6 +1247,22 @@
       "files": [
         "assets/models/fp/arms.glb"
       ]
+    },
+    {
+      "id": "sketchfab-emnix-psx-fridge",
+      "title": "PSX Fridge",
+      "creator": "emnix",
+      "source_url": "https://sketchfab.com/3d-models/psx-fridge-514cf16781884358b2ac940dea4a6cfa",
+      "evidence": "The owner's download (psx_fridge.glb): embedded asset.extras {\"author\": \"emnix (https://sketchfab.com/emnix)\", \"license\": \"CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)\", \"title\": \"PSX Fridge\"}.",
+      "notes": "In the TEST channel from v1.97.69: the fridge in the process building break room (in place of a plain steel box).",
+      "source_platform": "Sketchfab",
+      "license_name": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "status": "in-use",
+      "modifications": "File unchanged. In the game: scaled evenly to 0.78 m deep, centred, stood on the floor, texture drawn nearest-pixel.",
+      "files": [
+        "assets/models/psx_fridge.glb"
+      ]
     }
   ]
 }

@@ -1,3 +1,9 @@
+## TEST v1.97.69 — PSX fridge in the break room (2026-11-10)
+- Owner sent `psx_fridge.glb` — **"PSX Fridge" by emnix** (Sketchfab, CC BY 4.0, credit in the file). It replaces the plain steel box fridge in the process building break room, just east of the north door, door facing into the room.
+- The model (0.86 × 2.04 × 0.89 m, door toward +z) is scaled evenly so its depth fills the 0.78 m the box did (≈ 1.79 m tall), centred where the box stood and stood on the office floor; its texture is drawn nearest-pixel as the model asks. The box stays as a stand-in until the model has loaded (own materials, so the static merge doesn't fold it in), then goes. Collision unchanged. File shipped unchanged as `assets/models/psx_fridge.glb`; credited in CREDITS.md, the registry and `assets/models/README.md`.
+- Tests: new `validate-fridge.cjs`. Checked in the running game from the break room.
+- Bumped TEST to `1.97.69`.
+
 ## TEST v1.97.68 — the dog's feet stay on the ground (2026-11-10)
 - Owner: *"dogs feet clip through flor"*. Three causes, measured off the rig (`scripts/rig_animal_glb.py`'s pose on the real mesh):
   - **Sitting:** the body came down a straight 0.31 while the legs folded, so the hind legs went ~4 cm under the ground sat and up to ~7 cm under while sitting down or getting up. New sit pose (body 0.55, fore legs 0.65, hips −1.7, knees 1.2) puts the fore paws, the folded hind legs and the rump all on the ground, and `ANIMAL_SIT.drop` is now a table of how far the body may come down at each tenth of the way (the lowest point on the ground at every step, within 1.5 mm).

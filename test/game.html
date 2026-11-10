@@ -5673,6 +5673,23 @@ function loadGlbModel(url, onReady, tag) {
 // ---------- FIRE HYDRANT (v1.97.143, owner: lopoly_hydrant.glb): the owner's low-poly hydrant in place of the old code-drawn flat
 // picture. 2.1 units tall as made, drawn 0.88 m (the old picture's height), its three 64 px colour maps kept crisp (the model asks for
 // nearest-pixel sampling, which the shared GLB reader doesn't apply). Its round collider is the one placed with it.
+// ---------- PSX FRIDGE (v1.97.69, owner sent psx_fridge.glb: "PSX Fridge" by emnix, Sketchfab, CC BY 4.0): the break room's fridge.
+// The model is 0.86 x 2.04 x 0.89 m with its door facing +z; it is scaled evenly so its depth fills the 0.78 m the old box did
+// (about 1.79 m tall), stood on the office floor and centred where the box stood, door into the room. Its 256 x 512 picture is drawn
+// nearest-pixel as the model asks (the shared reader doesn't apply samplers). The plain box stays until the model arrives.
+const FRIDGE_URL = '/corn-souls/assets/models/psx_fridge.glb';
+function fridgeModel(x, z, y, depth, yaw, stand) {
+  if (typeof document === 'undefined') return;
+  loadGlbModel(FRIDGE_URL, ({ root }) => {
+    const g = new T.Group(); g.add(root); g.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(root), sz = bb.getSize(V3()), k = depth / (sz.z || 1);
+    root.position.set(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);   // centred on x / z, standing on y 0
+    g.scale.setScalar(k); g.position.set(x, y, z); g.rotation.y = yaw || 0; g.name = 'fridge';
+    root.traverse(o => { o.userData.noHit = false; if (o.isMesh && o.material.map) { const t = o.material.map; t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true; } });
+    mergeModel(g, true); scene.add(g);
+    for (const o of stand || []) if (o) { o.visible = false; o.removeFromParent(); }
+  }, 'fridge');
+}
 const HYDRANT_SCALE = 0.42;
 function hydrantModel(x, z, yaw) {
   if (typeof document === 'undefined') return;
@@ -8089,7 +8106,8 @@ function init(container) {
       box(0.4, 0.05, 0.5, mat(0x9aa1a8), BW + 0.33, 0.9, OZN + 1.6);                                     // sink
       for (let i = 1; i < 5; i++) { box(0.02, 0.7, 0.02, mat(0x4a2a1c), BW + 0.63, 0.45, OZN + 0.12 + i * 0.52); box(0.02, 0.6, 0.02, mat(0x4a2a1c), BW + 0.35, 1.85, OZN + 0.12 + i * 0.52); }
       wallSegs.push([BW + 0.63, OZN + 0.1, BW + 0.63, OZN + 2.72], [BW, OZN + 2.72, BW + 0.63, OZN + 2.72]);
-      box(0.92, 1.78, 0.78, steel, -62.48, 0.89, OZN + 0.52); box(0.02, 1.0, 0.02, mat(0x5a6066), -62.48, 1.35, OZN + 0.92);   // fridge
+      { const stand = [box(0.92, 1.78, 0.78, matU(0xb9bec3), -62.48, 0.89, OZN + 0.52), box(0.02, 1.0, 0.02, matU(0x5a6066), -62.48, 1.35, OZN + 0.92)];   // fridge: a stand-in until the model is in (own materials, so the static merge leaves it to be taken away)
+        fridgeModel(-62.48, OZN + 0.52, SLAB_TOP + 0.05, 0.78, 0, stand); }
       wallSegs.push([-62.95, OZN + 0.92, -62.0, OZN + 0.92], [-62.95, OZN + 0.1, -62.95, OZN + 0.92], [-62.0, OZN + 0.1, -62.0, OZN + 0.92]);
       // north wall east of the fridge (photo facing east): soda machine, a small empty space, snack machine in the NE corner
       const red = mat(0xd8341f), blackM = mat(0x1d2024), glassM = new T.MeshLambertMaterial({ color: 0x8fb0c4, transparent: true, opacity: 0.6 });

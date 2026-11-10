@@ -20,6 +20,7 @@ function build(source, westWing){
  ctx.NAME_K=0.75;   // label scale constant, defined at the top of the engine block
  ctx.srgbTex=t=>t;   // the canvas-texture sRGB helper lives in the engine block; this slice only needs it to exist
  ctx.ribWall=m=>m;   // the wall siding helper (v1.97.117) lives in the engine block
+ ctx.fridgeModel=noop;ctx.matU=c=>new T.MeshLambertMaterial({color:c});   // the break room's PSX fridge model (v1.97.69) loads in the engine block
  ctx.psxMat=m=>m;ctx.psxFace=m=>m;ctx.concM=c=>new T.MeshLambertMaterial({color:c});   // the PSX texture helpers (v1.97.65) live in the engine block
 
  ctx.loadVendMachine=()=>({});ctx.vendSpawn=noop;   // vending props are placed through their own loader
