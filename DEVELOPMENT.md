@@ -1,3 +1,8 @@
+## TEST v1.97.66 — rusty corrugated removed (2026-11-10)
+- Owner: *"remove the rusty corrugated"*. The metal buildings' siding is back to the painted ribs (`ribWall` / the process building's own rib canvas, as in v1.97.64) and the metal roofs are plain again. Every other PSX texture from v1.97.65 stays: grass, asphalt, concrete, office ceiling and lino floors, wood doors, blood splatter. `corrugated_rusty.png` stays in `assets/textures/psx/`, unused; credits and registry updated to say so.
+- Tests: `validate-siding.cjs` back to the rib checks plus a guard that no corrugated is applied; `validate-psx-textures.cjs` drops the corrugated uses and guards against them.
+- Bumped TEST to `1.97.66`.
+
 ## TEST v1.97.65 — PSX textures across the plant (2026-11-10)
 - Owner sent **"PSX Textures Free" by heyheythere** (CC BY 4.0) and picked *"Everything they fit"*. The 16 PNGs (16-colour dithered, 128 px a metre) are in `assets/textures/psx/` unchanged with the pack's LICENSE.txt, credited in CREDITS.md, the registry (credits page) and `assets/textures/README.md`.
 - **Where:** grass and asphalt ground (2 m a copy; the grass lifted to about the old green), concrete pads, slabs and every piece the code calls concrete (2 m), **rusty corrugated** on every metal building's siding and the metal roofs (1.5 m across, rust streaks 4 m tall so they don't row up), the office **drop ceiling** (2 ft ceiling tiles), the office and scale-house **floors** (1 ft lino), the scale house's inside **wood doors**, and a **blood splatter** where a corn zombie falls (up to 14 at a time, each gone after 90 s; on the guest's puppets too).

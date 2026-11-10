@@ -1206,7 +1206,7 @@
       "creator": "heyheythere",
       "source_url": "https://heyheythere.itch.io/psx-textures-free",
       "evidence": "The owner's download (psx-textures-free-assets.zip): LICENSE.txt \"Made and licensed by heyheythere (https://heyheythere.itch.io). PSX Textures Free is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)\" with the credit line \"PSX Textures Free by heyheythere - https://heyheythere.itch.io/psx-textures-free - CC BY 4.0\" (kept as assets/textures/psx/LICENSE.txt).",
-      "notes": "In the TEST channel from v1.97.65: grass and asphalt ground, concrete pads and slabs, rusty corrugated metal siding and roofs, office drop ceiling (ceiling tiles), office and scale-house floors (lino), the scale house's inside doors (wood door), and blood splatter where a corn zombie falls. Brick, cracked plaster, mint paint, dirty white tiles, wainscot, wood floor, rusty steel and the EXIT sign are kept, unused.",
+      "notes": "In the TEST channel from v1.97.65: grass and asphalt ground, concrete pads and slabs, office drop ceiling (ceiling tiles), office and scale-house floors (lino), the scale house's inside doors (wood door), and blood splatter where a corn zombie falls. Rusty corrugated (on the metal buildings in v1.97.65 only, removed at the owner's request in v1.97.66), brick, cracked plaster, mint paint, dirty white tiles, wainscot, wood floor, rusty steel and the EXIT sign are kept, unused.",
       "source_platform": "itch.io",
       "license_name": "CC BY 4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",

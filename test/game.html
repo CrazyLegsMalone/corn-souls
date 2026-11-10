@@ -4971,7 +4971,7 @@ const selfLit = m => { m.userData.csGlow = true; return m; };
 const srgbTex = t => { if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; };
 // ---------- PSX TEXTURES (v1.97.65, owner sent "PSX Textures Free" by heyheythere, CC BY 4.0, and picked "Everything they fit"):
 // 16-colour dithered PS1 textures at 128 px a metre, in assets/textures/psx/. The grass and the asphalt, the concrete pads and
-// slabs, the metal siding and roofs (rusty corrugated), the office drop ceiling and tile floors (ceiling tiles, lino) and the
+// slabs (the metal siding and roofs were rusty corrugated in v1.97.65 only), the office drop ceiling and tile floors (ceiling tiles, lino) and the
 // scale house's wood doors wear them, and a corn zombie leaves a blood splatter where it falls.
 //  - A surface keeps the colour it had: the texture's own average colour is measured when it loads and the material is tinted by
 //    old colour / that average, so the plant's colour scheme stays and the texture brings the detail.
@@ -4981,7 +4981,7 @@ const srgbTex = t => { if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; re
 //    run once before the meshes are merged), so the texture is the same size on a 1 m pad and a 100 m wall and lines up across pieces.
 //  - Nearest-pixel when close (the crunchy texels) but with mipmaps, so the ground does not shimmer out to the horizon.
 const PSX = { dir: '/corn-souls/assets/textures/psx/', tex: {}, avg: {}, wait: {}, white: null, list: [], uvs: 0, loaded: 0 };
-const PSX_TILE = { grass: 2, asphalt: 2, concrete: 2, corrugated_rusty: 1.5, ceiling_tiles: 1.22, tiles_lino: 0.61 };   // metres one copy of the texture covers
+const PSX_TILE = { grass: 2, asphalt: 2, concrete: 2, corrugated_rusty: 1.5, ceiling_tiles: 1.22, tiles_lino: 0.61 };   // (corrugated_rusty: not used since v1.97.66, owner: "remove the rusty corrugated")   // metres one copy of the texture covers
 const PSX_TALL = { corrugated_rusty: 4 };   // on a wall, metres one copy covers UP the wall (rust streaks run 4 m, not a row of drips every 1.5 m)
 function psxWhite() {
   if (PSX.white) return PSX.white;
@@ -5292,7 +5292,7 @@ function ribTexture() {
   const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return RIB_TEX = t;
 }
 const ribMats = [];
-function ribWall(m) { psxMat(m, 'corrugated_rusty'); ribMats.push(m); return m; }   // v1.97.65: rusty corrugated (PSX), in the wall's own colour; was the painted rib canvas (ribTexture, kept)
+function ribWall(m) { m.map = ribTexture(); m.userData.ribSiding = true; m.needsUpdate = true; ribMats.push(m); return m; }   // (v1.97.66, owner: "remove the rusty corrugated": the painted ribs again)
 function ribGeo(geo) {   // a box: each face gets one texture repeat per foot along its width (the ribs run up the wall)
   if (!geo || geo.userData.ribbed || geo.type !== 'BoxGeometry') return; geo.userData.ribbed = true;
   const P = geo.parameters, uv = geo.attributes.uv, n = geo.attributes.normal;
@@ -5326,7 +5326,7 @@ function building(x0, x1, z0, z1, h, northOpen, eastOpen, westOpen, southOpen) {
   { let at = x0; for (const [c, w, , sill] of nop) { if (sill) continue; wallSegs.push([at, z0, c - w / 2, z0]); at = c + w / 2; } wallSegs.push([at, z0, x1, z0]); }
   const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const wall = ribWall(new T.MeshLambertMaterial({ color: 0xa7afb8, transparent: true, opacity: 0.5, depthWrite: false }));   // ribbed metal siding
-  const roof = psxMat(new T.MeshLambertMaterial({ color: 0x4a5058, transparent: true, opacity: 0.42, depthWrite: false }), 'corrugated_rusty');
+  const roof = new T.MeshLambertMaterial({ color: 0x4a5058, transparent: true, opacity: 0.42, depthWrite: false });
   wallMats.push(wall, roof);
   { let at = x0; for (const [c, ow, oh, sill] of nop) { const a = c - ow / 2, y0 = sill || 0; if (a - at > 0.05) add(new T.BoxGeometry(a - at, h, 0.3), wall, (at + a) / 2, h / 2, z0, null, true);
       if (y0) add(new T.BoxGeometry(ow, y0, 0.3), wall, c, y0 / 2, z0, null, true);
@@ -7827,7 +7827,7 @@ function init(container) {
       g.fillStyle = '#f3f4f3'; g.fillRect(0, 0, 64, 4); g.fillStyle = '#cfd3d7'; g.fillRect(0, 0, 3, 4); g.fillStyle = '#e4e7e9'; g.fillRect(3, 0, 3, 4); g.fillRect(30, 0, 2, 4);
       const t = new T.CanvasTexture(cv); t.wrapS = t.wrapT = T.RepeatWrapping; if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; return t; })();
     const wm = selfLit(new T.MeshLambertMaterial({ color: 0xffffff, map: ribTex, emissive: 0x7a7d80, emissiveMap: ribTex, transparent: true, opacity: 0.5, depthWrite: false }));
-    wm.userData.ribbed = 0.3048; psxMat(wm, 'corrugated_rusty', 0, { base: 0xeceeef });   // v1.97.65: rusty corrugated (PSX) like every other metal wall, as white as the old ribs
+    wm.userData.ribbed = 0.3048;
     // roof deck seen from inside: light-medium gray metal with gray lines running east–west every 2 ft
     const roofTex = (() => { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 64; const g = cv.getContext('2d');
       g.fillStyle = '#c4c8cc'; g.fillRect(0, 0, 4, 64); g.fillStyle = '#979ca2'; g.fillRect(0, 0, 4, 4); g.fillStyle = '#b3b7bc'; g.fillRect(0, 4, 4, 3);

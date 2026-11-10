@@ -56,9 +56,6 @@ ctx.PSX.tex.concrete = null;
 
 // where they are used
 for (const [k, why] of [
-  ["function ribWall(m) { psxMat(m, 'corrugated_rusty'); ribMats.push(m); return m; }", 'every ribWall siding is rusty corrugated'],
-  ["wm.userData.ribbed = 0.3048; psxMat(wm, 'corrugated_rusty', 0, { base: 0xeceeef });", 'and the process building and maintenance shop'],
-  ["const roof = psxMat(new T.MeshLambertMaterial({ color: 0x4a5058, transparent: true, opacity: 0.42, depthWrite: false }), 'corrugated_rusty');", 'the metal buildings\' roofs'],
   ["m.userData.ground = 'pad'; return psxMat(m, 'concrete'); })());", 'the concrete pad layer'],
   ["function concreteFloor(x0, x1, z0, z1) { box(x1 - x0 - 0.3, 0.1, z1 - z0 - 0.3, concM(0x8d9196),", 'the simple concrete floors'],
   ["psxMat(conc, 'concrete');", 'the process building slab'],
@@ -73,4 +70,5 @@ for (const [k, why] of [
   ["stepSafe('blood', () => bloodStep(dt));", 'the splatters age'],
 ]) assert.ok(html.includes(k), why);
 assert.ok((html.match(/concM\(0x/g) || []).length >= 14, 'concrete pieces round the plant');
-console.log('PASS: PSX textures (16 files + licence + credits; colour-keeping tint, white placeholder map, world-metre UVs before the merge, grass / asphalt / concrete / corrugated / ceiling / lino / wood door / blood)');
+assert.ok(!/psxMat\([^)]*'corrugated_rusty'/.test(html), 'no rusty corrugated on the buildings (v1.97.66, owner: "remove the rusty corrugated")');
+console.log('PASS: PSX textures (16 files + licence + credits; colour-keeping tint, white placeholder map, world-metre UVs before the merge, grass / asphalt / concrete / ceiling / lino / wood door / blood; no rusty corrugated)');
