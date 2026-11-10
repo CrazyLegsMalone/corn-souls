@@ -59,6 +59,6 @@ assert.ok(/c\.state === 'hide'/.test(step) && /O\.shedManDoor\.open > 0\.1/.test
 assert.ok(/titleEl\.isConnected/.test(step), 'not set off behind the title screen');
 assert.ok(/catYowl\(\)/.test(step) && /c\.state = 'gone'/.test(step), 'yowls, runs, and is gone for the session');
 assert.ok(html.includes('O.shedManDoor = O.swingDoors[O.swingDoors.length - 1];'), 'the shed man door is known to the cat');
-assert.ok(/density: 0\.004125,/.test(html), 'grass tufts halved');
+assert.ok(/density: 0\.00206,/.test(html), 'grass tufts halved (and halved again in v1.97.64)');
 assert.ok(/!rd\.awake && now - rd\.born > 60\)/.test(html), 'buzzard after one minute');
 console.log('PASS: farm animals (cows east of the employee lot, sheep south of the diagonal road, dog by the rail spur, colliders, moos and baas, shed cat jump scare), cow / sheep / dog rigged and wandering, grass halved, buzzard at 1 min');

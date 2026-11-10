@@ -1,3 +1,11 @@
+## TEST v1.97.64 — paintball match, and fewer grass tufts (2026-11-09)
+- Owner: *"paintball match"* and *"Reduce amount of grass tufts"*.
+- **Paintball match.** Pause menu → **🎯 Paintball match**, with the other player in your game. The paint stops hurting and starts scoring: **first to 5 tags**. Where each of you is standing when it starts is your own end — a tag puts you straight back there with a full tank and two seconds where you cannot be tagged again, so it is quick back-and-forth with no death screen. A banner shows the score. Either of you can start it, either can call it off, and the link dropping ends it.
+- Whoever is tagged is the one who counts it and sends the score, so both ends always agree. Melee still hurts — paintball is the sport.
+- **Grass**: density halved again, 0.004125 → 0.00206 tufts per m², about an eightieth of the original 0.16.
+- Tests: new `validate-paintball-match.cjs` (starting, the guards, tagging and the grace period, the mirrored score, winning from either side, calling off, the link dropping); `validate-grass.cjs` baselines moved to the new density.
+- Bumped TEST to `1.97.64`.
+
 ## TEST v1.97.63 — co-op zombie horde (2026-11-09)
 - Owner: *"paintball match or maybe coop zombie horde"* → horde first.
 - **Pause menu → 🧟 Zombie horde here.** Wherever you are standing becomes the spot you defend. After a short breather, waves of corn zombies come in from 26–44 m out: **wave n is 3 + 2n of them**, each wave with more health (+18) and a little more speed (capped at 2.7 m/s, still slower than a sprint). At most 7 are on their feet at once, the rest arrive as you drop them. 22 seconds between waves. A banner at the top of the screen shows the wave, how many are left and your count, and your best wave is kept on the device.
