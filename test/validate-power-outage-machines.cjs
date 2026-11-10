@@ -571,6 +571,18 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     body.updateMatrixWorld(true); const bb = new T3.Box3().setFromObject(body);
     assert.ok(Math.abs(bb.min.y - 0.004) < 1e-6, 'a thrown body rests with its lowest point on the floor (' + bb.min.y.toFixed(3) + ')');
     assert.ok(Math.abs(body.rotation.z - Math.PI) < 1e-9 && bb.max.y < 0.25, 'belly-up, not sunk and not floating');
+    // v1.97.72: "You can throw lizard body through process building wall" - a wall 1 m ahead stops it, and one thrown from right at
+    // a wall starts on the thrower's side
+    ctx.wallSegs = [[1, -5, 1, 5]];
+    const b3 = new T3.Group(); b3.add(new T3.Mesh(new T3.BoxGeometry(0.2, 0.1, 0.3), new T3.MeshBasicMaterial())); b3.position.set(0, 1.5, 0);
+    ctx.THROWN.push({ g: b3, o: { thrown: true, t: 0 }, v: new T3.Vector3(9, 2, 0), spin: new T3.Vector3(1, 1, 1), t: 0 });
+    let maxX = 0; for (let i = 0; i < 400 && ctx.THROWN.length; i++) { ctx.step(1 / 60); maxX = Math.max(maxX, b3.position.x); }
+    assert.ok(maxX < 1, 'it never got past the wall (furthest ' + maxX.toFixed(3) + ' m)'); assert.ok(b3.position.x < 0.95, 'and it bounced back off it');
+    ctx.wallSegs = [[1, -5, 1, 5, 0, 0.5]];   // a wall that only applies to the ground floor (feet between 0 and 0.5 m): it reaches 2.6 m above that band
+    const b4 = new T3.Group(); b4.add(new T3.Mesh(new T3.BoxGeometry(0.2, 0.1, 0.3), new T3.MeshBasicMaterial())); b4.position.set(0, 6, 0);
+    ctx.THROWN.push({ g: b4, o: { thrown: true, t: 0 }, v: new T3.Vector3(6, 0, 0), spin: new T3.Vector3(1, 1, 1), t: 0 });
+    ctx.step(1 / 60); for (let i = 0; i < 40; i++) ctx.step(1 / 60); assert.ok(b4.position.x > 1, 'but high over a wall that stops at its floor band it carries on');
+    ctx.wallSegs = [];
     assert.equal(o.thrown, false, 'no longer exempt from the clean-up timer');
     assert.equal(o.t, 45, 'with a full timer again');
   }
