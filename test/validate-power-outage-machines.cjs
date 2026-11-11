@@ -109,7 +109,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   for (const gate of ['!POWER_OUTAGE.on && train.unloading', '!POWER_OUTAGE.on && pitBusy[i]', '!POWER_OUTAGE.on && fm.bu > 100']) {
     assert.ok(html.includes(gate), 'gated: ' + gate);
   }
-  assert.ok(html.includes("(POWER_OUTAGE.on ? 0 : 1) * (s.k === 'mill'"), 'mill rotors, the blender and the agitators stop');
+  assert.ok(html.includes("(POWER_OUTAGE.on ? 0 : 1) * (s.k === 'prop'"), 'mill rotors, the blender and the agitators (v1.97.76: the yeast props and blend tank too) stop');
   assert.ok(html.includes('POWER_OUTAGE.on && S.grid ? 0 : S.rate'), 'the RTO and cooling tower stacks stop smoking');
   assert.ok(html.includes('(OUT_F - C.T) * (0.0025 + 0.006 * openSum) * dt'), 'the cooler warms with no compressor');
 

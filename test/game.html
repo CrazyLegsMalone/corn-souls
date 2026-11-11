@@ -4351,11 +4351,15 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const SPEEDS = [[1 / 3600, 'Real time'], [1 / 60, '1 min/s'], [1 / 6, '10 min/s'], [1, '1 hr/s']];
 const SIM_H_PER_SEC = 1 / 60;   // default: one plant minute per real second
 const NF = 7;
-const CAP = { silo: 175000, day: 9000, st1: 1200, st2: 1200, ct: 30, liq: 1800, ferm: 18000, beer: 70000, etoh: 120000, oil: 60000 }; // bu-eq, gal, lb
+const CAP = { silo: 175000, day: 9000, st1: 1200, st2: 1200, ct: 30, liq: 1800, ferm: 18000, beer: 70000, etoh: 120000, oil: 60000, prop: 560 }; // bu-eq, gal, lb
 // 7 fermenters: at 1,700 bu/h an 85% batch (15,300 bu) fills in 9 h; then 50 h ferment, 2 h drain, 1 h clean = 62 h < 7 x 9 h
 const FERM_H = 50, DRAIN_RATE = 7650, CIP_H = 1, COL_MAX = 2700, TRUCK_DELAY = 1.0, TRUCK_DRAIN_H = 1.0;
 const RAIL_GAL = 8000, OIL_LOAD = 45000, CAKE_LOAD = 25;
 const FAILURES = false;   // no breakdowns for now (strainer plugging, fermenter infections) — add failure rates later
+// v1.97.76 yeast: the blend tank mixes water, yeast (from the yeast cooler totes), enzyme and nutrients; an empty prop tank takes that
+// batch plus a side stream of cooled mash off the mash coolers and grows yeast for ~8 h; the ready prop is pitched into the fermenter
+// that is filling. Two props take turns, so one can be cleaned while the other grows. A fermenter with no yeast pitched ferments slowly.
+const YB_MIX = 0.5, YB_DUMP = 0.25, PROP_H = 8, PROP_LEAD = 1.1, PROP_FILL = 0.9, SIDE_MAX = 700, PITCH_RATE = 1200, PROP_CIP = 0.5, PROP_STALE = 6;
 const MILL_MAX = 650, DAY_FILL = 900, STR_MAX = 3600, STR_PLUG_H = 14, STR_CLEAN_H = 0.75;
 
 // Every selectable unit. lvl/temp = setpoint ranges when the unit has that control.
@@ -4384,6 +4388,8 @@ const UNITS = [
   ...['A', 'B'].flatMap((t, i) => [
     { id: 'hx' + t + '1', st: 'cook', name: 'Beer/Mash Exchanger ' + t, holds: 'Hot mash + beer', color: '#ff8c42', hxTrain: i },
     { id: 'hx' + t + '2', st: 'cook', name: 'Mash Cooler ' + t,          holds: 'Mash + cooling water', color: '#5fb8ff', hxTrain: i }]),
+  { id: 'yb', st: 'ferm', name: 'Blend Tank', holds: 'Water, yeast, enzyme + nutrients', color: '#e8d29a', lvlRO: true },
+  ...[0, 1].map(i => ({ id: 'yp' + i, st: 'ferm', name: 'Yeast Prop Tank ' + (i + 1), holds: 'Yeast growing in cooled mash', color: '#e8d29a', lvlRO: true, temp: { def: 91, min: 80, max: 100, good: [88, 93] } })),
   ...Array.from({ length: NF }, (_, i) => ({ id: 'f' + i, st: 'ferm', name: 'Fermenter ' + (i + 1), holds: 'Fermenting mash', color: '#d9a441', lvl: { def: 85, min: 20, max: 100, label: 'Fill to' }, temp: { def: 90, min: 78, max: 100, good: [88, 92] } })),
   { id: 'beer',   st: 'ferm',      name: 'Beer Well',         holds: 'Beer',          color: '#d9a441', lvl: { def: 40, min: 0, max: 100 } },
   { id: 'col',    st: 'dist',      name: 'Beer Column',       holds: 'Beer → ethanol vapor', color: '#4aa3ff', temp: { def: 217, min: 195, max: 240, good: [212, 222], label: 'Bottom temperature' } },
@@ -4399,11 +4405,16 @@ const F = {
   liqT(T) { if (T < 184) return clamp(1 - 0.0012 * (184 - T) ** 2, 0.4, 1); if (T <= 190) return 1; return clamp(1 - 0.0018 * (T - 190) ** 2, 0.4, 1); },
   residence: h => 1 - Math.exp(-h / 0.15),
   tau: T => 13 * Math.exp(-0.07 * (T - 91)),
+  yeastK: y => 0.3 + 0.7 * y,   // a fermenter's speed by how good the yeast pitched into it was (0: none pitched)
+  propT(T) { if (T < 88) return clamp(1 - 0.06 * (88 - T), 0.2, 1); if (T <= 93) return 1; return clamp(1 - 0.08 * (T - 93), 0.2, 1); },
+  viab: T => T <= 45 ? 1 : clamp(1 - 0.015 * (T - 45), 0.5, 1),   // yeast from a warm cooler is weaker
   colRec: T => clamp(1 - 0.04 * (212 - T), 0.3, 1),
   offspec: T => clamp(0.03 * (T - 222), 0, 0.6)
 };
 
-function newFerm() { return { state: 'empty', t: 0, bu: 0, pot: 0, p: 0, stress: 0, inf: false, infLoss: 0, T: 80, rate: 0 }; }
+function newFerm() { return { state: 'empty', t: 0, bu: 0, pot: 0, p: 0, stress: 0, inf: false, infLoss: 0, T: 80, rate: 0, pitched: false, yeast: 0 }; }
+function newProp() { return { state: 'empty', t: 0, bu: 0, pot: 0, grow: 0, hold: 0, stress: 0, q0: 1, q: 0, to: -1, T: 80 }; }
+function propQ(p) { return p.q0 * (0.35 + 0.65 * p.grow) * (1 - p.stress) * (p.hold > PROP_STALE ? Math.exp(-(p.hold - PROP_STALE) / 12) : 1); }
 
 function create() {
   const s = { t: 0, sp: {}, events: [], alerts: [], speed: SIM_H_PER_SEC };
@@ -4421,6 +4432,8 @@ function create() {
   s.liqDuty = 0;
   s.hxTrain = 0;
   s.ferm = Array.from({ length: NF }, () => newFerm());
+  s.yb = { state: 'ready', t: 0, L: 85, q: 1 }; s.yeastT = 38; s.propSide = 0;
+  s.prop = [Object.assign(newProp(), { state: 'propping', bu: PROP_FILL * CAP.prop, pot: PROP_FILL * CAP.prop * 2.95 * 0.96, grow: 0.7, T: 91 }), Object.assign(newProp(), { T: 80 })];
   s.beer = { bu: 0.4 * CAP.beer, eth: 0.4 * CAP.beer * 2.75, feed: 0 };
   s.col = { T: 217, rec: 1, off: 0 };
   s.etoh = { gal: 0.45 * CAP.etoh, ships: [] };
@@ -4430,7 +4443,7 @@ function create() {
   // stagger the fermenters 9 h apart so the plant starts mid-run
   const batch = 0.85 * CAP.ferm, FILL = 9;
   s.ferm.forEach((f, i) => {
-    const age = 2.5 + i * FILL; f.T = 90;
+    const age = 2.5 + i * FILL; f.T = 90; f.pitched = true; f.yeast = 1;
     if (age < FILL) { f.state = 'filling'; f.bu = batch * age / FILL; f.p = 1 - Math.exp(-age / 2 / F.tau(90)); }
     else if (age < FILL + FERM_H) { f.state = 'fermenting'; f.t = age - FILL; f.bu = batch; f.p = 1 - Math.exp(-f.t / F.tau(90)); }
     else if (age < FILL + FERM_H + 2) { f.state = 'draining'; f.bu = batch * (1 - (age - FILL - FERM_H) / 2); f.p = 0.98; f.buTot = batch; f.ethTot = batch * 2.95 * 0.96 * 0.98; }
@@ -4455,7 +4468,7 @@ function dead(s) {
   s.mills.forEach(m => { m.rate = 0; m.limit = 'power'; });
   s.conveyor = 0; s.recv = 0; s.recvRail = 0; s.recvTruck = 0;
   s.blend.flow = 0; s.beer.feed = 0;
-  s.st1.out = 0; s.st2.out = 0; s.cook.out = 0; s.liq1.out = 0; s.liq.out = 0;
+  s.st1.out = 0; s.st2.out = 0; s.cook.out = 0; s.liq1.out = 0; s.liq.out = 0; s.propSide = 0;
   s.out.corn = 0; s.out.eth = 0; s.out.oil = 0; s.out.cake = 0;
 }
 function stepH(s, dt) {
@@ -4544,12 +4557,70 @@ function stepH(s, dt) {
   s.liq.res = resH;
   s.liq.q = F.liqT(s.liq.T) * F.residence(resH) * F.slurryT(s.st2.T) * s.cook.q;
 
+  // ---- yeast: blend tank -> prop tanks -> pitched into the fermenter that is filling (v1.97.76)
+  const yb = s.yb;
+  if (yb.state === 'empty') { yb.state = 'mixing'; yb.t = 0; }
+  if (yb.state === 'mixing') { yb.t += dt; yb.L = Math.min(85, 85 * yb.t / YB_MIX); if (yb.t >= YB_MIX) { yb.state = 'ready'; yb.q = F.viab(s.yeastT === undefined ? 38 : s.yeastT); } }
+  // the next prop is started so it is ready about when the fermenter it is for starts filling: the props already on their way
+  // (growing, or ready and not yet pitched) cover the next fills in turn, and a new one starts once the fill after those is
+  // less than a prop's lead time (blend drop + fill + ~8 h growing) away. At the normal rate that is when a fermenter starts
+  // filling; run the front end faster and the two tanks overlap.
+  let pf = s.prop.find(p => p.state === 'filling');
+  const onWay = s.prop.filter(p => p.state === 'propping' || p.state === 'ready').length;
+  let due = onWay === 0;
+  if (!due && filling && lOut > 1) {
+    const target = sp['f' + s.ferm.indexOf(filling)].lvl / 100 * CAP.ferm, left = Math.max(0, target - filling.bu) / lOut, full = target / lOut;
+    const times = (filling.pitched ? [] : [0]).concat([left, left + full, left + 2 * full]);
+    due = times[onWay] <= PROP_H + PROP_LEAD;
+  }
+  if (!pf && yb.state === 'ready' && due) {
+    pf = s.prop.find(p => p.state === 'empty');
+    if (pf) { Object.assign(pf, newProp(), { state: 'filling', T: pf.T, q0: yb.q }); yb.state = 'dumping'; yb.t = 0; yb.to = s.prop.indexOf(pf); }
+  }
+  if (yb.state === 'dumping') { yb.t += dt; yb.L = Math.max(0, 85 * (1 - yb.t / YB_DUMP)); if (yb.t >= YB_DUMP) { yb.state = 'empty'; yb.L = 0; } }
+  let side = 0;   // cooled mash to the filling prop, taken off what goes to the fermenter
+  if (pf && lOut > 0) {
+    side = Math.min(SIDE_MAX, lOut * 0.45, Math.max(0, PROP_FILL * CAP.prop - pf.bu) / dt);
+    pf.bu += side * dt; pf.pot += side * dt * 2.95 * 0.96 * s.liq.q;
+    if (pf.bu >= PROP_FILL * CAP.prop - 0.5) { pf.state = 'propping'; pf.t = 0; }
+  }
+  s.propSide = side;
+  s.prop.forEach((p, i) => {
+    const Tsp = sp['yp' + i].temp;
+    if (p.bu > 20) p.T += (Tsp - p.T) * (1 - Math.exp(-dt / 0.5)); else p.T += (78 - p.T) * (1 - Math.exp(-dt / 3));
+    if (p.state === 'propping' || p.state === 'ready') {
+      p.t += dt;
+      p.grow = Math.min(1, p.grow + dt / PROP_H * F.propT(p.T));
+      p.stress = Math.min(0.5, p.stress + 0.02 * Math.max(0, p.T - 95) * dt);
+      if (p.state === 'propping' && p.grow >= 1) p.state = 'ready';
+      if (p.state === 'ready') p.hold += dt;
+    }
+    if (p.state === 'cleaning') { p.t += dt; if (p.t >= PROP_CIP) Object.assign(p, newProp(), { T: p.T }); }
+  });
+  // pitch: a ready prop goes into the fermenter that is filling (or one that started fermenting in the last 3 h without yeast)
+  let pp = s.prop.find(p => p.state === 'pitching');
+  if (!pp) {
+    const tgt = s.ferm.findIndex(f => !f.pitched && (f.state === 'filling' || (f.state === 'fermenting' && f.t < 3))), r = s.prop.find(p => p.state === 'ready');
+    if (tgt >= 0 && r) { r.q = propQ(r); r.state = 'pitching'; r.to = tgt; pp = r; s.ferm[tgt].pitched = true; s.ferm[tgt].yeast = r.q; }
+  }
+  if (pp) {
+    const f = s.ferm[pp.to], amt = Math.min(PITCH_RATE * dt, pp.bu), k = pp.bu > 0 ? amt / pp.bu : 1;
+    f.bu += amt; f.pot += pp.pot * k; pp.pot -= pp.pot * k; pp.bu -= amt;
+    if (pp.bu <= 0.5) { pp.state = 'cleaning'; pp.t = 0; pp.bu = 0; pp.pot = 0; }
+  }
+  s.pitchRate = pp ? PITCH_RATE : 0; s.pitchTo = pp ? pp.to : -1;
+
   // ---- fermenters
-  if (filling && lOut > 0) {
+  const toFerm = lOut - side;
+  if (filling && toFerm > 0) {
     const i = s.ferm.indexOf(filling), target = sp['f' + i].lvl / 100 * CAP.ferm;
-    const add = Math.min(lOut * dt, Math.max(0, target - filling.bu));
+    const add = Math.min(toFerm * dt, Math.max(0, target - filling.bu));
     filling.bu += add; filling.pot += add * 2.95 * 0.96 * s.liq.q;
-    if (filling.bu >= target - 1) { filling.state = 'fermenting'; filling.t = 0; }
+  }
+  if (filling && filling.bu >= sp['f' + s.ferm.indexOf(filling)].lvl / 100 * CAP.ferm - 1) {
+    filling.state = 'fermenting'; filling.t = 0;
+    if (!filling.pitched && !s.prop.some(p => p.state === 'ready' || p.state === 'pitching'))
+      s.alerts.push({ unit: 'f' + s.ferm.indexOf(filling), msg: 'Fermenter ' + (s.ferm.indexOf(filling) + 1) + ' finished filling with no yeast pitched — it will ferment slowly.' });
   }
   s.ferm.forEach((f, i) => {
     const Tsp = sp['f' + i].temp;
@@ -4557,7 +4628,7 @@ function stepH(s, dt) {
     f.rate = 0;
     if (f.state === 'fermenting' || f.state === 'ready' || f.state === 'filling') {
       if (f.state !== 'filling') f.t += dt;
-      const dp = (1 - f.p) * dt / F.tau(f.T);
+      const dp = (1 - f.p) * dt / F.tau(f.T) * F.yeastK(f.yeast);
       f.p += dp; f.rate = dp / dt;
       if (f.state !== 'filling') f.stress = Math.min(0.5, f.stress + 0.0011 * Math.max(0, f.T - 93) * dt);
       if (FAILURES && !f.inf && f.bu > 100 && Math.random() < (0.00004 + 0.02 * Math.max(0, f.T - 94)) * dt) {
@@ -4651,11 +4722,14 @@ function level(s, id) {
     case 'oil': return s.oil.lb / CAP.oil * 100;
   }
   if (/^f\d$/.test(id)) return s.ferm[+id[1]].bu / CAP.ferm * 100;
+  if (id === 'yb') return s.yb.L;
+  if (id === 'yp0' || id === 'yp1') return s.prop[+id[2]].bu / CAP.prop * 100;
   return null;
 }
 function temp(s, id) {
   switch (id) { case 'st1': return s.st1.T; case 'st2': return s.st2.T; case 'hydro': return s.hydro.T; case 'ct1': return s.ct[0].T; case 'ct2': return s.ct[1].T; case 'liq': return s.liq.T; case 'liq1': return s.liq1.T; case 'col': return s.col.T; }
   if (/^f\d$/.test(id)) return s.ferm[+id[1]].T;
+  if (id === 'yp0' || id === 'yp1') return s.prop[+id[2]].T;
   return null;
 }
 const FSTATE = { empty: 'Empty', filling: 'Filling', fermenting: 'Fermenting', ready: 'Finished — waiting to drain', draining: 'Draining to beer well', cleaning: 'Cleaning (CIP)' };
@@ -4788,9 +4862,31 @@ function status(s, id) {
       if (L >= 99) return ['bad', 'Oil tank full — oil is going into the wet cake instead.'];
       return ['good', 'Corn oil pulled from the syrup by the centrifuges.'];
   }
+  if (id === 'yb') {
+    const y = s.yb;
+    if (y.state === 'mixing') return ['good', 'Mixing water, yeast, enzyme and nutrients for the next prop.'];
+    if (y.state === 'dumping') return ['good', 'Dropping its batch into Yeast Prop Tank ' + (y.to + 1) + '.'];
+    if (y.state === 'ready') return y.q < 0.9 ? ['warn', 'Mixed, but the yeast came out of a warm cooler — this batch is weak.'] : ['good', 'Mixed and waiting for the next prop tank to start.'];
+    return ['idle', 'Empty.'];
+  }
+  if (id === 'yp0' || id === 'yp1') {
+    const p = s.prop[+id[2]];
+    if (p.state === 'filling') return ['good', 'Filling: the blend tank\'s yeast plus cooled mash off the mash coolers.'];
+    if (p.state === 'propping') {
+      const t = tempMsg(UNIT[id], T); if (t) return [t[0], t[1] + ' — yeast grow best at 88–93°F.'];
+      return ['good', 'Growing yeast: ' + Math.round(p.grow * 100) + '% of the way to pitching.'];
+    }
+    if (p.state === 'ready') return p.hold > PROP_STALE ? ['warn', 'Waiting too long to be pitched — the yeast are running out of sugar.'] : ['good', 'Ready to pitch into the next fermenter that starts filling.'];
+    if (p.state === 'pitching') return ['good', 'Pitching into Fermenter ' + (p.to + 1) + '.'];
+    if (p.state === 'cleaning') return ['idle', 'Cleaning (CIP).'];
+    return ['idle', 'Empty, waiting its turn.'];
+  }
   if (/^f\d$/.test(id)) {
     const f = s.ferm[+id[1]];
     if (f.inf && f.state !== 'cleaning' && f.state !== 'empty') return ['bad', 'Infected! Bacteria are eating sugar and making acid instead of ethanol.'];
+    if (f.state === 'fermenting' && !f.pitched) return ['bad', 'No yeast was pitched — it is fermenting on almost nothing.'];
+    if (f.state === 'filling' && !f.pitched) return ['warn', 'Filling — waiting for a yeast prop to be pitched.'];
+    if ((f.state === 'fermenting' || f.state === 'ready') && f.yeast < 0.8) return ['warn', 'Weak yeast was pitched — this batch is slow.'];
     if (f.state === 'fermenting' || f.state === 'filling' || f.state === 'ready') {
       if (T > 94) return ['bad', 'Too hot — yeast are stressed and bacteria thrive.'];
       if (T > 92) return ['warn', 'Warm — yeast are getting stressed.'];
@@ -4809,7 +4905,7 @@ function stationStatus(s, st) {
   return w;
 }
 
-const Sim = { switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
+const Sim = { PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
 if (typeof module !== 'undefined') module.exports = Sim; else root.Sim = Sim;
 })(this);
 </script>
@@ -7235,6 +7331,7 @@ const UPOS = { rail: [-196, 0, 5.5, 6], recv: [-182, 0, 10.5, 10], silo0: [SILOX
   hydro: [-52, -8.5, 3.6, 6], ct1: [-42, -8.5, 1.3, 7.6], ct2: [-42, -4.0, 1.3, 7.6], liq: [-36.5, -18, 4.2, 13], liq1: [-46.5, -18, 4.2, 13], lp1: [-28.2, -21, 1.6, 2], lp2: [-28.2, -16, 1.6, 2], hxA1: [-27, -24, 1.6, 3.8], hxA2: [-27, -26.4, 1.6, 3.8], hxB1: [-27, -30, 1.6, 3.8], hxB2: [-27, -32.4, 1.6, 3.8], flash: [-34, -8.5, 1.8, 5, 3],
   f0: [-7.6, -47.1, 8.1, 18], f1: [-7.6, -63.5, 8.1, 18], f2: [-7.6, -79.9, 8.1, 18], f3: [-7.6, -96.3, 8.1, 18],
   f4: [-31, -96.3, 8.1, 18], f5: [-31, -79.9, 8.1, 18], f6: [-31, -63.5, 8.1, 18], beer: [-31, -45, 10.2, 15],
+  yb: [-11.6, -36.4, 1.5, 2, 2.1], yp0: [-11.6, -31.4, 2.5, 5.6], yp1: [-11.6, -26.3, 2.5, 5.6],   // v1.97.76: blend tank (on legs) and the two yeast props
   col: [-52.5, WEST_WING.south + 7.5, 12, 2], etoh: [-158, 236, 28, 13] };
 for (const id of ['rail', 'recv', 'silo0', 'silo1', 'tb3', 'tb4', 'day0', 'day1', 'day2', 'day3', 'mill0', 'mill1', 'mill2', 'mill3']) { UPOS[id][0] += GDX; UPOS[id][1] += GDZ; }
 for (const st of ['receiving', 'milling']) { STATIONS[st].pos[0] += GDX; STATIONS[st].pos[2] += GDZ; }
@@ -7810,6 +7907,49 @@ function init(container) {
     for (const s of [-1, 1]) pipe([[x - d * 2.2, 0.6, zg + s * 1.5], [x - d * 2.7, 0.6, zg]], id, 0.22);   // out of each tank's foot inside the gap, meeting in the middle
     pipe([[x - d * 2.7, 0.6, zg], [DX + d * 0.3, 0.6, zg]], id, 0.24);   // and on into the drain pump's volute
     pipe([[DX, 1.2, zg], [DX, FY - 0.9, zg]], id, 0.26);   // discharge up to the rack
+  }
+  // ---------- YEAST PROPS + BLEND TANK (v1.97.76, owner: "We need 2 yeast prop tanks and blend tank" - "Next to ferm 1 across from
+  // the mash cooler plate exchangers should be the blend tank. South of that the yeast prop tanks"). On the alley's east side between
+  // Ferm 1 and the Ferm MCC room, across the alley from the plate exchangers. The blend tank stands on legs with a cone bottom; its
+  // pump sends each batch along a line at 3.2 m on the wall side to the prop that is starting. Cooled mash comes to the props off the
+  // mash coolers' return (a tee at z -28.5 into a header over their alley side), and each prop has its own transfer pump (motor toward
+  // the alley) that pitches it up a header to the fermenter feed riser. Agitators turn while a tank has something in it.
+  {
+    const YX = -11.6, PR = 2.1, PH2 = 5.6, BR = 1.1, BH = 2.0, BY = 2.1, BZ = -36.4, PZS = [-31.4, -26.3], CX = -17.9, TEE = -28.5, SX = -14.6, PX = -15.0, BLX = -9.0, FZ = -35;
+    const yeast = 0xe8d29a, green = 0x3ddc84, steel = mat(0x8a96a3);
+    O.yb = tank(YX, BZ, BR, BH, green, 0xd9c79a, 'yb', { level: 0.8, flat: true, y: BY });
+    nameplate('BLEND TANK', YX, BY + 1.0, BZ, BR, -1, 0, 0.8);
+    { const top = BY + BH + BR * 0.25;
+      box(0.6, 0.4, 0.6, mat(0x6f7a85), YX, top + 0.2, BZ, 'yb'); cyl(0.28, 0.8, mat(0x1e88e5), YX, top + 0.4, BZ, 'yb', 12);
+      const ag = new T.Group(); ag.position.set(YX, 0, BZ);
+      const sh = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, BH, 6), steel); sh.position.y = BY + BH / 2; ag.add(sh);
+      const bl = new T.Mesh(new T.BoxGeometry(BR * 1.2, 0.1, 0.25), steel); bl.position.y = BY + 0.4; ag.add(bl);
+      scene.add(ag); spinners.push({ o: ag, axis: 'y', k: 'ybm' }); }
+    pipe([[YX, BY - 1.8, BZ], [YX, 0.45, BZ], [YX + 1.15, 0.45, BZ]], 'yb', 0.14);   // out of the cone into the blend pump
+    pumpModel('small', YX + 1.5, BZ, 'x', 1, 'yb', 0.5);
+    pipe([[YX + 1.5, 0.9, BZ], [YX + 1.5, 3.2, BZ], [BLX, 3.2, BZ], [BLX, 3.2, PZS[1]]], 'yb', 0.14);
+    O.props = PZS.map((z, i) => {
+      const id = 'yp' + i, t = tank(YX, z, PR, PH2, green, yeast, id, { level: 0.5, flat: true });
+      nameplate('YEAST PROP ' + (i + 1), YX, 2.4, z, PR, -1, 0);
+      const top = PH2 + PR * 0.25;
+      box(0.9, 0.6, 0.9, mat(0x6f7a85), YX, top + 0.3, z, id); cyl(0.4, 1.1, mat(0x1e88e5), YX, top + 0.6, z, id, 14);   // gearbox + motor
+      const ag = new T.Group(); ag.position.set(YX, 0, z);
+      const sh = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, PH2, 6), steel); sh.position.y = PH2 / 2 + 0.6; ag.add(sh);
+      for (const y of [1.3, 3.6]) for (let k = 0; k < 2; k++) { const bl = new T.Mesh(new T.BoxGeometry(PR * 1.2, 0.18, 0.4), steel); bl.position.y = y; bl.rotation.y = k * Math.PI / 2; ag.add(bl); }
+      scene.add(ag); spinners.push({ o: ag, axis: 'y', k: 'prop', i });
+      pipe([[BLX, 3.2, z], [YX + PR, 3.2, z]], id, 0.14);                                  // yeast batch in from the blend tank
+      pipe([[SX, 4.5, z], [YX - PR, 4.5, z]], id, 0.22);                                    // cooled mash in off the coolers
+      pipe([[YX - PR + 0.1, 0.6, z], [PX + 0.3, 0.6, z]], id, 0.2);                          // out of the bottom into its transfer pump
+      pumpModel('small', PX, z, 'x', -1, id, 0.55);
+      pipe([[PX, 1.0, z], [PX, 3.4, z]], id, 0.2);
+      const dump = [[YX + 1.5, 0.45, BZ], [YX + 1.5, 3.2, BZ], [BLX, 3.2, BZ], [BLX, 3.2, z], [YX + PR, 3.2, z]];
+      const side = [[CX, 4.5, TEE], [SX, 4.5, TEE], [SX, 4.5, z], [YX - PR, 4.5, z]];
+      const pitch = [[YX - PR + 0.1, 0.6, z], [PX, 0.6, z], [PX, 3.4, z], [PX, 3.4, FZ], [CX, 3.4, FZ], [CX, 4.5, FZ]];
+      return { t, dump: flow(dump.map(q => V3(...q)), blob, 0xd9c79a, 10, { speed: 4 }), side: flow(side.map(q => V3(...q)), blob, 0xf0a84a, 12, { speed: 5 }),
+        pitch: flow(pitch.map(q => V3(...q)), blob, yeast, 16, { speed: 6 }) };
+    });
+    pipe([[CX, 4.5, TEE], [SX, 4.5, TEE]], 'yp0', 0.22); pipe([[SX, 4.5, PZS[0]], [SX, 4.5, PZS[1]]], 'yp0', 0.22);   // mash tee off the cooler return, header over the props
+    pipe([[PX, 3.4, PZS[1]], [PX, 3.4, FZ], [CX, 3.4, FZ], [CX, 4.5, FZ]], 'yp0', 0.22);                            // pitch header up to the fermenter feed riser
   }
   // Beer leaves a fermenter through the drain in its own bottom head into the transfer main inside the building. There is
   // no drain run lying on the concrete along the outside of either column, no stub off every tank, and nothing climbing
@@ -11786,11 +11926,18 @@ function update(sim, dt, events) {
   O.str.forEach((st, i) => { st.f.rate = sim.duty === i ? sim.st1.out / N : 0; });
   O.fToHydro.rate = sim.st2.out / N; O.fCook.rate = sim.cook.out / N; O.fFlash.rate = sim.cook.out / N; O.fLiqOvf.rate = sim.liq1.out / N; O.hx.forEach((f, i) => { f.rate = sim.hxTrain === i ? sim.liq.out / N : 0; }); O.lp.forEach((p, i) => { const on = sim.liqDuty === i; p.f.rate = on ? sim.liq.out / N : 0; p.light.color.setHex(on ? 0x3ddc84 : 0x9aa4ae); }); O.fSteamIn.rate = sim.cook.out > 1 ? Math.max(0.3, (sim.hydro.T - 190) / 40) : 0;
   const fillIdx = sim.ferm.findIndex(f => f.state === 'filling');
-  O.fFill.forEach((f, i) => { f.rate = fillIdx === i ? sim.liq.out / N : 0; });
+  O.fFill.forEach((f, i) => { f.rate = ((fillIdx === i ? sim.liq.out - (sim.propSide || 0) : 0) + (sim.pitchTo === i ? sim.pitchRate : 0)) / N; });
+  if (O.props && sim.prop) {   // v1.97.76: the yeast props and blend tank
+    if (O.cooler) sim.yeastT = O.cooler.T;   // the totes' temperature is the yeast that goes into the next batch
+    O.props.forEach((P, i) => { const p = sim.prop[i];
+      P.side.rate = p.state === 'filling' ? 2 * (sim.propSide || 0) / N : 0;
+      P.dump.rate = sim.yb.state === 'dumping' && sim.yb.to === i ? 1 : 0;
+      P.pitch.rate = p.state === 'pitching' ? 1.2 : 0; });
+  }
   sim.ferm.forEach((fm, i) => { O.ferms[i].rec.rate = !POWER_OUTAGE.on && fm.bu > 100 && fm.state !== 'cleaning' ? 0.6 : 0; });
   O.fFeed.rate = feed / N;
   updateFlows(dt);
-  for (const s of spinners) s.o.rotation[s.axis] += dt * (POWER_OUTAGE.on ? 0 : 1) * (s.k === 'mill' ? 16 * sim.mills[s.i].rate / 425 : s.k === 'blend' ? 6 * Math.min(1.5, sim.blend.flow / N) : s.k === 'agit' ? (sim.ferm[s.i].bu > 100 ? 2.5 : 0) : 9 * Math.min(1.5, feed / N));
+  for (const s of spinners) s.o.rotation[s.axis] += dt * (POWER_OUTAGE.on ? 0 : 1) * (s.k === 'prop' ? (sim.prop && sim.prop[s.i].bu > 20 ? 2.5 : 0) : s.k === 'ybm' ? (sim.yb && (sim.yb.state === 'mixing' || sim.yb.state === 'dumping') ? 5 : 0) : s.k === 'mill' ? 16 * sim.mills[s.i].rate / 425 : s.k === 'blend' ? 6 * Math.min(1.5, sim.blend.flow / N) : s.k === 'agit' ? (sim.ferm[s.i].bu > 100 ? 2.5 : 0) : 9 * Math.min(1.5, feed / N));
 
   // real tank levels
   O.silos[0].set(lv('silo0')); O.silos[1].set(lv('silo1'));
@@ -11813,6 +11960,10 @@ function update(sim, dt, events) {
     O.f200.rate = O.f190.rate = feed / N;
   }
 
+  if (O.props && sim.prop) {   // v1.97.76: yeast prop and blend tank levels; a prop being cleaned shows its CIP rinse
+    O.yb.set(lv('yb'));
+    O.props.forEach((P, i) => { P.t.set(lv('yp' + i)); P.t.liqMat.color.setHex(sim.prop[i].state === 'cleaning' ? 0xcfe8ff : 0xe8d29a); });
+  }
   // fermenters
   sim.ferm.forEach((fm, i) => {
     const f = O.ferms[i], L = lv('f' + i);
@@ -17634,9 +17785,14 @@ function info(id) {
     case 'etoh': return [['In storage', n0(s.etoh.gal) + ' gal'], ['Tanker trucks coming', String((s.etoh.ships || []).length)], ['Making', n0(s.out.eth) + ' gal/h']];
     case 'oil': return [['In storage', n0(s.oil.lb) + ' lb'], ['Trucks coming', String((s.oil.ships || []).length)], ['Making', n0(s.out.oil) + ' lb/h']];
   }
+  if (id === 'yb') { const y = s.yb; return [['Batch', { mixing: 'Mixing', ready: 'Mixed, waiting', dumping: 'To Prop ' + (y.to + 1), empty: 'Empty' }[y.state]], ['Yeast strength', Math.round((y.q || 0) * 100) + '%'], ['Yeast cooler', (s.yeastT || 38).toFixed(0) + '°F']]; }
+  if (id === 'yp0' || id === 'yp1') { const p = s.prop[+id[2]];
+    return [['Status', { empty: 'Empty', filling: 'Filling', propping: 'Growing', ready: 'Ready to pitch', pitching: 'Pitching to Ferm ' + (p.to + 1), cleaning: 'Cleaning (CIP)' }[p.state]],
+      ['Grown', Math.round(p.grow * 100) + '%'], ['Mash in', p.state === 'filling' ? n0(s.propSide) + ' bu/h' : '—'], ['Yeast strength', p.state === 'ready' || p.state === 'pitching' ? Math.round(Sim.propQ(p) * 100) + '%' : '—']]; }
   if (/^f\d$/.test(id)) {
     const f = s.ferm[+id[1]];
     const r = [['Status', Sim.FSTATE[f.state]]];
+    if (f.state !== 'empty' && f.state !== 'cleaning') r.push(['Yeast pitched', f.pitched ? Math.round(f.yeast * 100) + '% strength' : 'Not yet']);
     if (f.state === 'fermenting' || f.state === 'ready') r.push(['Time fermenting', f.t.toFixed(0) + ' of 50 h']);
     if (f.bu > 100 && f.state !== 'cleaning') {
       r.push(['Sugar converted', (f.p * 100).toFixed(0) + '%']);
@@ -17866,6 +18022,11 @@ function controlsMenu(code, fromTitle) {
 const pick = a => a[Math.random() * a.length | 0];
 const coolerSay = () => { const c = P3.cooler; if (!c) return 'Cooler? Ask maintenance.'; const t = Math.round(c.T);
   return c.alarm ? 'Yeast cooler is at ' + t + ' degrees and alarming. ' + (c.open ? 'Somebody left ' + (c.open > 1 ? c.open + ' doors' : 'a door') + ' open. Go shut it.' : 'Doors are shut, it should come back.') : 'Yeast cooler is reading ' + t + ' degrees. That\'s fine. Leave the doors shut.'; };
+const propSay = () => {   // v1.97.76: the yeast props, from the live plant
+  const p = sim.prop, y = sim.yb; if (!p) return 'Props? Ask me when the plant is running.';
+  const st = p.map((q, i) => 'Prop ' + (i + 1) + ' is ' + { empty: 'empty', filling: 'filling', propping: Math.round(q.grow * 100) + '% grown', ready: 'ready to pitch', pitching: 'pitching into Ferm ' + (q.to + 1), cleaning: 'on CIP' }[q.state]).join(', ');
+  return 'Blend tank mixes the yeast, enzyme and nutrients, then a prop grows it in cooled mash for about eight hours and we pitch it into the next ferm. ' + st + '.' + (y.q < 0.9 ? ' And that last yeast came out of a warm cooler. Shut the doors.' : '');
+};
 const alarmSay = () => { const a = P3.alarms; return a.length ? 'Right now I\'ve got ' + a.length + ' alarm' + (a.length > 1 ? 's' : '') + ': ' + a.map(x => x.desc.replace(/\s+/g, ' ').toLowerCase()).join(', ') + '. Fun day.' : 'Board\'s quiet. No alarms. Don\'t jinx it.'; };
 const wxSay = () => { const el = $('wx'); return 'Out there it\'s ' + (P3.weather || 'sunny') + (el && el.style.display !== 'none' ? ', ' + el.textContent.replace('·', 'with wind') : '') + '. Check the wind socks by the wet cake pad and ammonia tank before you mess with ammonia.'; };
 const NPC_DEF = {
@@ -17885,6 +18046,7 @@ const NPC_DEF = {
       cigarettes: {"k":["cigarette","cigarettes","smoke","smoking","nicotine"],"say":["Coffee and cigarettes. Two bad habits and a long shift. Smoking stays in the designated area, away from process equipment.","I could use a cigarette break. No smoking around ethanol or process areas. I am grumpy, not interested in becoming an incident report."],"opts":["Do you drink coffee?","Any alarms?"]},
       shift: {"k":["how are you","how is your shift","how is your day","tired","grumpy","sarcastic"],"say":["Still here. Coffee is cold, board is busy, and somebody wants a personality update. How do you think I am?","Ask me after shift. Right now I am keeping an eye on the process and rationing my patience."],"opts":["Any alarms?","Tell me about yourself."]},
       cooler: { k: ['cooler', 'yeast', 'tote', 'temperature', 'temp', 'hot', 'cold'], say: coolerSay, opts: ['Any alarms?', 'What do the totes do?'] },
+      props: { k: ['prop', 'props', 'prop tank', 'prop tanks', 'yeast prop', 'propagation', 'blend tank', 'pitch', 'pitched'], say: () => propSay(), opts: ['How\'s the cooler?', 'Any alarms?'] },
       totes: { k: ['what do the totes', 'totes do'], say: 'The totes are the yeast. Yeast eats the sugar in the mash and makes the ethanol. Warm yeast is sad yeast.', opts: ['How\'s the cooler?', 'How does the plant work?'] },
       alarms: { k: ['alarm', 'alarms', 'board', 'problem', 'wrong', 'status'], say: alarmSay, opts: ['How\'s the cooler?', 'Got anything for me to do?'] },
       job: { k: ['got anything for me to do', 'got anything else', 'give me a job', 'job', 'task', 'help', 'bored'], say: () => pick(['Go check the yeast cooler doors. Somebody always leaves them open.', 'Mow something. The mower\'s in the shed.', 'Go walk the north corn field. Something out there keeps chewing the stalks.', 'Pigeons are everywhere. Do something about that.']), opts: ['Where\'s the mower?', 'Pigeons?', 'Never mind.'] },
