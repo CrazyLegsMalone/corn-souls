@@ -187,7 +187,7 @@ const fnSrc = (src, name) => { const i = src.indexOf('function ' + name + '('); 
 }
 {   // the launcher's stand-in meshes are freed when the real model arrives
   assert.ok(launcher.includes("for(const c of item.g.children)if(c.userData.cornFallback){c.geometry.dispose();c.material.dispose();}") && launcher.includes('mesh.userData.cornFallback=true;'), 'corn props free their stand-in');
-  assert.ok(/for\(const c of m\.children\)if\(c\.isMesh&&c\.geometry&&c\.material&&!c\.material\.isShaderMaterial\)\{c\.geometry\.dispose\(\);c\.material\.dispose\(\);\}\\n  m\.clear\(\);m\.add\(obj\);/.test(launcher), 'and so does the extinguisher');
+  assert.ok(html.includes("    for (const c of m.children) if (c.isMesh && c.geometry && c.material && !c.material.isShaderMaterial) { c.geometry.dispose(); c.material.dispose(); }   // (the extTex() picture itself is shared)\n    m.clear(); m.add(obj);"), 'and so does the extinguisher (v1.97.74: in the game itself, no longer a launcher patch)');
   assert.ok(html.includes('if (MMAP.bakes >= 2 && MMAP.flat && !(MMAP.again > 0)) {'), 'the minimap frees its stand-in materials after the last bake');
 }
 {   // noise buffers are made once per context and length

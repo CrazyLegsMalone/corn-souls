@@ -9,8 +9,8 @@ assert.equal(ctx.EXT.stations[0],m,'v1.97.55: a wall mount is a usable station')
 assert.equal(calls.length,1);assert.equal(calls[0].m,m);assert.equal(calls[0].h,.62);assert.equal(calls[0].hud,false);
 assert.equal(m.parent,ctx.scene);assert.equal(m.position.x,10.3);assert.equal(m.position.y,1);assert.equal(m.rotation.y,Math.PI/2);
 assert.ok(m.userData.noHit&&m.children[0].userData.noHit);assert.equal(m.children[0].geometry.type,'PlaneGeometry');
-delete ctx.extModelInto;assert.doesNotThrow(()=>ctx.extWall(0,1,0,0),'base game works without launcher GLB patch');
+assert.ok(html.includes('  extModelInto(m, 0.62, false);\n  EXT.stations.push(m);'),'v1.97.74: the model is the game\'s own now, not a launcher patch');
 assert.ok(html.includes('extWall(E1 + 0.3, 1.0, dz - 1.45, Math.PI / 2);'));
 assert.ok(!html.includes('cyl(0.09, 0.5, mat(0xc8211c), E1 + 0.25, 0.75, dz - 1.45, null, 8);'));
-assert.ok(fs.readFileSync('index.html','utf8').includes("extModelInto(m,0.62,false)"),'same model sizing as existing stations');
+assert.ok(html.includes("fallback.userData.noHit = true; m.add(fallback); extModelInto(m, 0.62, false);"),'same model sizing as the posts');
 console.log('PASS: MCC placeholder replaced, existing GLB helper and sizing reused, east-facing wall mount, fallback, decorative collision behavior');

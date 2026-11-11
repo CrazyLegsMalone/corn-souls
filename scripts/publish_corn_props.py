@@ -30,13 +30,9 @@ if "CORN_PROPS_STATE" in html:
  if html!=original:main.write_text(html)
  print("Live corn props, bucket shift and first-person maintenance shop verified")
 else:
- corn=engine("cornEngine")
- crowbar=engine("crowbarEngine")
- a=crowbar.index("function crowbarAccessor(")
- b=crowbar.index("function crowbarSlot(")
- loader=crowbar[a:b]
- # Do not alter the live crowbar; only reuse the GLB geometry loader.
- replace_once("root.Plant3D = {",loader+"\n"+corn+"\nroot.Plant3D = { cornBuild:cornBuild, cornInteract:cornInteract,")
+ # v1.97.74: the TEST launcher no longer carries its own GLB reader (crowbarEngine): the corn props read their models through the
+ # game's propGlb(), so a game without them needs test/game.html promoted, not this injection.
+ raise RuntimeError("Live index.html has no corn props, and the TEST corn engine now needs the game's propGlb(): promote test/game.html instead")
  replace_once("  clock += dt;","  clock += dt; cornUpdate(dt);")
  replace_once("function fire() {\n  if (!walk.on || walk.dead) return false;","function fire() {\n  if (!walk.on || walk.dead) return false;\n  if(cornThrow())return true;")
  replace_once("const r = P3.kiaToggle() || P3.radioToggle()","const r = P3.cornInteract() || P3.kiaToggle() || P3.radioToggle()")

@@ -49,7 +49,6 @@ const ctx = {
   loadGlbModel: (url, cb) => { const b = fs.readFileSync('..' + url.replace('/corn-souls', '')); cb(ctx.glbBuild(b.buffer.slice(b.byteOffset, b.byteOffset + b.length))); },
   hudMat: () => new T.MeshBasicMaterial(),
   toolMat: () => new T.MeshBasicMaterial(),
-  crowbarSlot: () => new T.Group(),
   gunKick: 0, sgTilt: 0, sgLast: null, sgBob: 0, swipe: 0, idleT: 0, MAG: 6, mags: { paint: 4 }, ammo: 'paint',
   wash: { t: 0 }, updateWasher() {}, gunClick() {}, onLadder: () => !!walk.ladder,
   localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },
@@ -67,13 +66,12 @@ const ctx = {
 scene.fog = new T.Fog(0);
 vm.createContext(ctx);
 const launcher = fs.readFileSync('index.html', 'utf8');
-const [, crowbarAnchor, crowbarReplacement] = launcher.match(/const fp='([^']+)';[\s\S]*?html=html\.replace\(fp, "([^"]+)"\);/);
-const makeToolSource = cut('function makeTool(k)', 'function toolItem(');
-assert.ok(makeToolSource.includes(crowbarAnchor));
+const makeToolSource = cut('function makeTool(k)', 'function toolItem(');   // (v1.97.74: the crowbar model is the game's own, no launcher patch to apply)
+assert.ok(!launcher.includes('crowbarEngine'), 'the launcher no longer patches the crowbar in');
 vm.runInContext([
   cut('function hudPart(', '\n'),
   cut('const TOOL_GLB = {', 'function toolTex('),
-  makeToolSource.replace(crowbarAnchor, crowbarReplacement),
+  makeToolSource,
   cut('const GLB_CT = {', 'function loadGlbModel('),
   cut('// ---------- SKINNED NPCs', 'function loadNpcModels() {'),
   cut('const PLAYER_SKIN = {', '// ---------- PACKAGE BOILERS'),
