@@ -672,10 +672,10 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' })"), 'break-room machine placed where the flat box was');
   assert.ok(html.includes("loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' })"), 'scale-house machine placed in shifted coordinates');
   assert.ok(html.includes('for (const s2 of DRINK_SPOTS) VEND.machines.push('), 'the Milo-Rade machines answer X too');
-  assert.ok(html.includes("if (r.water) toast('WATER: out of order - it never stocked water. Dispensing Milorade anyway.');"), 'the WATER button keeps its joke and still drops a Milorade bottle');
-  assert.ok(html.includes("vendSpawn('wet_water_bottle.glb', 'WET Water',"), 'the WET water bottle is a separate item at each machine');
+  assert.ok(!html.includes('never stocked water') && html.includes("file: 'wet_water_bottle.glb', name: 'WET Water', water: true"), 'v1.97.79: the WATER button gives a WET bottle (the joke is gone)');
+  assert.ok(!/vendSpawn\(/.test(html), 'v1.97.79: nothing vended is put on the floor - it waits in the machine (vendSpawnIn)');
   assert.ok(html.includes('if (!M || !M.ready || VEND.busy) return false;'), 'repeated presses are ignored while one is dropping');
-  assert.ok(!/vendSpawn\([^)]*0\.001/.test(html), 'the embedded preview packet scale is never copied onto a spawned prop');
+  assert.ok(!/vendSpawnIn\([^)]*0\.001/.test(html), 'the embedded preview packet scale is never copied onto a spawned prop');
   assert.ok(html.includes('// deliberately NOT merged: DISPENSED_* and SNACK_DISPENSER_FLAP have to stay addressable as nodes'), 'the machine stays unmerged so its nodes work');
   // the cabinets' own buttons are what you press - no menu, no dialog
   assert.ok(html.includes("const n = byName['SELECT_' + s2.key]; if (n) M.buttons.push({ node: n, file: s2.file, name: s2.name });"), 'the Shifty Food buttons are registered by node');

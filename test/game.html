@@ -6913,15 +6913,25 @@ function vendProp(file, cb) {                    // one upload per prop, shared 
     for (const f of Q.wait.splice(0)) f(root);
   }, 'vend');
 }
-// place one dispensed item at a world point, resting on the floor there
-function vendSpawn(file, name, x, y, z, cb) {
+// v1.97.79, owner: "Drinks should be grabbed from the dispensor door. There shouldn't be any bottles on floor at all" - a dispensed
+// item lands INSIDE its machine, at the cabinet's own drop point (the Milo-Rade machine's MILO_RADE_DISPENSED_CAN behind its door, the
+// Shifty Food bin's DISPENSED_* behind the PUSH TO COLLECT flap), lying as it would: a bottle on its side across the cabinet, a bag
+// leaning back. It stays there until you take it (X at the machine); nothing is ever put on the floor.
+function vendSpawnIn(M, file, name, cb) {
+  const a = M && M.drop; if (!a || !M.root) return;
   vendProp(file, src => {
-    const g = src.clone(true); g.position.set(x, y, z); g.rotation.y = Math.random() * 0.6 - 0.3;
+    const g = src.clone(true);
     g.traverse(o => { o.userData.noHit = true; if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-    scene.add(g); g.updateMatrixWorld(true);
-    const fl = Math.max(y, vendFloor(x, z, y));                                                  // v1.97.78: the break room / scale house floors stand above y 0
-    const bb = new T.Box3().setFromObject(g); g.position.y += fl - bb.min.y;   // sits on the floor it was dropped onto
-    VEND.picks.push({ g, name, x, z, t: 0 });
+    M.root.updateMatrixWorld(true);
+    const p = a.getWorldPosition(V3()), q = M.root.getWorldQuaternion(new T.Quaternion());
+    const lie = /bottle/.test(file) ? new T.Euler(0, 0, Math.PI / 2) : new T.Euler(-1.15, 0, 0);   // bottle on its side / bag leaning back
+    g.quaternion.copy(q).multiply(new T.Quaternion().setFromEuler(lie));
+    g.position.copy(p); scene.add(g); g.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(g), c = bb.getCenter(V3());
+    g.position.x += p.x - c.x; g.position.z += p.z - c.z; g.position.y += p.y - bb.min.y;   // centred on the drop point, resting on the bin floor
+    const back = V3(0, 0, -1).applyQuaternion(q), half = Math.abs(back.x) * (bb.max.x - bb.min.x) / 2 + Math.abs(back.z) * (bb.max.z - bb.min.z) / 2;
+    g.position.addScaledVector(back, Math.max(0, half - 0.01));   // its front at the drop point, so nothing pokes out through the flap or door
+    const pick = { g, name, x: p.x, z: p.z, t: 0, M }; VEND.picks.push(pick); M.item = pick;
     if (cb) cb(g);
   });
 }
@@ -6941,11 +6951,12 @@ function loadVendMachine(spot) {                 // spot: { x, y, z, yaw, kind }
     if (spot.kind === 'snack') {
       for (const s2 of SNACKS) { const n = byName['SELECT_' + s2.key]; if (n) M.buttons.push({ node: n, file: s2.file, name: s2.name }); const d = byName['DISPENSED_' + s2.key]; if (d) d.visible = false; }
       M.flap = byName['SNACK_DISPENSER_FLAP'] || null;
+      M.drop = byName['DISPENSED_CORN_CHIPS'] || byName['DISPENSED_POPCORN'] || byName['DISPENSED_ROASTED_CORN'] || null;   // the bin behind the flap
     } else {
       for (const nm of ['MILO_RADE_SELECT_BUTTON', 'MILO_RADE_SELECT_BUTTON_SECOND']) { const n = byName[nm]; if (n) M.buttons.push({ node: n, file: 'milorade_bottle.glb', name: 'Milorade' }); }
-      const w = byName['WATER_SELECT_BUTTON']; if (w) M.buttons.push({ node: w, file: 'milorade_bottle.glb', name: 'Milorade', water: true });
+      const w = byName['WATER_SELECT_BUTTON']; if (w) M.buttons.push({ node: w, file: 'wet_water_bottle.glb', name: 'WET Water', water: true });   // v1.97.79, owner: the WET bottle comes out of the drink machine like the Milorade
       const c = byName['MILO_RADE_DISPENSED_CAN']; if (c) c.visible = false;
-      M.flap = null;
+      M.flap = null; M.drop = c || null;
     }
     M.root = g; M.g = g; M.byName = byName; M.ready = true;
     const col = [spot.x, spot.z, spot.kind === 'snack' ? 0.62 : 0.62]; extraCols.push(col);
@@ -6962,17 +6973,17 @@ function vendDispense(M, file, name) {
   VEND.busy = true; M.busy = 1.2;                // repeat-click prevention until it has dropped
   M.flapT = 0.5;
   const p = vendFront(M);
-  setTimeout(() => { VEND.busy = false; vendSpawn(file, name, p.x, M.spot.y, p.z); }, 500);
+  setTimeout(() => { VEND.busy = false; vendSpawnIn(M, file, name); }, 500);
   return true;
 }
-function vendPickNear() {                       // the packet on the floor closest to you, or null
+function vendPickNear() {                       // the item waiting in a machine's dispenser closest to you, or null
   let best = null, bd = 2.6;
   for (const p of VEND.picks) { const d = Math.hypot(walk.x - p.x, walk.z - p.z); if (d < bd) { bd = d; best = p; } }
   return best;
 }
 function vendTake(p) {                          // pick it up; the UI says what it was
   if (!p) return '';
-  scene.remove(p.g); const i = VEND.picks.indexOf(p); if (i >= 0) VEND.picks.splice(i, 1);
+  scene.remove(p.g); const i = VEND.picks.indexOf(p); if (i >= 0) VEND.picks.splice(i, 1); if (p.M && p.M.item === p) p.M.item = null;
   VEND.eaten++; return p.name;
 }
 function vendPress() {                            // X at a machine: whatever button the crosshair is on, else the first one
@@ -7012,8 +7023,9 @@ function drinkButtons(M, g) {
   const by = nm => g.getObjectByName(nm);
   M.buttons = [];
   for (const nm of ['MILO_RADE_SELECT_BUTTON', 'MILO_RADE_SELECT_BUTTON_SECOND']) { const n = by(nm); if (n) M.buttons.push({ node: n, file: 'milorade_bottle.glb', name: 'Milorade' }); }
-  const w = by('WATER_SELECT_BUTTON'); if (w) M.buttons.push({ node: w, file: 'milorade_bottle.glb', name: 'Milorade', water: true });
+  const w = by('WATER_SELECT_BUTTON'); if (w) M.buttons.push({ node: w, file: 'wet_water_bottle.glb', name: 'WET Water', water: true });   // v1.97.79, owner: the WET bottle comes out of the drink machine like the Milorade
   const c = by('MILO_RADE_DISPENSED_CAN'); if (c) c.visible = false;
+  M.drop = c || null;   // v1.97.79: drinks come out behind the dispenser door
   return M.buttons.length;
 }
 function loadDrinkMachines() {
@@ -8323,7 +8335,6 @@ function init(container) {
       const red = mat(0xd8341f), blackM = mat(0x1d2024), glassM = new T.MeshLambertMaterial({ color: 0x8fb0c4, transparent: true, opacity: 0.6 });
       DRINK_SPOTS.push({ x: -61.35, y: 0, z: OZN + 0.46, yaw: 0 });   // Milo Rade machine (y = the floor; the base is measured at load)
       loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' });   // the owner's Shifty Food cabinet in place of the flat box
-      vendSpawn('wet_water_bottle.glb', 'WET Water', X[4] - 1.35, 0, OZN + 0.85);   // the water item the machine does not stock
       wallSegs.push([-61.85, OZN + 0.98, -60.85, OZN + 0.98], [X[4] - 1.0, OZN + 0.98, X[4], OZN + 0.98]);
       // counters along the east wall (shared with the manager's office), starting a step south of the snack machine
       const EX = X[4] - 0.1;
@@ -8985,7 +8996,6 @@ function init(container) {
     for (const x of [63.5, 66, 68.5, 71]) { desk(x, ZN + 1.0, 1.4, 0.7); box(0.5, 0.35, 0.05, mat(0x1d2024), x, FY + 1.0, ZN + 0.85); }   // training computers
     box(0.45, 0.45, 0.65, mat(0xf4f4f4), 76.6 + 2.2, FY + 0.22, ZN + 0.5); box(0.5, 0.15, 0.4, mat(0xf4f4f4), 76.4 + 3.4, FY + 0.85, ZN + 0.35);   // toilet, sink
     loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' });
-    vendSpawn('wet_water_bottle.glb', 'WET Water', 57.5 + SH_DX - 1.3, FY, ZN + 0.9);   // snack machine: the Shifty Food cabinet, in the building's shifted coordinates
     DRINK_SPOTS.push({ x: 59, y: FY, z: ZN + 0.46, yaw: 0 });                                            // Milo Rade machine on the raised scale-house floor
     const dS = DRINK_SPOTS.length - 1;                                                                   // ...which then moves east with the building
     { const DX = SH_DX;   // shift the building (laid out in its original numbers) east along with the east road
@@ -18012,13 +18022,12 @@ function pivotGenMenu() {   // center pivot: take or fill the diesel can, then p
   modal(`<div style="font-weight:bold;margin:10px 0 4px;color:#1f56a8">Center pivot · diesel gen-set</div>
     <div style="font-size:14px;line-height:1.45;color:#33404d">${G.running ? 'Engine running - the pivot is turning and watering.' : 'Engine stopped - the pivot is not turning.'} Day tank ${Math.round(G.fuel)} of ${G.cap} L, can ${Math.round(G.can)} L. It burns about 1.2 L an hour.</div>`, rows, true);
 }
-function vendX() {   // vending: pick up whatever is on the floor, or press the button you are looking at
+function vendX() {   // vending: take what is waiting in the machine's dispenser, or press the button you are looking at
   const p = P3.vendPickNear();
   if (p) { toast('Collected ' + P3.vendTake(p)); return true; }
   const r = P3.vendPress();
   if (!r) return false;
-  // No menu and no chatter: the button dispenses what it sells. Only the WATER button still talks, because that is the joke.
-  if (r.water) toast('WATER: out of order - it never stocked water. Dispensing Milorade anyway.');
+  // No menu and no chatter: the button dispenses what it sells (v1.97.79: WATER gives a WET bottle now - the "out of order" joke is gone).
   return true;
 }
 function powerResetMenu() {   // main substation: the master reset for a power outage

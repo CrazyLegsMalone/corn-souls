@@ -33,8 +33,14 @@ assert.ok(fs.existsSync(path.join(root, 'scripts/make_vend_items.py')), 'the bui
 // the game uses them
 assert.ok(html.includes("{ key: 'CORN_CHIPS', file: 'chippys_bag.glb', name: 'Chippys: Extra Corn!' },"), 'Chippys replaces the Shifty corn chips');
 assert.ok(!/file: 'shifty_corn_chips\.glb'|'milo_rade_can\.glb'|'water_can\.glb'/.test(html), 'the old chips, can and water can are not dispensed any more');
-assert.equal((html.match(/file: 'milorade_bottle\.glb', name: 'Milorade'/g) || []).length, 4, 'both Milo-Rade buttons and WATER, in both machine paths');
-assert.equal((html.match(/vendSpawn\('wet_water_bottle\.glb', 'WET Water',/g) || []).length, 2, 'the WET bottle at each machine');
+assert.equal((html.match(/file: 'milorade_bottle\.glb', name: 'Milorade'/g) || []).length, 2, 'both Milo-Rade buttons (one line per machine path)');
+assert.equal((html.match(/file: 'wet_water_bottle\.glb', name: 'WET Water', water: true/g) || []).length, 2, 'v1.97.79: WATER gives a WET bottle, in both machine paths');
+// v1.97.79, owner: "Drinks should be grabbed from the dispensor door. There shouldn't be any bottles on floor at all"
+assert.ok(!/vendSpawn\(/.test(html), 'nothing vended is placed on the floor');
+assert.ok(html.includes("setTimeout(() => { VEND.busy = false; vendSpawnIn(M, file, name); }, 500);"), 'a dispensed item lands in its machine');
+assert.ok(html.includes("M.flap = null; M.drop = c || null;") && html.includes("M.drop = c || null;   // v1.97.79: drinks come out behind the dispenser door"), 'drinks: behind the Milo-Rade dispenser door, in both machine paths');
+assert.ok(html.includes("M.drop = byName['DISPENSED_CORN_CHIPS'] || byName['DISPENSED_POPCORN'] || byName['DISPENSED_ROASTED_CORN'] || null;"), 'snacks: in the bin behind the flap');
+assert.ok(html.includes("if (p.M && p.M.item === p) p.M.item = null;"), 'taking it empties the dispenser');
 // credited
 const reg = JSON.parse(fs.readFileSync(path.join(root, 'assets/registry.json'), 'utf8')).assets;
 for (const f of Object.keys(SIZE)) assert.ok(reg.some(a => a.status === 'in-use' && a.files.includes('assets/models/' + f + '.glb')), f + ' registered');
