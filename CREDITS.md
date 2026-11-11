@@ -65,6 +65,8 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 
 - **"Shifty Food vending machine", "Butter Popcorn", "Corn Chips", "Roasted Corn Kernels", "Milo-Rade can", "Water can"** - made by the project owner, the models generated with ChatGPT and exported as GLBs (`assets/models/shifty_food_machine.glb`, `shifty_popcorn.glb`, `shifty_corn_chips.glb`, `shifty_roasted_corn.glb`, `milo_rade_can.glb`, `water_can.glb`). Registered in [assets/registry.json](assets/registry.json).
 
+- **"Milorade" sports drink, "WET" water, "Chippys: Extra Corn!" chips** - the product art made by the project owner (generated at the owner's direction); not obtained from a third-party marketplace. Built into models in this repository by `scripts/make_vend_items.py` from the pictures in `assets/models/source/vend_cards/` (`assets/models/milorade_bottle.glb`, `wet_water_bottle.glb`, `chippys_bag.glb`). Registered in [assets/registry.json](assets/registry.json).
+
 ## Attribution template
 
 **“Asset Title”** — by Creator ([source](https://example.com/)). [License Name](https://creativecommons.org/licenses/by/4.0/). Modifications: describe exactly what changed. No endorsement implied.

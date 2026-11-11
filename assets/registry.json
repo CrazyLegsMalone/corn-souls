@@ -1279,6 +1279,72 @@
       "files": [
         "assets/models/psx_office_chair.glb"
       ]
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - product art generated at the owner's direction; model built by scripts/make_vend_items.py",
+      "source_platform": "Owner-provided product picture (sent as a GLB with the picture wrapped on a box), rebuilt as a model in this repository",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-11",
+      "reviewer": "Owner (provided the art)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-milorade-bottle",
+      "title": "Milorade sports drink bottle",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/milorade_bottle.glb",
+      "modifications": "Product cut out of the owner's picture card (floor and caption dropped) and built into a model; source pictures kept in assets/models/source/vend_cards/.",
+      "files": [
+        "assets/models/milorade_bottle.glb",
+        "assets/models/source/vend_cards/milorade_card.png"
+      ],
+      "evidence": "Lathed from the product picture's own silhouette (12 sides, 40 rings), the picture as its label front and back.",
+      "notes": "What the Milo-Rade machines drop (both buttons, and the WATER button's joke) in TEST since v1.97.78."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - product art generated at the owner's direction; model built by scripts/make_vend_items.py",
+      "source_platform": "Owner-provided product picture (sent as a GLB with the picture wrapped on a box), rebuilt as a model in this repository",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-11",
+      "reviewer": "Owner (provided the art)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-wet-water-bottle",
+      "title": "WET water bottle",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/wet_water_bottle.glb",
+      "modifications": "Product cut out of the owner's picture card (floor and caption dropped) and built into a model; source pictures kept in assets/models/source/vend_cards/.",
+      "files": [
+        "assets/models/wet_water_bottle.glb",
+        "assets/models/source/vend_cards/wet_water_card.png"
+      ],
+      "evidence": "Lathed from the product picture's own silhouette (12 sides, 40 rings), the picture as its label front and back.",
+      "notes": "The water item left at each machine in TEST since v1.97.78."
+    },
+    {
+      "creator": "CrazyLegsMalone (project owner) - product art generated at the owner's direction; model built by scripts/make_vend_items.py",
+      "source_platform": "Owner-provided product picture (sent as a GLB with the picture wrapped on a box), rebuilt as a model in this repository",
+      "license_name": "First-party work, project owner (AI-generated at the owner's direction)",
+      "license_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/ASSET_POLICY.md",
+      "status": "in-use",
+      "checked_on": "2026-11-11",
+      "reviewer": "Owner (provided the art)",
+      "commercial_use_review": "first-party asset; no third-party licence applies",
+      "public_repository_redistribution_review": "owner-directed; published with owner approval",
+      "required_notice": "None (first-party asset).",
+      "id": "first-party-chippys-bag",
+      "title": "Chippys: Extra Corn! chip bag",
+      "source_url": "https://github.com/CrazyLegsMalone/corn-souls/blob/main/assets/models/chippys_bag.glb",
+      "modifications": "Product cut out of the owner's picture card (floor and caption dropped) and built into a model; source pictures kept in assets/models/source/vend_cards/.",
+      "files": [
+        "assets/models/chippys_bag.glb",
+        "assets/models/source/vend_cards/chippys_card.png"
+      ],
+      "evidence": "A puffed pillow following the picture's outline row by row, crimped ends flat, the picture front and back.",
+      "notes": "Replaces the Shifty Corn Chips in the snack machine in TEST since v1.97.78."
     }
   ]
 }

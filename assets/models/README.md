@@ -15,6 +15,7 @@ Shipped 3D GLB models in `assets/models/`:
 - `vulture_rig.glb` - "Turkey Vulture rig" - first-party (project owner, AI-generated with ChatGPT), the buzzard on the RTO stack in the TEST channel (0.8 scale, posed by joint rotation).
 - `ps1_utv_ranger.glb` - "PS1 UTV Ranger" - first-party (project owner, AI-generated with Gemini), the drivable Ranger in the TEST channel (732 triangles, Body material tinted per player at runtime).
 - `shifty_food_machine.glb`, `shifty_popcorn.glb`, `shifty_corn_chips.glb`, `shifty_roasted_corn.glb`, `milo_rade_can.glb`, `water_can.glb` - Shifty Food vending machine, its three snack packets, the Milo-Rade can and the water can - first-party (project owner, AI-generated with ChatGPT, from the shifty_food_cline_package).
+- `milorade_bottle.glb`, `wet_water_bottle.glb`, `chippys_bag.glb` - Milorade sports drink, WET water and Chippys chips - first-party (the owner's product art, built into models by `scripts/make_vend_items.py` from `source/vend_cards/`); in TEST since v1.97.78 they replace the Milo-Rade can, the water can and the Shifty corn chips.
 - `milorade_machine.glb` — "Milo Rade Vending Machine" — first-party (project owner, AI-generated with ChatGPT), break room + scale house vending machines in the TEST channel.
 - `1x4_cooling_tower_raised_sill.glb` — "1x4 Cooling Tower (Raised Sill)" — first-party (project owner, AI-generated with ChatGPT), cooling tower in the TEST channel.
 - `cob_stalker.glb` - "Cob Stalker" - first-party (project owner), the two creatures in the north corn field in the TEST channel.

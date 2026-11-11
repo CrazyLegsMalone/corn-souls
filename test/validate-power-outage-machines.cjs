@@ -652,7 +652,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
 
     assert.ok(html.includes(call), 'wired: ' + call.slice(0, 40));
   // ---------------------------------------------------------------- vending: the Shifty Food machine and the cans
-  { const files = ['shifty_food_machine.glb', 'shifty_popcorn.glb', 'shifty_corn_chips.glb', 'shifty_roasted_corn.glb', 'milo_rade_can.glb', 'water_can.glb'];
+  { const files = ['shifty_food_machine.glb', 'shifty_popcorn.glb', 'chippys_bag.glb', 'shifty_roasted_corn.glb', 'milorade_bottle.glb', 'wet_water_bottle.glb'];
     for (const f of files) assert.ok(fs.existsSync('assets/models/' + f), 'shipped: ' + f);
     const read = f => { const b = fs.readFileSync('assets/models/' + f); let off = 12, doc = null;
       while (off < b.length) { const len = b.readUInt32LE(off), type = b.readUInt32LE(off + 4), body = off + 8;
@@ -672,8 +672,8 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(html.includes("loadVendMachine({ x: X[4] - 0.55, y: 0, z: OZN + 0.55, yaw: 0, kind: 'snack' })"), 'break-room machine placed where the flat box was');
   assert.ok(html.includes("loadVendMachine({ x: 57.5 + SH_DX, y: FY, z: ZN + 0.52, yaw: 0, kind: 'snack' })"), 'scale-house machine placed in shifted coordinates');
   assert.ok(html.includes('for (const s2 of DRINK_SPOTS) VEND.machines.push('), 'the Milo-Rade machines answer X too');
-  assert.ok(html.includes("if (r.water) toast('WATER: out of order - it never stocked water. Dispensing Milo-Rade anyway.');"), 'the WATER button keeps its joke and still drops a Milo-Rade can');
-  assert.ok(html.includes("vendSpawn('water_can.glb', 'Water',"), 'the water can is a separate item at each machine');
+  assert.ok(html.includes("if (r.water) toast('WATER: out of order - it never stocked water. Dispensing Milorade anyway.');"), 'the WATER button keeps its joke and still drops a Milorade bottle');
+  assert.ok(html.includes("vendSpawn('wet_water_bottle.glb', 'WET Water',"), 'the WET water bottle is a separate item at each machine');
   assert.ok(html.includes('if (!M || !M.ready || VEND.busy) return false;'), 'repeated presses are ignored while one is dropping');
   assert.ok(!/vendSpawn\([^)]*0\.001/.test(html), 'the embedded preview packet scale is never copied onto a spawned prop');
   assert.ok(html.includes('// deliberately NOT merged: DISPENSED_* and SNACK_DISPENSER_FLAP have to stay addressable as nodes'), 'the machine stays unmerged so its nodes work');

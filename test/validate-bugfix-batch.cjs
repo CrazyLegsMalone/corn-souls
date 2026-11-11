@@ -37,7 +37,7 @@ for (const s of ['manDoor(rx + 2.5, rz - 3.9, true, null, 1); concreteFloor(rx -
   assert.equal(snack.root, undefined, 'a snack machine at the same spot is left alone');
   assert.equal(M0.buttons.length, 3, 'two Milo-Rade buttons and the WATER button');
   assert.ok(M1.buttons.every(b => { let q = b.node; while (q && q !== M1.root) q = q.parent; return q === M1.root; }), 'the second cabinet presses its own buttons, not the first one\'s');
-  assert.ok(M0.buttons[2].water && M0.buttons.every(b => b.file === 'milo_rade_can.glb'), 'WATER keeps its joke: it drops a Milo-Rade can');
+  assert.ok(M0.buttons[2].water && M0.buttons.every(b => b.file === 'milorade_bottle.glb'), 'WATER keeps its joke: it drops a Milorade bottle (v1.97.78)');
   assert.equal(M0.root.getObjectByName('MILO_RADE_DISPENSED_CAN').visible, false, 'the preview can inside the cabinet is hidden');
   assert.equal(colliders.length, 3, 'the cabinets block you even though the collider list was built before they arrived');
   assert.ok(colliders.includes(extraCols[0]) && colliders.includes(extraCols[1]), 'with the same entries as extraCols');
