@@ -4388,6 +4388,7 @@ const UNITS = [
   ...['A', 'B'].flatMap((t, i) => [
     { id: 'hx' + t + '1', st: 'cook', name: 'Beer/Mash Exchanger ' + t, holds: 'Hot mash + beer', color: '#ff8c42', hxTrain: i },
     { id: 'hx' + t + '2', st: 'cook', name: 'Mash Cooler ' + t,          holds: 'Mash + cooling water', color: '#5fb8ff', hxTrain: i }]),
+  { id: 'chill', st: 'ferm', name: 'Chiller', holds: 'Chilled water for the fermentation coolers', color: '#5fb8ff' },
   { id: 'yb', st: 'ferm', name: 'Blend Tank', holds: 'Water, yeast, enzyme + nutrients', color: '#e8d29a', lvlRO: true },
   ...[0, 1].map(i => ({ id: 'yp' + i, st: 'ferm', name: 'Yeast Prop Tank ' + (i + 1), holds: 'Yeast growing in cooled mash', color: '#e8d29a', lvlRO: true, temp: { def: 91, min: 80, max: 100, good: [88, 93] } })),
   ...Array.from({ length: NF }, (_, i) => ({ id: 'f' + i, st: 'ferm', name: 'Fermenter ' + (i + 1), holds: 'Fermenting mash', color: '#d9a441', lvl: { def: 85, min: 20, max: 100, label: 'Fill to' }, temp: { def: 90, min: 78, max: 100, good: [88, 92] } })),
@@ -4862,6 +4863,7 @@ function status(s, id) {
       if (L >= 99) return ['bad', 'Oil tank full — oil is going into the wet cake instead.'];
       return ['good', 'Corn oil pulled from the syrup by the centrifuges.'];
   }
+  if (id === 'chill') return ['good', 'Running: chilling water for the fermenter and yeast prop coolers.'];
   if (id === 'yb') {
     const y = s.yb;
     if (y.state === 'mixing') return ['good', 'Mixing water, yeast, enzyme and nutrients for the next prop.'];
@@ -7950,6 +7952,45 @@ function init(container) {
     });
     pipe([[CX, 4.5, TEE], [SX, 4.5, TEE]], 'yp0', 0.22); pipe([[SX, 4.5, PZS[0]], [SX, 4.5, PZS[1]]], 'yp0', 0.22);   // mash tee off the cooler return, header over the props
     pipe([[PX, 3.4, PZS[1]], [PX, 3.4, FZ], [CX, 3.4, FZ], [CX, 4.5, FZ]], 'yp0', 0.22);                            // pitch header up to the fermenter feed riser
+  }
+  // ---------- CHILLER (v1.97.77, owner: "In that open space where you deleted the wall goes a chiller"): a water-cooled packaged
+  // chiller on a skid in the room east of the alley (x -7.6..4.6, z -37.1..-29.8), along the north wall so the aisle from the Ferm
+  // MCC door to the east double door stays clear. Evaporator (north) and condenser (south) shells side by side, the compressor and
+  // its motor on top, the starter cabinet on the east end, the control panel with a run light facing the aisle. Chilled water
+  // supply and return rise off the evaporator's west water box and run overhead into the alley along the old wall line toward
+  // Ferm 1; the condenser water goes up through the roof (to the cooling tower). Flows run while the plant has power.
+  {
+    const CX0 = -1.0, CZ0 = -34.6, L = 4.4, body = mat(0x2f5d8a), dark = mat(0x23384f), steelC = mat(0x8a96a3), id = 'chill';
+    const along = (r, len, m, x, y, z, seg) => { const o = add(new T.CylinderGeometry(r, r, len, seg || 18).rotateZ(Math.PI / 2), m, x, y, z, id); return o; };
+    for (const dz of [-0.8, 0.8]) box(5.0, 0.2, 0.18, dark, CX0, 0.1, CZ0 + dz, id);                       // skid rails
+    for (const dx of [-2.3, 0, 2.3]) box(0.18, 0.2, 1.78, dark, CX0 + dx, 0.1, CZ0, id);
+    const EZ = CZ0 - 0.45, KZ = CZ0 + 0.45, EY = 0.72;
+    along(0.42, L, body, CX0, EY, EZ, 20); along(0.38, L, body, CX0, EY - 0.04, KZ, 20);                    // evaporator, condenser
+    for (const dx of [-L / 2 - 0.12, L / 2 + 0.12]) { along(0.5, 0.24, dark, CX0 + dx, EY, EZ); along(0.46, 0.24, dark, CX0 + dx, EY - 0.04, KZ); }   // water boxes
+    for (const dx of [-1.5, 1.5]) box(0.25, 0.45, 1.6, dark, CX0 + dx, 0.42, CZ0, id);                     // saddles
+    along(0.32, 0.9, body, CX0 - 0.55, 1.62, CZ0, 18);                                                      // compressor motor
+    along(0.48, 0.38, body, CX0 + 0.2, 1.62, CZ0, 22);                                                      // compressor (impeller housing)
+    along(0.24, 0.5, dark, CX0 + 0.62, 1.62, CZ0, 14);
+    pipe([[CX0 + 0.2, 1.62, CZ0 - 0.4], [CX0 + 0.2, EY + 0.45, EZ]], null, 0.2);                            // suction off the evaporator
+    pipe([[CX0 + 0.85, 1.62, CZ0], [CX0 + 1.2, 1.62, CZ0], [CX0 + 1.2, EY + 0.4, KZ]], null, 0.18);           // discharge into the condenser
+    box(0.6, 1.9, 1.2, mat(0x4a525c), CX0 + L / 2 + 0.65, 0.95 + 0.2, CZ0, id);                             // starter cabinet
+    box(0.04, 1.5, 0.02, mat(0x2a2e33), CX0 + L / 2 + 0.96, 1.15, CZ0 - 0.05, id);
+    box(0.08, 1.0, 0.08, steelC, CX0 - 1.0, 0.7, CZ0 + 1.05, id);                                          // control panel on its post, facing the aisle
+    box(0.7, 0.55, 0.16, mat(0x3a3f45), CX0 - 1.0, 1.45, CZ0 + 1.05, id);
+    add(new T.PlaneGeometry(0.42, 0.28), gridLight(new T.MeshBasicMaterial({ color: 0x7fe0a0 })), CX0 - 1.05, 1.48, CZ0 + 1.135, null, true);
+    O.chillLight = add(new T.SphereGeometry(0.06, 8, 6), gridLight(new T.MeshBasicMaterial({ color: 0x3ddc84 })), CX0 - 0.73, 1.78, CZ0 + 1.05, null, true);
+    nameplate('CHILLER', CX0 + 0.6, 1.1, CZ0, 0.9, 0, 1, 0.8);
+    extraCols.push([CX0 - 1.5, CZ0, 1.25], [CX0 + 1.1, CZ0, 1.25], [CX0 + L / 2 + 0.65, CZ0, 0.7]);
+    // chilled water: supply (lower nozzle) and return (upper) off the west water box, up and over into the alley toward Ferm 1
+    const WX = CX0 - L / 2 - 0.25, AX = -8.6, TOPY = [6.0, 6.5], NZ = -39.0;
+    O.chill = [[EY - 0.18, 0, 0x8fd3ff], [EY + 0.18, 1, 0xc4e9ff]].map(([y, k, col]) => {
+      const dz = k ? 0.35 : -0.35, path = [[WX, y, EZ + dz * 0.4], [WX - 0.5, y, EZ + dz * 0.4], [WX - 0.5, TOPY[k], EZ + dz * 0.4], [AX - k * 0.5, TOPY[k], EZ + dz * 0.4], [AX - k * 0.5, TOPY[k], NZ]];
+      pipe(path, id, 0.2);
+      return flow((k ? path.slice().reverse() : path).map(q => V3(...q)), blob, col, 14, { speed: 4 });
+    });
+    for (const k of [0, 1]) pipe([[AX - k * 0.5, TOPY[k], NZ], [AX - k * 0.5, TOPY[k] - 0.6, NZ]], id, 0.2);   // drops to the fermentation coolers' header
+    // condenser water: up through the roof to the cooling tower
+    for (const dx of [1.7, 2.0]) pipe([[CX0 + dx, EY + 0.3, KZ + 0.1], [CX0 + dx, 8.6, KZ + 0.1]], id, 0.18);
   }
   // Beer leaves a fermenter through the drain in its own bottom head into the transfer main inside the building. There is
   // no drain run lying on the concrete along the outside of either column, no stub off every tank, and nothing climbing
@@ -11962,6 +12003,7 @@ function update(sim, dt, events) {
 
   if (O.props && sim.prop) {   // v1.97.76: yeast prop and blend tank levels; a prop being cleaned shows its CIP rinse
     O.yb.set(lv('yb'));
+    if (O.chill) { const on = !POWER_OUTAGE.on && !sim.power; O.chill.forEach(f => { f.rate = on ? 0.6 : 0; }); O.chillLight.material.color.setHex(on ? 0x3ddc84 : 0xff4d4d); }   // v1.97.77: the chiller
     O.props.forEach((P, i) => { P.t.set(lv('yp' + i)); P.t.liqMat.color.setHex(sim.prop[i].state === 'cleaning' ? 0xcfe8ff : 0xe8d29a); });
   }
   // fermenters
