@@ -6895,7 +6895,7 @@ const DRINK_SPOTS = [];
 // The packaged GLB carries three glTF animation clips; this game's reader has no animation mixer (it builds meshes and
 // matrices only), so the flap is swung procedurally and the dispensed packet is replaced by the LABELLED standalone model
 // the package ships for each snack - one visible pick-up per press, never both.
-const VEND = { machines: [], picks: [], props: {}, busy: false, eaten: 0 };
+const VEND = { machines: [], picks: [], loose: [], props: {}, busy: false, eaten: 0 };
 const SNACKS = [
   { key: 'POPCORN', file: 'shifty_popcorn.glb', name: 'Butter Popcorn' },
   { key: 'CORN_CHIPS', file: 'chippys_bag.glb', name: 'Chippys: Extra Corn!' },   // v1.97.78, owner: "Replace the shifty corn chips" (scripts/make_vend_items.py, from the owner's art)
@@ -6917,7 +6917,7 @@ function vendProp(file, cb) {                    // one upload per prop, shared 
 // item lands INSIDE its machine, at the cabinet's own drop point (the Milo-Rade machine's MILO_RADE_DISPENSED_CAN behind its door, the
 // Shifty Food bin's DISPENSED_* behind the PUSH TO COLLECT flap), lying as it would: a bottle on its side across the cabinet, a bag
 // leaning back. It stays there until you take it (X at the machine); nothing is ever put on the floor.
-function vendSpawnIn(M, file, name, cb) {
+function vendSpawnIn(M, file, name, cb, water) {
   const a = M && M.drop; if (!a || !M.root) return;
   vendProp(file, src => {
     const g = src.clone(true);
@@ -6931,7 +6931,7 @@ function vendSpawnIn(M, file, name, cb) {
     g.position.x += p.x - c.x; g.position.z += p.z - c.z; g.position.y += p.y - bb.min.y;   // centred on the drop point, resting on the bin floor
     const back = V3(0, 0, -1).applyQuaternion(q), half = Math.abs(back.x) * (bb.max.x - bb.min.x) / 2 + Math.abs(back.z) * (bb.max.z - bb.min.z) / 2;
     g.position.addScaledVector(back, Math.max(0, half - 0.01));   // its front at the drop point, so nothing pokes out through the flap or door
-    const pick = { g, name, x: p.x, z: p.z, t: 0, M }; VEND.picks.push(pick); M.item = pick;
+    const pick = { g, name, file, water: !!water, x: p.x, z: p.z, t: 0, M }; VEND.picks.push(pick); M.item = pick;
     if (cb) cb(g);
   });
 }
@@ -6968,12 +6968,12 @@ function vendFront(M, out, up) {                 // a point just in front of the
   const s = M.spot, d = 0.62;
   return (out || V3()).set(s.x + Math.sin(s.yaw || 0) * d, s.y + (up || 0.35), s.z + Math.cos(s.yaw || 0) * d);
 }
-function vendDispense(M, file, name) {
+function vendDispense(M, file, name, water) {
   if (!M || !M.ready || VEND.busy) return false;
   VEND.busy = true; M.busy = 1.2;                // repeat-click prevention until it has dropped
   M.flapT = 0.5;
   const p = vendFront(M);
-  setTimeout(() => { VEND.busy = false; vendSpawnIn(M, file, name); }, 500);
+  setTimeout(() => { VEND.busy = false; vendSpawnIn(M, file, name, null, water); }, 500);
   return true;
 }
 function vendPickNear() {                       // the item waiting in a machine's dispenser closest to you, or null
@@ -6981,10 +6981,46 @@ function vendPickNear() {                       // the item waiting in a machine
   for (const p of VEND.picks) { const d = Math.hypot(walk.x - p.x, walk.z - p.z); if (d < bd) { bd = d; best = p; } }
   return best;
 }
-function vendTake(p) {                          // pick it up; the UI says what it was
+// v1.97.80 (owner: "What happens after you pick up the snacks" - "Both"): what you take out of a machine is in your hands, carried
+// like a dead critter (heldDead): B eats or drinks it, X puts it down where you stand, fire throws it. Put down or thrown, it stays
+// in the world (VEND.loose) and X picks it up again. Eating or drinking it does you good (VEND_GOOD).
+const VEND_GOOD = {   // hp: health back at once; rinse: the WET water washes out ammonia and pond poisoning
+  'chippys_bag.glb': { hp: 20, say: 'Crunchy. +20 HP' },
+  'milorade_bottle.glb': { hp: 30, say: 'Electrolytes! +30 HP' },
+  'wet_water_bottle.glb': { hp: 10, rinse: true, say: 'Refreshing. +10 HP, and it washes the ammonia and pond out of you' }
+};
+function vendTake(p) {                          // out of the dispenser into your hands; returns the line for the UI
   if (!p) return '';
-  scene.remove(p.g); const i = VEND.picks.indexOf(p); if (i >= 0) VEND.picks.splice(i, 1); if (p.M && p.M.item === p) p.M.item = null;
-  VEND.eaten++; return p.name;
+  const i = VEND.picks.indexOf(p); if (i >= 0) VEND.picks.splice(i, 1); if (p.M && p.M.item === p) p.M.item = null;
+  if (heldDead) deadDrop();                      // whatever you were carrying goes down first
+  return vendHold(vendLoose(p.g, p.name, p.file, p.water));
+}
+function vendLoose(g, name, file, water) {      // a vended item out in the world (at most 16; the oldest one on the floor goes)
+  const o = { vend: true, g, name, file, short: String(name).split(':')[0], drink: /bottle/.test(file || ''), water: !!water, held: false, thrown: false, state: 'item' };
+  VEND.loose.push(o);
+  if (VEND.loose.length > 16) { const old = VEND.loose.find(v => !v.held && !v.thrown); if (old) vendGone(old); }
+  return o;
+}
+function vendGone(o) {                          // eaten, drunk, or tidied away
+  const i = VEND.loose.indexOf(o); if (i >= 0) VEND.loose.splice(i, 1);
+  if (o.g.parent) o.g.parent.remove(o.g); o.held = false; o.thrown = false;
+}
+function vendHold(o) {                          // into your hands, in front of you like a carried corpse
+  o.held = true; heldDead = { o, g: o.g, nm: o.short, vend: true };
+  camera.attach(o.g); o.g.position.set(0.17, -0.23, -0.45);
+  if (o.drink) o.g.rotation.set(0.12, 0.5, 0.12); else o.g.rotation.set(0.3, 0.5, 0.08);
+  return 'Took the ' + o.short + ' - B to ' + (o.drink ? 'drink' : 'eat') + ' it, X to put it down, fire to throw it.';
+}
+function vendRest(g, o, thrown) {               // on the floor: a bottle stands (or lies on its side if thrown), a bag lies flat
+  if (o.drink) g.rotation.set(0, thrown ? g.rotation.y : walk.yaw, thrown ? Math.PI / 2 : 0); else g.rotation.set(-Math.PI / 2, 0, thrown ? g.rotation.z : walk.yaw);
+  corpseRest(g);
+}
+function vendGood(o) {                          // what eating / drinking it does
+  const G = VEND_GOOD[o.file] || { hp: 10, say: '+10 HP' }; VEND.eaten++;
+  HP.hp = Math.min(HP.max, HP.hp + G.hp);
+  if (G.rinse || o.water) { walk.toxic = 0; if (typeof NH3 !== 'undefined') NH3.exp *= 0.3; }
+  const msg = (o.drink ? 'You drank the ' : 'You ate the ') + o.short + '. ' + G.say;
+  if (DMG_NOTIFY && walk.on) DMG_NOTIFY(msg); return msg;
 }
 function vendPress() {                            // X at a machine: whatever button the crosshair is on, else the first one
   const M = vendMachineNear();
@@ -7001,7 +7037,7 @@ function vendPress() {                            // X at a machine: whatever bu
   if (!onIt) return null;                        // looking away from the cabinet: X is not a vending press
   const pick = btn || (M.buttons || [])[0];
   if (!pick) return null;
-  if (!vendDispense(M, pick.file, pick.name)) return null;
+  if (!vendDispense(M, pick.file, pick.name, pick.water)) return null;
   return { name: pick.name, water: !!pick.water };
 }
 function vendMachineNear() {                     // the machine closest to you, or null
@@ -15829,6 +15865,7 @@ function deadNear(r) {   // any corpse within reach that somebody is not already
   if (critters) for (const c of critters) if (c.state === 'hit' && !c.held) cand.push(c);
   if (typeof birds !== 'undefined' && birds) for (const b of birds) if ((b.state === 'fall' || b.state === 'down') && !b.held && b.g.visible) cand.push(b);   // (v1.97.112: a pigeon lying on the ground too, so it can be eaten)
   if (typeof pondFrogs !== 'undefined' && pondFrogs) for (const f of pondFrogs) if (f.state !== 'live' && !f.held) cand.push(f);
+  if (typeof VEND !== 'undefined') for (const v of VEND.loose) if (!v.held && !v.thrown) cand.push(v);   // v1.97.80: a snack or drink you put down or threw
   // v1.97.132: two ways to reach it. Within 2.2 m any way round you, or (like the corn cubes) up to 3.8 m away where you are looking.
   // The launcher's corn-cube carry used to grab corpses lying 2.2-3.8 m off: carried with no B-to-eat and no power. Now this always reaches first.
   const R0 = r || 2.2, cp = camera.getWorldPosition(V3()), dir = camera.getWorldDirection(V3()), hl = Math.hypot(dir.x, dir.z) || 1;
@@ -15849,6 +15886,7 @@ function critterPick() {   // X: pick a corpse up, or put down the one you are c
   if (!walk.on || walk.dead) return null;
   if (heldDead) { if (heldDead.eating) return 'Chewing...'; const nm = deadDrop(); return nm ? 'You put the ' + nm + ' down.' : null; }
   const o = deadNear(); if (!o) return null;
+  if (o.vend) return vendHold(o);
   const nm = deadName(o);
   o.held = true; heldDead = { o, g: o.g, nm };
   camera.attach(o.g); o.g.position.set(0.3, -0.3, -0.6); o.g.rotation.set(0.2, 0.6, 0.3);
@@ -15857,7 +15895,7 @@ function critterPick() {   // X: pick a corpse up, or put down the one you are c
 function critterEat() {   // B: eat it - v1.97.112: brought up to your mouth in three crunchy bites, crumbs flying (updateEat)
   if (!heldDead || heldDead.eating) return null;
   heldDead.eating = true; EAT = { h: heldDead, t: 0, bites: 0, s: heldDead.g.scale.x };
-  return 'You eat the ' + heldDead.nm + '...';
+  return (heldDead.vend && heldDead.o.drink ? 'You drink the ' : 'You eat the ') + heldDead.nm + '...';
 }
 let EAT = null;
 function chompSnd(v) {   // a short crunch: a burst of noise through a band-pass, a little different every bite
@@ -15866,9 +15904,15 @@ function chompSnd(v) {   // a short crunch: a burst of noise through a band-pass
   const n = C.createBufferSource(), f = C.createBiquadFilter(), gn = C.createGain(); n.buffer = buf; f.type = 'bandpass'; f.frequency.value = 700 + Math.random() * 700; f.Q.value = 1.4;
   gn.gain.value = 0.4 * (v == null ? 1 : v); n.connect(f); f.connect(gn); gn.connect(C.destination); n.start(t);
 }
-function eatCrumbs(p, o) {   // bits of it, and a little red
-  const m0 = o && o.mats && o.mats[0], mh = m0 && m0.color ? m0.color.getHex() : 0x8a6a4a, c = m0 && m0.vertexColors && mh === 0xffffff ? 0x468443 : mh;
-  for (let i = 0; i < 4; i++) puff(p.clone().add(V3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.25)), 0.035 + Math.random() * 0.03, i % 2 ? 0x8e2a22 : c);
+function eatCrumbs(p, o) {   // bits of it, and a little red (corn chips: just chip crumbs)
+  const m0 = o && o.mats && o.mats[0], mh = m0 && m0.color ? m0.color.getHex() : 0x8a6a4a, c = o && o.vend ? 0xe3b04b : m0 && m0.vertexColors && mh === 0xffffff ? 0x468443 : mh;
+  for (let i = 0; i < 4; i++) puff(p.clone().add(V3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.25)), 0.035 + Math.random() * 0.03, i % 2 && !(o && o.vend) ? 0x8e2a22 : c);
+}
+function gulpSnd() {   // a swallow: a short falling tone
+  const C = tsnd.ctx; if (!C) return; const t = C.currentTime, o = C.createOscillator(), g = C.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(300 + Math.random() * 60, t); o.frequency.exponentialRampToValueAtTime(110, t + 0.12);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  o.connect(g); g.connect(C.destination); o.start(t); o.stop(t + 0.18);
 }
 function eatGone(o) {   // eaten: out of the world (it comes back later as a fresh one, like any other critter)
   const g = critG(o); if (g.parent !== scene) scene.attach(g); g.visible = false; o.held = false; o.thrown = false;
@@ -15876,6 +15920,16 @@ function eatGone(o) {   // eaten: out of the world (it comes back later as a fre
 }
 function updateEat(dt) {
   if (!EAT) return; const E = EAT, h = E.h, g = h.g; E.t += dt;
+  if (h.vend && h.o.drink) {   // v1.97.80: a bottle is tipped up to your mouth, three gulps
+    const q = Math.min(1, E.t / 0.45); g.position.set(0.17 - 0.17 * q, -0.23 + 0.08 * q, -0.45 + 0.17 * q); g.rotation.set(0.12 + 1.75 * q, 0.5 * (1 - q), 0.12 * (1 - q));
+    if (E.t > 0.45 + E.bites * 0.3 && E.bites < 3) { E.bites++; gulpSnd(); }
+    if (E.t >= 1.45) eatFinish(); return;
+  }
+  if (h.vend) {   // a bag of chips: brought up and munched, crumbs flying
+    const q = Math.min(1, E.t / 0.95), chew = Math.sin(E.t * 28) * 0.01 * (1 - q); g.position.set(0.17 - 0.17 * q, -0.23 + 0.06 * q + chew, -0.45 + 0.17 * q); g.scale.setScalar(E.s * (1 - 0.8 * q));
+    if (E.t > 0.15 + E.bites * 0.3 && E.bites < 3) { E.bites++; chompSnd(); eatCrumbs(g.getWorldPosition(V3()), h.o); }
+    if (q >= 1) eatFinish(); return;
+  }
   const k = Math.min(1, E.t / 0.95), chew = Math.sin(E.t * 28) * 0.012 * (1 - k);
   g.position.set(0.3 - 0.3 * k, -0.3 + 0.12 * k + chew, -0.6 + 0.33 * k); g.scale.setScalar(E.s * (1 - 0.8 * k));
   if (E.t > 0.15 + E.bites * 0.3 && E.bites < 3) { E.bites++; chompSnd(); eatCrumbs(g.getWorldPosition(V3()), h.o); }
@@ -15883,6 +15937,7 @@ function updateEat(dt) {
 }
 function eatFinish() {
   const E = EAT; if (!E) return; EAT = null; const h = E.h; h.g.scale.setScalar(E.s); h.g.position.set(0, 0, 0);
+  if (h.vend) { vendGone(h.o); if (heldDead === h) heldDead = null; vendGood(h.o); return; }   // the wrapper / empty bottle goes too
   eatGone(h.o); if (heldDead === h) heldDead = null; critNetEat(h.o); powerGive(powerKindOf(h.o), 'You ate the ' + h.nm + '. ');   // its power (v1.97.113)
 }
 function deadDrop() {   // X, dying, or getting into something: the corpse goes down on the floor where you are
@@ -15890,6 +15945,7 @@ function deadDrop() {   // X, dying, or getting into something: the corpse goes 
   if (heldDead.eating) { eatFinish(); return null; }   // mid-bite: it is eaten
   const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; heldDead = null;
   if (g.parent === camera) scene.attach(g);
+  if (o.vend) { vendRest(g, o, false); return nm; }   // v1.97.80: a snack or drink is put down, not flopped belly-up
   g.rotation.set(0, g.rotation.y, Math.PI); corpseRest(g);   // belly-up on the ground
   return nm;
 }
@@ -15920,7 +15976,7 @@ function updateThrown(dt) {
     g.rotation.x += b.spin.x * dt; g.rotation.y += b.spin.y * dt; g.rotation.z += b.spin.z * dt;
     const top = corpseGround(g.position.x, g.position.z, g.position.y), low = corpseBottom(g);
     if ((isFinite(low) ? low : g.position.y - 0.06) <= top || b.t > 6) {   // landed - its lowest point reached the ground (or it gave up on a roof edge): a corpse on the ground again
-      g.rotation.set(0, g.rotation.y, Math.PI); corpseRest(g);
+      if (b.o.vend) vendRest(g, b.o, true); else { g.rotation.set(0, g.rotation.y, Math.PI); corpseRest(g); }
       b.o.thrown = false; b.o.t = 45; THROWN.splice(i, 1);
     }
   }
@@ -17655,7 +17711,7 @@ function lesionRender() {
 }
 
 if (typeof document !== 'undefined') { if (document.body) setTimeout(lesionInit, 0); else document.addEventListener('DOMContentLoaded', lesionInit); }
-root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), fpGrab: () => fpArmsGrab(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, paintball: () => pbToggle(), get pbOn() { return PBM.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, PBM, PSX, BLOOD, psxUVAll, corpseBottom, corpseRest, THROWN, thrownWall, get wallSegs() { return wallSegs; }, FPA, FP_SKIN, FPH, fpHoldStep, fpArmsPunch, fpArmsGrab, pbTagged, pbRecv, pbToggle, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
+root.Plant3D = { powerSet: on => powerSet(on), ping: () => pingDrop(), fpGrab: () => fpArmsGrab(), horde: () => hordeToggle(), get hordeOn() { return HORDE.on; }, paintball: () => pbToggle(), get pbOn() { return PBM.on; }, respawnPoint: () => respawnPoint(), toggleFpBody, get fpBody() { return FP_BODY.on; }, creeps: w => creepDebug(w), critterPick: () => critterPick(), critterEat: () => critterEat(), critterThrow: () => critterThrow(), get canEat() { return !!(heldDead && !heldDead.eating); }, deadDrop: () => deadDrop(), vendPickNear: () => vendPickNear(), vendTake: p => vendTake(p), vendMachineNear: () => vendMachineNear(), vendDispense: (m, f, n) => vendDispense(m, f, n), vendPress: () => vendPress(), get carrying() { return !!heldDead; }, get scene() { return scene; }, get drawCalls() { return renderer ? (PERF.dc || renderer.info.render.calls) : 0; }, get triCount() { return renderer ? (PERF.tri || renderer.info.render.triangles) : 0; }, get perf() { return PERF; }, get tier() { return TIER; }, get viewmodel() { const g = gun; return { held, third: !!VIEW.third, gun: !!(g && g.visible), parent: g && g.parent ? (g.parent === hudScene ? 'hud' : g.parent === camera ? 'camera' : 'other') : 'none', scene: !!hudScene, draw: !!PERF.dc }; }, snapshot: (w) => snapshot(w), drawHud: () => drawHudGun(), frameDrawn: () => { titleFrames++; }, get grass() { return { on: GRASS.on, density: GRASS.density, dist: GRASS.dist, chunks: GRASS.chunks.size, instances: GRASS.made, visible: GRASS.shown, drawCalls: [...GRASS.chunks.values()].reduce((n, c) => n + c.meshes.length, 0) }; }, setGrass: o => grassSet(o), takeExtinguisher: () => takeExtinguisher(), set dmgNotify(f) { DMG_NOTIFY = f; }, get vehHealth() { if (!walk.drive) return null; const d = DMG[dmgDrivingKey()]; return d ? { h: d.h, fire: d.fire, burnt: d.burnt } : { h: 100 }; }, get extCharge() { return held === 'ext' ? EXT.charge : null; }, takeTool: () => takeTool(), npcAt: () => npcAt(), get npcs() { return NPCS.map(n => { const p = n.g.getWorldPosition(V3()); return { id: n.id, x: p.x, y: p.y, z: p.z, yaw: n.g.rotation.y }; }); }, toggleView: () => setView(), get thirdPerson() { return VIEW.third; }, radioToggle: () => radioToggle(), radioFire: () => radioFire(), set radioNotify(f) { SR.notify = f; }, get carryingRadio() { return SR.carry === 'me'; }, get radio() { return { on: SR.on, i: SR.i, song: SR_SONGS[SR.i].name }; }, kiaToggle: () => kiaToggle(), pickChute: () => pickChute(), set chuteNotify(f) { CHUTE_NOTIFY = f; }, carToggle: () => carToggle(), takeKey: () => takeKey(), get keys() { return [...KEYS]; }, get noNos() { return !!CAR_ON && !CAR_ON.nos; }, get inKia() { return !!CAR_ON; }, kiaRadio: () => CAR_ON ? kiaToggle(null) : null, mowerToggle: () => mowerToggle(), get mowing() { return !!walk.mow; }, set mowNotify(f) { MOW_NOTIFY = f; }, nh3Valve: () => nh3Valve(), get nh3() { return walk.on ? Math.min(1, NH3.exp) : 0; }, setWind(mph, from) { if (isFinite(mph)) WIND.mph = mph; if (isFinite(from)) WIND.from = from; }, get shells() { return mags[ammoNext()]; }, MAG, setAim(b) { aimWant = !!b; }, get aiming() { return aimK > 0.5; }, reload() { if (held === 'gun' && mags[ammo] < MAG && pumpT <= 0) startReload(ammo, true); }, get alarms() { return ALARMS.map(a => ({ desc: a.desc, val: a.val, unit: a.unit, since: a.since })); }, coolerHandle: () => coolerHandle(), set outsideF(v) { if (isFinite(v)) OUT_F = v; }, get cooler() { const C = O.cooler; return C ? { T: C.T, alarm: C.alarm, open: (O.coolerDoors || []).filter(d => d.want).length } : null; }, set coolerNotify(f) { COOL_NOTIFY = f; }, netHost, netJoin, netLeave, get net() { return { on: !!(NET.conn && NET.conn.open), host: NET.host, code: NET.code, status: NET.status, tags: NET.tags }; }, set netNotify(f) { NET.notify = f; }, get driving() { return !!walk.drive; }, get nearUTV() { return !!utv.g && !walk.ride && (Math.hypot(walk.x - utv.x, walk.z - utv.z) < 3.2 || (!!NET.rr && !(NET.rp && NET.rp.drive) && Math.hypot(walk.x - NET.rr.x, walk.z - NET.rr.z) < 3.2)); }, utvDrive, utvLook, utvView, get utv() { return { x: utv.x, z: utv.z, a: utv.a, v: Math.hypot(utv.vx, utv.vz), nos: utv.nos, boosting: utv.boosting }; }, get dbg() { return { cam, loadGlbModel, skinBone, skinTurn, ZOMB, zombNear, zombSpawn, zombToolHit, HP, playerHurt, TOOL_WALL, TOOL_GLB, FP_MHAND, rebuildModelHands, get fpHands() { return fpHands; }, get fpModelHands() { return fpModelHands; }, LESION, DEVR, DEVT, TUNE, LESION_TUNE, lesionOpen, lesionAct, lesionSelect, devRecReport, devRecStart, devRecStop, INDOOR, indoorCullWant, indoorCullHide, indoorCullShow, NET, netRecv, netRemote, WSYNC, creepHurt, rideToggle, POWER_OUTAGE, CREEP, CFIELD, creepSpawn, creepLure, CBRUSH, CORN, HAULER, haulerPose, truck, enclAt, soundShutOut, utvEnter, VEHL, CSU, get utv() { return utv; }, get perches() { return perches; }, ENCL, MOW, cornCut, ROOFMAP, roofAt, roofMapRebuildStart, roofMapStep, roofMapMeshes, MMAP, mmapBakeStart, mmapStep, POWER, walkPhysics, get wallSegs() { return wallSegs; }, get birds() { return birds; }, get critters() { return critters; }, get animals() { return ANIMALS; }, get FISH() { return FISH; }, get FLIES() { return FLIES; }, get VULT() { return VULT; }, get KEYHOOKS() { return KEYHOOKS; }, get renderer() { return renderer; }, PERF, BAKE, HERD, PING, pingDrop, pingSet, HORDE, PBM, PSX, BLOOD, psxUVAll, corpseBottom, corpseRest, THROWN, thrownWall, get wallSegs() { return wallSegs; }, FPA, FP_SKIN, FPH, fpHoldStep, fpArmsPunch, fpArmsGrab, pbTagged, pbRecv, pbToggle, zombHurt, hordeStart, hordeStop, hordeRecv, pick, get colliders() { return colliders; }, get pondFrogs() { return typeof pondFrogs !== 'undefined' ? pondFrogs : null; }, hitBird, critNetUpdate, get mower() { return O.shedMower; }, get corn() { return typeof CORN_PROPS_STATE !== 'undefined' ? CORN_PROPS_STATE : null; }, PUMP_MODELS, LIGHT, lightSample, lightUpdate, get headlamp() { return headlamp; }, get TOOL_LAST() { return TOOL_LAST; }, SA, ITEMS, VEND, DMG, dmgHit, dmgTarget, EXT, VBOXES, O, SR, SR_SONGS, srCompile, srStep, srNet, get NETrp() { return NET.rp; }, VULT, updateVulture, chalkOutline, CHUTE, NH3, KEYS, buildShotgun, vehicles, get fpGun() { return fpGun; }, colliders, WALK_SURF, walk, bodies, renderer, camera, makeCharacter, makeRagdoll, scene, THRUS, RXING, get NETrr() { return NET.rr ? { x: +NET.rr.x.toFixed(1), z: +NET.rr.z.toFixed(1) } : null; }, get myutv() { return { x: +utv.x.toFixed(1), z: +utv.z.toFixed(1) }; } }; }, get toxic() { return walk.on ? (walk.toxic || 0) / TOXIC_T : 0; }, throwSwitch, rideToggle, railPhoneNear, railPhoneAction, railPhoneState, railPhoneNotice, pivotGenNear: () => pivotGenNear(), pivotGenAction: (k) => pivotGenAction(k), powerResetNear: () => powerResetNear(), rollSwitchNear: () => rollSwitchNear(), rollButtonAim: () => rollButtonAim(), rollButtonPress: () => rollButtonPress(), rollSwitchSet: (i, m) => rollSwitchSet(i, m), rollState: i => { const d = (O.rollDoors || [])[i]; return d ? { door: d.ws, mesh: d.wm, open: d.open, meshOpen: d.mo } : null; }, powerResetAction: () => powerResetAction(), get pivotGen() { return { fuel: PIVOT_GEN.fuel, cap: PIVOT_GEN.cap, running: PIVOT_GEN.running, can: CAN.charge, canCap: CAN.cap }; }, set pivotNotify(f) { PIVOT_NOTIFY = f; }, get riding() { return !!walk.ride; }, setWeather, get weather() { return weather.kind; }, setPowerOutage, get powerOutage() { return POWER_OUTAGE.on; },
   time: { set: o => { gameTimeSet(o); wsLock('gt'); netSend({ t: 'gt', v: wsClock() }); }, date: () => gameDate(), get real() { return GT.real; }, get fast() { return GT.rate > 1; } },
   lights: { flicker: (s, r) => { const v = lightsFlicker(s, r), e = LIGHT.flick; wsLock('dk'); netSend({ t: 'le', k: 'flick', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
     blackout: (s, r) => { const v = lightsBlackout(s, r), e = LIGHT.kill; wsLock('dk'); netSend({ t: 'le', k: 'kill', s: e.T, r: e.r, x: +e.x.toFixed(1), z: +e.z.toFixed(1) }); return v; },
@@ -18024,7 +18080,9 @@ function pivotGenMenu() {   // center pivot: take or fill the diesel can, then p
 }
 function vendX() {   // vending: take what is waiting in the machine's dispenser, or press the button you are looking at
   const p = P3.vendPickNear();
-  if (p) { toast('Collected ' + P3.vendTake(p)); return true; }
+  if (p) { if (P3.carrying) return false;   /* v1.97.80: hands full - X puts down what you carry first */
+    toast(P3.vendTake(p)); return true; }
+  if (P3.carrying) return false;   // hands full: X puts it down instead of buying another
   const r = P3.vendPress();
   if (!r) return false;
   // No menu and no chatter: the button dispenses what it sells (v1.97.79: WATER gives a WET bottle now - the "out of order" joke is gone).

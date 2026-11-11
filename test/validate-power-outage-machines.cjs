@@ -665,7 +665,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     assert.equal((m.images || []).length, 1, 'the machine labels are one embedded PNG');
     for (const f of files.slice(1)) assert.equal((read(f).images || []).length, 1, f + ' carries its own embedded label');
   }
-  assert.ok(html.includes("const VEND = { machines: [], picks: [], props: {}, busy: false, eaten: 0 };"), 'one vending state');
+  assert.ok(html.includes("const VEND = { machines: [], picks: [], loose: [], props: {}, busy: false, eaten: 0 };"), 'one vending state');
   assert.ok(html.includes('if (vendX()) return;   // a dropped packet or a vending machine takes the X press first'), 'X checks the vending first, from the UI block where toast/modal live');
   assert.ok(html.includes('const r = P3.kiaToggle() || P3.radioToggle()'), 'and the launcher-patched line is untouched');
   assert.ok(html.includes("stepSafe('vending', () => vendUpdate(dt));"), 'the flap is animated from the frame loop');
@@ -690,7 +690,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
     const engine = html.slice(a, b > a ? b : a + 12000);
     for (const fn of ['toast(', 'modal(', 'unlockMouse(']) assert.ok(!engine.includes(fn), 'the vending engine block must not call ' + fn);
     assert.ok(html.includes('vendPress: () => vendPress()'), 'it exposes the press to the UI instead');
-    assert.ok(html.includes("const p = P3.vendPickNear();") && html.includes("toast('Collected ' + P3.vendTake(p))"), 'and the UI block does the talking');
+    assert.ok(html.includes("const p = P3.vendPickNear();") && html.includes("toast(P3.vendTake(p))"), 'and the UI block does the talking');
   }
   // ---------------------------------------------------------------- ground and floor layering (z-fighting guard)
   // grass is the base plane at y 0; dirt, asphalt and the concrete pads lie above it. The separation must ride on the
