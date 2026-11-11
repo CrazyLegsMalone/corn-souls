@@ -8045,7 +8045,11 @@ function init(container) {
       box(FXE - FXW, 0.15, 1.6, mat(0x8a9097), AC, top, ZN);   // crossover walkway between the two tank tops
     }
     wall(FXW, BWZ + BWR, FXW, NZ, PH, wm, [[2.3, DOOR]], { trim: true });                      // west side, beer well down to the cook alley corner; man door just south of the beer well (photo)
-    wall(FXE, Z1 + FR, FXE, -23.7, PH, wm, [], { trim: true });                                  // east side, F1 down to the south edge of Ferm MCC; retain its enclosure
+    // east side, F1 down to the south edge of Ferm MCC. v1.97.75, owner (top view, the stretch marked in red): "Delete that wall" - the alley
+    // is open to the room east of it from the shop's north wall (z -37.1, the outside stays closed) to the Ferm MCC room's north wall
+    // (z -29.8); the short piece by Ferm 1 and the MCC room's own west wall stay.
+    wall(FXE, Z1 + FR, FXE, -37.1, PH, wm, [], { trim: true });
+    wall(FXE, -29.8, FXE, -23.7, PH, wm, [], { trim: true });
     // Open ferm aisle to the shop side from z=-23.7 to SZ: no divider meshes, trim, door leaves or collision.
     // roofs: west block and ferm alley (tanks and evaporators poke up through)
     add(new T.BoxGeometry(EW - WW + 0.6, 0.3, WZS - NZ + 0.6), roofM, (WW + EW) / 2, PH + 0.15, (NZ + WZS) / 2, null, true);

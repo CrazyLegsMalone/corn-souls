@@ -108,7 +108,7 @@ assert.ok(html.includes("groundMat('asphalt'")&&html.includes("groundMat('dirtro
   };
   const west = gaps(-31, -96.3, -12.5), east = gaps(-7.6, -96.3, -23.7);
   assert.deepEqual(west, [], 'the west wall of the ferm alley has no gap for the tanks to be seen through (' + JSON.stringify(west) + ')');
-  assert.deepEqual(east, [], 'nor the east wall, north of the open walkway (' + JSON.stringify(east) + ')');
+  assert.deepEqual(east.map(g => g.map(v => +v.toFixed(2))), [[-37.1, -29.8]], 'nor the east wall, north of the open walkway, except the opening into the room behind it (v1.97.75, owner: "Delete that wall") (' + JSON.stringify(east) + ')');
   assert.ok(curved.filter(o => Math.abs(o.position.x + 7.6) < 0.6 && Math.abs(o.position.z - -47.1) < 0.6 && o.geometry.parameters.radiusTop > 7.4).length === 1,
     'the wall bends round Ferm 1 on the alley side, just outside its shell');
   assert.equal(curved.length, 8, 'round all seven fermenters and the beer well');

@@ -1,3 +1,9 @@
+## TEST v1.97.75 — the ferm alley opens into the room east of it (2026-11-11)
+- Owner (top view, the stretch of the ferm alley's east wall south of Ferm 1 marked in red): *"Delete that wall"*. Clearing the floor there for the yeast prop tanks and blend tank going in next to Ferm 1, across from the mash coolers.
+- The east wall (x −7.6) used to run unbroken from Ferm 1 down to the Ferm MCC room. It now stops at the maintenance block's north wall (z −37.1) and starts again at the Ferm MCC room's north wall (z −29.8): the alley is open to that room, both inside the same roofed building, so nothing outside shows through. The short piece by Ferm 1 and the MCC room's own west wall stay; the walk lines follow the drawn walls.
+- Tests: `validate-west-wing.cjs` now expects exactly that one opening in the east wall. Checked in the running game from above and from the alley floor.
+- Bumped TEST to `1.97.75`.
+
 ## TEST v1.97.74 — the crowbar and extinguisher models live in the game, not the launcher (2026-11-10)
 - Owner, after a preview showed the old code-drawn crowbar and extinguisher: *"why are those even still in the code"* → *"Yes"* (move them in and drop the patches).
 - **Why they were there:** `test/index.html` carried a whole second GLB reader (`crowbarReadGLB`, left over from the crowbar model A/B test) and swapped in the 3D crowbar (hvarley) and the PSX extinguisher (zynxeror) at load by string-matching the old code-drawn crowbar picture and the flat extinguisher picture. The old code had to stay as the patch anchor, `game.html` on its own still showed it, and an edit near it could break the swap.
