@@ -1,3 +1,9 @@
+## TEST v1.97.81 — the wrench and crowbar in the right hand (2026-11-12)
+- Owner: *"The items should be held in right hand. Shot gun is fine."* — *"I meant the wrench and crowbar"* — *"They are being held by the left hand right now. They need to be in the right hand."*
+- Both had two grip points: the right fist at the very end of the handle, which sat below the bottom-right of the view, and the left reaching across to the middle, so all you saw was the left arm holding them. They are one-handed now (like the knives, the pan and the baton): one grip in the right hand, a little up from the end of the handle (pipe wrench `TOOL_GLB.wrench.grip [-0.3]`, crowbar `[-0.15]`), and the left arm hangs out of view. The shotgun is unchanged.
+- Tests: `validate-fp-body.cjs` (right hand on the wrench and crowbar, the left off them, one grip, in view, follows the swing). Checked in the running game: the right arm holds each one.
+- Bumped TEST to `1.97.81`.
+
 ## TEST v1.97.80 — snacks and drinks go into your hands: eat, drink, put down, throw (2026-11-11)
 - Owner: *"What happens after you pick up the snacks"* — nothing did: taking an item only added to an unused counter. Asked carry it or eat / drink it, owner: *"Both"*.
 - **In your hands:** X at the machine now puts what is waiting in the dispenser in front of you, carried like a dead critter (`heldDead`, `vendHold()`): *"Took the Milorade - B to drink it, X to put it down, fire to throw it."*

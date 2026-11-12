@@ -198,21 +198,18 @@ for (const hand of [right, left]) {
 }
 for (const name of ['wrench', 'crowbar', 'ext', 'hand']) {
   ctx.held = name; updateGun(0);
-  const item = name === 'hand' ? null : heldG[name];
-  assert.equal(right.parent, item);
-  assert.equal(left.parent, item);
+  const item = name === 'hand' ? null : heldG[name], one = name === 'wrench' || name === 'crowbar';   // v1.97.81, owner: "They are being held by the left hand right now. They need to be in the right hand."
+  assert.ok(right.parent === item, name + ': the right hand is on it');
+  assert.ok(left.parent === (one ? null : item), name + (one ? ': one-handed, the left hand is off it' : ': both hands on it'));
   if (name in TOOLS) {
     const [primary, support] = item.userData.gripPoints;
-    assert.ok(right.position.equals(primary) && left.position.equals(support));
-    assert.ok(primary.distanceTo(support) > 0.08, 'hands occupy different points on the handle');
-    for (const hand of [right, left]) {
-      hand.getWorldPosition(v).project(hudCam);
-      assert.ok(Math.abs(v.x) < 1 && Math.abs(v.y) < 1 && Math.abs(v.z) < 1, name + ' grip is in view at rest');
-    }
-    const before = left.getWorldPosition(new T.Vector3());
+    assert.ok(support === undefined && right.position.equals(primary), name + ': one grip, the right hand on it');
+    right.getWorldPosition(v).project(hudCam);
+    assert.ok(Math.abs(v.x) < 1 && Math.abs(v.y) < 1 && Math.abs(v.z) < 1, name + ' grip is in view at rest');
+    const before = right.getWorldPosition(new T.Vector3());
     ctx.swipe = 0.25; updateGun(0);
-    assert.ok(left.getWorldPosition(new T.Vector3()).distanceTo(before) > 0.05, 'support hand follows tool swing');
-    assert.ok(right.position.equals(primary) && left.position.equals(support), 'swing maintains both grip points');
+    assert.ok(right.getWorldPosition(new T.Vector3()).distanceTo(before) > 0.05, 'the right hand follows the tool swing');
+    assert.ok(right.position.equals(primary), 'swing keeps the grip');
     ctx.swipe = 0;
   }
 }
@@ -222,9 +219,9 @@ assert.equal(heldG.hand.visible, false, 'empty hands stay hidden on foot');
     const G = heldG[k]; let model = null, pic = null;
     G.traverse(o => { if (o.isMesh && o.geometry.attributes.position.count > 400) model = o; if (o.isMesh && o.geometry.type === 'PlaneGeometry') pic = o; });
     assert.ok(model, k + ': the model is in the first-person hand'); assert.equal(pic.material.visible, false, k + ': and the flat picture is hidden');
-    G.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(model), [p, s2] = G.userData.gripPoints;
-    assert.ok(p.distanceTo(s2) > 0.08, k + ': two grips apart on the handle');
-    for (const q of [p, s2]) assert.ok(bb.distanceToPoint(G.localToWorld(q.clone())) < 1e-6, k + ': each grip is on the tool');
+    G.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(model), gp = G.userData.gripPoints;
+    if (k === 'wrench') assert.equal(gp.length, 1, 'wrench: one-handed (v1.97.81)'); else assert.ok(gp[0].distanceTo(gp[1]) > 0.08, k + ': two grips apart on the handle');
+    for (const q of gp) assert.ok(bb.distanceToPoint(G.localToWorld(q.clone())) < 1e-6, k + ': each grip is on the tool');
   }
 }
 hudScene.add(SR.g); SR.carry = 'me'; updateGun(0);
