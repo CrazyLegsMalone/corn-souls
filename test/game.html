@@ -7005,11 +7005,15 @@ function vendGone(o) {                          // eaten, drunk, or tidied away
   const i = VEND.loose.indexOf(o); if (i >= 0) VEND.loose.splice(i, 1);
   if (o.g.parent) o.g.parent.remove(o.g); o.held = false; o.thrown = false;
 }
-function vendHold(o) {                          // into your hands, in front of you like a carried corpse
+function vendHold(o) {                          // into your right hand (v1.97.82: in the HUD scene, where the PSX arms can hold it - updateFpHands)
   o.held = true; heldDead = { o, g: o.g, nm: o.short, vend: true };
-  camera.attach(o.g); o.g.position.set(0.17, -0.23, -0.45);
+  if (o.g.parent) o.g.parent.remove(o.g); ensureHud().add(o.g); o.g.visible = true; o.g.position.set(0.16, -0.17, -0.43);
   if (o.drink) o.g.rotation.set(0.12, 0.5, 0.12); else o.g.rotation.set(0.3, 0.5, 0.08);
   return 'Took the ' + o.short + ' - B to ' + (o.drink ? 'drink' : 'eat') + ' it, X to put it down, fire to throw it.';
+}
+function vendToWorld(g) {                       // out of your hand (HUD space = camera space) into the world, where it was on screen
+  if (g.parent !== hudScene) return; camera.updateMatrixWorld(true); g.updateMatrix();
+  const m = camera.matrixWorld.clone().multiply(g.matrix); hudScene.remove(g); scene.add(g); m.decompose(g.position, g.quaternion, g.scale); g.visible = true;
 }
 function vendRest(g, o, thrown) {               // on the floor: a bottle stands (or lies on its side if thrown), a bag lies flat
   if (o.drink) g.rotation.set(0, thrown ? g.rotation.y : walk.yaw, thrown ? Math.PI / 2 : 0); else g.rotation.set(-Math.PI / 2, 0, thrown ? g.rotation.z : walk.yaw);
@@ -15921,13 +15925,13 @@ function eatGone(o) {   // eaten: out of the world (it comes back later as a fre
 function updateEat(dt) {
   if (!EAT) return; const E = EAT, h = E.h, g = h.g; E.t += dt;
   if (h.vend && h.o.drink) {   // v1.97.80: a bottle is tipped up to your mouth, three gulps
-    const q = Math.min(1, E.t / 0.45); g.position.set(0.17 - 0.17 * q, -0.23 + 0.08 * q, -0.45 + 0.17 * q); g.rotation.set(0.12 + 1.75 * q, 0.5 * (1 - q), 0.12 * (1 - q));
+    const q = Math.min(1, E.t / 0.45); g.position.set(0.16 - 0.16 * q, -0.17 + 0.03 * q, -0.43 + 0.15 * q); g.rotation.set(0.12 + 1.75 * q, 0.5 * (1 - q), 0.12 * (1 - q));
     if (E.t > 0.45 + E.bites * 0.3 && E.bites < 3) { E.bites++; gulpSnd(); }
     if (E.t >= 1.45) eatFinish(); return;
   }
   if (h.vend) {   // a bag of chips: brought up and munched, crumbs flying
-    const q = Math.min(1, E.t / 0.95), chew = Math.sin(E.t * 28) * 0.01 * (1 - q); g.position.set(0.17 - 0.17 * q, -0.23 + 0.06 * q + chew, -0.45 + 0.17 * q); g.scale.setScalar(E.s * (1 - 0.8 * q));
-    if (E.t > 0.15 + E.bites * 0.3 && E.bites < 3) { E.bites++; chompSnd(); eatCrumbs(g.getWorldPosition(V3()), h.o); }
+    const q = Math.min(1, E.t / 0.95), chew = Math.sin(E.t * 28) * 0.01 * (1 - q); g.position.set(0.16 - 0.16 * q, -0.17 + 0.02 * q + chew, -0.43 + 0.15 * q); g.scale.setScalar(E.s * (1 - 0.8 * q));
+    if (E.t > 0.15 + E.bites * 0.3 && E.bites < 3) { E.bites++; chompSnd(); const w = g.getWorldPosition(V3()); eatCrumbs(g.parent === hudScene ? w.applyMatrix4(camera.matrixWorld) : w, h.o); }   // (in your hand it is in HUD = camera space)
     if (q >= 1) eatFinish(); return;
   }
   const k = Math.min(1, E.t / 0.95), chew = Math.sin(E.t * 28) * 0.012 * (1 - k);
@@ -15944,7 +15948,7 @@ function deadDrop() {   // X, dying, or getting into something: the corpse goes 
   if (!heldDead) return null;
   if (heldDead.eating) { eatFinish(); return null; }   // mid-bite: it is eaten
   const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; heldDead = null;
-  if (g.parent === camera) scene.attach(g);
+  if (g.parent === camera) scene.attach(g); else if (o.vend) vendToWorld(g);
   if (o.vend) { vendRest(g, o, false); return nm; }   // v1.97.80: a snack or drink is put down, not flopped belly-up
   g.rotation.set(0, g.rotation.y, Math.PI); corpseRest(g);   // belly-up on the ground
   return nm;
@@ -15956,7 +15960,7 @@ function critterThrow() {   // returns a line for the UI, or null so the fire bu
   if (!heldDead || !walk.on || walk.dead) return null;
   if (heldDead.eating) return 'Chewing...';
   const o = heldDead.o, g = heldDead.g, nm = heldDead.nm; o.held = false; o.thrown = true; o.t = 45; heldDead = null;
-  scene.attach(g);
+  if (o.vend) vendToWorld(g); else scene.attach(g);
   const dir = camera.getWorldDirection(V3(0, 0, 0)), eye = camera.getWorldPosition(V3(0, 0, 0));
   g.position.copy(eye).addScaledVector(dir, 0.7);
   { const w = typeof thrownWall === 'function' ? thrownWall(eye.x, eye.z, g.position.x, g.position.z, g.position.y) : null;   // v1.97.72: standing at a wall, it leaves your hand on your side of it
@@ -17360,10 +17364,10 @@ function rebuildModelHands() {   // the Lesion Toolbox / tuning: bake again with
 let fpHands = null, fpVest = null;
 const T_V1 = new T.Vector3(), T_V2 = new T.Vector3(), T_V3 = new T.Vector3();
 function updateFpHands(fp, reloadOut) {
-  const radio = SR.carry === 'me' && SR.g && SR.g.parent === hudScene;
-  const item = radio ? 'radio' : held;
-  const active = fp && FP_BODY.on && !walk.ride && !walk.pass &&
-    (item === 'gun' || item === 'wrench' || item === 'crowbar' || !!TOOL_GLB[item] || item === 'ext' || item === 'radio');
+  const radio = SR.carry === 'me' && SR.g && SR.g.parent === hudScene, vend = !!(heldDead && heldDead.vend && heldDead.g.parent === hudScene && walk.on && !walk.dead && !walk.drive && !walk.mow && !VIEW.third);   // v1.97.82: a carried snack / drink (fp is off while anything is carried)
+  const item = vend ? 'vend' : radio ? 'radio' : held;
+  const active = (fp || vend) && FP_BODY.on && !walk.ride && !walk.pass &&
+    (item === 'vend' || item === 'gun' || item === 'wrench' || item === 'crowbar' || !!TOOL_GLB[item] || item === 'ext' || item === 'radio');
   if (!active) {
     if (fpHands) for (const hand of fpHands) hand.removeFromParent();
     if (typeof FPH !== 'undefined') FPH.on = false; return;
@@ -17406,6 +17410,8 @@ function updateFpHands(fp, reloadOut) {
   } else if (item === 'ext') {
     grip(right, heldG.ext, 0.253, -0.09, -0.5, 0.38, -0.36, 0.35, [-1, 0, 0]);
     grip(left, heldG.ext, 0.162, -0.177, -0.506, 0.38, 0.52, -0.48, [0, 1, 0]);
+  } else if (item === 'vend') {   // v1.97.82: the right fist round the bottle / bag, thumb up; the left arm hangs
+    grip(right, heldDead.g, 0, heldDead.o.drink ? 0.075 : 0.09, 0, 0.48, -0.46, 0.4, [0, 1, 0]); left.removeFromParent();
   } else if (item === 'radio') {
     grip(right, SR.g, 0.155, 0.266, 0.025, 0.42, -0.35, 0.28, [-1, 0, 0]);
     grip(left, SR.g, -0.162, 0.074, 0.086, 0.45, 0.48, -0.5, [0, 1, 0]);
@@ -17425,6 +17431,8 @@ function updateGun(dt) {
   if (!gun) gun = makeGun();
   if (!heldG.hand) { heldG.hand = makeHand(); heldG.washer = makeWasher(); for (const k in TOOLS) heldG[k] = makeTool(k); heldG.ext = makeExtHud(); }
   const show = walk.on && !walk.dead && !walk.drive && !walk.mow, fp = show && !VIEW.third && !heldDead;   // carrying a dead critter: both hands on it, no gun (v1.97.111)
+  const vh = !!(heldDead && heldDead.vend), fpv = show && !VIEW.third && vh;   // v1.97.82: a snack or drink is in your right hand (updateFpHands); the tool is put away meanwhile, as with a corpse
+  if (vh) heldDead.g.visible = fpv || heldDead.g.parent !== hudScene;
   gun.visible = fp && held === 'gun'; heldG.hand.visible = fp && held === 'hand'; for (const k in TOOLS) heldG[k].visible = fp && held === k; heldG.ext.visible = fp && held === 'ext'; heldG.washer.visible = false;
   wash.t = Math.max(0, wash.t - dt); updateWasher(dt, show && held === 'gun' && wash.t > 0);
   if (!show) { if (typeof fpArmsStep === 'function') fpArmsStep(dt, false); updateFpHands(false, 0); aimK = 0; if (!walk.drive && camera.fov !== 42) { camera.fov = 42; camera.updateProjectionMatrix(); } return; }

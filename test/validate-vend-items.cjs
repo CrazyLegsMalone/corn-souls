@@ -44,12 +44,12 @@ assert.ok(html.includes("if (p.M && p.M.item === p) p.M.item = null;"), 'taking 
 // v1.97.80, owner: "What happens after you pick up the snacks" - "Both" (carry it, and eat / drink it from your hands)
 { const blk = cut('const VEND_GOOD = {', 'function vendPress()');
   const c2 = { heldDead: null, HP: { hp: 40, max: 100 }, walk: { on: true, toxic: 12, yaw: 0 }, NH3: { exp: 0.8 }, DMG_NOTIFY: null, VEND: { loose: [], picks: [], eaten: 0 },
-    camera: { attach(g) { g.parent = this; } }, deadDrop() { c2.dropped = true; }, corpseRest() {} };
+    hudScene: { add(g) { g.parent = this; } }, ensureHud() { return c2.hudScene; }, camera: {}, deadDrop() { c2.dropped = true; }, corpseRest() {} };
   vm.createContext(c2); vm.runInContext(blk + '\nthis.vendTake = vendTake; this.vendGood = vendGood; this.vendLoose = vendLoose;', c2);
-  const g = { position: { set() {} }, rotation: { set() {} }, parent: null }, M = { item: null };
+  const g = { position: { set() {} }, rotation: { set() {} }, parent: { remove(o) { o.parent = null; } } }, M = { item: null };
   const pick = { g, name: 'Chippys: Extra Corn!', file: 'chippys_bag.glb', M }; M.item = pick; c2.VEND.picks.push(pick);
   assert.match(c2.vendTake(pick), /^Took the Chippys - B to eat it, X to put it down, fire to throw it\.$/);
-  assert.ok(c2.heldDead && c2.heldDead.vend && c2.heldDead.o.held && g.parent === c2.camera && !c2.VEND.picks.length && M.item === null, 'in your hands, out of the machine');
+  assert.ok(c2.heldDead && c2.heldDead.vend && c2.heldDead.o.held && g.parent === c2.hudScene && !c2.VEND.picks.length && M.item === null, 'in your hands, out of the machine');
   assert.match(c2.vendGood(c2.heldDead.o), /You ate the Chippys/); assert.equal(c2.HP.hp, 60, 'chips: +20 HP');
   const w = c2.vendLoose({}, 'WET Water', 'wet_water_bottle.glb', true); assert.ok(w.drink && w.water);
   assert.match(c2.vendGood(w), /You drank the WET Water/); assert.ok(c2.walk.toxic === 0 && c2.NH3.exp < 0.3, 'WET washes out the pond and the ammonia');
@@ -59,6 +59,10 @@ assert.ok(html.includes("if (o.vend) return vendHold(o);") && html.includes("for
 assert.ok(html.includes("if (o.vend) { vendRest(g, o, false); return nm; }") && html.includes("if (b.o.vend) vendRest(g, b.o, true);"), 'put down it stands / lies flat; thrown it lands on its side');
 assert.ok(html.includes("if (h.vend) { vendGone(h.o); if (heldDead === h) heldDead = null; vendGood(h.o); return; }"), 'finishing it: gone, and it does you good');
 assert.ok(html.includes("if (P3.carrying) return false;   // hands full: X puts it down instead of buying another"), 'X with your hands full puts it down, not another purchase');
+// v1.97.82: a carried snack or drink is in the right hand of the first-person arms (it floated in front of you with no hand on it)
+assert.ok(html.includes("(item === 'vend' || item === 'gun' ||") && html.includes("grip(right, heldDead.g, 0, heldDead.o.drink ? 0.075 : 0.09, 0, 0.48, -0.46, 0.4, [0, 1, 0]); left.removeFromParent();"), 'the right hand closes round it, the left arm hangs');
+assert.ok(html.includes("const active = (fp || vend) && FP_BODY.on && !walk.ride && !walk.pass &&") && html.includes("fp = show && !VIEW.third && !heldDead;"), 'the arms hold it though the tool is put away (the line the launcher patches is untouched)');
+assert.ok(html.includes("ensureHud().add(o.g);") && html.includes("function vendToWorld(g)") && html.includes("if (o.vend) vendToWorld(g); else scene.attach(g);"), 'in hand it lives in the HUD scene, and goes back into the world where it was on screen');
 // credited
 const reg = JSON.parse(fs.readFileSync(path.join(root, 'assets/registry.json'), 'utf8')).assets;
 for (const f of Object.keys(SIZE)) assert.ok(reg.some(a => a.status === 'in-use' && a.files.includes('assets/models/' + f + '.glb')), f + ' registered');
