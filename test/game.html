@@ -4364,6 +4364,12 @@ const MILL_LBM_PCT = 15.3, MILL_AMP0 = 140, MILL_AMP_LB = 0.19;
 // slurry blender: flour + backset + heated cook water, by the grind / water ratio (lb/gal) and backset %; alpha-amylase dosed in ml/min
 // (owner: no controls for these yet - fixed at the real plant's numbers)
 const BLEND = { ratio: 4.8, bs: 55, enz: 80 };
+// v1.97.88 the water side of the slurry, connected as on the plant's screens (owner: "It should connect in the way as in the pictures and
+// function that way as well"): the centrifuges send thin stillage to the Thin Stillage Tank; the Backset Pump sends part of it to the blender,
+// the evaporators take the rest; evaporator condensate goes to the Meth Feed Tank, the Meth Feed Pump sends it to the Cook Water Tank (the
+// methanators are out of service; well water makes up a low tank); the Cook Water Pump sends it through the Cook Water Heater to the blender. GPM throughout.
+const CMT_GAL = 374000, THIN_FRAC = 0.8, EVAP_MAX = 900, COND_FRAC = 0.78, MFP_MAX = 700, MAKEUP_GPM = 350, PUMP_MAX = 1400;
+const TB_CAP = 550000, TB_FILL = 80, RECLAIM = 3000;   // Tin Bins 3 & 4: storage. Spare receiving fills them; they refill Tin Bins 1 & 2 when trucks fall behind
 const FLOUR_LBG = 12.5, BACKSET_LBG = 8.7, WATER_LBG = 8.34, CW_T = 202, BS_T = 185, CORN_T = 60, ENZ_PER_LB = 80 / 4350;
 // 7 fermenters: at ~4,650 bu/h an 85% batch fills in 9 h; then 50 h ferment, 2 h drain, 1 h clean = 62 h < 7 x 9 h
 const FERM_H = 50, DRAIN_RATE = 7650 * K, CIP_H = 1, COL_MAX = 2700 * K, TRUCK_DELAY = 1.0, TRUCK_DRAIN_H = 1.0;
@@ -4386,8 +4392,16 @@ const UNITS = [
   { id: 'st1',    st: 'slurry',    name: 'Slurry Tank 1',     holds: 'Corn slurry',    color: '#e8c88a', lvl: { def: 60, min: 0, max: 100 }, temp: { def: 186, min: 140, max: 200, good: [182, 190] } },
   { id: 'strA',   st: 'slurry',    name: 'Strainer 1',        holds: 'Slurry',         color: '#c9b48a', duty: 0 },
   { id: 'strB',   st: 'slurry',    name: 'Strainer 2',        holds: 'Slurry',         color: '#c9b48a', duty: 1 },
-  { id: 'tb3',    st: 'receiving', name: 'Tin Bin 3', holds: 'Corn (550,000 bu storage)', color: '#ffc61a' },
-  { id: 'tb4',    st: 'receiving', name: 'Tin Bin 4', holds: 'Corn (550,000 bu storage)', color: '#ffc61a' },
+  { id: 'tb3',    st: 'receiving', name: 'Tin Bin 3', holds: 'Corn (550,000 bu storage)', color: '#ffc61a', lvlRO: true },
+  { id: 'tb4',    st: 'receiving', name: 'Tin Bin 4', holds: 'Corn (550,000 bu storage)', color: '#ffc61a', lvlRO: true },
+  { id: 'scalper', st: 'milling',  name: 'Scalper & Gravity Splitter', holds: 'Corn on its way to the grinding bins', color: '#8bc34a' },
+  { id: 'tst',    st: 'slurry',    name: 'Thin Stillage Tank', holds: 'Thin stillage from the centrifuges (backset)', color: '#b9a27a', lvlRO: true },
+  { id: 'tsp',    st: 'slurry',    name: 'Backset Pump',       holds: 'Thin stillage to the slurry blender', color: '#2f6fa8' },
+  { id: 'mft',    st: 'slurry',    name: 'Meth Feed Tank',     holds: 'Evaporator condensate', color: '#a8946c', lvlRO: true },
+  { id: 'mfp',    st: 'slurry',    name: 'Meth Feed Pump',     holds: 'Condensate to the Cook Water Tank', color: '#2f6fa8' },
+  { id: 'cwt',    st: 'slurry',    name: 'Cook Water Tank',    holds: 'Cook water', color: '#9fc4d8', lvlRO: true },
+  { id: 'cwp',    st: 'slurry',    name: 'Cook Water Pump',    holds: 'Cook water to the heater and blender', color: '#2f6fa8' },
+  { id: 'cwh',    st: 'slurry',    name: 'Cook Water Heater',  holds: 'Cook water', color: '#ff8c42', tempRO: true, tempHint: 'Steam heats the cook water to about 202°F on its way to the blender.' },
   { id: 'cip',    st: 'slurry',    name: 'CIP Tank',          holds: 'Cleaning solution', color: '#7fd3ff' },
   { id: 'st2',    st: 'slurry',    name: 'Slurry Tank 2',     holds: 'Strained slurry', color: '#e8c88a', lvl: { def: 60, min: 0, max: 100 }, temp: { def: 187, min: 140, max: 205, good: [182, 190] } },
   { id: 'hydro',  st: 'cook',      name: 'Hydroheater',       holds: 'Slurry + steam',  color: '#ff5a5f', temp: { def: 225, min: 195, max: 250, good: [220, 230], label: 'Discharge temperature' } },
@@ -4445,6 +4459,8 @@ function create() {
   s.day = [0, 1, 2, 3].map(() => ({ L: 70, inflow: 0 }));
   s.mills = [0, 1, 2, 3].map((_, i) => ({ rate: 0, limit: '', lbm: 0, amps: 0, bearT: 95, dir: i % 2 ? 'REV' : 'FWD', on: true, low: false }));
   s.blend = { flow: 0, lbm: 0, water: 0, bsGpm: 0, cwGpm: 0, gpm: 0, dens: 0, mixT: 0, q: 1 };
+  s.tb = [{ L: 73, in: 0, out: 0 }, { L: 23, in: 0, out: 0 }]; s.reclaim = 0;
+  s.tst = { L: 50, in: 0, out: 0, evap: 0 }; s.mft = { L: 39, in: 0, out: 0 }; s.cwt = { L: 44, in: 0, out: 0, makeup: 0 }; s.cwh = { T: 202 }; s.waterShort = false;
   s.st1 = { L: 60, T: 186, out: 0, steam: 0 };
   s.str = [{ f: 0, clean: 0 }, { f: 0, clean: 0 }]; s.duty = 0;
   s.st2 = { L: 60, T: 187, out: 0, steam: 0 };
@@ -4489,6 +4505,7 @@ function dead(s) {
   s.day.forEach(d => { d.inflow = 0; });
   s.mills.forEach(m => { m.rate = 0; m.limit = 'power'; m.lbm = 0; m.amps = 0; });
   s.conveyor = 0; s.recv = 0; s.recvRail = 0; s.recvTruck = 0;
+  s.tb.forEach(b => { b.in = 0; b.out = 0; }); s.reclaim = 0; s.tst.in = s.tst.out = s.tst.evap = 0; s.mft.in = s.mft.out = 0; s.cwt.in = s.cwt.out = s.cwt.makeup = 0;
   s.blend.flow = 0; s.blend.lbm = 0; s.blend.water = 0; s.blend.bsGpm = 0; s.blend.cwGpm = 0; s.blend.gpm = 0; s.st1.steam = 0; s.st2.steam = 0; s.beer.feed = 0;
   s.st1.out = 0; s.st2.out = 0; s.cook.out = 0; s.liq1.out = 0; s.liq.out = 0; s.propSide = 0;
   s.out.corn = 0; s.out.eth = 0; s.out.oil = 0; s.out.cake = 0;
@@ -4504,6 +4521,16 @@ function stepH(s, dt) {
   s.silo.forEach((sl, i) => { const spL = sp['silo' + i].lvl; if (sl.L < spL - 3) sl.filling = true; else if (sl.L >= spL) sl.filling = false; });
   const need = s.silo.filter(sl => sl.filling).length, truckCap = sp.recv.rate * 1000, railCap = sp.rail.rate * 3500, recvCap = truckCap + railCap;
   s.silo.forEach(sl => { sl.inflow = sl.filling ? recvCap / need : 0; recv += sl.inflow; });
+  // Tin Bins 3 & 4 (storage): receiving fills them when Tin Bins 1 & 2 are at their setpoints; when trucks fall behind (Bins 1 & 2 under
+  // 40%) their reclaim conveyor sends corn back up the elevator to Bins 1 & 2
+  s.tb.forEach(b => { b.in = 0; b.out = 0; });
+  if (!need) { const low = s.tb.filter(b => b.L < TB_FILL - 1); low.forEach(b => { b.in = recvCap / low.length; recv += b.in; }); }
+  const siloAvg = (s.silo[0].L + s.silo[1].L) / 2, have = s.tb.filter(b => b.L > 1);
+  if (siloAvg < 40) s.reclaiming = true; else if (siloAvg > 55) s.reclaiming = false;
+  s.reclaim = s.reclaiming && have.length ? RECLAIM : 0;
+  if (s.reclaim) have.forEach(b => { b.out = RECLAIM / have.length; });
+  s.tb.forEach(b => { b.L = clamp(b.L + (b.in - b.out) * dt / TB_CAP * 100, 0, 100); });
+  if (s.reclaim) s.silo.forEach(sl => { sl.inflow += RECLAIM / 2; });
   s.recv = recv; s.recvRail = recvCap > 0 ? recv * railCap / recvCap : 0; s.recvTruck = recv - s.recvRail;
   if (s.recvTruck > 0) { s.truckAcc = (s.truckAcc || 0) + s.recvTruck * dt / 1000; while (s.truckAcc >= 1) { s.truckAcc -= 1; s.trucksIn = (s.trucksIn || 0) + 1; s.events.push({ kind: 'corn' }); } }
 
@@ -4516,8 +4543,14 @@ function stepH(s, dt) {
 
   // ---- day bins -> hammermills -> slurry blender
   let flour = 0; s.millLimited = '';
+  // water for the blender: backset while the Thin Stillage Tank has some, cook water while the Cook Water Tank has some (GPM)
+  const tsGal = s.tst.L / 100 * CMT_GAL, cwGal = s.cwt.L / 100 * CMT_GAL;
+  const bsAvail = tsGal > 500 ? PUMP_MAX : s.tst.in, cwAvail = cwGal > 500 ? PUMP_MAX : s.cwt.in;
+  const want = sp['mill0'].rate + sp['mill1'].rate + sp['mill2'].rate + sp['mill3'].rate, wantLbm = want * MILL_LBM_PCT, waterMax = bsAvail + cwAvail;
+  const wScale = wantLbm > 0 ? Math.min(1, waterMax * BLEND.ratio / wantLbm) : 1;
+  s.waterShort = wScale < 0.999;
   s.mills.forEach((m, i) => {
-    let r = sp['mill' + i].rate * MILL_LBM_PCT * 60 / LB_BU; m.limit = '';   // feeder speed % -> bu/h
+    let r = sp['mill' + i].rate * MILL_LBM_PCT * 60 / LB_BU * wScale; m.limit = s.waterShort ? 'nowater' : '';   // feeder speed % -> bu/h (less if the blender is short of water)
     const d = s.day[i], dBu = d.L / 100 * CAP.day;
     if (dBu < 5 && r > d.inflow) { r = d.inflow; m.limit = 'nocorn'; }
     if (s.st1.L >= 96) { r = 0; m.limit = 'full'; } else if (s.st1.L > 90) { r *= (96 - s.st1.L) / 6; m.limit = 'full'; }
@@ -4536,13 +4569,16 @@ function stepH(s, dt) {
   });
   s.blend.flow = flour;
   // ---- slurry blender: flour + backset + heated cook water, mixed to the grind / water ratio; alpha-amylase dosed in
-  { const B = s.blend, bp = BLEND, lbm = LBM(flour), water = lbm / bp.ratio, bs = water * bp.bs / 100, cw = water - bs;
+  { const B = s.blend, bp = BLEND, lbm = LBM(flour), water = lbm / bp.ratio;
+    let bs = Math.min(water * bp.bs / 100, bsAvail), cw = Math.min(water - bs, cwAvail); bs = Math.min(water - cw, bsAvail);   // short of one, the other makes it up
     B.lbm = lbm; B.water = water; B.bsGpm = bs; B.cwGpm = cw; B.gpm = water + lbm / FLOUR_LBG;
     const mass = lbm + cw * WATER_LBG + bs * BACKSET_LBG;
     B.dens = B.gpm > 0 ? mass / B.gpm : 0;
-    B.mixT = mass > 0 ? (lbm * 0.4 * CORN_T + cw * WATER_LBG * CW_T + bs * BACKSET_LBG * BS_T) / (lbm * 0.4 + cw * WATER_LBG + bs * BACKSET_LBG) : CORN_T;
+    B.mixT = mass > 0 ? (lbm * 0.4 * CORN_T + cw * WATER_LBG * s.cwh.T + bs * BACKSET_LBG * BS_T) / (lbm * 0.4 + cw * WATER_LBG + bs * BACKSET_LBG) : CORN_T;
     B.enzNeed = lbm * ENZ_PER_LB;
-    B.q = lbm > 1 ? F.ratio(bp.ratio) * F.enz(B.enzNeed > 0 ? bp.enz / B.enzNeed : 1) * F.backset(bp.bs) : 1; }
+    B.q = lbm > 1 ? F.ratio(bp.ratio) * F.enz(B.enzNeed > 0 ? bp.enz / B.enzNeed : 1) * F.backset(water > 0 ? bs / water * 100 : bp.bs) : 1;
+    // cook water heater: steam brings the cook water to ~202 F while it flows; it cools off when it doesn't
+    s.cwh.T += ((cw > 1 ? CW_T : 150) - s.cwh.T) * (1 - Math.exp(-dt / (cw > 1 ? 0.05 : 1))); }
 
   // ---- slurry tank 1 -> duty strainer -> slurry tank 2
   const b1 = s.st1.L / 100 * CAP.st1, sd = s.str[s.duty], so = s.str[1 - s.duty];
@@ -4708,6 +4744,20 @@ function stepH(s, dt) {
   const lost = ethIn * (1 - s.col.rec);
   s.etoh.gal = Math.min(CAP.etoh, s.etoh.gal + eth * dt);
 
+  // ---- the water side of the slurry (GPM): centrifuges -> Thin Stillage Tank -> Backset Pump (blender) / evaporators;
+  //      evaporator condensate -> Meth Feed Tank -> Meth Feed Pump -> Cook Water Tank (+ well water) -> Cook Water Pump -> heater -> blender
+  { const T = s.tst, M = s.mft, W = s.cwt, h = 60 * dt / CMT_GAL * 100;   // GPM over dt hours -> % of a 374,000 gal tank
+    T.in = GPM(feed) * THIN_FRAC; T.out = s.blend.bsGpm;
+    T.evap = clamp(T.in - T.out + (T.L - 50) * 12, 0, EVAP_MAX); if (T.L <= 0.5) T.evap = 0;
+    T.L = clamp(T.L + (T.in - T.out - T.evap) * h, 0, 100);
+    M.in = T.evap * COND_FRAC; M.out = M.L > 0.5 ? clamp(M.in + (M.L - 40) * 10, 0, MFP_MAX) : 0;
+    M.L = clamp(M.L + (M.in - M.out) * h, 0, 100);
+    if (W.L < 30) W.filling = true; else if (W.L > 45) W.filling = false;
+    W.makeup = W.filling ? MAKEUP_GPM : 0; W.in = M.out + W.makeup; W.out = s.blend.cwGpm;
+    W.L = clamp(W.L + (W.in - W.out) * h, 0, 100);
+    if (W.L < 5 && !W.warned) { W.warned = true; s.alerts.push({ unit: 'cwt', msg: 'Cook Water Tank is nearly empty — the blender is short of water.' }); } if (W.L > 15) W.warned = false;
+    if (T.L < 5 && !T.warned) { T.warned = true; s.alerts.push({ unit: 'tst', msg: 'Thin Stillage Tank is nearly empty — no backset for the blender.' }); } if (T.L > 15) T.warned = false; }
+
   // ---- stillage -> decanters / evaporators -> wet cake + corn oil
   const conv = feed > 0 ? Math.min(1, ethIn / (feed * 2.95)) : 1;
   const oil = feed * 0.8;
@@ -4754,7 +4804,8 @@ function ship(s, tank, key, cap, spL, load, kind, dt) {
 // ---- readouts for a unit: level %, temperature, flows, state text
 function level(s, id) {
   switch (id) {
-    case 'silo0': return s.silo[0].L; case 'silo1': return s.silo[1].L;
+    case 'silo0': return s.silo[0].L; case 'silo1': return s.silo[1].L; case 'tb3': return s.tb[0].L; case 'tb4': return s.tb[1].L;
+    case 'tst': return s.tst.L; case 'mft': return s.mft.L; case 'cwt': return s.cwt.L;
     case 'day0': case 'day1': case 'day2': case 'day3': return s.day[+id[3]].L;
     case 'st1': return s.st1.L; case 'st2': return s.st2.L;
     case 'liq': return s.liq.L; case 'liq1': return s.liq1.L;
@@ -4768,7 +4819,7 @@ function level(s, id) {
   return null;
 }
 function temp(s, id) {
-  switch (id) { case 'st1': return s.st1.T; case 'st2': return s.st2.T; case 'hydro': return s.hydro.T; case 'ct1': return s.ct[0].T; case 'ct2': return s.ct[1].T; case 'liq': return s.liq.T; case 'liq1': return s.liq1.T; case 'col': return s.col.T; }
+  switch (id) { case 'cwh': return s.cwh.T; case 'st1': return s.st1.T; case 'st2': return s.st2.T; case 'hydro': return s.hydro.T; case 'ct1': return s.ct[0].T; case 'ct2': return s.ct[1].T; case 'liq': return s.liq.T; case 'liq1': return s.liq1.T; case 'col': return s.col.T; }
   if (/^f\d$/.test(id)) return s.ferm[+id[1]].T;
   if (id === 'yp0' || id === 'yp1') return s.prop[+id[2]].T;
   return null;
@@ -4815,16 +4866,51 @@ function status(s, id) {
       const m = s.mills[+id[4]];
       if (sp.rate === 0) return ['idle', 'Mill stopped.'];
       if (m.limit === 'nocorn') return ['bad', 'Grinding bin is empty — the mill is starving for corn.'];
+      if (m.limit === 'nowater') return ['bad', 'Slowed down: the slurry blender is short of water (backset and cook water).'];
       if (m.limit === 'full') return ['bad', 'Slowed down: Slurry Tank 1 is full because the plant downstream is backed up.'];
       if (sp.rate > 90) return ['warn', 'Feeder near wide open — the mill is pulling ' + Math.round(m.amps) + ' A.'];
       return ['good', 'Grinding corn into flour for the slurry blender (' + m.dir + ').'];
     }
-    case 'tb3': case 'tb4':
-      return ['idle', 'Big storage bin (550,000 bu). Not connected yet.'];
+    case 'tb3': case 'tb4': {
+      const b = s.tb[id === 'tb3' ? 0 : 1];
+      if (b.out > 0) return ['warn', 'Reclaiming: trucks are behind, so this bin is refilling Tin Bins 1 and 2.'];
+      if (b.in > 0) return ['good', 'Filling with the corn Tin Bins 1 and 2 don\'t need right now.'];
+      if (L < 3) return ['warn', 'Empty — nothing in reserve if the trucks fall behind.'];
+      return ['good', 'Storage. Refills Tin Bins 1 and 2 if they drop under 40%.'];
+    }
+    case 'scalper':
+      if (s.conveyor < 1) return ['idle', 'The grinding bins are full — nothing coming over the scalper.'];
+      return ['good', 'Screens out cobs, stones and trash; the gravity splitter divides the corn between the four grinding bins.'];
+    case 'tst':
+      if (L < 5) return ['bad', 'Nearly empty — the Backset Pump is losing suction; the blender is using cook water instead.'];
+      if (s.tst.in < 1) return ['idle', 'No thin stillage coming in — the beer column is not running.'];
+      return ['good', 'Thin stillage from the centrifuges. Backset goes to the blender; the evaporators take the rest (' + Math.round(s.tst.evap) + ' GPM).'];
+    case 'tsp':
+      if (s.blend.bsGpm < 1) return ['idle', 'Not pumping.'];
+      if (s.tst.L < 5) return ['bad', 'Losing suction — the Thin Stillage Tank is nearly empty.'];
+      return ['good', 'Pumping backset to the slurry blender.'];
+    case 'mft':
+      if (s.mft.in < 1) return ['idle', 'No condensate coming in from the evaporators.'];
+      return ['good', 'Evaporator condensate, pumped on to the Cook Water Tank.'];
+    case 'mfp':
+      if (s.mft.out < 1) return ['idle', 'Not pumping.'];
+      return ['good', 'Pumping condensate into the Cook Water Tank (the methanators are out of service).'];
+    case 'cwt':
+      if (L < 5) return ['bad', 'Nearly empty — the blender is short of water and the mills slow down.'];
+      if (s.cwt.makeup > 0) return ['warn', 'Low — well water is making it up.'];
+      return ['good', 'Recycled condensate for the slurry blender.'];
+    case 'cwp':
+      if (s.blend.cwGpm < 1) return ['idle', 'Not pumping.'];
+      if (s.cwt.L < 5) return ['bad', 'Losing suction — the Cook Water Tank is nearly empty.'];
+      return ['good', 'Pumping cook water through the heater to the slurry blender.'];
+    case 'cwh':
+      if (s.blend.cwGpm < 1) return ['idle', 'No cook water flowing.'];
+      return ['good', 'Steam heats the cook water to about 202°F.'];
     case 'cip':
       return ['idle', 'Clean-in-place tank. Not piped to anything yet.'];
     case 'blend': {
       if (s.blend.flow < 1) return ['idle', 'No flour coming in.'];
+      if (s.waterShort) return ['bad', 'Short of water — the Cook Water and Thin Stillage tanks can\'t keep up, so the mills are slowed.'];
       return ['good', 'Mixing flour with backset and hot cook water into slurry.'];
     }
     case 'st1': {
@@ -4950,7 +5036,7 @@ function stationStatus(s, st) {
   return w;
 }
 
-const Sim = { K, LB_BU, GAL_BU, LBM, GPM, CW_T, spDefaults, PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
+const Sim = { K, LB_BU, GAL_BU, LBM, GPM, CW_T, CMT_GAL, TB_CAP, spDefaults, PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
 if (typeof module !== 'undefined') module.exports = Sim; else root.Sim = Sim;
 })(this);
 </script>
@@ -7433,8 +7519,11 @@ const UPOS = { rail: [-196, 0, 5.5, 6], recv: [-182, 0, 10.5, 10], silo0: [SILOX
   f0: [-7.6, -47.1, 8.1, 18], f1: [-7.6, -63.5, 8.1, 18], f2: [-7.6, -79.9, 8.1, 18], f3: [-7.6, -96.3, 8.1, 18],
   f4: [-31, -96.3, 8.1, 18], f5: [-31, -79.9, 8.1, 18], f6: [-31, -63.5, 8.1, 18], beer: [-31, -45, 10.2, 15],
   yb: [-11.6, -36.4, 1.5, 2, 2.1], yp0: [-11.6, -31.4, 2.5, 5.6], yp1: [-11.6, -26.3, 2.5, 5.6],   // v1.97.76: blend tank (on legs) and the two yeast props
-  col: [-52.5, WEST_WING.south + 7.5, 12, 2], etoh: [-158, 236, 28, 13] };
-for (const id of ['rail', 'recv', 'silo0', 'silo1', 'tb3', 'tb4', 'day0', 'day1', 'day2', 'day3', 'mill0', 'mill1', 'mill2', 'mill3']) { UPOS[id][0] += GDX; UPOS[id][1] += GDZ; }
+  col: [-52.5, WEST_WING.south + 7.5, 12, 2], etoh: [-158, 236, 28, 13],
+  // v1.97.88: the scalper over the grinding bins, and the CMT tanks, their pumps and the cook water heater south of the building
+  scalper: [COLX, -2, 3.2, 3, DAYY + 16.5], tst: [37.4, 56.654, 5.6, 17], mft: [26.182, 56.654, 5.6, 17], cwt: [14.964, 56.654, 5.6, 17],
+  tsp: [36.89, 48.84, 0.8, 1.6], mfp: [25.67, 48.84, 0.8, 1.6], cwp: [14.45, 48.84, 0.8, 1.6], cwh: [18.3, 48.6, 1.2, 2.6] };
+for (const id of ['rail', 'recv', 'silo0', 'silo1', 'tb3', 'tb4', 'scalper', 'day0', 'day1', 'day2', 'day3', 'mill0', 'mill1', 'mill2', 'mill3']) { UPOS[id][0] += GDX; UPOS[id][1] += GDZ; }
 for (const st of ['receiving', 'milling']) { STATIONS[st].pos[0] += GDX; STATIONS[st].pos[2] += GDZ; }
 let selected = null, selRing = null, selRing2 = null;
 
@@ -7737,6 +7826,26 @@ function init(container) {
     rl([sxB + 0.85, landY + 1.0, landZ - 0.2], [sxB + 0.85, 1.0, z1 + 0.7]);
     rl([sxA - 0.9, landY + 1.0, landZ + 1.2], [sxB + 0.9, landY + 1.0, landZ + 1.2]);
   }
+  // v1.97.88, connected as on the plant's grain screen: the shaker cleaner is the SCALPER, with the GRAVITY SPLITTER under it dividing the corn
+  // between the four grinding bins; Tin Bins 3 & 4 are filled by an overhead gallery conveyor from the receiving elevator head and emptied by a
+  // reclaim conveyor under them that runs back to the elevator boot between Tin Bins 1 & 2
+  O.cleaner.traverse(o => { if (o.isMesh) { o.userData.unit = 'scalper'; o.userData.station = 'milling'; pickables.push(o); } });
+  { const CYs = DAYY + 16.5;
+    add(new T.ConeGeometry(1.25, 1.3, 16).rotateX(Math.PI), mat(0x9aa6b2), COLX + 0.8, CYs - 1.35, -2, 'scalper');   // gravity splitter: a cone the spouts hang off
+    nameplate('SCALPER', COLX, CYs + 0.2, -2, 2.4, 0, 1); }
+  { const GY = EH - 0.8, HX = EX + 1.8, top = SILOH + 0.15;
+    box(1.6, 1.4, 1.6, mat(0xff8c42), HX + 0.4, GY + 0.2, -1.8, null);                                                  // transfer head off the elevator
+    O.fTbFill = [
+      flow(belt([HX + 0.4, GY, -1.8], [TB34X, GY, TB34Z[0]], 1.2, 0xff8c42, 'tb3', true), kernel, 0xffc61a, 40, { spread: 0.5, lift: 0.2, speed: 7, tumble: true }),
+      flow(belt([TB34X, GY, TB34Z[0]], [TB34X, GY, TB34Z[1]], 1.2, 0xff8c42, 'tb4', true), kernel, 0xffc61a, 30, { spread: 0.5, lift: 0.2, speed: 7, tumble: true })];
+    O.fTbDrop = TB34Z.map(z => { pipe([[TB34X, GY - 0.4, z], [TB34X, top + 0.6, z]], null, 0.4); return flow([V3(TB34X, GY - 0.4, z), V3(TB34X, top + 0.6, z)], kernel, 0xffc61a, 8, { spread: 0.3, speed: 6, tumble: true }); });
+    for (const [x, z] of [[(HX + TB34X) / 2, (TB34Z[0] - 1.8) / 2], [TB34X, (TB34Z[0] + TB34Z[1]) / 2]]) box(0.5, GY - top, 0.5, mat(0x8a96a3), x, (GY + top) / 2, z);   // gallery supports on the bin roofs / walkway
+    // reclaim: under Tin Bin 4, under Tin Bin 3, then to the elevator boot between Tin Bins 1 & 2
+    O.fReclaim = [
+      flow(belt([TB34X, 1.2, TB34Z[1]], [TB34X, 1.2, TB34Z[0]], 1.4, 0xff8c42, 'tb4'), kernel, 0xffc61a, 30, { spread: 0.6, lift: 0.2, speed: 6, tumble: true }),
+      flow(belt([TB34X, 1.2, TB34Z[0]], [RX, 0.9, -3.1], 1.4, 0xff8c42, 'tb3'), kernel, 0xffc61a, 40, { spread: 0.6, lift: 0.2, speed: 6, tumble: true })];
+    for (const z of TB34Z) box(1.4, 0.9, 1.4, mat(0x9aa6b2), TB34X, 1.9, z);                                            // bin discharge gates
+  }
   for (let i = G0; i < scene.children.length; i++) { const o = scene.children[i]; o.position.x += GDX; o.position.z += GDZ; if (!o.matrixAutoUpdate) o.updateMatrix(); }   // whole grain yard to its real spot (v1.97.42: frozen-matrix pieces - the TIN BIN plates - moved too; they were left hanging where the yard used to be)
   // then a straight line of conveyors, end to end, right into the slurry blender
   const FA = V3(FLOURX + 1 + GDX, MY + 1.6, -2 + GDZ), FB = V3(BLX - 0.1, BLY + 0.6, -5.5), fp = t => FA.clone().lerp(FB, t).toArray();
@@ -7790,7 +7899,7 @@ function init(container) {
   }
   // CIP tank sits between the slurry tanks; not piped to anything yet
   tank(-65.3, -8.5, 2.5, 4.8, 0x1e88e5, 0x9fe0ff, 'cip', { level: 0.7 });   // 25,000 gal
-  nameplate('TF-12111|CIP TANK', -65.3, 2.1, -8.5, 2.5, 0, 1);
+  nameplate('CIP TANK', -65.3, 2.1, -8.5, 2.5, 0, 1);
   // duty/standby strainers south of the hydroheater (Strainer 1 west, Strainer 2 east).
   // Slurry Pump 1's line comes in from the west and splits into the bottom of each strainer;
   // the strainer tops join a header that runs north, then west to Slurry Tank 2.
@@ -7959,7 +8068,7 @@ function init(container) {
   const bubbleGeo = new T.SphereGeometry(0.45, 6, 5);
   fx.forEach(([x, z], i) => {
     const t = tank(x, z, FR, FH, 0x3ddc84, 0xd9a441, 'f' + i, { level: 0.8, dome: false, noRail: true });   // flat top (deck + guardrail added below)
-    nameplate(['TF-3110', 'TF-3120', 'TF-3130', 'TF-3140', 'TF-3210', 'TF-3220', 'TF-3230'][i] + '|FERM ' + (i + 1), x, 3.0, z, FR, x > AC ? -1 : 1, 0);   // on the side facing the ferm alley
+    nameplate('FERM ' + (i + 1), x, 3.0, z, FR, x > AC ? -1 : 1, 0);   // on the side facing the ferm alley
     cyl(FR * 1.02, 2.4, concM(0x45494d), x, 0, z, null, 28);                                       // dark concrete foundation ring (photo)
     const foam = add(new T.CylinderGeometry(FR * 0.92, FR * 0.92, 0.6, 28), matU(0xfff6d8), x, 8, z, null, true);
     const bm = new T.InstancedMesh(bubbleGeo, new T.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 }), 36);
@@ -8141,7 +8250,7 @@ function init(container) {
     for (let y = 0.3; y < WY; y += 0.3) box(0.5, 0.035, 0.035, lrail, AC, y, LZ);
     for (let y = 2.4; y < WY + 1; y += 1.2) { const hoop = new T.Mesh(new T.TorusGeometry(0.38, 0.025, 4, 14, Math.PI), lrail); hoop.rotation.x = Math.PI / 2; hoop.rotation.z = Math.PI; hoop.position.set(AC, y, LZ); scene.add(hoop); }
     LADDERS.push({ x: AC, z: LZ - 0.1, top: WY, dx: 0, dz: 1 }); }
-  nameplate('TF-3501|BEER WELL', FXW, 3.0, BWZ, BWR, 1, 0);
+  nameplate('BEER WELL', FXW, 3.0, BWZ, BWR, 1, 0);
   cyl(BWR * 1.02, 2.4, mat(0x45494d), FXW, 0, BWZ, null, 28);
   // building walls along both column lines (between the tanks), across the north end, and south then east from Ferm 1
   // ---------- PROCESS BUILDING (from the plant's evacuation map) ----------
@@ -8249,13 +8358,38 @@ function init(container) {
       // west to 5.5 paces past the cook water tank, then around; east of the north berm's end the thin stillage foundation wall is the containment. Not connected yet.
       const R = 5.334, TH = 15.85, FH = 1.2, ZN = SZ + 5.64, TZ = SZ + 7.32 + R, GAP = 0.55, IN = 1.7, X1 = 37.4, yel = mat(0xe3c22a), conc = mat(0x9c9c96);
       const XC = X1 - 2 * (2 * R + GAP), BX0 = XC - R - 1.68 - 0.125, BXE = X1 + R + IN, BZ1 = TZ + R + IN;
-      [['TF-6801|THIN STILLAGE TANK', 0xb9a27a], ['METH FEED TANK', 0xa8946c], ['COOK WATER TANK', 0x9fc4d8]].forEach(([nm, liq], i) => { const x = X1 - i * (2 * R + GAP);
+      // v1.97.88 connected as on the plant's screens: the Backset Pump (thin stillage) and the Cook Water Pump (through the Cook Water Heater) send
+      // their lines up onto the berm rack, through the south wall and along the inside of the building, then up the west wall to the slurry
+      // blender; the Meth Feed Pump sends condensate along the rack into the top of the Cook Water Tank
+      O.cmt = []; const PXS = [];
+      [['THIN STILLAGE TANK', 0xb9a27a, 'tst', 'tsp'], ['METH FEED TANK', 0xa8946c, 'mft', 'mfp'], ['COOK WATER TANK', 0x9fc4d8, 'cwt', 'cwp']].forEach(([nm, liq, id, pid], i) => { const x = X1 - i * (2 * R + GAP);
         add(new T.CylinderGeometry(R + 0.25, R + 0.35, FH, 32), conc, x, FH / 2, TZ);                                    // concrete ring foundation
-        tank(x, TZ, R, TH, 0xb9bfc5, liq, null, { level: 0.6, flat: true, y: FH }); nameplate(nm, x, FH + 1.0, TZ, R, 0, -1); extraCols.push([x, TZ, R + 0.35]);
-        // its pump (like the ferm pumps): just north of the berm, motor to the east; suction from the tank's north side, discharge left open for now
+        O.cmt.push(tank(x, TZ, R, TH, 0xb9bfc5, liq, id, { level: 0.6, flat: true, y: FH })); nameplate(nm, x, FH + 1.0, TZ, R, 0, -1); extraCols.push([x, TZ, R + 0.35]);
+        // its pump (like the ferm pumps): just north of the berm, motor to the east; suction from the tank's north side
         const k = 0.425, PZ = ZN - 0.8, PX = x - 1.0, Y = 1.05 * k, sx = PX - 0.5, wz = TZ - Math.sqrt(R * R - (sx - x) ** 2) + 0.05;
-        pumpSet(PX, PZ, 'x', 1, null, k); extraCols.push([PX + 0.5, PZ, 0.65]);
-        pipe([[sx, FH + 0.45, wz], [sx, FH + 0.45, PZ], [sx, Y, PZ], [PX - 0.13, Y, PZ]], null, 0.12); });
+        pumpSet(PX, PZ, 'x', 1, pid, k); extraCols.push([PX + 0.5, PZ, 0.65]); PXS.push(PX);
+        pipe([[sx, FH + 0.45, wz], [sx, FH + 0.45, PZ], [sx, Y, PZ], [PX - 0.13, Y, PZ]], pid, 0.12); });
+      { const RY = 6.75, RZ = ZN - 0.25, IN = SZ - 0.7, IY = 7.75, WX = WEST_WING.west + 0.45, [tsX, mfX, cwX] = PXS, PZ = ZN - 0.8;
+        const line = (pts, id, col, n) => { pipe(pts, id, 0.13); return flow(pts.map(q => V3(...q)), new T.SphereGeometry(0.11, 5, 4), col, n, { speed: 5 }); };
+        // Cook Water Heater: a small plate-and-frame exchanger with a steam supply, east of the Cook Water Pump
+        const HX = 18.3, HZ = 48.6;
+        for (const dx of [-0.75, 0.75]) box(0.18, 2.2, 1.3, mat(0x3d5a80), HX + dx, 1.25, HZ, 'cwh');
+        for (let n = 0; n < 6; n++) box(0.13, 1.8, 1.1, mat(n % 2 ? 0xff8c42 : 0xdfe6ee), HX - 0.55 + n * 0.22, 1.15, HZ, 'cwh');
+        box(1.8, 0.2, 0.2, mat(0x6f7a85), HX, 2.45, HZ, null); box(1.9, 0.3, 1.5, mat(0xf2c200), HX, 0.15, HZ, null); extraCols.push([HX, HZ, 1.1]);
+        nameplate('COOK WATER HEATER', HX, 2.75, HZ - 0.7, 0.2, 0, -1, 0.6);
+        pipe([[HX + 0.75, 2.0, HZ + 0.3], [HX + 2.2, 2.0, HZ + 0.3], [HX + 2.2, RY, HZ + 0.3], [HX + 2.2, RY, RZ + 0.35]], 'cwh', 0.1);   // steam up from the rack
+        // Cook Water Pump -> heater -> up onto the rack -> west -> through the south wall -> along the inside -> up the west wall -> blender
+        const ZC = RZ - 0.35, ZB = RZ + 0.35;
+        O.fCookW = line([[cwX, 1.0, PZ], [cwX, 1.5, PZ], [cwX, 1.5, HZ + 0.5], [HX - 0.75, 1.5, HZ + 0.5], [HX - 0.75, 1.5, HZ], [HX + 0.75, 1.5, HZ - 0.3], [HX + 1.2, 1.5, HZ - 0.3], [HX + 1.2, RY, HZ - 0.3], [HX + 1.2, RY, ZC],
+          [BX0 + 0.6, RY, ZC], [BX0 + 0.6, IY, ZC], [BX0 + 0.6, IY, IN], [WX, IY, IN], [WX, IY, -6.6], [BLX - 0.55, BLY + 0.3, -6.6]], 'cwp', 0x9fc4d8, 70);
+        // Backset Pump -> up onto the rack -> west (alongside) -> into the building -> blender
+        O.fBackset = line([[tsX, 1.0, PZ], [tsX, RY + 0.3, PZ], [tsX, RY + 0.3, ZB], [BX0 + 0.3, RY + 0.3, ZB], [BX0 + 0.3, IY + 0.3, ZB], [BX0 + 0.3, IY + 0.3, IN - 0.35],
+          [WX + 0.3, IY + 0.3, IN - 0.35], [WX + 0.3, IY + 0.3, -7.6], [BLX - 0.55, BLY + 0.3, -7.6]], 'tsp', 0xb9a27a, 70);
+        // Meth Feed Pump -> up onto the rack -> west -> into the top of the Cook Water Tank
+        O.fMeth = line([[mfX, 1.0, PZ], [mfX, RY + 0.6, PZ], [mfX, RY + 0.6, RZ], [cwX + 1.0, RY + 0.6, RZ], [cwX + 1.0, TH + FH + 0.5, RZ], [cwX + 1.0, TH + FH + 0.5, TZ - R + 1.2], [cwX + 1.0, TH + FH - 0.3, TZ - R + 1.2]], 'mfp', 0xa8946c, 30);
+        box(X1 - BX0, 0.12, 1.4, mat(0x6f7378), (BX0 + X1) / 2, RY - 0.25, RZ, null);                                     // rack deck the lines sit on
+        for (let x = BX0 + 0.5; x < X1; x += 6) box(0.25, RY - 0.3, 0.25, mat(0x7f8a95), x, (RY - 0.3) / 2, RZ + 0.75);   // its posts (south side, clear of the pumps)
+      }
       for (const [w, d, x, z] of [[X1 - BX0, 0.25, (BX0 + X1) / 2, ZN], [0.25, BZ1 - ZN, BX0, (ZN + BZ1) / 2]]) box(w, 0.3, d, yel, x, 0.15, z);
       box(0.3, 6.5, 0.3, mat(0x7f8a95), X1, 3.25, ZN - 0.25); extWall(X1 + 0.2, 0.8, ZN - 0.47, Math.PI);   // steel column + extinguisher at the berm's east end (v1.97.55: the real, usable one)
       box(X1 - BX0, 0.35, 0.35, mat(0x6f7378), (BX0 + X1) / 2, 6.3, ZN - 0.25);                                         // pipe rack beam along the berm
@@ -8749,7 +8883,7 @@ function init(container) {
           tank(x, z, CR, TH, 0xb4bac0, 0xd9a441, null, { level: 0.001, top: 0xc9ced3, flat: true });
           for (let y = 1.2; y < TH; y += 1.25) { const b = new T.Mesh(band, bandM); b.position.set(x, y, z); scene.add(b); }
           const mw = add(new T.CylinderGeometry(0.36, 0.36, 0.22, 16), manM, x + inS * (CR + 0.05), 1.0, z, null); mw.rotation.z = Math.PI / 2; const pf = add(new T.CylinderGeometry(0.44, 0.44, 0.045, 16), mat(0x7d848b), x + inS * (CR + 0.17), 1.0, z, null); pf.rotation.z = Math.PI / 2; for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, bt = add(new T.CylinderGeometry(0.02, 0.02, 0.08, 6), mat(0x4a5056), x + inS * (CR + 0.17), 1.0 + Math.cos(a) * 0.38, z + Math.sin(a) * 0.38, null); bt.rotation.z = Math.PI / 2; }   // inner manway + bolted pancake blind flange protruding into the hallway
-          nameplate('TS-1050' + (3 + n) + '|METHANATOR #' + n, x, 2.2, z, CR, dx < 0 ? -1 : 1, 0); extraCols.push([x, z, CR]); }
+          nameplate('METHANATOR #' + n, x, 2.2, z, CR, dx < 0 ? -1 : 1, 0); extraCols.push([x, z, CR]); }
         { // pump house between #3 and #4 (photo facing south): white vertical-panel shed with green corner trim, gable roof with white fascia,
           // green door with a big window and a NOTICE (hard hats + eye protection) sign, V-shaped FIRE EXTINGUISHER sign + extinguisher to its left, two vent pipes behind the roof
           const px = OX, fz = OZ - SP / 2 - 1.7, D = BSZ - fz, pz = (fz + BSZ) / 2, W = 1.9, H = 2.6;
@@ -8811,7 +8945,7 @@ function init(container) {
           const t = add(new T.CylinderGeometry(R, R, L, 20), mat(0xeef0f1), SX, 1.0 + R, SZ0, null); t.rotation.x = Math.PI / 2;
           for (const dz of [-1, 1]) { const e = add(new T.SphereGeometry(R, 16, 8), mat(0xeef0f1), SX, 1.0 + R, SZ0 + dz * L / 2, null); e.scale.z = 0.35; }
           for (const dz of [-0.3, 0.3]) box(1.8, 1.0, 0.4, cm, SX, 0.5, SZ0 + dz * L);   // saddles
-          nameplate('TP-12501|SULFURIC ACID', SX, 1.0 + R, SZ0, R, 1, 0);   // 8,000 gal
+          nameplate('SULFURIC ACID', SX, 1.0 + R, SZ0, R, 1, 0);   // 8,000 gal
           Object.assign(SA, { x: SX, z: SZ0, R, L, cy: 1.0 + R, cx0: SX - 2.15, cx1: SX + 2.15, cz0: SZ0 - (L + 2.6) / 2 + 0.15, cz1: SZ0 + (L + 2.6) / 2 - 0.15 });   // the existing tank: leaks + puddle (see SULFURIC ACID LEAKS)
           const cw = 4.6, cd = L + 2.6;
           for (const [w, d, x, z] of [[cw, 0.3, SX, SZ0 - cd / 2], [cw, 0.3, SX, SZ0 + cd / 2], [0.3, cd, SX - cw / 2, SZ0], [0.3, cd, SX + cw / 2, SZ0]]) { box(w, 0.9, d, cm, x, 0.45, z); }
@@ -8883,8 +9017,8 @@ function init(container) {
   O.p190 = tank(PRX, P190Z, 5, 9.1, 0x7fd3ff, 0x9fe0ff, 'etoh', { flat: true, y: -TPIT.d, level: 0.6 });       // 190 proof tank (188,000 gal)
   O.p200 = tank(PRX, P200Z, 5, 9.1, 0x7fd3ff, 0x5ec8ff, 'etoh', { flat: true, y: -TPIT.d, level: 0.3 });       // 200 proof tank (188,000 gal)
   extraCols.push([FPX, FP1Z, 12.2], [FPX, FP2Z, 12.2], [PRX, P190Z, 5.2], [PRX, P200Z, 5.2]);   // each tank its own collider (room to walk between them)
-  nameplate('TF-8422|DENATURED ETHANOL', FPX, 2.2, FP1Z, 12, 1, 0); nameplate('TF-8433|DENATURED ETHANOL', FPX, 2.2, FP2Z, 12, 1, 0);
-  nameplate('TF-8401|190 PROOF TANK', PRX, 2.2, P190Z, 5, -1, 0); nameplate('TS-8403|200 PROOF TANK', PRX, 2.2, P200Z, 5, -1, 0);
+  nameplate('DENATURED ETHANOL', FPX, 2.2, FP1Z, 12, 1, 0); nameplate('DENATURED ETHANOL', FPX, 2.2, FP2Z, 12, 1, 0);
+  nameplate('190 PROOF TANK', PRX, 2.2, P190Z, 5, -1, 0); nameplate('200 PROOF TANK', PRX, 2.2, P200Z, 5, -1, 0);
   { // ethanol LOADOUT shack (4 photos): 10 x 10 ft white panel shed with a gray barn-style (gambrel) metal roof, ~6 ft walls, 9 ft peak,
     // on gravel just north of Final Product Tank 1. Ridge east-west: door in the east gable (spill-kit + fire-extinguisher signs either side),
     // double-hung window on the south wall, 6-pane window + vent in the west gable (hydrant + bollard out front; the hydrant is the owner's model), NO SMOKING on the north wall.
@@ -12059,6 +12193,11 @@ function update(sim, dt, events) {
   O.fFlour.rate = O.fFlour2.rate = O.fFlour3.rate = sim.blend.flow / N;
   O.fMillA.rate = (sim.mills[0].rate + sim.mills[1].rate) / (850 * Sim.K); O.fMillB.rate = (sim.mills[2].rate + sim.mills[3].rate) / (850 * Sim.K);
   O.fBlend.rate = sim.blend.flow / N;
+  // v1.97.88: Tin Bins 3 & 4 filling / reclaiming; backset, cook water and condensate lines; the CMT tank levels
+  if (O.fTbFill) { const fin = sim.tb[0].in + sim.tb[1].in; O.fTbFill[0].rate = fin / 3000; O.fTbFill[1].rate = sim.tb[1].in / 3000; O.fTbDrop.forEach((f, i) => { f.rate = sim.tb[i].in / 3000; });
+    O.fReclaim[0].rate = sim.tb[1].out / 1500; O.fReclaim[1].rate = sim.reclaim / 3000; }
+  if (O.fCookW) { O.fCookW.rate = sim.blend.cwGpm / 400; O.fBackset.rate = sim.blend.bsGpm / 500; O.fMeth.rate = sim.mft.out / 400; }
+  if (O.cmt) O.cmt.forEach((t, i) => t.set(lv(['tst', 'mft', 'cwt'][i])));
   O.str.forEach((st, i) => { st.f.rate = sim.duty === i ? sim.st1.out / N : 0; });
   O.fToHydro.rate = sim.st2.out / N; O.fCook.rate = sim.cook.out / N; O.fFlash.rate = sim.cook.out / N; O.fLiqOvf.rate = sim.liq1.out / N; O.hx.forEach((f, i) => { f.rate = sim.hxTrain === i ? sim.liq.out / N : 0; }); O.lp.forEach((p, i) => { const on = sim.liqDuty === i; p.f.rate = on ? sim.liq.out / N : 0; p.light.color.setHex(on ? 0x3ddc84 : 0x9aa4ae); }); O.fSteamIn.rate = sim.cook.out > 1 ? Math.max(0.3, (sim.hydro.T - 190) / 40) : 0;
   const fillIdx = sim.ferm.findIndex(f => f.state === 'filling');
@@ -17924,10 +18063,18 @@ function info(id) {
     case 'silo0': case 'silo1': { const sl = s.silo[+id[4]]; return [['Corn in bin', n0(sl.L / 100 * C.silo) + ' bu'], ['Trucks unloading', sl.inflow > 0 ? 'Yes' : 'No'], ['Both bins to day bins', n0(s.conveyor) + ' bu/h']]; }
     case 'day0': case 'day1': case 'day2': case 'day3': { const i = +id[3], d = s.day[i]; return [['Corn in bin', n0(d.L / 100 * C.day) + ' bu'], ['Filling from tin bins', lbm(d.inflow)], ['To Hammermill ' + (i + 1), lbm(s.mills[i].rate)], ['Low level alarm', d.L < 10 ? 'ON' : 'Off']]; }
     case 'mill0': case 'mill1': case 'mill2': case 'mill3': { const i = +id[4], m = s.mills[i]; return [['Feed', lbm(m.rate)], ['Motor', m.on ? Math.round(m.amps) + ' A · ' + m.dir : 'Stopped'], ['Bearings', m.bearT.toFixed(0) + '°F'], ['Grinding Bin ' + (i + 1), s.day[i].L.toFixed(0) + '%'], ['All 4 mills', lbm(s.blend.flow)]]; }
-    case 'blend': { const B = s.blend; return [['Ground corn in', n0(B.lbm) + ' lb/min'], ['Backset in', n0(B.bsGpm) + ' GPM'], ['Cook water in (' + Sim.CW_T + '°F)', n0(B.cwGpm) + ' GPM'], ['Slurry out', n0(B.gpm) + ' GPM'], ['Slurry density', B.dens ? B.dens.toFixed(2) + ' lb/gal' : '—'], ['Mixed temperature', B.lbm > 1 ? B.mixT.toFixed(0) + '°F' : '—'], ['Enzyme needed', n0(B.enzNeed || 0) + ' ml/min']]; }
+    case 'blend': { const B = s.blend; return [['Ground corn in', n0(B.lbm) + ' lb/min'], ['Backset in', n0(B.bsGpm) + ' GPM'], ['Cook water in (' + s.cwh.T.toFixed(0) + '°F)', n0(B.cwGpm) + ' GPM'], ['Slurry out', n0(B.gpm) + ' GPM'], ['Slurry density', B.dens ? B.dens.toFixed(2) + ' lb/gal' : '—'], ['Mixed temperature', B.lbm > 1 ? B.mixT.toFixed(0) + '°F' : '—'], ['Enzyme needed', n0(B.enzNeed || 0) + ' ml/min']]; }
     case 'st1': return [['In from blender', n0(s.blend.gpm) + ' GPM'], ['Pumped to strainer', gpm(s.st1.out)], ['Steam valve', s.st1.steam.toFixed(0) + '%'], ['Density', s.blend.dens ? s.blend.dens.toFixed(2) + ' lb/gal' : '—'], ['Time in tank', s.st1.out > 1 ? (s.st1.L / 100 * C.st1 / s.st1.out * 60).toFixed(0) + ' min' : '—'], ['Strainer in service', 'Strainer ' + (s.duty + 1)]];
     case 'strA': case 'strB': { const i = id === 'strA' ? 0 : 1; return [['Status', s.duty === i ? 'In service' : (s.str[i].f > 0.01 ? 'Standby — cleaning' : 'Standby — clean')], ['Flow through', gpm(s.duty === i ? s.st1.out : 0)]]; }
-    case 'tb3': case 'tb4': return [['Capacity', '550,000 bu'], ['Connected to', 'Nothing yet']];
+    case 'tb3': case 'tb4': { const b = s.tb[id === 'tb3' ? 0 : 1]; return [['Corn in bin', n0(b.L / 100 * Sim.TB_CAP) + ' bu'], ['Filling from receiving', n0(b.in) + ' bu/h'], ['Reclaim to Tin Bins 1 / 2', n0(b.out) + ' bu/h']]; }
+    case 'scalper': return [['Corn over the scalper', lbm(s.conveyor)], ['Grinding Bins 1–4', s.day.map(d => d.L.toFixed(0) + '%').join(' / ')]];
+    case 'tst': return [['In from the centrifuges', n0(s.tst.in) + ' GPM'], ['Backset to the blender', n0(s.blend.bsGpm) + ' GPM'], ['To the evaporators', n0(s.tst.evap) + ' GPM'], ['In tank', n0(s.tst.L / 100 * Sim.CMT_GAL) + ' gal']];
+    case 'tsp': return [['Flow', n0(s.blend.bsGpm) + ' GPM'], ['From', 'Thin Stillage Tank'], ['To', 'Slurry Blender']];
+    case 'mft': return [['Condensate in', n0(s.mft.in) + ' GPM'], ['Pumped to Cook Water Tank', n0(s.mft.out) + ' GPM'], ['In tank', n0(s.mft.L / 100 * Sim.CMT_GAL) + ' gal']];
+    case 'mfp': return [['Flow', n0(s.mft.out) + ' GPM'], ['From', 'Meth Feed Tank'], ['To', 'Cook Water Tank']];
+    case 'cwt': return [['From the Meth Feed Pump', n0(s.mft.out) + ' GPM'], ['Well water make-up', n0(s.cwt.makeup) + ' GPM'], ['To the blender', n0(s.blend.cwGpm) + ' GPM'], ['In tank', n0(s.cwt.L / 100 * Sim.CMT_GAL) + ' gal']];
+    case 'cwp': return [['Flow', n0(s.blend.cwGpm) + ' GPM'], ['From', 'Cook Water Tank'], ['To', 'Cook Water Heater → Slurry Blender']];
+    case 'cwh': return [['Cook water', n0(s.blend.cwGpm) + ' GPM'], ['Out', s.cwh.T.toFixed(0) + '°F']];
     case 'cip': return [['Holds', 'Cleaning solution'], ['Connected to', 'Nothing yet']];
     case 'st2': return [['In from strainer', gpm(s.st1.out)], ['Pumped to hydroheater', gpm(s.st2.out)], ['Steam valve', s.st2.steam.toFixed(0) + '%'], ['Time in tank', s.st2.out > 1 ? (s.st2.L / 100 * C.st2 / s.st2.out * 60).toFixed(0) + ' min' : '—']];
     case 'hydro': return [['Slurry flow', gpm(s.cook.out)], ['Inlet temperature', s.st2.T.toFixed(0) + '°F'], ['Starch cooked', (s.cook.q * 100).toFixed(0) + '%']];

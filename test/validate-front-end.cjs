@@ -57,4 +57,27 @@ for (const want of ["['Feed', lbm(m.rate)]", "['Motor', m.on ? Math.round(m.amps
   assert.ok(html.includes(want), 'panel shows ' + want);
 assert.ok(!/'bu\/h'\]|\+ ' bu\/h'\], \['Pumped|Slurry flow', n0/.test(html), 'slurry and mash flows read in GPM, not bu/h');
 
-console.log('PASS validate-front-end: real rate (~4,350 lb/min, ~1,250 GPM slurry, 9 h fermenter fill), mills, the blender at the real mix, grinding bin alarm, plant units');
+// ---- v1.97.88: connected as on the plant's screens - the water side of the slurry and Tin Bins 3 & 4
+{ const x = Sim.create(); let minC = 100, maxC = 0, minT = 100, short = 0;
+  run(x, 24 * 6, y => { minC = Math.min(minC, y.cwt.L); maxC = Math.max(maxC, y.cwt.L); minT = Math.min(minT, y.tst.L); if (y.waterShort) short++; });
+  assert.ok(minC > 10 && maxC < 95 && minT > 10, 'cook water and thin stillage tanks hold their own over 6 days (cook water ' + minC.toFixed(0) + '-' + maxC.toFixed(0) + '%, thin stillage min ' + minT.toFixed(0) + '%)');
+  assert.equal(short, 0, 'the blender never runs short of water at the normal rate');
+  near(x.blend.bsGpm + x.blend.cwGpm, x.blend.water, 0.5, 'backset + cook water = the water the blender needs');
+  near(x.cwh.T, 202, 2, 'cook water heater outlet');
+  assert.ok(x.tst.in > 300 && x.mft.in >= 0, 'thin stillage comes from the beer column side');
+  for (const id of ['tst', 'tsp', 'mft', 'mfp', 'cwt', 'cwp', 'cwh', 'scalper']) assert.ok(Sim.UNIT[id] && !Sim.UNIT[id].lvl && !Sim.UNIT[id].rate && !Sim.UNIT[id].temp, id + ' is a unit with no controls');
+  // the Cook Water Tank runs dry: backset makes up the water first, then the mills slow down and say why
+  x.sp.beer.lvl = 100; run(x, 0.5); x.cwt.L = 0; x.mft.L = 0; x.tst.L = 0; run(x, 0.2);   // beer well held full: no column feed, so no thin stillage
+  assert.ok(x.waterShort, 'no water: short'); assert.equal(x.mills[0].limit, 'nowater'); assert.ok(Sim.LBM(x.blend.flow) < 4000, 'the mills slow down');
+  assert.equal(Sim.status(x, 'blend')[0], 'bad'); assert.equal(Sim.status(x, 'cwt')[0], 'bad'); }
+{ const x = Sim.create(); run(x, 24 * 6);
+  near(x.tb[0].L, 80, 2, 'Tin Bin 3 filled with the spare receiving'); near(x.tb[1].L, 80, 2, 'Tin Bin 4 too');
+  x.sp.recv.rate = 0; x.sp.rail.rate = 0; let rec = 0; run(x, 24 * 2, y => { if (y.reclaim) rec++; });
+  assert.ok(rec > 0 && x.tb[0].L < 80, 'no trucks: Tin Bins 3 & 4 refill Tin Bins 1 & 2');
+  assert.ok(x.silo[0].L > 20, 'so Tin Bins 1 & 2 do not run dry (' + x.silo[0].L.toFixed(0) + '%)'); }
+for (const want of ["O.fTbFill = [", "O.fReclaim = [", "O.fCookW = line(", "O.fBackset = line(", "O.fMeth = line(", "['THIN STILLAGE TANK', 0xb9a27a, 'tst', 'tsp']", "nameplate('COOK WATER HEATER'"])
+  assert.ok(html.includes(want), 'built and connected in 3D: ' + want);
+assert.ok(html.includes("nameplate('SCALPER'"), 'the scalper is labelled');
+assert.ok(!/nameplate\('[A-Z]{1,4}-\d/.test(html) && html.includes("const [tag, name] = text.includes('|') ? text.split('|') : [null, text];"), 'nameplates carry no tag numbers');
+
+console.log('PASS validate-front-end: real rate (~4,350 lb/min, ~1,250 GPM slurry, 9 h fermenter fill), mills, the blender at the real mix, grinding bin alarm, plant units, backset / cook water / meth feed connected, Tin Bins 3 & 4');
