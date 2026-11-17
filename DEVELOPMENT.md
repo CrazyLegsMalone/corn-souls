@@ -1,3 +1,8 @@
+## TEST v1.97.91 — sieve bottles almost as tall as the evaporators (2026-11-17)
+- Owner: *"The seive bottles should be almost as tall as the evaps."*
+- The 8 sieve bottles are now ~24 m tall (21 m shell on 2.4 m legs, 1.4 m radius; the evaporator tops are ~28 m), with three walkways between the rows (8.4 m, 16.4 m and the top) on steel posts. The vapor and regen headers moved up to the bottle tops.
+- Bumped TEST to `1.97.91`.
+
 ## TEST v1.97.90 — distillation built and connected as on the plant's screens (2026-11-17)
 - Owner: *"We can finish cooling later let's do distillation"*, with the plant's Beer Stripper, Rectifier, Mole Sieve A and Mole Sieve B screens. Generic names only, no new controls.
 - **Beer column** (now a real column on the pad): beer feed from the beer/mash exchanger in near the top, heated by **2nd effect evaporator vapor** at the bottom, under vacuum (~7.7 psia), ~180 °F bottom / ~153 °F top. Its bottom temperature setpoint moved from the old atmospheric 217 °F to 180 °F (good 176–185 °F); an old saved 217 °F setpoint resets to 180. Overhead vapor to the rectifier; bottoms through the **Beer Bottoms Pump** to the whole stillage tank (stub until that tank is built).

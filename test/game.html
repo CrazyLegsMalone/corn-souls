@@ -7631,7 +7631,7 @@ const UPOS = { rail: [-196, 0, 5.5, 6], recv: [-182, 0, 10.5, 10], silo0: [SILOX
   // v1.97.90 distillation pad
   rect: [-43, 52.6, 1.7, 28], ss: [-48, 50.2, 1.0, 16], bbp: [-34.6, 56.4, 0.7, 1.5], ssp: [-49.4, 48.3, 0.6, 1.4], rbp: [-43.0, 56.3, 0.6, 1.4], fusel: [-44.9, 48.6, 0.5, 1.2],
   cond190: [-52, 50.4, 2.2, 3, 8], reflux: [-50, 55.6, 1.4, 2.6], vac: [-52.0, 55.6, 0.9, 1.2], rfp: [-46.8, 56.3, 0.6, 1.4], sfp: [-72.2, 53.0, 0.6, 1.3], vapz: [-71.6, 50.2, 0.85, 3.9],
-  ms1: [-58.3, 50, 1.25, 8.5], ms2: [-61.8, 50, 1.25, 8.5], ms3: [-65.3, 50, 1.25, 8.5], ms7: [-68.8, 50, 1.25, 8.5], ms4: [-58.3, 54.6, 1.25, 8.5], ms5: [-61.8, 54.6, 1.25, 8.5], ms6: [-65.3, 54.6, 1.25, 8.5], ms8: [-68.8, 54.6, 1.25, 8.5],
+  ms1: [-58.3, 50, 1.4, 24], ms2: [-61.8, 50, 1.4, 24], ms3: [-65.3, 50, 1.4, 24], ms7: [-68.8, 50, 1.4, 24], ms4: [-58.3, 54.6, 1.4, 24], ms5: [-61.8, 54.6, 1.4, 24], ms6: [-65.3, 54.6, 1.4, 24], ms8: [-68.8, 54.6, 1.4, 24],
   regen: [-54.5, 55.6, 1.4, 6], rgp: [-52.4, 57.9, 0.5, 1.2], fv200: [-72.4, 57.4, 0.75, 2.8], pp200: [-70.1, 58.15, 0.5, 1.2],
   tsp: [36.89, 48.84, 0.8, 1.6], mfp: [25.67, 48.84, 0.8, 1.6], cwp: [14.45, 48.84, 0.8, 1.6], cwh: [18.3, 48.6, 1.2, 2.6] };
 for (const id of ['rail', 'recv', 'silo0', 'silo1', 'tb3', 'tb4', 'scalper', 'day0', 'day1', 'day2', 'day3', 'mill0', 'mill1', 'mill2', 'mill3']) { UPOS[id][0] += GDX; UPOS[id][1] += GDZ; }
@@ -9186,7 +9186,7 @@ function init(container) {
     // rack along the south edge of the pad
     for (let x = -67; x < -32; x += 6) { box(0.25, 7.2, 0.25, steel, x, 3.6, 57.75, null); box(0.2, 0.2, 1.4, steel, x, 7.25, 57.75, null); extraCols.push([x, 57.75, 0.25]); }
     // --- mole sieves
-    const SX = [-58.3, -61.8, -65.3, -68.8], SZN = 50.0, SZS = 54.6, HZ = 52.3, Y0 = 2.4, SH = 5.6, SR = 1.25;
+    const SX = [-58.3, -61.8, -65.3, -68.8], SZN = 50.0, SZS = 54.6, HZ = 52.3, Y0 = 2.4, SH = 21, SR = 1.4, VY = Y0 + SH + 1.4;   // v1.97.91 (owner): bottles almost as tall as the evaporators
     const bottle = [1, 2, 3, 7].map((n, i) => [n, SX[i], SZN, -1]).concat([4, 5, 6, 8].map((n, i) => [n, SX[i], SZS, 1]));
     O.dist.bands = [];
     for (const [n, x, z, face] of bottle) {
@@ -9199,10 +9199,13 @@ function init(container) {
       add(new T.CylinderGeometry(SR + 0.04, SR + 0.04, 0.35, 22), bm, x, Y0 + SH - 0.6, z, id, true);   // step band: green ON, blue REGEN, yellow DEPRESS / REPRESS
       extraCols.push([x, z, SR]);
       nameplate('SIEVE #' + n, x, 3.4, z, SR, 0, face, 0.5);
-      P([[x, Y0 + SH + 0.5, z], [x, 9.3, z], [x, 9.3, HZ]], id, 0.2);   // vapor in at the top
+      P([[x, Y0 + SH + 0.5, z], [x, VY, z], [x, VY, HZ]], id, 0.2);   // vapor in at the top
       P([[x, 0.6, z], [x, 0.6, HZ]], id, 0.2);                         // product / regen out the bottom
     }
-    nameplate('MOLE SIEVE A', -63.5, 9.9, SZN - SR, 0.1, 0, -1, 0.7); nameplate('MOLE SIEVE B', -63.5, 9.9, SZS + SR, 0.1, 0, 1, 0.7);
+    nameplate('MOLE SIEVE A', -63.5, 7.0, SZN - SR, 0.1, 0, -1, 0.7); nameplate('MOLE SIEVE B', -63.5, 7.0, SZS + SR, 0.1, 0, 1, 0.7);
+    for (const y of [8.4, 16.4, Y0 + SH - 0.3]) { add(new T.BoxGeometry(SX[0] - SX[3] + 3.2, 0.15, 1.6), grate, (SX[0] + SX[3]) / 2, y, HZ, null, true);   // walkways between the rows
+      box(SX[0] - SX[3] + 3.2, 0.06, 0.06, yel, (SX[0] + SX[3]) / 2, y + 1.05, HZ - 0.8); box(SX[0] - SX[3] + 3.2, 0.06, 0.06, yel, (SX[0] + SX[3]) / 2, y + 1.05, HZ + 0.8); }
+    for (const x of [SX[0] + 1.6, SX[3] - 1.6]) for (const z of [HZ - 0.7, HZ + 0.7]) box(0.22, Y0 + SH, 0.22, steel, x, (Y0 + SH) / 2, z, null);
     // 190 proof feed pump (fed from the 190 line on the rack) -> sieve vaporizer -> vapor header over the bottles
     pumpSet(-72.6, 53.0, 'x', 1, 'sfp', 0.5); nameplate('190 PROOF FEED PUMP', -72.2, 1.8, 53.0, 0.4, 0, -1, 0.42);
     cyl(0.8, 3.6, jacket, -71.6, 0.3, 50.2, 'vapz', 20); cyl(0.85, 0.3, conc, -71.6, 0, 50.2, null, 20); extraCols.push([-71.6, 50.2, 0.85]);
@@ -9210,7 +9213,7 @@ function init(container) {
     P([[-71.0, 3.0, 50.2], [-70.2, 3.0, 50.2], [-70.2, 5.0, 49.0]], 'vapz', 0.12);   // steam in
     const feed = [[-73.4, 7.0, 57.3], [-73.4, 0.6, 57.3], [-73.4, 0.6, 53.0], [-73.0, 0.6, 53.0], [-72.6, 1.4, 53.0], [-72.6, 2.0, 53.0], [-72.6, 2.0, 51.4], [-71.6, 2.0, 51.0]];
     P(feed, 'sfp', 0.22); O.dist.sfeed = F(feed, 0x9fe0ff, 30);
-    const hdr = [[-71.6, 3.9, 50.2], [-71.6, 9.3, 50.2], [-71.6, 9.3, HZ], [SX[0], 9.3, HZ]];
+    const hdr = [[-71.6, 3.9, 50.2], [-71.6, VY, 50.2], [-71.6, VY, HZ], [SX[0], VY, HZ]];
     P(hdr, 'vapz', 0.3); O.dist.hdr = F(hdr, 0xf4f6f8, 40, { speed: 9 });
     // 200 proof vapor out the bottoms -> economizer + 200P cooler -> 200 proof flash vessel -> 200 proof product pump -> rack
     const out = [[SX[0], 0.6, HZ], [-70.9, 0.6, HZ], [-70.9, 1.0, 53.6], [-70.9, 1.0, 56.4], [-70.9, 1.9, 56.4], [-70.9, 1.9, 53.6], [-70.9, 2.6, 53.6], [-71.6, 2.6, 57.4]];
@@ -9223,7 +9226,7 @@ function init(container) {
     pumpSet(-70.6, 58.15, 'x', 1, 'pp200', 0.45); nameplate('200 PROOF PRODUCT PUMP', -69.9, 1.4, 58.15, 0.35, 0, 1, 0.38);
     P([[-72.4, 0.5, 57.9], [-71.0, 0.5, 58.15]], 'pp200', 0.15);
     // regen: a vacuum header off the bottles in regen -> regen condensers 1 + 2 -> regen tank -> regen pumps -> rectifier
-    const rgv = [[SX[3], 9.9, HZ], [-56.0, 9.9, HZ], [-56.0, 9.9, 55.6], [-56.0, 5.4, 55.6], [-55.7, 5.4, 55.6]];
+    const rgv = [[SX[3], VY + 0.6, HZ], [-56.0, VY + 0.6, HZ], [-56.0, VY + 0.6, 55.6], [-56.0, 5.4, 55.6], [-55.7, 5.4, 55.6]];
     P(rgv, 'regen', 0.25); O.dist.rgv = F(rgv, 0xf4f6f8, 30, { speed: 8 });
     for (const y of [4.3, 5.4]) hvessel(-54.5, y, 55.6, 0.4, 2.4, 'x', 'regen');
     for (const x of [-55.6, -53.4]) for (const z of [55.1, 56.1]) box(0.15, 5.6, 0.15, steel, x, 2.8, z, null);
