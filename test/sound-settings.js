@@ -14,6 +14,16 @@ function soundSetMusicVolume(value){
  if(slider)slider.value=String(Math.round(volume*100));
  if(label)label.textContent=Math.round(volume*100)+'%';
 }
+// v1.97.83: how people talk. Auto = the device's voice, or their mumble where the device can't speak; Mumble = always mumble;
+// Device voice = always the device's text-to-speech (silent where there is none). Saved in cs_npc_voice.
+const SOUND_NPC_VOICES=[['auto','Auto'],['mumble','Mumble'],['device','Device voice']];
+function soundNpcVoice(){try{const v=localStorage.getItem('cs_npc_voice');return SOUND_NPC_VOICES.some(x=>x[0]===v)?v:'auto';}catch(e){return 'auto';}}
+function soundNpcVoiceLabel(){const v=soundNpcVoice();return (SOUND_NPC_VOICES.find(x=>x[0]===v)||SOUND_NPC_VOICES[0])[1];}
+function soundNpcVoiceNext(){
+ const i=SOUND_NPC_VOICES.findIndex(x=>x[0]===soundNpcVoice()),v=SOUND_NPC_VOICES[(i+1)%SOUND_NPC_VOICES.length][0];
+ try{localStorage.setItem('cs_npc_voice',v);}catch(e){}
+ try{if(typeof mumble==='function'){if(window.speechSynthesis)speechSynthesis.cancel();if(v!=='device')mumble('Like this, okay?','op');else if(typeof mumbleStop==='function')mumbleStop();}}catch(e){}   /* a sample so you hear the choice */
+}
 function soundSettings(focus=0){
  const percent=Math.round(music.volume*100);
  modal('<h1>Sound</h1><label for="csMusicVolume" style="display:block;margin:16px 0 8px">Music volume <b id="csMusicVolumeLabel">'+percent+'%</b></label>'+
@@ -22,6 +32,7 @@ function soundSettings(focus=0){
   '<input id="csMusicVolume" type="range" min="0" max="100" step="1" value="'+percent+'" style="width:100%;min-width:0;min-height:44px;box-sizing:border-box;margin:0">'+
   '<button id="csMusicPlus" type="button" aria-label="Increase music volume" style="height:44px;padding:0;font-size:22px">+</button></div>',
   [[musicOn?'Music: On':'Music: Off',()=>{toggleMusic();soundSettings(2);}],
+   ['NPC voices: '+soundNpcVoiceLabel(),()=>{soundNpcVoiceNext();soundSettings(3);}],
    ['Back to pause menu',()=>menu()]],true);
  // v1.97.197: steps land on whole percents (0.1 + 0.2 drifted to 0.30000000000000004)
  $('csMusicMinus').onclick=()=>soundSetMusicVolume(Math.round((music.volume-.1)*100)/100);

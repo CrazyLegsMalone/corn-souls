@@ -18527,11 +18527,132 @@ setInterval(() => {
     npcSpokeAt = now; return;   // one voice at a time
   }
 }, 1000);
-function npcSay(D, text) {   // the device voice: lower and slower for Rick, higher for Brenda and Tammy
-  try { if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.pitch = D.pitch; u.rate = D.rate; u.volume = 0.95;
-    const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); const fem = D.pitch > 1; const v = vs.find(v => (fem ? /female|woman|zira|samantha|victoria|karen|aria|jenny/i : /male|man|david|daniel|alex|guy|fred/i).test(v.name) && !(fem ? /\bmale/i : /female/i).test(v.name)); if (v) u.voice = v;
-    speechSynthesis.speak(u); } catch (e) {}
+function npcSay(D, text) {   // the device voice: lower and slower for Rick, higher for Brenda and Tammy; or their mumble where the device can't talk (v1.97.83)
+  const who = Object.keys(NPC_DEF).find(k => NPC_DEF[k] === D) || 'op';
+  let u = null;
+  try { if (window.speechSynthesis && window.SpeechSynthesisUtterance) { speechSynthesis.cancel(); u = new SpeechSynthesisUtterance(text); u.pitch = D.pitch; u.rate = D.rate; u.volume = 0.95;
+    const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang)); const fem = D.pitch > 1; const v = vs.find(v => (fem ? /female|woman|zira|samantha|victoria|karen|aria|jenny/i : /male|man|david|daniel|alex|guy|fred/i).test(v.name) && !(fem ? /\bmale/i : /female/i).test(v.name)); if (v) u.voice = v; } } catch (e) { u = null; }
+  npcVoiceSay(u, text, who);
 }
+// ---------- NPC MUMBLE VOICE (v1.97.83): where the device can't speak (no text-to-speech, or it never starts), people talk in a
+// synthesized mumble built from the actual line, like Animal Crossing but following the words: every vowel is a voiced "ah/eh/ee/oh/oo"
+// shaped by its own mouth sounds (formants), consonants are breath, hiss, clicks and hums, commas and full stops are pauses, a question
+// goes up at the end and "!" is louder. Each person has their own pitch and pace (Rick low and steady, Vern lower and slow, Brenda and
+// Tammy higher and quicker). One sawtooth + one noise buffer per line, all scheduled up front: no sound files, almost no CPU.
+const MUMBLE_VOICE = {   // f0 = speaking pitch (Hz), rate = syllables pace, breath = how much air in the voice
+  op: { f0: 112, rate: 1.0, breath: 0.025, tract: 1.0 },
+  vern: { f0: 92, rate: 0.82, breath: 0.04, tract: 0.94 },
+  brenda: { f0: 205, rate: 1.08, breath: 0.018, tract: 1.16 },
+  tammy: { f0: 228, rate: 1.12, breath: 0.02, tract: 1.2 },
+  radio: { f0: 118, rate: 1.06, breath: 0.03, tract: 1.0 }
+};
+const MUMBLE_VOWEL = { a: [730, 1090], e: [530, 1840], i: [300, 2200], o: [570, 840], u: [320, 900], y: [300, 2100] };   // F1, F2
+function mumbleSyllables(text) {   // the line as syllables [onset consonants, vowel, coda] plus pauses
+  const out = []; const s = String(text || '').replace(/\*[^*]*\*/g, ' ').replace(/^Radio:\s*/i, '').toLowerCase();   // *stage directions* are not spoken
+  const re = /([a-z']+)|([,;:—-]+)|([.!?…]+)/g; let m;
+  while ((m = re.exec(s))) {
+    if (m[2]) { out.push({ pause: 0.16 }); continue; }
+    if (m[3]) { const last = out[out.length - 1]; if (last && !last.pause) { last.end = m[3].includes('?') ? '?' : m[3].includes('!') ? '!' : '.'; } out.push({ pause: m[3].includes('.') && !m[3].includes('?') ? 0.3 : 0.24 }); continue; }
+    const w = m[1].replace(/'/g, ''); if (!w) continue;
+    const parts = w.match(/[^aeiouy]*[aeiouy]+[^aeiouy]*?(?=[^aeiouy][aeiouy]|$)|[^aeiouy]+$/g) || [w];
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i], v = (p.match(/[aeiouy]+/) || [''])[0];
+      if (!v) { const prev = out[out.length - 1]; if (prev && !prev.pause) prev.coda += p; else out.push({ on: p, v: 'u', coda: '', mute: true }); continue; }
+      const k = p.indexOf(v); out.push({ on: p.slice(0, k), v, coda: p.slice(k + v.length), first: i === 0, len: parts.length });
+    }
+  }
+  return out;
+}
+function mumbleCons(ch) {   // what a consonant sounds like: 'f' fricative (hiss), 'p' plosive (click), 'n' nasal/liquid (hum)
+  if (/[szcx]/.test(ch)) return { k: 'f', f: 5200, q: 1.4, d: 0.07 };
+  if (/[fv]/.test(ch) || ch === 'th') return { k: 'f', f: 3600, q: 0.8, d: 0.06 };
+  if (ch === 'sh' || ch === 'ch' || /[j]/.test(ch)) return { k: 'f', f: 2600, q: 1.2, d: 0.08 };
+  if (ch === 'h') return { k: 'f', f: 1500, q: 0.5, d: 0.05 };
+  if (/[ptkbdgq]/.test(ch)) return { k: 'p', f: /[pb]/.test(ch) ? 900 : /[td]/.test(ch) ? 3200 : 1800, q: 1, d: /[ptkq]/.test(ch) ? 0.035 : 0.02 };
+  return { k: 'n', f: /[mn]/.test(ch) ? 280 : 420, q: 1, d: 0.05 };   // m n l r w
+}
+let mumbleNow = null;   // the line being mumbled, so the next one cuts it off
+function mumbleStop() { const m = mumbleNow; mumbleNow = null; if (!m) return; try { const t = m.C.currentTime; m.g.gain.cancelScheduledValues(t); m.g.gain.setTargetAtTime(0, t, 0.02); m.o.stop(t + 0.1); m.n.stop(t + 0.1); } catch (e) {} }
+function mumbleCtx() { try { const C = (typeof tsnd !== 'undefined' && tsnd.ctx) || (window.__mumbleCtx = window.__mumbleCtx || new (window.AudioContext || window.webkitAudioContext)()); if (C && C.state === 'suspended') C.resume(); return C || null; } catch (e) { return null; } }
+function mumble(text, who, opt) {   // speak a line as mumble; who = NPC id (or 'radio'); returns how long it lasts (s)
+  opt = opt || {}; const V = MUMBLE_VOICE[who] || MUMBLE_VOICE.op, syl = mumbleSyllables(text); if (!syl.some(x => !x.pause)) return 0;
+  const C = mumbleCtx(); if (!C) return 0;
+  mumbleStop();
+  const t0 = C.currentTime + 0.04 + (opt.delay || 0), out = C.createGain(); out.gain.value = opt.volume == null ? 0.6 : opt.volume;
+  if (opt.radio) {   // walkie-talkie: thin band, a little crunch
+    const hp = C.createBiquadFilter(), lp = C.createBiquadFilter(), sh = C.createWaveShaper(), cv = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = i / 127.5 - 1; cv[i] = Math.tanh(x * 2.2) * 0.8; }
+    hp.type = 'highpass'; hp.frequency.value = 450; lp.type = 'lowpass'; lp.frequency.value = 2800; sh.curve = cv;
+    out.connect(hp); hp.connect(sh); sh.connect(lp); lp.connect(C.destination);
+  } else out.connect(C.destination);
+  // voice: sawtooth -> two formant band-passes (F1, F2) + a little straight-through for body
+  const o = C.createOscillator(); o.type = 'sawtooth'; const vg = C.createGain(); vg.gain.value = 0;
+  const f1 = C.createBiquadFilter(), f2 = C.createBiquadFilter(), body = C.createBiquadFilter(), g1 = C.createGain(), g2 = C.createGain(), gb = C.createGain();
+  f1.type = f2.type = 'bandpass'; f1.Q.value = 4; f2.Q.value = 6; body.type = 'lowpass'; body.frequency.value = 900; g1.gain.value = 3.2; g2.gain.value = 2.6; gb.gain.value = 0.3;
+  o.connect(vg); vg.connect(f1); vg.connect(f2); vg.connect(body); f1.connect(g1); f2.connect(g2); body.connect(gb); g1.connect(out); g2.connect(out); gb.connect(out);
+  // breath / consonants: one looping noise buffer through a moving band-pass
+  const nb = C.createBuffer(1, C.sampleRate * 0.5 | 0, C.sampleRate), nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const n = C.createBufferSource(); n.buffer = nb; n.loop = true; const nf = C.createBiquadFilter(); nf.type = 'bandpass'; const ng = C.createGain(); ng.gain.value = 0;
+  n.connect(nf); nf.connect(ng); ng.connect(out);
+  const pace = 1 / (V.rate * (opt.rate || 1));
+  let t = t0, phrase = 0; const LIMIT = 7;   // seconds: long speeches trail off instead of droning on
+  o.frequency.setValueAtTime(V.f0, t0); vg.gain.setValueAtTime(0, t0); ng.gain.setValueAtTime(0, t0);
+  for (const x of syl) {
+    if (t - t0 > LIMIT) break;
+    if (x.pause) { vg.gain.setTargetAtTime(0, t, 0.02); t += x.pause * pace; phrase = 0; continue; }
+    // consonants before the vowel
+    const on = x.on.match(/sh|ch|th|[a-z]/g) || [];
+    for (const c of on.slice(-2)) {
+      const K = mumbleCons(c), d = K.d * pace;
+      nf.frequency.setValueAtTime(K.f, t); nf.Q.setValueAtTime(K.q, t);
+      if (K.k === 'n') { vg.gain.setTargetAtTime(0.18, t, 0.01); f1.frequency.setValueAtTime(K.f * V.tract, t); f2.frequency.setValueAtTime(1300 * V.tract, t); }
+      else { vg.gain.setTargetAtTime(K.k === 'p' && /[bdg]/.test(c) ? 0.06 : 0, t, 0.006); ng.gain.setValueAtTime(0, t); ng.gain.linearRampToValueAtTime(K.k === 'p' ? 0.22 : 0.09, t + 0.005); ng.gain.setTargetAtTime(0, t + d * 0.6, 0.012); }
+      t += d;
+    }
+    // the vowel: its formants, a pitch that drifts a little, wobble, and the end of the sentence
+    const F = MUMBLE_VOWEL[x.v[x.v.length - 1]] || MUMBLE_VOWEL.a, F0 = MUMBLE_VOWEL[x.v[0]] || F;
+    const stress = x.first && x.len > 1 ? 1.08 : 1, decl = 1 - Math.min(0.12, phrase * 0.012);
+    let f = V.f0 * stress * decl * (1 + (Math.random() - 0.5) * 0.1);
+    const dur = (0.075 + Math.min(0.06, x.v.length * 0.025) + (x.end ? 0.06 : 0)) * pace * (x.mute ? 0.6 : 1);
+    f1.frequency.setTargetAtTime(F0[0] * V.tract, t, 0.012); f2.frequency.setTargetAtTime(F0[1] * V.tract, t, 0.012);
+    if (x.v.length > 1) { f1.frequency.setTargetAtTime(F[0] * V.tract, t + dur * 0.45, 0.02); f2.frequency.setTargetAtTime(F[1] * V.tract, t + dur * 0.45, 0.02); }
+    o.frequency.setTargetAtTime(f, t, 0.015);
+    if (x.end === '?') o.frequency.setTargetAtTime(f * 1.35, t + dur * 0.3, 0.05);
+    else if (x.end === '.') o.frequency.setTargetAtTime(f * 0.86, t + dur * 0.4, 0.06);
+    const amp = (x.end === '!' ? 0.62 : 0.48) * (x.mute ? 0.4 : 1);
+    vg.gain.setTargetAtTime(amp, t, 0.012); ng.gain.setTargetAtTime(V.breath, t, 0.02); nf.frequency.setValueAtTime(F[1] * V.tract, t); nf.Q.setValueAtTime(1.2, t);
+    vg.gain.setTargetAtTime(amp * 0.7, t + dur * 0.6, 0.03);
+    t += dur;
+    // consonants after the vowel: a short closing sound
+    if (x.coda) { const K = mumbleCons(x.coda.slice(-1)); vg.gain.setTargetAtTime(K.k === 'n' ? 0.16 : 0, t, 0.01); if (K.k !== 'n') { nf.frequency.setValueAtTime(K.f, t); ng.gain.setTargetAtTime(K.k === 'p' ? 0.14 : 0.07, t, 0.004); } ng.gain.setTargetAtTime(0, t + K.d * pace * 0.7, 0.012); t += K.d * pace * 0.8; }
+    else { ng.gain.setTargetAtTime(0, t, 0.015); }
+    t += 0.025 * pace; phrase++;
+  }
+  vg.gain.setTargetAtTime(0, t, 0.03); ng.gain.setTargetAtTime(0, t, 0.02);
+  o.start(t0); n.start(t0); o.stop(t + 0.3); n.stop(t + 0.3);
+  const me = { C, o, n, g: out }; mumbleNow = me; o.onended = () => { if (mumbleNow === me) mumbleNow = null; };
+  return t - t0;
+}
+// Device voice or mumble: 'auto' (default) uses the device's text-to-speech and drops to mumble for good the first time it isn't there or
+// never starts; the Sound menu can force either one. (cs_npc_voice in localStorage: 'auto' | 'mumble' | 'device')
+let ttsWorks = null;   // null = not tried yet, true = it spoke, false = it didn't (stay on mumble)
+function npcVoiceMode() { try { const v = localStorage.getItem('cs_npc_voice'); return v === 'mumble' || v === 'device' ? v : 'auto'; } catch (e) { return 'auto'; } }
+function ttsAvailable() { return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); }
+function npcVoiceSay(u, text, who, opt) {   // speak utterance u with the device voice, or mumble the text instead
+  const mode = npcVoiceMode();
+  if (mode === 'mumble' || (mode === 'auto' && (ttsWorks === false || !ttsAvailable()))) { try { speechSynthesis.cancel(); } catch (e) {} mumble(text, who, opt); return; }
+  if (!ttsAvailable()) return;   // 'device' chosen but there is none: silent, as before
+  mumbleStop();
+  if (mode === 'auto' && ttsWorks !== true) {   // first lines: make sure it really starts, else mumble this line and every one after
+    let started = false;
+    u.onstart = () => { started = true; ttsWorks = true; };
+    u.onerror = e => { if (started || (e && /interrupted|canceled/.test(e.error))) return; started = true; ttsWorks = false; mumble(text, who, opt); };
+    setTimeout(() => { if (started || ttsWorks === true) return; ttsWorks = false; try { speechSynthesis.cancel(); } catch (e) {} mumble(text, who, opt); }, 2500 + (opt && opt.delay ? opt.delay * 1000 : 0));
+  }
+  const go = () => { try { speechSynthesis.speak(u); } catch (e) { ttsWorks = false; mumble(text, who); } };
+  if (opt && opt.delay) setTimeout(go, opt.delay * 1000); else go();
+}
+window.__mumble = { say: mumble, syllables: mumbleSyllables, stop: mumbleStop, get tts() { return ttsWorks; }, set tts(v) { ttsWorks = v; }, mode: npcVoiceMode };   // (for testing)
 function npcMatch(D, said) {   // best topic for what was typed / said: whole phrases count most, then words (plurals and typos forgiven a little)
   const s = ' ' + said.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ') + ' ', words = s.trim().split(' ');
   if (D === NPC_DEF.op) {
@@ -18616,7 +18737,7 @@ function reply(id, said) {
   const T = npcMatch(D, said); talk(id, T ? T.id : '?', said);
 }
 function listenTalk(id) {
-  const D = NPC_DEF[id]; try { speechSynthesis.cancel(); } catch (e) {}
+  const D = NPC_DEF[id]; try { speechSynthesis.cancel(); } catch (e) {} try { mumbleStop(); } catch (e) {}
   modal('<h1>' + D.name + '</h1><p style="font-size:18px">🎤 Listening… say something.</p>', [['Cancel', () => { try { window.Android && Android.stopListen && Android.stopListen(); } catch (e) {} talk(id); }]], true);
   voiceListen((t, err) => {
     if (talkWith !== id) return;
@@ -18645,7 +18766,9 @@ function radioSquelch() {
 }
 function radio(who, text) {
   radioSquelch();
-  try { if (window.speechSynthesis && window.SpeechSynthesisUtterance) { const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; u.pitch = 0.85; u.volume = 0.9; setTimeout(() => speechSynthesis.speak(u), 350); } } catch (e) {}
+  try { let u = null; if (window.speechSynthesis && window.SpeechSynthesisUtterance) { u = new SpeechSynthesisUtterance(text); u.rate = 1.05; u.pitch = 0.85; u.volume = 0.9; }
+    const w = /brenda/i.test(who) ? 'brenda' : /tammy/i.test(who) ? 'tammy' : /vern/i.test(who) ? 'vern' : 'radio';
+    npcVoiceSay(u, text, w, { radio: true, delay: 0.35, volume: 0.5 }); } catch (e) {}   // v1.97.83: mumbles over the radio where the device can't talk
   let el = document.getElementById('radioSub');
   if (!el) { el = document.createElement('div'); el.id = 'radioSub'; el.style.cssText = 'position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(58px + env(safe-area-inset-right,0px));max-width:min(42vw,420px);background:rgba(15,18,22,.72);color:#fff;font:13px/1.3 Arial;padding:6px 10px;border-radius:8px;z-index:20;pointer-events:none;transition:opacity .4s;text-align:left'; document.body.appendChild(el); }
   el.innerHTML = '📻 <b style="color:#ffcf5a">' + who + ':</b> ' + text; el.style.opacity = '1'; clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0'; }, 6000);

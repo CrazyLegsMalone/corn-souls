@@ -10,7 +10,16 @@ c.soundSettings();assert.ok(panel[0].includes('Music volume'));assert.ok(panel[0
 elements.csMusicVolume.value='25';elements.csMusicVolume.oninput();assert.equal(c.music.volume,.25);assert.equal(c.soundMusicVolume(),.25);assert.equal(elements.csMusicVolumeLabel.textContent,'25%');
 c.soundSettings();const layout=panel[0];assert.ok(layout.indexOf('id="csMusicMinus"')<layout.indexOf('id="csMusicVolume"'));
 assert.ok(layout.indexOf('id="csMusicPlus"')>layout.indexOf('id="csMusicVolume"'));
-assert.equal(panel[1].length,2,'footer only has music toggle and Back');
+assert.equal(panel[1].length,3,'footer has the music toggle, NPC voices (v1.97.83) and Back');
+{ // v1.97.83: NPC voices cycles Auto -> Mumble -> Device voice -> Auto, saved in cs_npc_voice
+  const npc=()=>panel[1].find(b=>/^NPC voices: /.test(b[0]));
+  assert.equal(npc()[0],'NPC voices: Auto','defaults to Auto');
+  npc()[1]();assert.equal(stored.get('cs_npc_voice'),'mumble');assert.equal(npc()[0],'NPC voices: Mumble');
+  npc()[1]();assert.equal(stored.get('cs_npc_voice'),'device');assert.equal(npc()[0],'NPC voices: Device voice');
+  npc()[1]();assert.equal(stored.get('cs_npc_voice'),'auto');assert.equal(npc()[0],'NPC voices: Auto');
+  stored.set('cs_npc_voice','junk');c.soundSettings();assert.equal(npc()[0],'NPC voices: Auto','anything else reads as Auto');
+  stored.delete('cs_npc_voice');c.modalFocus=0;c.soundSettings();
+}
 c.modalFocus=1;elements.csMusicPlus.onclick();assert.equal(c.music.volume,.35);
 assert.equal(c.modalFocus,1,'inline adjustment keeps controller focus');
 assert.equal(c.modalBtns[1],elements.csMusicPlus,'inline controls participate in controller navigation');
