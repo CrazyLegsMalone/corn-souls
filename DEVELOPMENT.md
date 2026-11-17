@@ -1,3 +1,13 @@
+## TEST v1.97.89 — the cook and liquefaction connected as on the plant's screens (2026-11-17)
+- Owner: *"Continue"* (after v1.97.88: next the cook, from the plant's cook / liquefaction / beer well screens).
+- **Hydroheater:** shows the steam it takes (lb/h, ~23,700 at the normal rate, worked out from the heat the slurry takes) and its pressure (~22.6 psig).
+- **Flash vessel:** ~8.8 psia, ~186 °F, level ~50%; the flash vapor (lb/h) goes overhead to the side stripper (a new line from the vapor stack over the roof to a stub on the distillation pad); alpha-amylase dosed again after the flash (~120 ml/min, by the grind).
+- **Forward / recirculate:** the flash vessel pump sends the mash forward to Liq Tank 1, or — while the cook is under 215 °F (starting up, or the hydroheater set too low) — back to Slurry Tank 1 until it's over 219 °F (new recirc line, shows its flow).
+- **Liq Tank 1 overflows back to Slurry Tank 1** when the liquefaction tanks are full (new overflow line over the roof); the cook no longer stops at 97% — the backed-up slurry slows the mills instead, as the plant does.
+- **Beer/mash exchanger:** beer from the beer well pump now goes through the in-service train's beer/mash exchanger on its way to distillation (both trains piped; the flow follows the train in service) and is heated to ~150 °F; the exchanger panel shows beer in → out.
+- Tests: `validate-front-end.cjs` covers the cook numbers, the recirculation, the Liq Tank 1 overflow and the new lines.
+- Bumped TEST to `1.97.89`.
+
 ## TEST v1.97.88 — corn to slurry connected the way the plant's screens show it (2026-11-17)
 - Owner: *"It should connect in the way as in the pictures and function that way as well"* (no controls yet: *"this is just to build and connect tanks and pumps properly"*). Generic names only.
 - **Grain:** the shaker cleaner over the grinding bins is the **Scalper & Gravity Splitter** (selectable unit, a splitter cone the four spouts hang off, SCALPER plate). **Tin Bins 3 & 4** are connected: an overhead gallery conveyor from the receiving elevator head runs over Tin Bin 3 to Tin Bin 4 with a drop spout into each roof; a reclaim conveyor under them runs back to the elevator boot between Tin Bins 1 & 2. In the model they fill with the receiving Tin Bins 1 & 2 don't need (to 80%) and send corn back (3,000 bu/h) when Tin Bins 1 & 2 drop under 40% (until 55%).

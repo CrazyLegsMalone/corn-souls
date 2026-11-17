@@ -80,4 +80,17 @@ for (const want of ["O.fTbFill = [", "O.fReclaim = [", "O.fCookW = line(", "O.fB
 assert.ok(html.includes("nameplate('SCALPER'"), 'the scalper is labelled');
 assert.ok(!/nameplate\('[A-Z]{1,4}-\d/.test(html) && html.includes("const [tag, name] = text.includes('|') ? text.split('|') : [null, text];"), 'nameplates carry no tag numbers');
 
-console.log('PASS validate-front-end: real rate (~4,350 lb/min, ~1,250 GPM slurry, 9 h fermenter fill), mills, the blender at the real mix, grinding bin alarm, plant units, backset / cook water / meth feed connected, Tin Bins 3 & 4');
+// ---- v1.97.89: the cook and liquefaction as on the plant's screens
+{ const x = Sim.create(); run(x, 24);
+  near(x.hydro.steam, 23000, 3000, 'steam into the hydroheater, lb/h'); near(x.flash.T, 186, 1, 'flash vessel temperature'); near(x.flash.L, 50, 3, 'flash vessel level');
+  assert.ok(x.flash.vapor > 15000, 'flash vapor to the side stripper'); near(x.flash.enz, 120, 5, 'alpha-amylase after the flash, ml/min');
+  near(x.beerHx.Tout, 150, 8, 'beer heated by the mash on its way to the column'); assert.ok(x.cook.fwd, 'forward to Liq Tank 1');
+  // too cool a cook: the flash vessel pump sends it back to Slurry Tank 1
+  x.sp.hydro.temp = 205; run(x, 0.5); assert.ok(!x.cook.fwd && x.cook.recirc > 0, 'cool cook recirculates'); assert.equal(Sim.status(x, 'flash')[0], 'warn');
+  x.sp.hydro.temp = 225; run(x, 0.5); assert.ok(x.cook.fwd, 'back to forward once it is hot');
+  // no fermenter ready: the liq tanks fill and Liq Tank 1 overflows back to Slurry Tank 1 (the cook keeps running)
+  const y = Sim.create(); y.ferm.forEach(f => { f.state = 'fermenting'; f.t = 0; }); let ov = 0, cook = 0; run(y, 6, z => { if (z.liqOvf > 0) ov++; if (z.cook.out > 1) cook++; });
+  assert.ok(ov > 0 && /Overflowing back/.test(Sim.status(y, 'liq1')[1]), 'Liq Tank 1 overflows back to Slurry Tank 1'); assert.ok(cook > 0, 'the cook did not stop'); }
+for (const want of ["O.fVapor = flow(", "O.fRecirc = flow(", "O.fLiqOvf2 = flow(", "O.fFeedHx = [-24, -30].map("]) assert.ok(html.includes(want), 'built in 3D: ' + want);
+
+console.log('PASS validate-front-end: real rate (~4,350 lb/min, ~1,250 GPM slurry, 9 h fermenter fill), mills, the blender at the real mix, grinding bin alarm, plant units, backset / cook water / meth feed connected, Tin Bins 3 & 4, cook / flash / liquefaction / beer-mash exchanger');

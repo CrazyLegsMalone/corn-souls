@@ -4464,7 +4464,7 @@ function create() {
   s.st1 = { L: 60, T: 186, out: 0, steam: 0 };
   s.str = [{ f: 0, clean: 0 }, { f: 0, clean: 0 }]; s.duty = 0;
   s.st2 = { L: 60, T: 187, out: 0, steam: 0 };
-  s.hydro = { T: 225 }; s.ct = [{ T: 224 }, { T: 223 }]; s.cook = { out: 0, q: 1, hold: 0 };
+  s.hydro = { T: 225, steam: 0, P: 0 }; s.ct = [{ T: 224 }, { T: 223 }]; s.cook = { out: 0, q: 1, hold: 0, recirc: 0, fwd: true }; s.flash = { L: 50, T: 186, vapor: 0, enz: 0 }; s.liqOvf = 0; s.beerHx = { Tin: 93, Tout: 150 };
   s.liq1 = { L: 90, T: 188, out: 0 };
   s.liq = { L: 70, T: 187, out: 0, q: 1 };
   s.liqDuty = 0;
@@ -4506,6 +4506,7 @@ function dead(s) {
   s.mills.forEach(m => { m.rate = 0; m.limit = 'power'; m.lbm = 0; m.amps = 0; });
   s.conveyor = 0; s.recv = 0; s.recvRail = 0; s.recvTruck = 0;
   s.tb.forEach(b => { b.in = 0; b.out = 0; }); s.reclaim = 0; s.tst.in = s.tst.out = s.tst.evap = 0; s.mft.in = s.mft.out = 0; s.cwt.in = s.cwt.out = s.cwt.makeup = 0;
+  s.hydro.steam = 0; s.hydro.P = 0; s.flash.vapor = 0; s.flash.enz = 0; s.cook.recirc = 0; s.liqOvf = 0;
   s.blend.flow = 0; s.blend.lbm = 0; s.blend.water = 0; s.blend.bsGpm = 0; s.blend.cwGpm = 0; s.blend.gpm = 0; s.st1.steam = 0; s.st2.steam = 0; s.beer.feed = 0;
   s.st1.out = 0; s.st2.out = 0; s.cook.out = 0; s.liq1.out = 0; s.liq.out = 0; s.propSide = 0;
   s.out.corn = 0; s.out.eth = 0; s.out.oil = 0; s.out.cake = 0;
@@ -4599,7 +4600,7 @@ function stepH(s, dt) {
   // ---- slurry tank 2 -> hydroheater -> cook tube 1 -> cook tube 2
   const b2 = s.st2.L / 100 * CAP.st2;
   let o2 = clamp(o1 + 2.5 * (s.st2.L - sp.st2.lvl) / 100 * CAP.st2, 0, 3400 * K);
-  if (s.liq1.L >= 97) o2 = 0;
+  // (v1.97.89: no longer stops the cook when Liq Tank 1 is full - it overflows back to Slurry Tank 1, as on the plant's screen)
   o2 = Math.min(o2, b2 / dt + o1);
   s.st2.out = o2;
   s.st2.L = clamp((b2 + (o1 - o2) * dt) / CAP.st2 * 100, 0, 100);
@@ -4612,7 +4613,21 @@ function stepH(s, dt) {
   s.cook.hold = o2 > 1 ? 2 * CAP.ct / o2 : 0;
   s.cook.q = F.cookT((s.ct[0].T + s.ct[1].T) / 2) * (o2 > 1 ? F.hold(s.cook.hold) : 1);
   s.cook.out = o2;
-  const sOut = o2;
+  // v1.97.89 cook as on the plant's screen: steam into the hydroheater (lb/h) from the heat the slurry takes; the cook tubes run under
+  // pressure; the flash vessel drops to ~8.8 psia and boils the mash down to ~186 F, sending the vapor to the side stripper; alpha-amylase
+  // is dosed again after the flash. The flash vessel pump sends it FORWARD to Liq Tank 1 - or, while the cook is too cool to have cooked the
+  // starch (under 215 F, e.g. starting up), back to Slurry Tank 1.
+  { const gpmS = GPM(o2), lbh = gpmS * (s.blend.dens || 9.6) * 60;
+    s.hydro.steam = o2 > 1 ? Math.max(0, lbh * 0.85 * (s.hydro.T - s.st2.T) / 1000) : 0;
+    s.hydro.P = o2 > 1 ? 22.6 * clamp(gpmS / 1250, 0.3, 1.3) : 0;
+    s.flash.vapor = o2 > 1 ? Math.max(0, lbh * 0.85 * (s.ct[1].T - 186) / 970) : 0;
+    s.flash.T += ((o2 > 1 ? 186 : s.flash.T - 20) - s.flash.T) * (1 - Math.exp(-dt / 0.1)); s.flash.T = Math.max(s.flash.T, 80);
+    s.flash.L += ((o2 > 1 ? 50 : 5) - s.flash.L) * (1 - Math.exp(-dt / 0.2));
+    s.flash.enz = LBM(o2) * 120 / 4350 * (o2 > 1 ? 1 : 0);
+    if (s.hydro.T < 215 && o2 > 1) s.cook.fwd = false; else if (s.hydro.T > 219 || o2 <= 1) s.cook.fwd = true; }
+  s.cook.recirc = s.cook.fwd ? 0 : o2;
+  if (s.cook.recirc) s.st1.L = clamp(s.st1.L + s.cook.recirc * dt / CAP.st1 * 100, 0, 100);   // back to Slurry Tank 1
+  const sOut = s.cook.fwd ? o2 : 0;
 
   // ---- liquefaction tank: only drains when a fermenter is filling
   let filling = s.ferm.find(f => f.state === 'filling');
@@ -4621,7 +4636,10 @@ function stepH(s, dt) {
   const l1Bu = s.liq1.L / 100 * CAP.liq;
   const l1Out = s.liq.L < 97 ? Math.max(0, l1Bu + sOut * dt - 0.9 * CAP.liq) / dt : 0;
   s.liq1.out = l1Out;
-  s.liq1.L = clamp((l1Bu + (sOut - l1Out) * dt) / CAP.liq * 100, 0, 100);
+  { const L1 = (l1Bu + (sOut - l1Out) * dt) / CAP.liq * 100;   // over full: overflows back to Slurry Tank 1
+    s.liqOvf = L1 > 100 ? (L1 - 100) / 100 * CAP.liq / dt : 0;
+    if (s.liqOvf) s.st1.L = clamp(s.st1.L + s.liqOvf * dt / CAP.st1 * 100, 0, 100);
+    s.liq1.L = clamp(L1, 0, 100); }
   s.liq1.T += (sp.liq.temp + 1 - s.liq1.T) * (1 - Math.exp(-dt / 0.3));
   // Liq Tank 2: the online Liq pump sends mash to the filling fermenter
   const lIn = l1Out, lBu = s.liq.L / 100 * CAP.liq;
@@ -4737,6 +4755,8 @@ function stepH(s, dt) {
   let ethIn = 0;
   if (feed > 0 && s.beer.bu > 0) { const q = feed * dt / s.beer.bu; ethIn = s.beer.eth * q; s.beer.eth -= ethIn; s.beer.bu -= feed * dt; ethIn /= dt; }
 
+  // v1.97.89 the beer from the beer well goes through the in-service beer/mash exchanger (heated by the hot mash) on its way to the column
+  s.beerHx.Tin = 93; s.beerHx.Tout = feed > 1 && lOut > 1 ? clamp(93 + 0.62 * (s.liq.T - 93) * Math.min(1, lOut / Math.max(1, feed)), 93, s.liq.T - 20) : 93;
   // ---- beer column: bottom temperature decides recovery and product quality
   s.col.T += (sp.col.temp - s.col.T) * (1 - Math.exp(-dt / 0.3));
   s.col.rec = F.colRec(s.col.T); s.col.off = F.offspec(s.col.T);
@@ -4948,7 +4968,7 @@ function status(s, id) {
       return ['good', 'Holds the hot mash so the starch fully cooks. Flows in the bottom, out the top.'];
     case 'liq1':
       if (s.cook.out < 1) return ['idle', 'No mash coming from the flash vessel.'];
-      if (s.liq1.L > 95) return ['bad', 'Can\'t overflow — Liq Tank 2 is full. Cooking will stop if this keeps up.'];
+      if (s.liqOvf > 1) return ['bad', 'Overflowing back to Slurry Tank 1 — Liq Tank 2 is full because no fermenter is ready.'];
       return ['good', 'Fed through the bottom by the flash vessel pump; overflows out the top into Liq Tank 2.'];
     case 'hxA1': case 'hxA2': case 'hxB1': case 'hxB2': {
       const i = id[2] === 'A' ? 0 : 1, other = i ? 'A' : 'B';
@@ -4964,7 +4984,8 @@ function status(s, id) {
     }
     case 'flash':
       if (s.cook.out < 1) return ['idle', 'No mash coming from the cook tubes.'];
-      return ['good', 'Cooked mash drops in pressure here and flashes off steam, then the pump sends it to Liq Tank 1.'];
+      if (!s.cook.fwd) return ['warn', 'Recirculating to Slurry Tank 1 — the cook is under 215°F, so the starch isn\'t cooked yet.'];
+      return ['good', 'Cooked mash drops to ~8.8 psia and flashes off steam (to the side stripper); the pump sends it forward to Liq Tank 1.'];
     case 'liq': {
       if (L > 94) return ['bad', 'High level — no fermenter is ready to fill, so the plant upstream backs up.'];
       if (T > 196) return ['bad', 'Too hot — the alpha-amylase enzyme is being destroyed.'];
@@ -7996,6 +8017,15 @@ function init(container) {
   const cblob = new T.SphereGeometry(0.42, 8, 6);
   O.fCook = flow([...toCt1, [CTX, 1.8, CZ1], ...ovf, [CTX, 1.8, CZ2], ...out2].map(q => V3(...q)), cblob, 0xf08a3a, 80, { speed: 6, glow: true });
   O.fFlash = flow(flashOut.map(q => V3(...q)), blob, 0xf0a84a, 20, { speed: 6 });
+  // v1.97.89 as on the plant's cook screen: the flash vapor goes overhead to the side stripper (distillation pad); the flash vessel pump can send
+  // the mash back to Slurry Tank 1 instead of forward (while the cook is too cool); Liq Tank 1 overflows back to Slurry Tank 1 when it's full
+  { const VY = FVY + FVH + 3.2, DZ0 = WEST_WING.south + 3.3, vap = [[FVX, VY, FVZ], [FVX, 11.4, FVZ], [FVX, 11.4, DZ0 + 1.5], [-36, 11.4, DZ0 + 1.5], [-36, 3.0, DZ0 + 1.5]];
+    pipe(vap.slice(1), 'flash', 0.38); box(1.2, 3.0, 1.2, mat(0x9aa6b2), -36, 1.5, DZ0 + 1.5, 'flash');   // stub on the pad where the side stripper will stand
+    O.fVapor = flow(vap.map(q => V3(...q)), new T.SphereGeometry(0.3, 6, 5), 0xf4f6f8, 40, { speed: 9 });
+    const rec = [[FVX + 0.4, 1.4, -2.9], [FVX + 0.4, 7.4, -2.2], [-70.0, 7.4, -2.2], [-70.0, 7.4, -7.0], [-70.0, ST1H + 0.5, -7.0]];
+    pipe(rec, 'flash', 0.3); O.fRecirc = flow(rec.map(q => V3(...q)), blob, 0xe8c88a, 30, { speed: 6 });
+    const ovr = [[LQ1[0] - 1.2, LQH + 0.2, LQ1[1]], [LQ1[0] - 1.2, LQH + 0.6, LQ1[1]], [-69.3, LQH + 0.6, LQ1[1]], [-69.3, LQH + 0.6, -7.6], [-69.3, ST1H + 0.5, -7.6]];
+    pipe(ovr, 'liq1', 0.3); O.fLiqOvf2 = flow(ovr.map(q => V3(...q)), blob, 0xf0a84a, 30, { speed: 6 }); }
   O.liq1 = tank(LQ1[0], LQ1[1], LQR, LQH, 0xff5a5f, 0xf0a84a, 'liq1', { level: 0.9, dome: false, noRail: true });
   tankDeck(O.liq1);   // flat, walked on, with a caged ladder on the north side
   nameplate('LIQUEFACTION TANK #1', LQ1[0], 2.2, LQ1[1], LQR, 0, -1);
@@ -8971,9 +9001,13 @@ function init(container) {
   pumpModel('large', BPX, BPZ, 'x', 1, 'beer', 0.9);   // the owner's big teal motor pump, motor toward the alley
   const BRX = FXW + BWR + 1.1;   // the beer line runs south just clear of the beer well (it used to clip its side)
   const bwOut = [[FXW + BWO - 0.15, 0.9, BPZ], [BPX, 0.9, BPZ], [BPX, 7.6, BPZ], [BRX, 7.6, BPZ], [BRX, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 1.6, DISTZ0 + 2]];   // beer runs overhead down the ferm alley, out the south wall
-  pipe(bwOut, 'dist', 0.42);
-  
-  O.fFeed = flow(bwOut.map(q => V3(...q)), blob, 0xd9a441, 60, { speed: 7 });
+  // v1.97.89 as on the plant's screens: on its way to distillation the beer goes through the in-service beer/mash exchanger (train A at z -24,
+  // train B at z -30), where the hot mash heats it: off the overhead run at the exchangers, down and in the exchanger's east side, out its top, back up
+  const BHX = -25.6, hxPath = z => [...bwOut.slice(0, 4), [BRX, 7.6, z - 1.2], [BHX, 7.6, z - 1.2], [BHX, 1.4, z - 1.2], [-26.3, 1.4, z - 0.5], [-26.3, 3.4, z + 0.5], [BHX + 0.6, 3.4, z + 0.5], [BHX + 0.6, 7.9, z + 0.5], [BRX, 7.9, z + 0.5], [BRX, 7.9, bwOut[4][2]], ...bwOut.slice(5)];
+  pipe(bwOut.slice(0, 4), 'dist', 0.42); pipe([bwOut[3], [BRX, 7.6, -25.2]], 'dist', 0.42); pipe([[BRX, 7.9, -29.5], [BRX, 7.9, bwOut[4][2]], ...bwOut.slice(5)], 'dist', 0.42);
+  for (const z of [-24, -30]) { pipe([[BRX, 7.6, z - 1.2], [BHX, 7.6, z - 1.2], [BHX, 1.4, z - 1.2], [-26.3, 1.4, z - 0.5]], 'dist', 0.3); pipe([[-26.3, 3.4, z + 0.5], [BHX + 0.6, 3.4, z + 0.5], [BHX + 0.6, 7.9, z + 0.5], [BRX, 7.9, z + 0.5]], 'dist', 0.3); }
+  O.fFeedHx = [-24, -30].map(z => flow(hxPath(z).map(q => V3(...q)), blob, 0xd9a441, 70, { speed: 7 }));
+  O.fFeed = { rate: 0 };   // (the single straight run is now the two exchanger paths above)
 
   // ---------- EVAPORATORS 1-8 (photos): big insulated bottom sump, a cone, then a tall tube body, all in one row along the south
   // side of the evap alley, all on the ground floor. Above the first floor, Evaps 1 and 2 (west end) stand in the open; Evaps 3-8 are
@@ -12210,7 +12244,8 @@ function update(sim, dt, events) {
       P.pitch.rate = p.state === 'pitching' ? 1.2 : 0; });
   }
   sim.ferm.forEach((fm, i) => { O.ferms[i].rec.rate = !POWER_OUTAGE.on && fm.bu > 100 && fm.state !== 'cleaning' ? 0.6 : 0; });
-  O.fFeed.rate = feed / N;
+  O.fFeed.rate = feed / N; if (O.fFeedHx) O.fFeedHx.forEach((f, i) => { f.rate = sim.hxTrain === i ? feed / N : 0; });
+  if (O.fVapor) { O.fVapor.rate = sim.flash.vapor / 24000; O.fRecirc.rate = sim.cook.recirc / N; O.fLiqOvf2.rate = sim.liqOvf / N; }
   updateFlows(dt);
   for (const s of spinners) s.o.rotation[s.axis] += dt * (POWER_OUTAGE.on ? 0 : 1) * (s.k === 'prop' ? (sim.prop && sim.prop[s.i].bu > 20 ? 2.5 : 0) : s.k === 'ybm' ? (sim.yb && (sim.yb.state === 'mixing' || sim.yb.state === 'dumping') ? 5 : 0) : s.k === 'mill' ? 16 * sim.mills[s.i].rate / (425 * Sim.K) : s.k === 'blend' ? 6 * Math.min(1.5, sim.blend.flow / N) : s.k === 'agit' ? (sim.ferm[s.i].bu > 100 ? 2.5 : 0) : 9 * Math.min(1.5, feed / N));
 
@@ -18077,14 +18112,15 @@ function info(id) {
     case 'cwh': return [['Cook water', n0(s.blend.cwGpm) + ' GPM'], ['Out', s.cwh.T.toFixed(0) + '°F']];
     case 'cip': return [['Holds', 'Cleaning solution'], ['Connected to', 'Nothing yet']];
     case 'st2': return [['In from strainer', gpm(s.st1.out)], ['Pumped to hydroheater', gpm(s.st2.out)], ['Steam valve', s.st2.steam.toFixed(0) + '%'], ['Time in tank', s.st2.out > 1 ? (s.st2.L / 100 * C.st2 / s.st2.out * 60).toFixed(0) + ' min' : '—']];
-    case 'hydro': return [['Slurry flow', gpm(s.cook.out)], ['Inlet temperature', s.st2.T.toFixed(0) + '°F'], ['Starch cooked', (s.cook.q * 100).toFixed(0) + '%']];
+    case 'hydro': return [['Slurry flow', gpm(s.cook.out)], ['Inlet temperature', s.st2.T.toFixed(0) + '°F'], ['Steam in', n0(s.hydro.steam) + ' lb/h'], ['Pressure', s.hydro.P.toFixed(1) + ' psig'], ['Starch cooked', (s.cook.q * 100).toFixed(0) + '%']];
     case 'ct1': case 'ct2': return [['Flow', gpm(s.cook.out)], ['Time in both tubes', s.cook.hold > 0 ? (s.cook.hold * 60).toFixed(1) + ' min' : '—'], ['Flow path', id === 'ct1' ? 'In bottom, out top → Tube 2' : 'From Tube 1, in bottom, out top → Flash vessel']];
-    case 'flash': return [['In from Cook Tube 2', gpm(s.cook.out)], ['Pumped to Liq Tank 1', gpm(s.cook.out)]];
-    case 'liq1': return [['In from flash vessel', gpm(s.cook.out)], ['Overflow to Liq Tank 2', gpm(s.liq1.out)]];
+    case 'flash': return [['In from Cook Tube 2', gpm(s.cook.out)], ['Pressure', s.cook.out > 1 ? '8.8 psia' : '—'], ['Level', s.flash.L.toFixed(0) + '%'], ['Temperature', s.flash.T.toFixed(0) + '°F'], ['Vapor to the side stripper', n0(s.flash.vapor) + ' lb/h'], ['Alpha-amylase', n0(s.flash.enz) + ' ml/min'], ['Pump sending', s.cook.out < 1 ? '—' : s.cook.fwd ? 'Forward → Liq Tank 1' : 'Back → Slurry Tank 1']];
+    case 'liq1': return [['In from flash vessel', gpm(s.cook.fwd ? s.cook.out : 0)], ['Overflow to Liq Tank 2', gpm(s.liq1.out)], ['Overflow back to Slurry Tank 1', gpm(s.liqOvf)]];
     case 'hxA1': case 'hxA2': case 'hxB1': case 'hxB2': {
       const on = s.hxTrain === (id[2] === 'A' ? 0 : 1), f = on ? s.liq.out : 0, Tin = s.liq.T, Tmid = Tin - 48, Tout = 92;
       return [['Train ' + id[2], on ? 'In service' : 'Standby'], ['Mash flow', gpm(f)],
-        id[3] === '1' ? ['Mash in → out', f > 1 ? Tin.toFixed(0) + '°F → ' + Tmid.toFixed(0) + '°F' : '—'] : ['Mash in → out', f > 1 ? Tmid.toFixed(0) + '°F → ' + Tout + '°F' : '—']];
+        id[3] === '1' ? ['Mash in → out', f > 1 ? Tin.toFixed(0) + '°F → ' + Tmid.toFixed(0) + '°F' : '—'] : ['Mash in → out', f > 1 ? Tmid.toFixed(0) + '°F → ' + Tout + '°F' : '—'],
+        id[3] === '1' ? ['Beer in → out (to the column)', f > 1 && s.beer.feed > 1 ? s.beerHx.Tin.toFixed(0) + '°F → ' + s.beerHx.Tout.toFixed(0) + '°F' : '—'] : ['Cooling water', f > 1 ? 'In service' : '—']];
     }
     case 'lp1': case 'lp2': { const i = id === 'lp1' ? 0 : 1; return [['Status', s.liqDuty === i ? 'Online' : 'Standby'], ['Flow', gpm(s.liqDuty === i ? s.liq.out : 0)]]; }
     case 'liq': return [['In from Liq Tank 1', gpm(s.liq1.out)], ['Pumped to fermenters', gpm(s.liq.out)], ['Time in Liq 1 + 2', (s.liq.res * 60).toFixed(0) + ' min'], ['Starch broken down', (s.liq.q * 100).toFixed(0) + '%']];
