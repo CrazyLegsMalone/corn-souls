@@ -32,6 +32,10 @@ This file lists externally sourced 3D assets shipped in the Corn Souls repositor
 - **“PSX Fridge”** — by **emnix** ([Sketchfab source](https://sketchfab.com/3d-models/psx-fridge-514cf16781884358b2ac940dea4a6cfa)). Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Modifications: none to the file (`assets/models/psx_fridge.glb`); in the game it is scaled evenly to 0.78 m deep (about 1.79 m tall), stood on the floor and drawn nearest-pixel. The break room fridge from v1.97.69.
 - **“PSX Office Chair”** — by **emnix** ([Sketchfab source](https://sketchfab.com/3d-models/psx-office-chair-715256fa219e46ef9e793f2a06f04904)). Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Modifications: none to the file (`assets/models/psx_office_chair.glb`); in the game it is turned, scaled evenly so the seat top is at 0.47 m (about 0.94 m tall) and drawn nearest-pixel. Every office chair from v1.97.70: the energy center control room's operator chairs and the board operator's chair.
 
+## Voices (`assets/voices/`)
+
+- **NPC voices** — generated with **[Piper](https://github.com/rhasspy/piper)** (Rhasspy, MIT) using the **en_US-libritts-high** model ([source](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/libritts/high)), trained from scratch on **LibriTTS** by Heiga Zen et al. ([openslr.org/60](https://www.openslr.org/60/)), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Each character uses one LibriTTS speaker; every line is synthesized, silence-trimmed and encoded as Opus by `scripts/make_npc_voices.py`. No endorsement implied.
+
 ## First-party assets
 
 - **"Operator (male, PSX style)"** — made by the project owner with an AI-assisted character creator (Gemini); not obtained from a third-party marketplace. Used as Squeeg's third-person character in the TEST channel (`test/models/operator_male_psx_rig.glb`). Registered in [assets/registry.json](assets/registry.json) as `first-party-operator-male-psx-rig`. No third-party licence terms apply.

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Corn Souls TEST · NPC voice audition</title>
+<style>
+ body{margin:0;font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#e6edf3}
+ main{max-width:720px;margin:0 auto;padding:16px 14px 40px}
+ h1{font-size:22px;margin:4px 0 6px} h2{font-size:18px;margin:22px 0 4px} p{margin:6px 0;color:#9aa7b4}
+ .line{font-style:italic;color:#c9d4df;margin:2px 0 10px}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+ button{font:inherit;border:1px solid #30363d;background:#161b22;color:#e6edf3;border-radius:10px;padding:10px 8px;text-align:left;min-height:56px;cursor:pointer}
+ button.now{border-color:#3fb950;box-shadow:0 0 0 1px #3fb950 inset}
+ button.playing{background:#1f3b5c}
+ small{display:block;color:#8b98a5;font-size:12px}
+ .err{color:#ff7b72}
+</style></head>
+<body><main>
+<h1>NPC voice audition</h1>
+<p>Tap a voice to hear it. The green one is what the game uses now. Tell Claude the number you like for each person (for example "Rick 412, Tammy 88").</p>
+<div id="out"><p>Loading…</p></div>
+</main>
+<script>
+const BASE = '/corn-souls/assets/voices/', NAMES = { op: 'Rick · Board Op', vern: 'Vern · Grain Receiving', brenda: 'Brenda · Inbound Scale', tammy: 'Tammy · Outbound Scale' };
+let audio = null, playingBtn = null;
+function play(btn, url) {
+  if (audio) { audio.pause(); if (playingBtn) playingBtn.classList.remove('playing'); }
+  audio = new Audio(url); playingBtn = btn; btn.classList.add('playing');
+  audio.onended = () => btn.classList.remove('playing');
+  audio.play().catch(() => { btn.classList.remove('playing'); btn.querySelector('small').textContent = 'can’t play here'; });
+}
+(async () => {
+  const out = document.getElementById('out'), t = '?t=' + Date.now();
+  try {
+    const aud = await (await fetch(BASE + 'audition/audition.json' + t, { cache: 'no-store' })).json();
+    let idx = null; try { idx = await (await fetch(BASE + 'index.json' + t, { cache: 'no-store' })).json(); } catch (e) {}
+    out.innerHTML = '';
+    for (const who of ['op', 'vern', 'brenda', 'tammy']) {
+      const now = idx && idx.voices && idx.voices[who] ? idx.voices[who].speaker : null;
+      const h = document.createElement('h2'); h.textContent = NAMES[who]; out.appendChild(h);
+      const l = document.createElement('div'); l.className = 'line'; l.textContent = '“' + aud.samples[who] + '”'; out.appendChild(l);
+      const g = document.createElement('div'); g.className = 'grid'; out.appendChild(g);
+      (aud.roles[who] || []).forEach((r, i) => {
+        const b = document.createElement('button'); if (r.speaker === now) b.className = 'now';
+        b.innerHTML = '<b>' + r.speaker + '</b>' + (r.speaker === now ? ' ✓ in game' : i === 0 ? ' (top pick)' : '') + '<small>pitch ' + Math.round(r.f0) + ' Hz · clarity ' + Math.round(r.clarity * 100) + '</small>';
+        b.onclick = () => play(b, BASE + 'audition/' + who + '/' + r.speaker + '.ogg' + t);
+        g.appendChild(b);
+      });
+    }
+  } catch (e) { out.innerHTML = '<p class="err">No audition yet. The “NPC voices” job on GitHub makes it; check back in a few minutes.</p>'; }
+})();
+</script>
+</body></html>

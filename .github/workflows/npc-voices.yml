@@ -1,0 +1,73 @@
+name: NPC voices
+
+# Records every NPC line as a small voice clip (Piper, en_US-libritts-high) into assets/voices/ and commits them, whenever the
+# lines or the voice settings change. Only new or changed lines are recorded; clips for removed lines are deleted. The first run
+# (or "Run workflow" with "Redo the voice audition" ticked) also makes the samples for test/voice-audition.html.
+# Scripts: scripts/npc_voice_lines.cjs (which lines), scripts/make_npc_voices.py (recording), scripts/npc_voices.json (who sounds like what).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'test/game.html'
+      - 'game.html'
+      - 'scripts/npc_voice_lines.cjs'
+      - 'scripts/make_npc_voices.py'
+      - 'scripts/npc_voices.json'
+      - '.github/workflows/npc-voices.yml'
+  workflow_dispatch:
+    inputs:
+      audition:
+        description: 'Redo the voice audition'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: npc-voices
+  cancel-in-progress: false
+
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tools (Piper, ffmpeg)
+        run: |
+          pip install piper-tts numpy
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - name: Voice model cache
+        uses: actions/cache@v4
+        with:
+          path: build/piper
+          key: piper-${{ hashFiles('scripts/npc_voices.json') }}
+          restore-keys: piper-
+      - name: Which lines
+        run: node scripts/npc_voice_lines.cjs build/npc_lines.json
+      - name: Record
+        run: python scripts/make_npc_voices.py build/npc_lines.json ${{ inputs.audition && '--audition' || '' }}
+      - name: Commit the clips
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A assets/voices
+          if git diff --cached --quiet; then echo "No voice changes."; exit 0; fi
+          git commit -m "NPC voices: recorded for ${GITHUB_SHA::7}"
+          for i in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push origin HEAD:main; then pushed=1; break; fi
+            sleep 10
+          done
+          [ "$pushed" = 1 ] || exit 1
+          # a push made with the workflow token may not start a Pages build on its own: ask for one
+          curl -s -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages/builds" || true

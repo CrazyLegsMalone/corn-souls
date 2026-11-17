@@ -18689,6 +18689,13 @@ function npcVoiceMode() { try { const v = localStorage.getItem('cs_npc_voice'); 
 function ttsAvailable() { return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); }
 function npcVoiceSay(u, text, who, opt) {   // speak utterance u with the device voice, or mumble the text instead
   const mode = npcVoiceMode();
+  // v1.97.86: Auto plays the recorded voice when this line has one (whole, or joined from pieces and numbers); if it can't load, the old way
+  if (mode === 'auto' && typeof voicePlay === 'function' && voicePlay(text, who, opt, () => npcVoiceFallback(u, text, who, opt))) { try { speechSynthesis.cancel(); } catch (e) {} mumbleStop(); return; }
+  if (typeof voiceStop === 'function') voiceStop();
+  npcVoiceFallback(u, text, who, opt);
+}
+function npcVoiceFallback(u, text, who, opt) {   // the device's text-to-speech, or the mumble
+  const mode = npcVoiceMode();
   if (mode === 'mumble' || (mode === 'auto' && (ttsWorks === false || !ttsAvailable()))) { try { speechSynthesis.cancel(); } catch (e) {} mumble(text, who, opt); return; }
   if (!ttsAvailable()) return;   // 'device' chosen but there is none: silent, as before
   mumbleStop();
@@ -18702,6 +18709,80 @@ function npcVoiceSay(u, text, who, opt) {   // speak utterance u with the device
   if (opt && opt.delay) setTimeout(go, opt.delay * 1000); else go();
 }
 window.__mumble = { say: mumble, syllables: mumbleSyllables, stop: mumbleStop, get tts() { return ttsWorks; }, set tts(v) { ttsWorks = v; }, mode: npcVoiceMode };   // (for testing)
+// ---------- RECORDED VOICES (v1.97.86, owner: "Let's do the full voice system"): every NPC line is recorded ahead of time with Piper
+// (scripts/make_npc_voices.py, run by the "NPC voices" GitHub workflow whenever lines change) as small Opus clips in assets/voices/<who>/,
+// listed in assets/voices/index.json. A line plays its own clip; a line with live numbers in it ("the cooler is at 47 degrees") is
+// joined from clips of its pieces and the numbers 0-100. A line with no clip yet uses the device voice / mumble as before.
+// voiceNorm / voiceKey / voiceSegments are read by scripts/npc_voice_lines.cjs too, so the game and the build always agree.
+const VOICE = { base: '/corn-souls/assets/voices/', index: null, loading: null, failed: false, bufs: new Map(), now: null, token: 0 };
+function voiceNorm(t) { return String(t == null ? '' : t).replace(/\*[^*]*\*/g, ' ').replace(/^\s*Radio:\s*/i, '').replace(/\s+/g, ' ').trim(); }
+function voiceKey(t) {   // FNV-1a of the normalized, lower-cased text: the clip's file name
+  const s = voiceNorm(t).toLowerCase(); let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return ('0000000' + h.toString(16)).slice(-8);
+}
+function voiceSegments(t) {   // a line in pieces: text between numbers and punctuation, and the numbers themselves
+  const out = [];
+  for (const part of voiceNorm(t).split(/(?<![\w.])(\d+%?)(?!\w)/)) {   // standalone numbers only ("4x4" stays text)
+    if (/^\d+%?$/.test(part)) { out.push({ num: parseInt(part, 10), pct: part.endsWith('%') }); continue; }
+    for (const x of part.split(/(?<=[.!?:;,])\s+/)) { const y = x.replace(/^[\s,;:.!?'-]+/, '').trim(); if (y && /[a-z]/i.test(y)) out.push({ text: y }); }
+  }
+  return out;
+}
+function voiceIndexLoad() {
+  if (VOICE.index || VOICE.loading || VOICE.failed) return VOICE.loading;
+  VOICE.loading = fetch(VOICE.base + 'index.json?t=' + Math.floor(Date.now() / 600000), { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !j.voices) { VOICE.failed = true; return null; }
+    for (const w in j.voices) j.voices[w].set = new Set(j.voices[w].clips || []);
+    VOICE.index = j; return j;
+  }).catch(() => { VOICE.failed = true; return null; });
+  return VOICE.loading;
+}
+['pointerdown', 'keydown'].forEach(ev => window.addEventListener(ev, () => { try { voiceIndexLoad(); } catch (e) {} }, { once: true }));
+function voicePlan(text, V) {   // the clips that say this line, in order, or null
+  const k = voiceKey(text); if (V.set.has(k)) return [k];
+  const segs = voiceSegments(text), plan = []; if (segs.length < 2) return null;
+  for (const g of segs) {
+    if (g.text != null) { const q = voiceKey(g.text); if (!V.set.has(q)) return null; plan.push(q); continue; }
+    if (!(g.num >= 0 && g.num <= 100)) return null;
+    const n = voiceKey(String(g.num)); if (!V.set.has(n)) return null; plan.push(n);
+    if (g.pct) { const p = voiceKey('percent'); if (!V.set.has(p)) return null; plan.push(p); }
+  }
+  return plan;
+}
+async function voiceGet(w, k, rev, C) {
+  const id = w + '/' + k + '@' + rev; if (VOICE.bufs.has(id)) return VOICE.bufs.get(id);
+  const url = VOICE.base + w + '/' + k + '.ogg?r=' + rev; let res = null, cache = null;
+  try { cache = await caches.open('corn-souls-voices'); res = await cache.match(url); } catch (e) {}
+  if (!res) { res = await fetch(url); if (!res.ok) throw Error('clip ' + res.status); if (cache) try { await cache.put(url, res.clone()); } catch (e) {} }
+  const buf = await C.decodeAudioData(await res.arrayBuffer());
+  if (VOICE.bufs.size > 80) VOICE.bufs.delete(VOICE.bufs.keys().next().value);   // keep the last 80 decoded
+  VOICE.bufs.set(id, buf); return buf;
+}
+function voiceStop() { VOICE.token++; const n = VOICE.now; VOICE.now = null; if (n) for (const s of n.srcs) try { s.stop(); } catch (e) {} }
+function voicePlay(text, who, opt, fallback) {   // true if a recorded voice is going to say it (or fallback() if the clips won't load)
+  opt = opt || {};
+  if (!VOICE.index) { voiceIndexLoad(); return false; }
+  const w = who === 'radio' ? 'op' : who, V = VOICE.index.voices[w]; if (!V) return false;
+  const plan = voicePlan(text, V); if (!plan) return false;
+  const C = mumbleCtx(); if (!C) return false;
+  voiceStop(); const token = VOICE.token;
+  Promise.all(plan.map(k => voiceGet(w, k, V.rev, C))).then(bufs => {
+    if (token !== VOICE.token) return;
+    const out = C.createGain(); out.gain.value = opt.volume == null ? 0.95 : opt.volume * 1.4;
+    if (opt.radio) {   // the same walkie-talkie as the mumble: thin band, a little crunch
+      const hp = C.createBiquadFilter(), lp = C.createBiquadFilter(), sh = C.createWaveShaper(), cv = new Float32Array(256);
+      for (let i = 0; i < 256; i++) { const x = i / 127.5 - 1; cv[i] = Math.tanh(x * 2.2) * 0.8; }
+      hp.type = 'highpass'; hp.frequency.value = 400; lp.type = 'lowpass'; lp.frequency.value = 3200; sh.curve = cv;
+      out.connect(hp); hp.connect(sh); sh.connect(lp); lp.connect(C.destination);
+    } else out.connect(C.destination);
+    let t = C.currentTime + 0.03 + (opt.delay || 0); const srcs = [];
+    for (const b of bufs) { const s = C.createBufferSource(); s.buffer = b; s.connect(out); s.start(t); t += b.duration + (bufs.length > 1 ? 0.04 : 0); srcs.push(s); }
+    VOICE.now = { srcs };
+  }).catch(() => { if (token === VOICE.token && fallback) fallback(); });
+  return true;
+}
+window.__voices = { get index() { return VOICE.index; }, load: voiceIndexLoad, key: voiceKey, segments: voiceSegments, plan: (t, w) => VOICE.index && VOICE.index.voices[w] ? voicePlan(t, VOICE.index.voices[w]) : null, stop: voiceStop };   // (for testing)
 function npcMatch(D, said) {   // best topic for what was typed / said: whole phrases count most, then words (plurals and typos forgiven a little)
   const s = ' ' + said.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ') + ' ', words = s.trim().split(' ');
   if (D === NPC_DEF.op) {
@@ -18786,7 +18867,7 @@ function reply(id, said) {
   const T = npcMatch(D, said); talk(id, T ? T.id : '?', said);
 }
 function listenTalk(id) {
-  const D = NPC_DEF[id]; try { speechSynthesis.cancel(); } catch (e) {} try { mumbleStop(); } catch (e) {}
+  const D = NPC_DEF[id]; try { speechSynthesis.cancel(); } catch (e) {} try { mumbleStop(); voiceStop(); } catch (e) {}
   modal('<h1>' + D.name + '</h1><p style="font-size:18px">🎤 Listening… say something.</p>', [['Cancel', () => { try { window.Android && Android.stopListen && Android.stopListen(); } catch (e) {} talk(id); }]], true);
   voiceListen((t, err) => {
     if (talkWith !== id) return;

@@ -1,0 +1,10 @@
+{
+  "_about": "Voices for the recorded NPC lines (scripts/make_npc_voices.py). speaker: a number from the audition (test/voice-audition.html), or \"auto\" for the audition's top pick. length_scale: above 1 is slower. Changing either re-records that person.",
+  "model": "en_US-libritts-high",
+  "voices": {
+    "op": { "speaker": "auto", "length_scale": 1.0 },
+    "brenda": { "speaker": "auto", "length_scale": 0.95 },
+    "tammy": { "speaker": "auto", "length_scale": 0.95 },
+    "vern": { "speaker": "auto", "length_scale": 1.15 }
+  }
+}
