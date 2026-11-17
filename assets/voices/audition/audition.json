@@ -7,172 +7,204 @@
   "tammy": "Hey! What's up? Just getting these trucks out, then I get to go home."
  },
  "roles": {
-  "op": [
-   {
-    "speaker": 142,
-    "f0": 142.3,
-    "clarity": 0.754
-   },
-   {
-    "speaker": 509,
-    "f0": 139.6,
-    "clarity": 0.751
-   },
-   {
-    "speaker": 106,
-    "f0": 137.0,
-    "clarity": 0.75
-   },
-   {
-    "speaker": 610,
-    "f0": 143.2,
-    "clarity": 0.75
-   },
-   {
-    "speaker": 320,
-    "f0": 140.4,
-    "clarity": 0.747
-   },
-   {
-    "speaker": 598,
-    "f0": 140.4,
-    "clarity": 0.744
-   },
-   {
-    "speaker": 816,
-    "f0": 142.3,
-    "clarity": 0.741
-   },
-   {
-    "speaker": 335,
-    "f0": 140.4,
-    "clarity": 0.74
-   }
-  ],
   "vern": [
    {
-    "speaker": 43,
-    "f0": 129.7,
-    "clarity": 0.738
+    "speaker": 646,
+    "f0": 105.5,
+    "clarity": 0.698,
+    "score": 0.043
    },
    {
-    "speaker": 317,
-    "f0": 134.5,
-    "clarity": 0.731
+    "speaker": 472,
+    "f0": 93.8,
+    "clarity": 0.669,
+    "score": 0.037
    },
    {
-    "speaker": 690,
-    "f0": 135.3,
-    "clarity": 0.731
+    "speaker": 90,
+    "f0": 106.5,
+    "clarity": 0.682,
+    "score": 0.026
    },
    {
-    "speaker": 106,
-    "f0": 137.0,
-    "clarity": 0.75
+    "speaker": 288,
+    "f0": 102.1,
+    "clarity": 0.676,
+    "score": 0.024
    },
    {
-    "speaker": 485,
-    "f0": 137.8,
-    "clarity": 0.74
+    "speaker": 436,
+    "f0": 98.0,
+    "clarity": 0.667,
+    "score": 0.024
    },
    {
-    "speaker": 632,
-    "f0": 138.7,
-    "clarity": 0.735
+    "speaker": 157,
+    "f0": 107.3,
+    "clarity": 0.682,
+    "score": 0.023
    },
    {
-    "speaker": 509,
-    "f0": 139.6,
-    "clarity": 0.751
+    "speaker": 248,
+    "f0": 103.0,
+    "clarity": 0.671,
+    "score": 0.019
    },
    {
-    "speaker": 110,
-    "f0": 139.6,
-    "clarity": 0.734
+    "speaker": 409,
+    "f0": 103.5,
+    "clarity": 0.669,
+    "score": 0.016
    }
   ],
-  "brenda": [
+  "op": [
    {
-    "speaker": 698,
-    "f0": 242.3,
-    "clarity": 0.846
+    "speaker": 769,
+    "f0": 108.1,
+    "clarity": 0.711,
+    "score": 0.05
    },
    {
-    "speaker": 91,
-    "f0": 245.0,
-    "clarity": 0.844
+    "speaker": 462,
+    "f0": 117.9,
+    "clarity": 0.726,
+    "score": 0.049
    },
    {
-    "speaker": 166,
-    "f0": 232.1,
-    "clarity": 0.844
+    "speaker": 809,
+    "f0": 123.2,
+    "clarity": 0.731,
+    "score": 0.045
    },
    {
-    "speaker": 23,
-    "f0": 214.1,
-    "clarity": 0.843
+    "speaker": 303,
+    "f0": 110.8,
+    "clarity": 0.706,
+    "score": 0.04
    },
    {
-    "speaker": 301,
-    "f0": 247.8,
-    "clarity": 0.843
+    "speaker": 297,
+    "f0": 121.8,
+    "clarity": 0.721,
+    "score": 0.039
    },
    {
-    "speaker": 754,
-    "f0": 237.1,
-    "clarity": 0.843
+    "speaker": 72,
+    "f0": 120.5,
+    "clarity": 0.719,
+    "score": 0.038
    },
    {
-    "speaker": 807,
-    "f0": 242.3,
-    "clarity": 0.842
+    "speaker": 374,
+    "f0": 126.0,
+    "clarity": 0.726,
+    "score": 0.037
    },
    {
-    "speaker": 840,
-    "f0": 225.0,
-    "clarity": 0.842
+    "speaker": 838,
+    "f0": 114.0,
+    "clarity": 0.709,
+    "score": 0.037
    }
   ],
   "tammy": [
    {
-    "speaker": 59,
-    "f0": 268.9,
-    "clarity": 0.838
+    "speaker": 23,
+    "f0": 214.1,
+    "clarity": 0.843,
+    "score": 0.053
    },
    {
-    "speaker": 737,
-    "f0": 253.4,
-    "clarity": 0.859
+    "speaker": 108,
+    "f0": 212.0,
+    "clarity": 0.838,
+    "score": 0.051
    },
    {
-    "speaker": 699,
-    "f0": 250.6,
-    "clarity": 0.839
+    "speaker": 840,
+    "f0": 225.0,
+    "clarity": 0.842,
+    "score": 0.045
    },
    {
-    "speaker": 301,
-    "f0": 247.8,
-    "clarity": 0.843
+    "speaker": 443,
+    "f0": 226.2,
+    "clarity": 0.84,
+    "score": 0.041
    },
    {
-    "speaker": 91,
-    "f0": 245.0,
-    "clarity": 0.844
+    "speaker": 354,
+    "f0": 218.3,
+    "clarity": 0.835,
+    "score": 0.04
    },
    {
-    "speaker": 698,
-    "f0": 242.3,
-    "clarity": 0.846
+    "speaker": 123,
+    "f0": 222.7,
+    "clarity": 0.835,
+    "score": 0.039
    },
    {
-    "speaker": 807,
-    "f0": 242.3,
-    "clarity": 0.842
+    "speaker": 166,
+    "f0": 232.1,
+    "clarity": 0.844,
+    "score": 0.038
    },
    {
-    "speaker": 754,
-    "f0": 237.1,
-    "clarity": 0.843
+    "speaker": 553,
+    "f0": 210.0,
+    "clarity": 0.823,
+    "score": 0.037
+   }
+  ],
+  "brenda": [
+   {
+    "speaker": 170,
+    "f0": 202.3,
+    "clarity": 0.839,
+    "score": 0.053
+   },
+   {
+    "speaker": 108,
+    "f0": 212.0,
+    "clarity": 0.838,
+    "score": 0.051
+   },
+   {
+    "speaker": 373,
+    "f0": 196.9,
+    "clarity": 0.829,
+    "score": 0.045
+   },
+   {
+    "speaker": 732,
+    "f0": 188.5,
+    "clarity": 0.818,
+    "score": 0.043
+   },
+   {
+    "speaker": 323,
+    "f0": 173.6,
+    "clarity": 0.796,
+    "score": 0.042
+   },
+   {
+    "speaker": 133,
+    "f0": 200.5,
+    "clarity": 0.824,
+    "score": 0.04
+   },
+   {
+    "speaker": 516,
+    "f0": 190.1,
+    "clarity": 0.819,
+    "score": 0.04
+   },
+   {
+    "speaker": 220,
+    "f0": 198.6,
+    "clarity": 0.823,
+    "score": 0.039
    }
   ]
  },
@@ -4697,5 +4729,6 @@
    "f0": 176.4,
    "clarity": 0.756
   }
- ]
+ ],
+ "pick": 2
 }
