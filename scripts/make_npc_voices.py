@@ -125,6 +125,35 @@ def measure(x, rate):
     return float(np.median(f0s)), float(np.mean(clar))
 
 
+AUDITION_PICK = 2   # bump when the way roles are picked changes: the picks are redone from the saved measurements
+ROLE_PITCH = {'vern': (82, 108), 'op': (100, 126), 'brenda': (172, 212), 'tammy': (205, 250)}   # Hz: deep / low-middle men, lower / higher women
+
+
+def pick_roles(rows, per_role=8):
+    """the cleanest speakers in each role's pitch range. Clarity reads higher for higher voices, so each speaker is compared with
+    the speakers within 10 Hz of it (how much cleaner than its neighbours), not with everyone."""
+    def residual(r):
+        near = sorted(q['clarity'] for q in rows if q['f0'] and abs(q['f0'] - r['f0']) <= 10)
+        return r['clarity'] - near[len(near) // 2]
+    scored = [dict(r, score=round(residual(r), 3)) for r in rows if r['f0']]
+    roles, used = {}, set()
+    for who in ['vern', 'op', 'tammy', 'brenda']:
+        lo, hi = ROLE_PITCH[who]
+        c = sorted([r for r in scored if lo <= r['f0'] <= hi and r['speaker'] not in used], key=lambda r: -r['score'])[:per_role]
+        used.update(r['speaker'] for r in c[:1])
+        roles[who] = c
+    return roles
+
+
+def audition_samples(synth, out_dir, roles):
+    for d in ('op', 'vern', 'brenda', 'tammy'):
+        if (out_dir / d).exists():
+            shutil.rmtree(out_dir / d)
+    for who, cands in roles.items():
+        for r in cands:
+            write_ogg(trim(synth.say(ROLE_SAMPLES[who], r['speaker']), synth.rate), synth.rate, out_dir / who / f"{r['speaker']}.ogg")
+
+
 def audition(synth, out_dir, per_role=8):
     """measure every speaker, keep the best candidates per role, save their samples"""
     rows = []
@@ -134,20 +163,11 @@ def audition(synth, out_dir, per_role=8):
         rows.append({'speaker': sp, 'f0': round(f0, 1), 'clarity': round(c, 3)})
         if sp % 100 == 0:
             print(f'  audition {sp}/{synth.speakers}', flush=True)
-    men = sorted([r for r in rows if 75 <= r['f0'] <= 145], key=lambda r: -r['clarity'])[:per_role * 2]
-    women = sorted([r for r in rows if 165 <= r['f0'] <= 270], key=lambda r: -r['clarity'])[:per_role * 2]
-    # Vern: the deepest of the clean men; Rick: the rest of them, cleanest first. Tammy: the higher women; Brenda: the rest.
-    vern = sorted(men, key=lambda r: r['f0'])[:per_role]
-    rick = [r for r in men if r not in vern[:2]][:per_role]
-    tammy = sorted(women, key=lambda r: -r['f0'])[:per_role]
-    brenda = [r for r in women if r not in tammy[:2]][:per_role]
-    roles = {'op': rick, 'vern': vern, 'brenda': brenda, 'tammy': tammy}
+    roles = pick_roles(rows, per_role)
     if out_dir.exists():
         shutil.rmtree(out_dir)
-    for who, cands in roles.items():
-        for r in cands:
-            write_ogg(trim(synth.say(ROLE_SAMPLES[who], r['speaker']), synth.rate), synth.rate, out_dir / who / f"{r['speaker']}.ogg")
-    data = {'probe': PROBE, 'samples': ROLE_SAMPLES, 'roles': {w: c for w, c in roles.items()}, 'all': rows}
+    audition_samples(synth, out_dir, roles)
+    data = {'pick': AUDITION_PICK, 'probe': PROBE, 'samples': ROLE_SAMPLES, 'roles': roles, 'all': rows}
     (out_dir / 'audition.json').write_text(json.dumps(data, indent=1))
     return data
 
@@ -174,6 +194,13 @@ def main():
         aud = audition(synth, out / 'audition')
     else:
         aud = json.loads(aud_path.read_text())
+        if aud.get('pick') != AUDITION_PICK:   # new way of picking: redo the picks from the saved measurements, and their samples
+            print('Audition: re-picking from the saved measurements', flush=True)
+            aud['roles'] = pick_roles(aud['all'])
+            aud['pick'] = AUDITION_PICK
+            aud['samples'] = ROLE_SAMPLES
+            audition_samples(synth, out / 'audition', aud['roles'])
+            aud_path.write_text(json.dumps(aud, indent=1))
 
     idx_path = out / 'index.json'
     old = json.loads(idx_path.read_text()) if idx_path.exists() else {'voices': {}}
