@@ -1,0 +1,4701 @@
+{
+ "probe": "Hey, the yeast cooler is getting hot. Somebody go shut those doors, okay?",
+ "samples": {
+  "op": "Yeah? Make it useful. The plant does not run on conversation.",
+  "vern": "Belt's tracking left. Keep the pit clear.",
+  "brenda": "Make it quick. Trucks are waiting. If this is about corn, go ask Vern.",
+  "tammy": "Hey! What's up? Just getting these trucks out, then I get to go home."
+ },
+ "roles": {
+  "op": [
+   {
+    "speaker": 142,
+    "f0": 142.3,
+    "clarity": 0.754
+   },
+   {
+    "speaker": 509,
+    "f0": 139.6,
+    "clarity": 0.751
+   },
+   {
+    "speaker": 106,
+    "f0": 137.0,
+    "clarity": 0.75
+   },
+   {
+    "speaker": 610,
+    "f0": 143.2,
+    "clarity": 0.75
+   },
+   {
+    "speaker": 320,
+    "f0": 140.4,
+    "clarity": 0.747
+   },
+   {
+    "speaker": 598,
+    "f0": 140.4,
+    "clarity": 0.744
+   },
+   {
+    "speaker": 816,
+    "f0": 142.3,
+    "clarity": 0.741
+   },
+   {
+    "speaker": 335,
+    "f0": 140.4,
+    "clarity": 0.74
+   }
+  ],
+  "vern": [
+   {
+    "speaker": 43,
+    "f0": 129.7,
+    "clarity": 0.738
+   },
+   {
+    "speaker": 317,
+    "f0": 134.5,
+    "clarity": 0.731
+   },
+   {
+    "speaker": 690,
+    "f0": 135.3,
+    "clarity": 0.731
+   },
+   {
+    "speaker": 106,
+    "f0": 137.0,
+    "clarity": 0.75
+   },
+   {
+    "speaker": 485,
+    "f0": 137.8,
+    "clarity": 0.74
+   },
+   {
+    "speaker": 632,
+    "f0": 138.7,
+    "clarity": 0.735
+   },
+   {
+    "speaker": 509,
+    "f0": 139.6,
+    "clarity": 0.751
+   },
+   {
+    "speaker": 110,
+    "f0": 139.6,
+    "clarity": 0.734
+   }
+  ],
+  "brenda": [
+   {
+    "speaker": 698,
+    "f0": 242.3,
+    "clarity": 0.846
+   },
+   {
+    "speaker": 91,
+    "f0": 245.0,
+    "clarity": 0.844
+   },
+   {
+    "speaker": 166,
+    "f0": 232.1,
+    "clarity": 0.844
+   },
+   {
+    "speaker": 23,
+    "f0": 214.1,
+    "clarity": 0.843
+   },
+   {
+    "speaker": 301,
+    "f0": 247.8,
+    "clarity": 0.843
+   },
+   {
+    "speaker": 754,
+    "f0": 237.1,
+    "clarity": 0.843
+   },
+   {
+    "speaker": 807,
+    "f0": 242.3,
+    "clarity": 0.842
+   },
+   {
+    "speaker": 840,
+    "f0": 225.0,
+    "clarity": 0.842
+   }
+  ],
+  "tammy": [
+   {
+    "speaker": 59,
+    "f0": 268.9,
+    "clarity": 0.838
+   },
+   {
+    "speaker": 737,
+    "f0": 253.4,
+    "clarity": 0.859
+   },
+   {
+    "speaker": 699,
+    "f0": 250.6,
+    "clarity": 0.839
+   },
+   {
+    "speaker": 301,
+    "f0": 247.8,
+    "clarity": 0.843
+   },
+   {
+    "speaker": 91,
+    "f0": 245.0,
+    "clarity": 0.844
+   },
+   {
+    "speaker": 698,
+    "f0": 242.3,
+    "clarity": 0.846
+   },
+   {
+    "speaker": 807,
+    "f0": 242.3,
+    "clarity": 0.842
+   },
+   {
+    "speaker": 754,
+    "f0": 237.1,
+    "clarity": 0.843
+   }
+  ]
+ },
+ "all": [
+  {
+   "speaker": 0,
+   "f0": 186.9,
+   "clarity": 0.747
+  },
+  {
+   "speaker": 1,
+   "f0": 177.8,
+   "clarity": 0.686
+  },
+  {
+   "speaker": 2,
+   "f0": 188.5,
+   "clarity": 0.752
+  },
+  {
+   "speaker": 3,
+   "f0": 110.2,
+   "clarity": 0.597
+  },
+  {
+   "speaker": 4,
+   "f0": 219.4,
+   "clarity": 0.74
+  },
+  {
+   "speaker": 5,
+   "f0": 110.0,
+   "clarity": 0.652
+  },
+  {
+   "speaker": 6,
+   "f0": 114.2,
+   "clarity": 0.675
+  },
+  {
+   "speaker": 7,
+   "f0": 124.6,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 8,
+   "f0": 114.8,
+   "clarity": 0.648
+  },
+  {
+   "speaker": 9,
+   "f0": 239.7,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 10,
+   "f0": 198.6,
+   "clarity": 0.787
+  },
+  {
+   "speaker": 11,
+   "f0": 216.2,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 12,
+   "f0": 229.7,
+   "clarity": 0.63
+  },
+  {
+   "speaker": 13,
+   "f0": 225.0,
+   "clarity": 0.814
+  },
+  {
+   "speaker": 14,
+   "f0": 195.1,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 15,
+   "f0": 237.1,
+   "clarity": 0.748
+  },
+  {
+   "speaker": 16,
+   "f0": 120.8,
+   "clarity": 0.701
+  },
+  {
+   "speaker": 17,
+   "f0": 187.7,
+   "clarity": 0.752
+  },
+  {
+   "speaker": 18,
+   "f0": 220.5,
+   "clarity": 0.808
+  },
+  {
+   "speaker": 19,
+   "f0": 130.5,
+   "clarity": 0.675
+  },
+  {
+   "speaker": 20,
+   "f0": 122.5,
+   "clarity": 0.631
+  },
+  {
+   "speaker": 21,
+   "f0": 237.1,
+   "clarity": 0.819
+  },
+  {
+   "speaker": 22,
+   "f0": 101.6,
+   "clarity": 0.616
+  },
+  {
+   "speaker": 23,
+   "f0": 214.1,
+   "clarity": 0.843
+  },
+  {
+   "speaker": 24,
+   "f0": 140.4,
+   "clarity": 0.703
+  },
+  {
+   "speaker": 25,
+   "f0": 177.8,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 26,
+   "f0": 159.2,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 27,
+   "f0": 106.5,
+   "clarity": 0.627
+  },
+  {
+   "speaker": 28,
+   "f0": 160.9,
+   "clarity": 0.722
+  },
+  {
+   "speaker": 29,
+   "f0": 245.0,
+   "clarity": 0.819
+  },
+  {
+   "speaker": 30,
+   "f0": 218.3,
+   "clarity": 0.703
+  },
+  {
+   "speaker": 31,
+   "f0": 100.2,
+   "clarity": 0.635
+  },
+  {
+   "speaker": 32,
+   "f0": 137.8,
+   "clarity": 0.686
+  },
+  {
+   "speaker": 33,
+   "f0": 190.1,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 34,
+   "f0": 121.2,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 35,
+   "f0": 103.5,
+   "clarity": 0.592
+  },
+  {
+   "speaker": 36,
+   "f0": 176.4,
+   "clarity": 0.722
+  },
+  {
+   "speaker": 37,
+   "f0": 200.5,
+   "clarity": 0.759
+  },
+  {
+   "speaker": 38,
+   "f0": 175.0,
+   "clarity": 0.753
+  },
+  {
+   "speaker": 39,
+   "f0": 222.7,
+   "clarity": 0.773
+  },
+  {
+   "speaker": 40,
+   "f0": 168.3,
+   "clarity": 0.772
+  },
+  {
+   "speaker": 41,
+   "f0": 135.7,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 42,
+   "f0": 95.5,
+   "clarity": 0.629
+  },
+  {
+   "speaker": 43,
+   "f0": 129.7,
+   "clarity": 0.738
+  },
+  {
+   "speaker": 44,
+   "f0": 208.0,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 45,
+   "f0": 202.3,
+   "clarity": 0.812
+  },
+  {
+   "speaker": 46,
+   "f0": 207.0,
+   "clarity": 0.726
+  },
+  {
+   "speaker": 47,
+   "f0": 116.1,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 48,
+   "f0": 132.0,
+   "clarity": 0.666
+  },
+  {
+   "speaker": 49,
+   "f0": 90.7,
+   "clarity": 0.632
+  },
+  {
+   "speaker": 50,
+   "f0": 115.7,
+   "clarity": 0.658
+  },
+  {
+   "speaker": 51,
+   "f0": 108.1,
+   "clarity": 0.67
+  },
+  {
+   "speaker": 52,
+   "f0": 127.5,
+   "clarity": 0.686
+  },
+  {
+   "speaker": 53,
+   "f0": 268.9,
+   "clarity": 0.767
+  },
+  {
+   "speaker": 54,
+   "f0": 126.7,
+   "clarity": 0.702
+  },
+  {
+   "speaker": 55,
+   "f0": 185.3,
+   "clarity": 0.73
+  },
+  {
+   "speaker": 56,
+   "f0": 239.7,
+   "clarity": 0.78
+  },
+  {
+   "speaker": 57,
+   "f0": 128.2,
+   "clarity": 0.729
+  },
+  {
+   "speaker": 58,
+   "f0": 212.0,
+   "clarity": 0.786
+  },
+  {
+   "speaker": 59,
+   "f0": 268.9,
+   "clarity": 0.838
+  },
+  {
+   "speaker": 60,
+   "f0": 246.4,
+   "clarity": 0.789
+  },
+  {
+   "speaker": 61,
+   "f0": 190.1,
+   "clarity": 0.749
+  },
+  {
+   "speaker": 62,
+   "f0": 210.0,
+   "clarity": 0.735
+  },
+  {
+   "speaker": 63,
+   "f0": 190.1,
+   "clarity": 0.786
+  },
+  {
+   "speaker": 64,
+   "f0": 204.2,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 65,
+   "f0": 200.5,
+   "clarity": 0.8
+  },
+  {
+   "speaker": 66,
+   "f0": 142.3,
+   "clarity": 0.717
+  },
+  {
+   "speaker": 67,
+   "f0": 218.3,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 68,
+   "f0": 206.1,
+   "clarity": 0.813
+  },
+  {
+   "speaker": 69,
+   "f0": 144.1,
+   "clarity": 0.622
+  },
+  {
+   "speaker": 70,
+   "f0": 142.3,
+   "clarity": 0.697
+  },
+  {
+   "speaker": 71,
+   "f0": 129.7,
+   "clarity": 0.715
+  },
+  {
+   "speaker": 72,
+   "f0": 120.5,
+   "clarity": 0.719
+  },
+  {
+   "speaker": 73,
+   "f0": 239.7,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 74,
+   "f0": 228.5,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 75,
+   "f0": 208.0,
+   "clarity": 0.805
+  },
+  {
+   "speaker": 76,
+   "f0": 232.1,
+   "clarity": 0.839
+  },
+  {
+   "speaker": 77,
+   "f0": 212.0,
+   "clarity": 0.806
+  },
+  {
+   "speaker": 78,
+   "f0": 149.0,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 79,
+   "f0": 198.6,
+   "clarity": 0.806
+  },
+  {
+   "speaker": 80,
+   "f0": 202.3,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 81,
+   "f0": 133.6,
+   "clarity": 0.696
+  },
+  {
+   "speaker": 82,
+   "f0": 158.6,
+   "clarity": 0.696
+  },
+  {
+   "speaker": 83,
+   "f0": 168.3,
+   "clarity": 0.746
+  },
+  {
+   "speaker": 84,
+   "f0": 222.7,
+   "clarity": 0.78
+  },
+  {
+   "speaker": 85,
+   "f0": 239.7,
+   "clarity": 0.803
+  },
+  {
+   "speaker": 86,
+   "f0": 102.1,
+   "clarity": 0.631
+  },
+  {
+   "speaker": 87,
+   "f0": 177.8,
+   "clarity": 0.709
+  },
+  {
+   "speaker": 88,
+   "f0": 149.0,
+   "clarity": 0.745
+  },
+  {
+   "speaker": 89,
+   "f0": 158.1,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 90,
+   "f0": 106.5,
+   "clarity": 0.682
+  },
+  {
+   "speaker": 91,
+   "f0": 245.0,
+   "clarity": 0.844
+  },
+  {
+   "speaker": 92,
+   "f0": 134.9,
+   "clarity": 0.699
+  },
+  {
+   "speaker": 93,
+   "f0": 198.6,
+   "clarity": 0.772
+  },
+  {
+   "speaker": 94,
+   "f0": 222.7,
+   "clarity": 0.75
+  },
+  {
+   "speaker": 95,
+   "f0": 200.5,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 96,
+   "f0": 190.1,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 97,
+   "f0": 109.2,
+   "clarity": 0.663
+  },
+  {
+   "speaker": 98,
+   "f0": 180.7,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 99,
+   "f0": 206.1,
+   "clarity": 0.797
+  },
+  {
+   "speaker": 100,
+   "f0": 239.7,
+   "clarity": 0.809
+  },
+  {
+   "speaker": 101,
+   "f0": 212.0,
+   "clarity": 0.823
+  },
+  {
+   "speaker": 102,
+   "f0": 142.3,
+   "clarity": 0.707
+  },
+  {
+   "speaker": 103,
+   "f0": 206.1,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 104,
+   "f0": 127.1,
+   "clarity": 0.638
+  },
+  {
+   "speaker": 105,
+   "f0": 115.2,
+   "clarity": 0.638
+  },
+  {
+   "speaker": 106,
+   "f0": 137.0,
+   "clarity": 0.75
+  },
+  {
+   "speaker": 107,
+   "f0": 234.6,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 108,
+   "f0": 212.0,
+   "clarity": 0.838
+  },
+  {
+   "speaker": 109,
+   "f0": 214.1,
+   "clarity": 0.797
+  },
+  {
+   "speaker": 110,
+   "f0": 139.6,
+   "clarity": 0.734
+  },
+  {
+   "speaker": 111,
+   "f0": 164.6,
+   "clarity": 0.742
+  },
+  {
+   "speaker": 112,
+   "f0": 193.4,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 113,
+   "f0": 98.4,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 114,
+   "f0": 159.8,
+   "clarity": 0.704
+  },
+  {
+   "speaker": 115,
+   "f0": 220.5,
+   "clarity": 0.754
+  },
+  {
+   "speaker": 116,
+   "f0": 109.7,
+   "clarity": 0.665
+  },
+  {
+   "speaker": 117,
+   "f0": 114.2,
+   "clarity": 0.66
+  },
+  {
+   "speaker": 118,
+   "f0": 210.0,
+   "clarity": 0.811
+  },
+  {
+   "speaker": 119,
+   "f0": 188.5,
+   "clarity": 0.724
+  },
+  {
+   "speaker": 120,
+   "f0": 167.0,
+   "clarity": 0.761
+  },
+  {
+   "speaker": 121,
+   "f0": 195.1,
+   "clarity": 0.817
+  },
+  {
+   "speaker": 122,
+   "f0": 128.2,
+   "clarity": 0.666
+  },
+  {
+   "speaker": 123,
+   "f0": 222.7,
+   "clarity": 0.835
+  },
+  {
+   "speaker": 124,
+   "f0": 116.7,
+   "clarity": 0.707
+  },
+  {
+   "speaker": 125,
+   "f0": 126.7,
+   "clarity": 0.667
+  },
+  {
+   "speaker": 126,
+   "f0": 201.4,
+   "clarity": 0.741
+  },
+  {
+   "speaker": 127,
+   "f0": 189.3,
+   "clarity": 0.749
+  },
+  {
+   "speaker": 128,
+   "f0": 212.0,
+   "clarity": 0.74
+  },
+  {
+   "speaker": 129,
+   "f0": 229.7,
+   "clarity": 0.834
+  },
+  {
+   "speaker": 130,
+   "f0": 191.7,
+   "clarity": 0.743
+  },
+  {
+   "speaker": 131,
+   "f0": 168.3,
+   "clarity": 0.77
+  },
+  {
+   "speaker": 132,
+   "f0": 96.7,
+   "clarity": 0.623
+  },
+  {
+   "speaker": 133,
+   "f0": 200.5,
+   "clarity": 0.824
+  },
+  {
+   "speaker": 134,
+   "f0": 128.2,
+   "clarity": 0.705
+  },
+  {
+   "speaker": 135,
+   "f0": 104.5,
+   "clarity": 0.654
+  },
+  {
+   "speaker": 136,
+   "f0": 109.7,
+   "clarity": 0.694
+  },
+  {
+   "speaker": 137,
+   "f0": 90.7,
+   "clarity": 0.597
+  },
+  {
+   "speaker": 138,
+   "f0": 212.0,
+   "clarity": 0.759
+  },
+  {
+   "speaker": 139,
+   "f0": 115.1,
+   "clarity": 0.679
+  },
+  {
+   "speaker": 140,
+   "f0": 239.7,
+   "clarity": 0.743
+  },
+  {
+   "speaker": 141,
+   "f0": 233.3,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 142,
+   "f0": 142.3,
+   "clarity": 0.754
+  },
+  {
+   "speaker": 143,
+   "f0": 190.1,
+   "clarity": 0.683
+  },
+  {
+   "speaker": 144,
+   "f0": 185.3,
+   "clarity": 0.795
+  },
+  {
+   "speaker": 145,
+   "f0": 211.0,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 146,
+   "f0": 128.9,
+   "clarity": 0.708
+  },
+  {
+   "speaker": 147,
+   "f0": 129.7,
+   "clarity": 0.723
+  },
+  {
+   "speaker": 148,
+   "f0": 225.0,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 149,
+   "f0": 245.0,
+   "clarity": 0.81
+  },
+  {
+   "speaker": 150,
+   "f0": 214.1,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 151,
+   "f0": 262.5,
+   "clarity": 0.836
+  },
+  {
+   "speaker": 152,
+   "f0": 134.9,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 153,
+   "f0": 190.1,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 154,
+   "f0": 196.9,
+   "clarity": 0.806
+  },
+  {
+   "speaker": 155,
+   "f0": 154.2,
+   "clarity": 0.721
+  },
+  {
+   "speaker": 156,
+   "f0": 118.5,
+   "clarity": 0.66
+  },
+  {
+   "speaker": 157,
+   "f0": 107.3,
+   "clarity": 0.682
+  },
+  {
+   "speaker": 158,
+   "f0": 193.4,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 159,
+   "f0": 156.4,
+   "clarity": 0.766
+  },
+  {
+   "speaker": 160,
+   "f0": 183.8,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 161,
+   "f0": 204.2,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 162,
+   "f0": 228.5,
+   "clarity": 0.801
+  },
+  {
+   "speaker": 163,
+   "f0": 146.0,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 164,
+   "f0": 196.9,
+   "clarity": 0.79
+  },
+  {
+   "speaker": 165,
+   "f0": 195.1,
+   "clarity": 0.547
+  },
+  {
+   "speaker": 166,
+   "f0": 232.1,
+   "clarity": 0.844
+  },
+  {
+   "speaker": 167,
+   "f0": 227.3,
+   "clarity": 0.806
+  },
+  {
+   "speaker": 168,
+   "f0": 122.8,
+   "clarity": 0.696
+  },
+  {
+   "speaker": 169,
+   "f0": 195.1,
+   "clarity": 0.693
+  },
+  {
+   "speaker": 170,
+   "f0": 202.3,
+   "clarity": 0.839
+  },
+  {
+   "speaker": 171,
+   "f0": 204.2,
+   "clarity": 0.82
+  },
+  {
+   "speaker": 172,
+   "f0": 234.6,
+   "clarity": 0.807
+  },
+  {
+   "speaker": 173,
+   "f0": 136.1,
+   "clarity": 0.7
+  },
+  {
+   "speaker": 174,
+   "f0": 122.5,
+   "clarity": 0.678
+  },
+  {
+   "speaker": 175,
+   "f0": 167.0,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 176,
+   "f0": 141.8,
+   "clarity": 0.686
+  },
+  {
+   "speaker": 177,
+   "f0": 227.3,
+   "clarity": 0.815
+  },
+  {
+   "speaker": 178,
+   "f0": 184.5,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 179,
+   "f0": 210.0,
+   "clarity": 0.801
+  },
+  {
+   "speaker": 180,
+   "f0": 232.1,
+   "clarity": 0.793
+  },
+  {
+   "speaker": 181,
+   "f0": 109.4,
+   "clarity": 0.63
+  },
+  {
+   "speaker": 182,
+   "f0": 98.0,
+   "clarity": 0.638
+  },
+  {
+   "speaker": 183,
+   "f0": 135.3,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 184,
+   "f0": 178.5,
+   "clarity": 0.769
+  },
+  {
+   "speaker": 185,
+   "f0": 173.6,
+   "clarity": 0.667
+  },
+  {
+   "speaker": 186,
+   "f0": 102.3,
+   "clarity": 0.62
+  },
+  {
+   "speaker": 187,
+   "f0": 112.8,
+   "clarity": 0.683
+  },
+  {
+   "speaker": 188,
+   "f0": 204.2,
+   "clarity": 0.714
+  },
+  {
+   "speaker": 189,
+   "f0": 131.2,
+   "clarity": 0.719
+  },
+  {
+   "speaker": 190,
+   "f0": 132.8,
+   "clarity": 0.718
+  },
+  {
+   "speaker": 191,
+   "f0": 127.8,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 192,
+   "f0": 196.0,
+   "clarity": 0.792
+  },
+  {
+   "speaker": 193,
+   "f0": 212.0,
+   "clarity": 0.777
+  },
+  {
+   "speaker": 194,
+   "f0": 188.5,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 195,
+   "f0": 239.7,
+   "clarity": 0.828
+  },
+  {
+   "speaker": 196,
+   "f0": 175.0,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 197,
+   "f0": 170.9,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 198,
+   "f0": 113.1,
+   "clarity": 0.704
+  },
+  {
+   "speaker": 199,
+   "f0": 130.9,
+   "clarity": 0.66
+  },
+  {
+   "speaker": 200,
+   "f0": 113.1,
+   "clarity": 0.651
+  },
+  {
+   "speaker": 201,
+   "f0": 139.6,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 202,
+   "f0": 185.3,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 203,
+   "f0": 137.4,
+   "clarity": 0.696
+  },
+  {
+   "speaker": 204,
+   "f0": 118.5,
+   "clarity": 0.693
+  },
+  {
+   "speaker": 205,
+   "f0": 204.2,
+   "clarity": 0.816
+  },
+  {
+   "speaker": 206,
+   "f0": 183.8,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 207,
+   "f0": 239.7,
+   "clarity": 0.829
+  },
+  {
+   "speaker": 208,
+   "f0": 162.1,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 209,
+   "f0": 134.5,
+   "clarity": 0.701
+  },
+  {
+   "speaker": 210,
+   "f0": 210.0,
+   "clarity": 0.758
+  },
+  {
+   "speaker": 211,
+   "f0": 204.2,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 212,
+   "f0": 119.8,
+   "clarity": 0.698
+  },
+  {
+   "speaker": 213,
+   "f0": 183.8,
+   "clarity": 0.776
+  },
+  {
+   "speaker": 214,
+   "f0": 202.3,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 215,
+   "f0": 198.6,
+   "clarity": 0.8
+  },
+  {
+   "speaker": 216,
+   "f0": 138.7,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 217,
+   "f0": 107.0,
+   "clarity": 0.657
+  },
+  {
+   "speaker": 218,
+   "f0": 173.6,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 219,
+   "f0": 120.5,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 220,
+   "f0": 198.6,
+   "clarity": 0.823
+  },
+  {
+   "speaker": 221,
+   "f0": 156.4,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 222,
+   "f0": 120.5,
+   "clarity": 0.592
+  },
+  {
+   "speaker": 223,
+   "f0": 146.0,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 224,
+   "f0": 216.2,
+   "clarity": 0.797
+  },
+  {
+   "speaker": 225,
+   "f0": 128.9,
+   "clarity": 0.677
+  },
+  {
+   "speaker": 226,
+   "f0": 198.6,
+   "clarity": 0.794
+  },
+  {
+   "speaker": 227,
+   "f0": 103.0,
+   "clarity": 0.655
+  },
+  {
+   "speaker": 228,
+   "f0": 229.7,
+   "clarity": 0.817
+  },
+  {
+   "speaker": 229,
+   "f0": 206.1,
+   "clarity": 0.789
+  },
+  {
+   "speaker": 230,
+   "f0": 148.0,
+   "clarity": 0.739
+  },
+  {
+   "speaker": 231,
+   "f0": 125.3,
+   "clarity": 0.637
+  },
+  {
+   "speaker": 232,
+   "f0": 111.1,
+   "clarity": 0.652
+  },
+  {
+   "speaker": 233,
+   "f0": 118.9,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 234,
+   "f0": 214.1,
+   "clarity": 0.795
+  },
+  {
+   "speaker": 235,
+   "f0": 179.3,
+   "clarity": 0.776
+  },
+  {
+   "speaker": 236,
+   "f0": 176.4,
+   "clarity": 0.71
+  },
+  {
+   "speaker": 237,
+   "f0": 180.0,
+   "clarity": 0.723
+  },
+  {
+   "speaker": 238,
+   "f0": 205.1,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 239,
+   "f0": 173.6,
+   "clarity": 0.753
+  },
+  {
+   "speaker": 240,
+   "f0": 191.7,
+   "clarity": 0.789
+  },
+  {
+   "speaker": 241,
+   "f0": 200.5,
+   "clarity": 0.764
+  },
+  {
+   "speaker": 242,
+   "f0": 172.3,
+   "clarity": 0.763
+  },
+  {
+   "speaker": 243,
+   "f0": 123.2,
+   "clarity": 0.674
+  },
+  {
+   "speaker": 244,
+   "f0": 158.6,
+   "clarity": 0.772
+  },
+  {
+   "speaker": 245,
+   "f0": 159.8,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 246,
+   "f0": 119.8,
+   "clarity": 0.606
+  },
+  {
+   "speaker": 247,
+   "f0": 206.1,
+   "clarity": 0.8
+  },
+  {
+   "speaker": 248,
+   "f0": 103.0,
+   "clarity": 0.671
+  },
+  {
+   "speaker": 249,
+   "f0": 180.0,
+   "clarity": 0.74
+  },
+  {
+   "speaker": 250,
+   "f0": 230.9,
+   "clarity": 0.837
+  },
+  {
+   "speaker": 251,
+   "f0": 210.0,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 252,
+   "f0": 210.0,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 253,
+   "f0": 132.8,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 254,
+   "f0": 191.7,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 255,
+   "f0": 186.9,
+   "clarity": 0.755
+  },
+  {
+   "speaker": 256,
+   "f0": 132.8,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 257,
+   "f0": 126.7,
+   "clarity": 0.652
+  },
+  {
+   "speaker": 258,
+   "f0": 200.5,
+   "clarity": 0.704
+  },
+  {
+   "speaker": 259,
+   "f0": 117.3,
+   "clarity": 0.677
+  },
+  {
+   "speaker": 260,
+   "f0": 173.6,
+   "clarity": 0.754
+  },
+  {
+   "speaker": 261,
+   "f0": 124.6,
+   "clarity": 0.673
+  },
+  {
+   "speaker": 262,
+   "f0": 180.7,
+   "clarity": 0.749
+  },
+  {
+   "speaker": 263,
+   "f0": 176.4,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 264,
+   "f0": 129.7,
+   "clarity": 0.698
+  },
+  {
+   "speaker": 265,
+   "f0": 229.7,
+   "clarity": 0.821
+  },
+  {
+   "speaker": 266,
+   "f0": 193.4,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 267,
+   "f0": 222.7,
+   "clarity": 0.781
+  },
+  {
+   "speaker": 268,
+   "f0": 187.7,
+   "clarity": 0.727
+  },
+  {
+   "speaker": 269,
+   "f0": 106.0,
+   "clarity": 0.664
+  },
+  {
+   "speaker": 270,
+   "f0": 152.1,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 271,
+   "f0": 148.0,
+   "clarity": 0.736
+  },
+  {
+   "speaker": 272,
+   "f0": 128.9,
+   "clarity": 0.678
+  },
+  {
+   "speaker": 273,
+   "f0": 202.3,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 274,
+   "f0": 182.2,
+   "clarity": 0.714
+  },
+  {
+   "speaker": 275,
+   "f0": 136.1,
+   "clarity": 0.678
+  },
+  {
+   "speaker": 276,
+   "f0": 191.7,
+   "clarity": 0.78
+  },
+  {
+   "speaker": 277,
+   "f0": 182.2,
+   "clarity": 0.754
+  },
+  {
+   "speaker": 278,
+   "f0": 103.5,
+   "clarity": 0.656
+  },
+  {
+   "speaker": 279,
+   "f0": 183.8,
+   "clarity": 0.717
+  },
+  {
+   "speaker": 280,
+   "f0": 212.0,
+   "clarity": 0.823
+  },
+  {
+   "speaker": 281,
+   "f0": 222.7,
+   "clarity": 0.82
+  },
+  {
+   "speaker": 282,
+   "f0": 195.1,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 283,
+   "f0": 256.4,
+   "clarity": 0.789
+  },
+  {
+   "speaker": 284,
+   "f0": 139.6,
+   "clarity": 0.65
+  },
+  {
+   "speaker": 285,
+   "f0": 245.0,
+   "clarity": 0.836
+  },
+  {
+   "speaker": 286,
+   "f0": 127.5,
+   "clarity": 0.72
+  },
+  {
+   "speaker": 287,
+   "f0": 127.5,
+   "clarity": 0.696
+  },
+  {
+   "speaker": 288,
+   "f0": 102.1,
+   "clarity": 0.676
+  },
+  {
+   "speaker": 289,
+   "f0": 132.8,
+   "clarity": 0.709
+  },
+  {
+   "speaker": 290,
+   "f0": 206.1,
+   "clarity": 0.68
+  },
+  {
+   "speaker": 291,
+   "f0": 164.6,
+   "clarity": 0.748
+  },
+  {
+   "speaker": 292,
+   "f0": 179.3,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 293,
+   "f0": 134.5,
+   "clarity": 0.611
+  },
+  {
+   "speaker": 294,
+   "f0": 165.8,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 295,
+   "f0": 120.5,
+   "clarity": 0.703
+  },
+  {
+   "speaker": 296,
+   "f0": 101.4,
+   "clarity": 0.628
+  },
+  {
+   "speaker": 297,
+   "f0": 121.8,
+   "clarity": 0.721
+  },
+  {
+   "speaker": 298,
+   "f0": 210.0,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 299,
+   "f0": 206.1,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 300,
+   "f0": 145.1,
+   "clarity": 0.702
+  },
+  {
+   "speaker": 301,
+   "f0": 247.8,
+   "clarity": 0.843
+  },
+  {
+   "speaker": 302,
+   "f0": 195.1,
+   "clarity": 0.774
+  },
+  {
+   "speaker": 303,
+   "f0": 110.8,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 304,
+   "f0": 110.8,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 305,
+   "f0": 208.0,
+   "clarity": 0.817
+  },
+  {
+   "speaker": 306,
+   "f0": 200.5,
+   "clarity": 0.799
+  },
+  {
+   "speaker": 307,
+   "f0": 256.4,
+   "clarity": 0.817
+  },
+  {
+   "speaker": 308,
+   "f0": 147.5,
+   "clarity": 0.754
+  },
+  {
+   "speaker": 309,
+   "f0": 177.8,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 310,
+   "f0": 210.0,
+   "clarity": 0.748
+  },
+  {
+   "speaker": 311,
+   "f0": 200.5,
+   "clarity": 0.821
+  },
+  {
+   "speaker": 312,
+   "f0": 198.6,
+   "clarity": 0.811
+  },
+  {
+   "speaker": 313,
+   "f0": 214.1,
+   "clarity": 0.808
+  },
+  {
+   "speaker": 314,
+   "f0": 203.2,
+   "clarity": 0.756
+  },
+  {
+   "speaker": 315,
+   "f0": 256.4,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 316,
+   "f0": 225.0,
+   "clarity": 0.764
+  },
+  {
+   "speaker": 317,
+   "f0": 134.5,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 318,
+   "f0": 131.2,
+   "clarity": 0.689
+  },
+  {
+   "speaker": 319,
+   "f0": 200.5,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 320,
+   "f0": 140.4,
+   "clarity": 0.747
+  },
+  {
+   "speaker": 321,
+   "f0": 218.3,
+   "clarity": 0.72
+  },
+  {
+   "speaker": 322,
+   "f0": 212.0,
+   "clarity": 0.799
+  },
+  {
+   "speaker": 323,
+   "f0": 173.6,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 324,
+   "f0": 172.3,
+   "clarity": 0.761
+  },
+  {
+   "speaker": 325,
+   "f0": 198.6,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 326,
+   "f0": 117.3,
+   "clarity": 0.688
+  },
+  {
+   "speaker": 327,
+   "f0": 122.2,
+   "clarity": 0.639
+  },
+  {
+   "speaker": 328,
+   "f0": 142.3,
+   "clarity": 0.657
+  },
+  {
+   "speaker": 329,
+   "f0": 130.5,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 330,
+   "f0": 127.8,
+   "clarity": 0.677
+  },
+  {
+   "speaker": 331,
+   "f0": 188.5,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 332,
+   "f0": 98.9,
+   "clarity": 0.585
+  },
+  {
+   "speaker": 333,
+   "f0": 165.8,
+   "clarity": 0.754
+  },
+  {
+   "speaker": 334,
+   "f0": 118.5,
+   "clarity": 0.689
+  },
+  {
+   "speaker": 335,
+   "f0": 140.4,
+   "clarity": 0.74
+  },
+  {
+   "speaker": 336,
+   "f0": 229.7,
+   "clarity": 0.772
+  },
+  {
+   "speaker": 337,
+   "f0": 137.0,
+   "clarity": 0.636
+  },
+  {
+   "speaker": 338,
+   "f0": 135.3,
+   "clarity": 0.662
+  },
+  {
+   "speaker": 339,
+   "f0": 91.7,
+   "clarity": 0.626
+  },
+  {
+   "speaker": 340,
+   "f0": 202.3,
+   "clarity": 0.78
+  },
+  {
+   "speaker": 341,
+   "f0": 109.7,
+   "clarity": 0.673
+  },
+  {
+   "speaker": 342,
+   "f0": 98.4,
+   "clarity": 0.649
+  },
+  {
+   "speaker": 343,
+   "f0": 223.9,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 344,
+   "f0": 195.1,
+   "clarity": 0.763
+  },
+  {
+   "speaker": 345,
+   "f0": 193.4,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 346,
+   "f0": 156.4,
+   "clarity": 0.756
+  },
+  {
+   "speaker": 347,
+   "f0": 177.1,
+   "clarity": 0.729
+  },
+  {
+   "speaker": 348,
+   "f0": 190.1,
+   "clarity": 0.769
+  },
+  {
+   "speaker": 349,
+   "f0": 159.8,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 350,
+   "f0": 129.7,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 351,
+   "f0": 254.9,
+   "clarity": 0.828
+  },
+  {
+   "speaker": 352,
+   "f0": 200.5,
+   "clarity": 0.81
+  },
+  {
+   "speaker": 353,
+   "f0": 118.9,
+   "clarity": 0.591
+  },
+  {
+   "speaker": 354,
+   "f0": 218.3,
+   "clarity": 0.835
+  },
+  {
+   "speaker": 355,
+   "f0": 245.0,
+   "clarity": 0.819
+  },
+  {
+   "speaker": 356,
+   "f0": 191.7,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 357,
+   "f0": 131.2,
+   "clarity": 0.671
+  },
+  {
+   "speaker": 358,
+   "f0": 136.1,
+   "clarity": 0.688
+  },
+  {
+   "speaker": 359,
+   "f0": 250.6,
+   "clarity": 0.807
+  },
+  {
+   "speaker": 360,
+   "f0": 121.2,
+   "clarity": 0.672
+  },
+  {
+   "speaker": 361,
+   "f0": 151.0,
+   "clarity": 0.758
+  },
+  {
+   "speaker": 362,
+   "f0": 141.3,
+   "clarity": 0.703
+  },
+  {
+   "speaker": 363,
+   "f0": 154.2,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 364,
+   "f0": 151.0,
+   "clarity": 0.739
+  },
+  {
+   "speaker": 365,
+   "f0": 160.9,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 366,
+   "f0": 191.7,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 367,
+   "f0": 147.0,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 368,
+   "f0": 138.7,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 369,
+   "f0": 134.5,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 370,
+   "f0": 222.7,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 371,
+   "f0": 116.7,
+   "clarity": 0.672
+  },
+  {
+   "speaker": 372,
+   "f0": 211.0,
+   "clarity": 0.758
+  },
+  {
+   "speaker": 373,
+   "f0": 196.9,
+   "clarity": 0.829
+  },
+  {
+   "speaker": 374,
+   "f0": 126.0,
+   "clarity": 0.726
+  },
+  {
+   "speaker": 375,
+   "f0": 117.9,
+   "clarity": 0.712
+  },
+  {
+   "speaker": 376,
+   "f0": 199.6,
+   "clarity": 0.792
+  },
+  {
+   "speaker": 377,
+   "f0": 226.2,
+   "clarity": 0.737
+  },
+  {
+   "speaker": 378,
+   "f0": 249.2,
+   "clarity": 0.734
+  },
+  {
+   "speaker": 379,
+   "f0": 167.0,
+   "clarity": 0.744
+  },
+  {
+   "speaker": 380,
+   "f0": 98.4,
+   "clarity": 0.593
+  },
+  {
+   "speaker": 381,
+   "f0": 218.3,
+   "clarity": 0.793
+  },
+  {
+   "speaker": 382,
+   "f0": 204.2,
+   "clarity": 0.787
+  },
+  {
+   "speaker": 383,
+   "f0": 185.3,
+   "clarity": 0.735
+  },
+  {
+   "speaker": 384,
+   "f0": 198.6,
+   "clarity": 0.776
+  },
+  {
+   "speaker": 385,
+   "f0": 110.8,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 386,
+   "f0": 136.1,
+   "clarity": 0.719
+  },
+  {
+   "speaker": 387,
+   "f0": 175.0,
+   "clarity": 0.745
+  },
+  {
+   "speaker": 388,
+   "f0": 121.2,
+   "clarity": 0.694
+  },
+  {
+   "speaker": 389,
+   "f0": 200.5,
+   "clarity": 0.762
+  },
+  {
+   "speaker": 390,
+   "f0": 149.5,
+   "clarity": 0.781
+  },
+  {
+   "speaker": 391,
+   "f0": 155.3,
+   "clarity": 0.741
+  },
+  {
+   "speaker": 392,
+   "f0": 131.2,
+   "clarity": 0.7
+  },
+  {
+   "speaker": 393,
+   "f0": 139.6,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 394,
+   "f0": 139.6,
+   "clarity": 0.717
+  },
+  {
+   "speaker": 395,
+   "f0": 124.6,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 396,
+   "f0": 245.0,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 397,
+   "f0": 154.2,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 398,
+   "f0": 147.0,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 399,
+   "f0": 106.0,
+   "clarity": 0.643
+  },
+  {
+   "speaker": 400,
+   "f0": 104.5,
+   "clarity": 0.645
+  },
+  {
+   "speaker": 401,
+   "f0": 133.2,
+   "clarity": 0.722
+  },
+  {
+   "speaker": 402,
+   "f0": 126.7,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 403,
+   "f0": 183.8,
+   "clarity": 0.753
+  },
+  {
+   "speaker": 404,
+   "f0": 137.8,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 405,
+   "f0": 122.5,
+   "clarity": 0.7
+  },
+  {
+   "speaker": 406,
+   "f0": 117.9,
+   "clarity": 0.682
+  },
+  {
+   "speaker": 407,
+   "f0": 151.0,
+   "clarity": 0.724
+  },
+  {
+   "speaker": 408,
+   "f0": 222.7,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 409,
+   "f0": 103.5,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 410,
+   "f0": 111.9,
+   "clarity": 0.675
+  },
+  {
+   "speaker": 411,
+   "f0": 172.3,
+   "clarity": 0.788
+  },
+  {
+   "speaker": 412,
+   "f0": 190.1,
+   "clarity": 0.737
+  },
+  {
+   "speaker": 413,
+   "f0": 106.0,
+   "clarity": 0.665
+  },
+  {
+   "speaker": 414,
+   "f0": 130.5,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 415,
+   "f0": 128.2,
+   "clarity": 0.722
+  },
+  {
+   "speaker": 416,
+   "f0": 124.6,
+   "clarity": 0.661
+  },
+  {
+   "speaker": 417,
+   "f0": 157.5,
+   "clarity": 0.704
+  },
+  {
+   "speaker": 418,
+   "f0": 111.4,
+   "clarity": 0.661
+  },
+  {
+   "speaker": 419,
+   "f0": 180.7,
+   "clarity": 0.795
+  },
+  {
+   "speaker": 420,
+   "f0": 193.4,
+   "clarity": 0.668
+  },
+  {
+   "speaker": 421,
+   "f0": 242.3,
+   "clarity": 0.83
+  },
+  {
+   "speaker": 422,
+   "f0": 175.0,
+   "clarity": 0.723
+  },
+  {
+   "speaker": 423,
+   "f0": 108.1,
+   "clarity": 0.659
+  },
+  {
+   "speaker": 424,
+   "f0": 128.2,
+   "clarity": 0.655
+  },
+  {
+   "speaker": 425,
+   "f0": 193.4,
+   "clarity": 0.726
+  },
+  {
+   "speaker": 426,
+   "f0": 141.3,
+   "clarity": 0.722
+  },
+  {
+   "speaker": 427,
+   "f0": 106.3,
+   "clarity": 0.666
+  },
+  {
+   "speaker": 428,
+   "f0": 140.0,
+   "clarity": 0.705
+  },
+  {
+   "speaker": 429,
+   "f0": 109.7,
+   "clarity": 0.678
+  },
+  {
+   "speaker": 430,
+   "f0": 119.8,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 431,
+   "f0": 172.3,
+   "clarity": 0.74
+  },
+  {
+   "speaker": 432,
+   "f0": 108.9,
+   "clarity": 0.666
+  },
+  {
+   "speaker": 433,
+   "f0": 127.5,
+   "clarity": 0.682
+  },
+  {
+   "speaker": 434,
+   "f0": 177.8,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 435,
+   "f0": 196.0,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 436,
+   "f0": 98.0,
+   "clarity": 0.667
+  },
+  {
+   "speaker": 437,
+   "f0": 156.4,
+   "clarity": 0.734
+  },
+  {
+   "speaker": 438,
+   "f0": 132.8,
+   "clarity": 0.705
+  },
+  {
+   "speaker": 439,
+   "f0": 238.4,
+   "clarity": 0.827
+  },
+  {
+   "speaker": 440,
+   "f0": 190.1,
+   "clarity": 0.737
+  },
+  {
+   "speaker": 441,
+   "f0": 147.0,
+   "clarity": 0.677
+  },
+  {
+   "speaker": 442,
+   "f0": 136.5,
+   "clarity": 0.674
+  },
+  {
+   "speaker": 443,
+   "f0": 226.2,
+   "clarity": 0.84
+  },
+  {
+   "speaker": 444,
+   "f0": 218.3,
+   "clarity": 0.803
+  },
+  {
+   "speaker": 445,
+   "f0": 126.0,
+   "clarity": 0.694
+  },
+  {
+   "speaker": 446,
+   "f0": 220.5,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 447,
+   "f0": 212.0,
+   "clarity": 0.773
+  },
+  {
+   "speaker": 448,
+   "f0": 245.0,
+   "clarity": 0.771
+  },
+  {
+   "speaker": 449,
+   "f0": 229.7,
+   "clarity": 0.841
+  },
+  {
+   "speaker": 450,
+   "f0": 187.7,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 451,
+   "f0": 108.6,
+   "clarity": 0.668
+  },
+  {
+   "speaker": 452,
+   "f0": 247.8,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 453,
+   "f0": 130.1,
+   "clarity": 0.648
+  },
+  {
+   "speaker": 454,
+   "f0": 222.7,
+   "clarity": 0.795
+  },
+  {
+   "speaker": 455,
+   "f0": 147.0,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 456,
+   "f0": 164.6,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 457,
+   "f0": 204.2,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 458,
+   "f0": 116.1,
+   "clarity": 0.639
+  },
+  {
+   "speaker": 459,
+   "f0": 129.7,
+   "clarity": 0.684
+  },
+  {
+   "speaker": 460,
+   "f0": 186.9,
+   "clarity": 0.758
+  },
+  {
+   "speaker": 461,
+   "f0": 168.3,
+   "clarity": 0.759
+  },
+  {
+   "speaker": 462,
+   "f0": 117.9,
+   "clarity": 0.726
+  },
+  {
+   "speaker": 463,
+   "f0": 205.1,
+   "clarity": 0.746
+  },
+  {
+   "speaker": 464,
+   "f0": 142.3,
+   "clarity": 0.724
+  },
+  {
+   "speaker": 465,
+   "f0": 219.4,
+   "clarity": 0.817
+  },
+  {
+   "speaker": 466,
+   "f0": 191.7,
+   "clarity": 0.788
+  },
+  {
+   "speaker": 467,
+   "f0": 190.1,
+   "clarity": 0.806
+  },
+  {
+   "speaker": 468,
+   "f0": 175.0,
+   "clarity": 0.764
+  },
+  {
+   "speaker": 469,
+   "f0": 169.6,
+   "clarity": 0.738
+  },
+  {
+   "speaker": 470,
+   "f0": 200.5,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 471,
+   "f0": 125.3,
+   "clarity": 0.693
+  },
+  {
+   "speaker": 472,
+   "f0": 93.8,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 473,
+   "f0": 115.1,
+   "clarity": 0.7
+  },
+  {
+   "speaker": 474,
+   "f0": 169.6,
+   "clarity": 0.772
+  },
+  {
+   "speaker": 475,
+   "f0": 163.3,
+   "clarity": 0.662
+  },
+  {
+   "speaker": 476,
+   "f0": 122.5,
+   "clarity": 0.626
+  },
+  {
+   "speaker": 477,
+   "f0": 159.8,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 478,
+   "f0": 103.5,
+   "clarity": 0.623
+  },
+  {
+   "speaker": 479,
+   "f0": 184.5,
+   "clarity": 0.786
+  },
+  {
+   "speaker": 480,
+   "f0": 113.1,
+   "clarity": 0.701
+  },
+  {
+   "speaker": 481,
+   "f0": 163.3,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 482,
+   "f0": 117.6,
+   "clarity": 0.703
+  },
+  {
+   "speaker": 483,
+   "f0": 113.7,
+   "clarity": 0.656
+  },
+  {
+   "speaker": 484,
+   "f0": 200.5,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 485,
+   "f0": 137.8,
+   "clarity": 0.74
+  },
+  {
+   "speaker": 486,
+   "f0": 211.0,
+   "clarity": 0.737
+  },
+  {
+   "speaker": 487,
+   "f0": 218.3,
+   "clarity": 0.766
+  },
+  {
+   "speaker": 488,
+   "f0": 123.2,
+   "clarity": 0.662
+  },
+  {
+   "speaker": 489,
+   "f0": 143.2,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 490,
+   "f0": 124.9,
+   "clarity": 0.648
+  },
+  {
+   "speaker": 491,
+   "f0": 126.7,
+   "clarity": 0.688
+  },
+  {
+   "speaker": 492,
+   "f0": 196.0,
+   "clarity": 0.671
+  },
+  {
+   "speaker": 493,
+   "f0": 190.1,
+   "clarity": 0.792
+  },
+  {
+   "speaker": 494,
+   "f0": 130.5,
+   "clarity": 0.73
+  },
+  {
+   "speaker": 495,
+   "f0": 114.9,
+   "clarity": 0.61
+  },
+  {
+   "speaker": 496,
+   "f0": 128.2,
+   "clarity": 0.72
+  },
+  {
+   "speaker": 497,
+   "f0": 114.2,
+   "clarity": 0.699
+  },
+  {
+   "speaker": 498,
+   "f0": 84.5,
+   "clarity": 0.615
+  },
+  {
+   "speaker": 499,
+   "f0": 107.3,
+   "clarity": 0.644
+  },
+  {
+   "speaker": 500,
+   "f0": 107.6,
+   "clarity": 0.626
+  },
+  {
+   "speaker": 501,
+   "f0": 137.0,
+   "clarity": 0.708
+  },
+  {
+   "speaker": 502,
+   "f0": 203.2,
+   "clarity": 0.788
+  },
+  {
+   "speaker": 503,
+   "f0": 212.0,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 504,
+   "f0": 146.0,
+   "clarity": 0.688
+  },
+  {
+   "speaker": 505,
+   "f0": 212.0,
+   "clarity": 0.821
+  },
+  {
+   "speaker": 506,
+   "f0": 114.8,
+   "clarity": 0.634
+  },
+  {
+   "speaker": 507,
+   "f0": 172.9,
+   "clarity": 0.761
+  },
+  {
+   "speaker": 508,
+   "f0": 153.1,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 509,
+   "f0": 139.6,
+   "clarity": 0.751
+  },
+  {
+   "speaker": 510,
+   "f0": 173.6,
+   "clarity": 0.676
+  },
+  {
+   "speaker": 511,
+   "f0": 126.0,
+   "clarity": 0.676
+  },
+  {
+   "speaker": 512,
+   "f0": 118.5,
+   "clarity": 0.675
+  },
+  {
+   "speaker": 513,
+   "f0": 239.7,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 514,
+   "f0": 115.4,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 515,
+   "f0": 198.7,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 516,
+   "f0": 190.1,
+   "clarity": 0.819
+  },
+  {
+   "speaker": 517,
+   "f0": 259.4,
+   "clarity": 0.788
+  },
+  {
+   "speaker": 518,
+   "f0": 103.5,
+   "clarity": 0.656
+  },
+  {
+   "speaker": 519,
+   "f0": 132.4,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 520,
+   "f0": 110.8,
+   "clarity": 0.654
+  },
+  {
+   "speaker": 521,
+   "f0": 138.2,
+   "clarity": 0.672
+  },
+  {
+   "speaker": 522,
+   "f0": 117.3,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 523,
+   "f0": 99.8,
+   "clarity": 0.617
+  },
+  {
+   "speaker": 524,
+   "f0": 182.2,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 525,
+   "f0": 232.1,
+   "clarity": 0.815
+  },
+  {
+   "speaker": 526,
+   "f0": 155.3,
+   "clarity": 0.594
+  },
+  {
+   "speaker": 527,
+   "f0": 117.3,
+   "clarity": 0.624
+  },
+  {
+   "speaker": 528,
+   "f0": 116.1,
+   "clarity": 0.697
+  },
+  {
+   "speaker": 529,
+   "f0": 228.5,
+   "clarity": 0.812
+  },
+  {
+   "speaker": 530,
+   "f0": 162.1,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 531,
+   "f0": 113.7,
+   "clarity": 0.632
+  },
+  {
+   "speaker": 532,
+   "f0": 208.0,
+   "clarity": 0.781
+  },
+  {
+   "speaker": 533,
+   "f0": 95.0,
+   "clarity": 0.609
+  },
+  {
+   "speaker": 534,
+   "f0": 180.7,
+   "clarity": 0.718
+  },
+  {
+   "speaker": 535,
+   "f0": 190.1,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 536,
+   "f0": 191.7,
+   "clarity": 0.741
+  },
+  {
+   "speaker": 537,
+   "f0": 212.0,
+   "clarity": 0.794
+  },
+  {
+   "speaker": 538,
+   "f0": 115.4,
+   "clarity": 0.693
+  },
+  {
+   "speaker": 539,
+   "f0": 227.3,
+   "clarity": 0.83
+  },
+  {
+   "speaker": 540,
+   "f0": 131.2,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 541,
+   "f0": 172.3,
+   "clarity": 0.736
+  },
+  {
+   "speaker": 542,
+   "f0": 133.6,
+   "clarity": 0.701
+  },
+  {
+   "speaker": 543,
+   "f0": 107.6,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 544,
+   "f0": 137.0,
+   "clarity": 0.705
+  },
+  {
+   "speaker": 545,
+   "f0": 105.0,
+   "clarity": 0.546
+  },
+  {
+   "speaker": 546,
+   "f0": 212.0,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 547,
+   "f0": 131.2,
+   "clarity": 0.699
+  },
+  {
+   "speaker": 548,
+   "f0": 106.0,
+   "clarity": 0.645
+  },
+  {
+   "speaker": 549,
+   "f0": 237.1,
+   "clarity": 0.819
+  },
+  {
+   "speaker": 550,
+   "f0": 152.1,
+   "clarity": 0.741
+  },
+  {
+   "speaker": 551,
+   "f0": 110.8,
+   "clarity": 0.647
+  },
+  {
+   "speaker": 552,
+   "f0": 225.0,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 553,
+   "f0": 210.0,
+   "clarity": 0.823
+  },
+  {
+   "speaker": 554,
+   "f0": 112.5,
+   "clarity": 0.647
+  },
+  {
+   "speaker": 555,
+   "f0": 222.7,
+   "clarity": 0.789
+  },
+  {
+   "speaker": 556,
+   "f0": 185.3,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 557,
+   "f0": 194.3,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 558,
+   "f0": 232.1,
+   "clarity": 0.772
+  },
+  {
+   "speaker": 559,
+   "f0": 216.2,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 560,
+   "f0": 239.7,
+   "clarity": 0.82
+  },
+  {
+   "speaker": 561,
+   "f0": 122.2,
+   "clarity": 0.715
+  },
+  {
+   "speaker": 562,
+   "f0": 222.7,
+   "clarity": 0.794
+  },
+  {
+   "speaker": 563,
+   "f0": 204.2,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 564,
+   "f0": 202.3,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 565,
+   "f0": 153.1,
+   "clarity": 0.722
+  },
+  {
+   "speaker": 566,
+   "f0": 95.9,
+   "clarity": 0.641
+  },
+  {
+   "speaker": 567,
+   "f0": 183.8,
+   "clarity": 0.763
+  },
+  {
+   "speaker": 568,
+   "f0": 216.2,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 569,
+   "f0": 208.0,
+   "clarity": 0.787
+  },
+  {
+   "speaker": 570,
+   "f0": 114.2,
+   "clarity": 0.649
+  },
+  {
+   "speaker": 571,
+   "f0": 114.2,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 572,
+   "f0": 157.5,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 573,
+   "f0": 110.0,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 574,
+   "f0": 193.4,
+   "clarity": 0.816
+  },
+  {
+   "speaker": 575,
+   "f0": 202.3,
+   "clarity": 0.73
+  },
+  {
+   "speaker": 576,
+   "f0": 148.0,
+   "clarity": 0.708
+  },
+  {
+   "speaker": 577,
+   "f0": 198.6,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 578,
+   "f0": 123.9,
+   "clarity": 0.718
+  },
+  {
+   "speaker": 579,
+   "f0": 204.2,
+   "clarity": 0.792
+  },
+  {
+   "speaker": 580,
+   "f0": 192.6,
+   "clarity": 0.786
+  },
+  {
+   "speaker": 581,
+   "f0": 237.1,
+   "clarity": 0.841
+  },
+  {
+   "speaker": 582,
+   "f0": 208.0,
+   "clarity": 0.762
+  },
+  {
+   "speaker": 583,
+   "f0": 123.9,
+   "clarity": 0.696
+  },
+  {
+   "speaker": 584,
+   "f0": 111.9,
+   "clarity": 0.666
+  },
+  {
+   "speaker": 585,
+   "f0": 225.0,
+   "clarity": 0.77
+  },
+  {
+   "speaker": 586,
+   "f0": 140.0,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 587,
+   "f0": 222.7,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 588,
+   "f0": 229.7,
+   "clarity": 0.789
+  },
+  {
+   "speaker": 589,
+   "f0": 122.5,
+   "clarity": 0.698
+  },
+  {
+   "speaker": 590,
+   "f0": 206.1,
+   "clarity": 0.781
+  },
+  {
+   "speaker": 591,
+   "f0": 117.9,
+   "clarity": 0.626
+  },
+  {
+   "speaker": 592,
+   "f0": 109.2,
+   "clarity": 0.622
+  },
+  {
+   "speaker": 593,
+   "f0": 204.2,
+   "clarity": 0.809
+  },
+  {
+   "speaker": 594,
+   "f0": 186.1,
+   "clarity": 0.726
+  },
+  {
+   "speaker": 595,
+   "f0": 92.3,
+   "clarity": 0.626
+  },
+  {
+   "speaker": 596,
+   "f0": 247.8,
+   "clarity": 0.747
+  },
+  {
+   "speaker": 597,
+   "f0": 107.8,
+   "clarity": 0.649
+  },
+  {
+   "speaker": 598,
+   "f0": 140.4,
+   "clarity": 0.744
+  },
+  {
+   "speaker": 599,
+   "f0": 207.0,
+   "clarity": 0.803
+  },
+  {
+   "speaker": 600,
+   "f0": 120.5,
+   "clarity": 0.656
+  },
+  {
+   "speaker": 601,
+   "f0": 210.0,
+   "clarity": 0.782
+  },
+  {
+   "speaker": 602,
+   "f0": 130.5,
+   "clarity": 0.687
+  },
+  {
+   "speaker": 603,
+   "f0": 273.9,
+   "clarity": 0.773
+  },
+  {
+   "speaker": 604,
+   "f0": 135.3,
+   "clarity": 0.661
+  },
+  {
+   "speaker": 605,
+   "f0": 104.5,
+   "clarity": 0.644
+  },
+  {
+   "speaker": 606,
+   "f0": 131.2,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 607,
+   "f0": 100.7,
+   "clarity": 0.647
+  },
+  {
+   "speaker": 608,
+   "f0": 128.9,
+   "clarity": 0.698
+  },
+  {
+   "speaker": 609,
+   "f0": 121.8,
+   "clarity": 0.701
+  },
+  {
+   "speaker": 610,
+   "f0": 143.2,
+   "clarity": 0.75
+  },
+  {
+   "speaker": 611,
+   "f0": 234.6,
+   "clarity": 0.803
+  },
+  {
+   "speaker": 612,
+   "f0": 168.3,
+   "clarity": 0.761
+  },
+  {
+   "speaker": 613,
+   "f0": 110.8,
+   "clarity": 0.654
+  },
+  {
+   "speaker": 614,
+   "f0": 232.1,
+   "clarity": 0.828
+  },
+  {
+   "speaker": 615,
+   "f0": 106.8,
+   "clarity": 0.627
+  },
+  {
+   "speaker": 616,
+   "f0": 121.5,
+   "clarity": 0.659
+  },
+  {
+   "speaker": 617,
+   "f0": 179.3,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 618,
+   "f0": 118.5,
+   "clarity": 0.703
+  },
+  {
+   "speaker": 619,
+   "f0": 175.0,
+   "clarity": 0.75
+  },
+  {
+   "speaker": 620,
+   "f0": 155.8,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 621,
+   "f0": 188.5,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 622,
+   "f0": 125.3,
+   "clarity": 0.715
+  },
+  {
+   "speaker": 623,
+   "f0": 216.2,
+   "clarity": 0.756
+  },
+  {
+   "speaker": 624,
+   "f0": 239.7,
+   "clarity": 0.809
+  },
+  {
+   "speaker": 625,
+   "f0": 206.1,
+   "clarity": 0.813
+  },
+  {
+   "speaker": 626,
+   "f0": 219.4,
+   "clarity": 0.762
+  },
+  {
+   "speaker": 627,
+   "f0": 118.5,
+   "clarity": 0.643
+  },
+  {
+   "speaker": 628,
+   "f0": 201.4,
+   "clarity": 0.678
+  },
+  {
+   "speaker": 629,
+   "f0": 94.2,
+   "clarity": 0.644
+  },
+  {
+   "speaker": 630,
+   "f0": 177.8,
+   "clarity": 0.687
+  },
+  {
+   "speaker": 631,
+   "f0": 101.1,
+   "clarity": 0.613
+  },
+  {
+   "speaker": 632,
+   "f0": 138.7,
+   "clarity": 0.735
+  },
+  {
+   "speaker": 633,
+   "f0": 120.8,
+   "clarity": 0.688
+  },
+  {
+   "speaker": 634,
+   "f0": 110.8,
+   "clarity": 0.67
+  },
+  {
+   "speaker": 635,
+   "f0": 168.3,
+   "clarity": 0.73
+  },
+  {
+   "speaker": 636,
+   "f0": 116.7,
+   "clarity": 0.707
+  },
+  {
+   "speaker": 637,
+   "f0": 121.2,
+   "clarity": 0.706
+  },
+  {
+   "speaker": 638,
+   "f0": 169.6,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 639,
+   "f0": 182.2,
+   "clarity": 0.749
+  },
+  {
+   "speaker": 640,
+   "f0": 126.0,
+   "clarity": 0.709
+  },
+  {
+   "speaker": 641,
+   "f0": 104.5,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 642,
+   "f0": 116.7,
+   "clarity": 0.664
+  },
+  {
+   "speaker": 643,
+   "f0": 111.1,
+   "clarity": 0.643
+  },
+  {
+   "speaker": 644,
+   "f0": 195.1,
+   "clarity": 0.792
+  },
+  {
+   "speaker": 645,
+   "f0": 153.1,
+   "clarity": 0.702
+  },
+  {
+   "speaker": 646,
+   "f0": 105.5,
+   "clarity": 0.698
+  },
+  {
+   "speaker": 647,
+   "f0": 179.3,
+   "clarity": 0.764
+  },
+  {
+   "speaker": 648,
+   "f0": 128.2,
+   "clarity": 0.612
+  },
+  {
+   "speaker": 649,
+   "f0": 225.0,
+   "clarity": 0.738
+  },
+  {
+   "speaker": 650,
+   "f0": 218.3,
+   "clarity": 0.825
+  },
+  {
+   "speaker": 651,
+   "f0": 185.3,
+   "clarity": 0.744
+  },
+  {
+   "speaker": 652,
+   "f0": 208.0,
+   "clarity": 0.763
+  },
+  {
+   "speaker": 653,
+   "f0": 121.2,
+   "clarity": 0.705
+  },
+  {
+   "speaker": 654,
+   "f0": 185.3,
+   "clarity": 0.746
+  },
+  {
+   "speaker": 655,
+   "f0": 153.1,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 656,
+   "f0": 245.0,
+   "clarity": 0.799
+  },
+  {
+   "speaker": 657,
+   "f0": 206.1,
+   "clarity": 0.781
+  },
+  {
+   "speaker": 658,
+   "f0": 192.6,
+   "clarity": 0.788
+  },
+  {
+   "speaker": 659,
+   "f0": 127.5,
+   "clarity": 0.684
+  },
+  {
+   "speaker": 660,
+   "f0": 120.5,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 661,
+   "f0": 212.0,
+   "clarity": 0.733
+  },
+  {
+   "speaker": 662,
+   "f0": 107.6,
+   "clarity": 0.617
+  },
+  {
+   "speaker": 663,
+   "f0": 123.9,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 664,
+   "f0": 242.3,
+   "clarity": 0.81
+  },
+  {
+   "speaker": 665,
+   "f0": 173.6,
+   "clarity": 0.705
+  },
+  {
+   "speaker": 666,
+   "f0": 117.9,
+   "clarity": 0.657
+  },
+  {
+   "speaker": 667,
+   "f0": 170.9,
+   "clarity": 0.662
+  },
+  {
+   "speaker": 668,
+   "f0": 159.8,
+   "clarity": 0.744
+  },
+  {
+   "speaker": 669,
+   "f0": 111.4,
+   "clarity": 0.7
+  },
+  {
+   "speaker": 670,
+   "f0": 127.5,
+   "clarity": 0.657
+  },
+  {
+   "speaker": 671,
+   "f0": 120.5,
+   "clarity": 0.635
+  },
+  {
+   "speaker": 672,
+   "f0": 198.6,
+   "clarity": 0.746
+  },
+  {
+   "speaker": 673,
+   "f0": 128.9,
+   "clarity": 0.727
+  },
+  {
+   "speaker": 674,
+   "f0": 146.5,
+   "clarity": 0.738
+  },
+  {
+   "speaker": 675,
+   "f0": 237.1,
+   "clarity": 0.783
+  },
+  {
+   "speaker": 676,
+   "f0": 182.2,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 677,
+   "f0": 131.3,
+   "clarity": 0.704
+  },
+  {
+   "speaker": 678,
+   "f0": 122.2,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 679,
+   "f0": 222.7,
+   "clarity": 0.819
+  },
+  {
+   "speaker": 680,
+   "f0": 116.1,
+   "clarity": 0.677
+  },
+  {
+   "speaker": 681,
+   "f0": 222.7,
+   "clarity": 0.822
+  },
+  {
+   "speaker": 682,
+   "f0": 176.4,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 683,
+   "f0": 158.6,
+   "clarity": 0.745
+  },
+  {
+   "speaker": 684,
+   "f0": 121.2,
+   "clarity": 0.653
+  },
+  {
+   "speaker": 685,
+   "f0": 126.7,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 686,
+   "f0": 116.1,
+   "clarity": 0.653
+  },
+  {
+   "speaker": 687,
+   "f0": 95.9,
+   "clarity": 0.653
+  },
+  {
+   "speaker": 688,
+   "f0": 130.5,
+   "clarity": 0.674
+  },
+  {
+   "speaker": 689,
+   "f0": 145.1,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 690,
+   "f0": 135.3,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 691,
+   "f0": 179.3,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 692,
+   "f0": 206.1,
+   "clarity": 0.778
+  },
+  {
+   "speaker": 693,
+   "f0": 250.6,
+   "clarity": 0.815
+  },
+  {
+   "speaker": 694,
+   "f0": 198.6,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 695,
+   "f0": 235.8,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 696,
+   "f0": 159.8,
+   "clarity": 0.645
+  },
+  {
+   "speaker": 697,
+   "f0": 141.3,
+   "clarity": 0.663
+  },
+  {
+   "speaker": 698,
+   "f0": 242.3,
+   "clarity": 0.846
+  },
+  {
+   "speaker": 699,
+   "f0": 250.6,
+   "clarity": 0.839
+  },
+  {
+   "speaker": 700,
+   "f0": 110.2,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 701,
+   "f0": 245.0,
+   "clarity": 0.689
+  },
+  {
+   "speaker": 702,
+   "f0": 242.3,
+   "clarity": 0.756
+  },
+  {
+   "speaker": 703,
+   "f0": 173.6,
+   "clarity": 0.785
+  },
+  {
+   "speaker": 704,
+   "f0": 114.2,
+   "clarity": 0.676
+  },
+  {
+   "speaker": 705,
+   "f0": 146.0,
+   "clarity": 0.736
+  },
+  {
+   "speaker": 706,
+   "f0": 113.7,
+   "clarity": 0.677
+  },
+  {
+   "speaker": 707,
+   "f0": 220.5,
+   "clarity": 0.741
+  },
+  {
+   "speaker": 708,
+   "f0": 208.0,
+   "clarity": 0.773
+  },
+  {
+   "speaker": 709,
+   "f0": 148.0,
+   "clarity": 0.714
+  },
+  {
+   "speaker": 710,
+   "f0": 191.7,
+   "clarity": 0.793
+  },
+  {
+   "speaker": 711,
+   "f0": 170.9,
+   "clarity": 0.779
+  },
+  {
+   "speaker": 712,
+   "f0": 193.4,
+   "clarity": 0.797
+  },
+  {
+   "speaker": 713,
+   "f0": 150.0,
+   "clarity": 0.734
+  },
+  {
+   "speaker": 714,
+   "f0": 167.0,
+   "clarity": 0.752
+  },
+  {
+   "speaker": 715,
+   "f0": 103.5,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 716,
+   "f0": 130.5,
+   "clarity": 0.721
+  },
+  {
+   "speaker": 717,
+   "f0": 179.3,
+   "clarity": 0.776
+  },
+  {
+   "speaker": 718,
+   "f0": 126.7,
+   "clarity": 0.716
+  },
+  {
+   "speaker": 719,
+   "f0": 222.8,
+   "clarity": 0.809
+  },
+  {
+   "speaker": 720,
+   "f0": 107.6,
+   "clarity": 0.623
+  },
+  {
+   "speaker": 721,
+   "f0": 164.6,
+   "clarity": 0.735
+  },
+  {
+   "speaker": 722,
+   "f0": 145.1,
+   "clarity": 0.712
+  },
+  {
+   "speaker": 723,
+   "f0": 220.5,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 724,
+   "f0": 114.8,
+   "clarity": 0.666
+  },
+  {
+   "speaker": 725,
+   "f0": 133.6,
+   "clarity": 0.716
+  },
+  {
+   "speaker": 726,
+   "f0": 167.7,
+   "clarity": 0.676
+  },
+  {
+   "speaker": 727,
+   "f0": 220.5,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 728,
+   "f0": 154.2,
+   "clarity": 0.759
+  },
+  {
+   "speaker": 729,
+   "f0": 131.2,
+   "clarity": 0.713
+  },
+  {
+   "speaker": 730,
+   "f0": 118.5,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 731,
+   "f0": 250.6,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 732,
+   "f0": 188.5,
+   "clarity": 0.818
+  },
+  {
+   "speaker": 733,
+   "f0": 198.6,
+   "clarity": 0.77
+  },
+  {
+   "speaker": 734,
+   "f0": 137.0,
+   "clarity": 0.715
+  },
+  {
+   "speaker": 735,
+   "f0": 111.9,
+   "clarity": 0.654
+  },
+  {
+   "speaker": 736,
+   "f0": 96.3,
+   "clarity": 0.632
+  },
+  {
+   "speaker": 737,
+   "f0": 253.4,
+   "clarity": 0.859
+  },
+  {
+   "speaker": 738,
+   "f0": 113.1,
+   "clarity": 0.663
+  },
+  {
+   "speaker": 739,
+   "f0": 117.0,
+   "clarity": 0.702
+  },
+  {
+   "speaker": 740,
+   "f0": 132.8,
+   "clarity": 0.719
+  },
+  {
+   "speaker": 741,
+   "f0": 186.9,
+   "clarity": 0.797
+  },
+  {
+   "speaker": 742,
+   "f0": 119.8,
+   "clarity": 0.678
+  },
+  {
+   "speaker": 743,
+   "f0": 117.9,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 744,
+   "f0": 140.4,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 745,
+   "f0": 193.4,
+   "clarity": 0.813
+  },
+  {
+   "speaker": 746,
+   "f0": 237.1,
+   "clarity": 0.806
+  },
+  {
+   "speaker": 747,
+   "f0": 154.2,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 748,
+   "f0": 203.2,
+   "clarity": 0.82
+  },
+  {
+   "speaker": 749,
+   "f0": 146.0,
+   "clarity": 0.748
+  },
+  {
+   "speaker": 750,
+   "f0": 121.8,
+   "clarity": 0.698
+  },
+  {
+   "speaker": 751,
+   "f0": 123.9,
+   "clarity": 0.652
+  },
+  {
+   "speaker": 752,
+   "f0": 112.8,
+   "clarity": 0.647
+  },
+  {
+   "speaker": 753,
+   "f0": 137.0,
+   "clarity": 0.683
+  },
+  {
+   "speaker": 754,
+   "f0": 237.1,
+   "clarity": 0.843
+  },
+  {
+   "speaker": 755,
+   "f0": 218.3,
+   "clarity": 0.81
+  },
+  {
+   "speaker": 756,
+   "f0": 174.3,
+   "clarity": 0.775
+  },
+  {
+   "speaker": 757,
+   "f0": 229.7,
+   "clarity": 0.832
+  },
+  {
+   "speaker": 758,
+   "f0": 133.2,
+   "clarity": 0.712
+  },
+  {
+   "speaker": 759,
+   "f0": 183.8,
+   "clarity": 0.799
+  },
+  {
+   "speaker": 760,
+   "f0": 117.6,
+   "clarity": 0.68
+  },
+  {
+   "speaker": 761,
+   "f0": 230.9,
+   "clarity": 0.83
+  },
+  {
+   "speaker": 762,
+   "f0": 154.2,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 763,
+   "f0": 127.5,
+   "clarity": 0.654
+  },
+  {
+   "speaker": 764,
+   "f0": 208.0,
+   "clarity": 0.774
+  },
+  {
+   "speaker": 765,
+   "f0": 234.6,
+   "clarity": 0.809
+  },
+  {
+   "speaker": 766,
+   "f0": 188.5,
+   "clarity": 0.759
+  },
+  {
+   "speaker": 767,
+   "f0": 116.4,
+   "clarity": 0.651
+  },
+  {
+   "speaker": 768,
+   "f0": 182.2,
+   "clarity": 0.784
+  },
+  {
+   "speaker": 769,
+   "f0": 108.1,
+   "clarity": 0.711
+  },
+  {
+   "speaker": 770,
+   "f0": 123.2,
+   "clarity": 0.693
+  },
+  {
+   "speaker": 771,
+   "f0": 242.3,
+   "clarity": 0.709
+  },
+  {
+   "speaker": 772,
+   "f0": 126.7,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 773,
+   "f0": 215.1,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 774,
+   "f0": 163.3,
+   "clarity": 0.736
+  },
+  {
+   "speaker": 775,
+   "f0": 196.9,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 776,
+   "f0": 127.8,
+   "clarity": 0.694
+  },
+  {
+   "speaker": 777,
+   "f0": 190.9,
+   "clarity": 0.804
+  },
+  {
+   "speaker": 778,
+   "f0": 117.9,
+   "clarity": 0.67
+  },
+  {
+   "speaker": 779,
+   "f0": 138.7,
+   "clarity": 0.714
+  },
+  {
+   "speaker": 780,
+   "f0": 225.0,
+   "clarity": 0.765
+  },
+  {
+   "speaker": 781,
+   "f0": 111.9,
+   "clarity": 0.647
+  },
+  {
+   "speaker": 782,
+   "f0": 165.8,
+   "clarity": 0.752
+  },
+  {
+   "speaker": 783,
+   "f0": 196.9,
+   "clarity": 0.799
+  },
+  {
+   "speaker": 784,
+   "f0": 129.7,
+   "clarity": 0.661
+  },
+  {
+   "speaker": 785,
+   "f0": 265.7,
+   "clarity": 0.786
+  },
+  {
+   "speaker": 786,
+   "f0": 176.4,
+   "clarity": 0.766
+  },
+  {
+   "speaker": 787,
+   "f0": 124.6,
+   "clarity": 0.72
+  },
+  {
+   "speaker": 788,
+   "f0": 116.7,
+   "clarity": 0.709
+  },
+  {
+   "speaker": 789,
+   "f0": 132.0,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 790,
+   "f0": 206.1,
+   "clarity": 0.781
+  },
+  {
+   "speaker": 791,
+   "f0": 169.6,
+   "clarity": 0.727
+  },
+  {
+   "speaker": 792,
+   "f0": 122.8,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 793,
+   "f0": 128.2,
+   "clarity": 0.664
+  },
+  {
+   "speaker": 794,
+   "f0": 216.2,
+   "clarity": 0.758
+  },
+  {
+   "speaker": 795,
+   "f0": 135.3,
+   "clarity": 0.728
+  },
+  {
+   "speaker": 796,
+   "f0": 241.0,
+   "clarity": 0.729
+  },
+  {
+   "speaker": 797,
+   "f0": 93.4,
+   "clarity": 0.632
+  },
+  {
+   "speaker": 798,
+   "f0": 164.6,
+   "clarity": 0.73
+  },
+  {
+   "speaker": 799,
+   "f0": 150.0,
+   "clarity": 0.748
+  },
+  {
+   "speaker": 800,
+   "f0": 88.6,
+   "clarity": 0.63
+  },
+  {
+   "speaker": 801,
+   "f0": 120.8,
+   "clarity": 0.689
+  },
+  {
+   "speaker": 802,
+   "f0": 142.3,
+   "clarity": 0.708
+  },
+  {
+   "speaker": 803,
+   "f0": 121.8,
+   "clarity": 0.68
+  },
+  {
+   "speaker": 804,
+   "f0": 120.5,
+   "clarity": 0.687
+  },
+  {
+   "speaker": 805,
+   "f0": 88.2,
+   "clarity": 0.583
+  },
+  {
+   "speaker": 806,
+   "f0": 99.8,
+   "clarity": 0.621
+  },
+  {
+   "speaker": 807,
+   "f0": 242.3,
+   "clarity": 0.842
+  },
+  {
+   "speaker": 808,
+   "f0": 126.0,
+   "clarity": 0.643
+  },
+  {
+   "speaker": 809,
+   "f0": 123.2,
+   "clarity": 0.731
+  },
+  {
+   "speaker": 810,
+   "f0": 190.1,
+   "clarity": 0.787
+  },
+  {
+   "speaker": 811,
+   "f0": 99.3,
+   "clarity": 0.653
+  },
+  {
+   "speaker": 812,
+   "f0": 130.9,
+   "clarity": 0.653
+  },
+  {
+   "speaker": 813,
+   "f0": 113.7,
+   "clarity": 0.657
+  },
+  {
+   "speaker": 814,
+   "f0": 143.2,
+   "clarity": 0.689
+  },
+  {
+   "speaker": 815,
+   "f0": 196.9,
+   "clarity": 0.766
+  },
+  {
+   "speaker": 816,
+   "f0": 142.3,
+   "clarity": 0.741
+  },
+  {
+   "speaker": 817,
+   "f0": 163.3,
+   "clarity": 0.752
+  },
+  {
+   "speaker": 818,
+   "f0": 118.9,
+   "clarity": 0.681
+  },
+  {
+   "speaker": 819,
+   "f0": 230.9,
+   "clarity": 0.79
+  },
+  {
+   "speaker": 820,
+   "f0": 234.6,
+   "clarity": 0.824
+  },
+  {
+   "speaker": 821,
+   "f0": 132.0,
+   "clarity": 0.679
+  },
+  {
+   "speaker": 822,
+   "f0": 113.1,
+   "clarity": 0.689
+  },
+  {
+   "speaker": 823,
+   "f0": 202.3,
+   "clarity": 0.759
+  },
+  {
+   "speaker": 824,
+   "f0": 122.5,
+   "clarity": 0.643
+  },
+  {
+   "speaker": 825,
+   "f0": 134.9,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 826,
+   "f0": 123.9,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 827,
+   "f0": 134.5,
+   "clarity": 0.672
+  },
+  {
+   "speaker": 828,
+   "f0": 151.0,
+   "clarity": 0.739
+  },
+  {
+   "speaker": 829,
+   "f0": 112.8,
+   "clarity": 0.619
+  },
+  {
+   "speaker": 830,
+   "f0": 204.2,
+   "clarity": 0.802
+  },
+  {
+   "speaker": 831,
+   "f0": 108.1,
+   "clarity": 0.667
+  },
+  {
+   "speaker": 832,
+   "f0": 229.7,
+   "clarity": 0.768
+  },
+  {
+   "speaker": 833,
+   "f0": 206.1,
+   "clarity": 0.792
+  },
+  {
+   "speaker": 834,
+   "f0": 144.1,
+   "clarity": 0.736
+  },
+  {
+   "speaker": 835,
+   "f0": 196.0,
+   "clarity": 0.744
+  },
+  {
+   "speaker": 836,
+   "f0": 137.0,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 837,
+   "f0": 218.3,
+   "clarity": 0.79
+  },
+  {
+   "speaker": 838,
+   "f0": 114.0,
+   "clarity": 0.709
+  },
+  {
+   "speaker": 839,
+   "f0": 114.8,
+   "clarity": 0.707
+  },
+  {
+   "speaker": 840,
+   "f0": 225.0,
+   "clarity": 0.842
+  },
+  {
+   "speaker": 841,
+   "f0": 111.9,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 842,
+   "f0": 113.7,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 843,
+   "f0": 113.7,
+   "clarity": 0.641
+  },
+  {
+   "speaker": 844,
+   "f0": 120.5,
+   "clarity": 0.645
+  },
+  {
+   "speaker": 845,
+   "f0": 160.9,
+   "clarity": 0.743
+  },
+  {
+   "speaker": 846,
+   "f0": 103.0,
+   "clarity": 0.639
+  },
+  {
+   "speaker": 847,
+   "f0": 108.6,
+   "clarity": 0.674
+  },
+  {
+   "speaker": 848,
+   "f0": 123.9,
+   "clarity": 0.682
+  },
+  {
+   "speaker": 849,
+   "f0": 225.0,
+   "clarity": 0.824
+  },
+  {
+   "speaker": 850,
+   "f0": 216.2,
+   "clarity": 0.799
+  },
+  {
+   "speaker": 851,
+   "f0": 117.9,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 852,
+   "f0": 142.3,
+   "clarity": 0.724
+  },
+  {
+   "speaker": 853,
+   "f0": 250.6,
+   "clarity": 0.669
+  },
+  {
+   "speaker": 854,
+   "f0": 117.0,
+   "clarity": 0.685
+  },
+  {
+   "speaker": 855,
+   "f0": 120.8,
+   "clarity": 0.671
+  },
+  {
+   "speaker": 856,
+   "f0": 126.0,
+   "clarity": 0.712
+  },
+  {
+   "speaker": 857,
+   "f0": 137.0,
+   "clarity": 0.693
+  },
+  {
+   "speaker": 858,
+   "f0": 111.4,
+   "clarity": 0.645
+  },
+  {
+   "speaker": 859,
+   "f0": 103.0,
+   "clarity": 0.661
+  },
+  {
+   "speaker": 860,
+   "f0": 182.2,
+   "clarity": 0.763
+  },
+  {
+   "speaker": 861,
+   "f0": 136.5,
+   "clarity": 0.68
+  },
+  {
+   "speaker": 862,
+   "f0": 185.3,
+   "clarity": 0.776
+  },
+  {
+   "speaker": 863,
+   "f0": 105.5,
+   "clarity": 0.665
+  },
+  {
+   "speaker": 864,
+   "f0": 190.9,
+   "clarity": 0.793
+  },
+  {
+   "speaker": 865,
+   "f0": 177.8,
+   "clarity": 0.714
+  },
+  {
+   "speaker": 866,
+   "f0": 173.6,
+   "clarity": 0.762
+  },
+  {
+   "speaker": 867,
+   "f0": 128.9,
+   "clarity": 0.653
+  },
+  {
+   "speaker": 868,
+   "f0": 107.6,
+   "clarity": 0.608
+  },
+  {
+   "speaker": 869,
+   "f0": 232.1,
+   "clarity": 0.73
+  },
+  {
+   "speaker": 870,
+   "f0": 118.2,
+   "clarity": 0.697
+  },
+  {
+   "speaker": 871,
+   "f0": 162.1,
+   "clarity": 0.749
+  },
+  {
+   "speaker": 872,
+   "f0": 168.3,
+   "clarity": 0.797
+  },
+  {
+   "speaker": 873,
+   "f0": 165.8,
+   "clarity": 0.769
+  },
+  {
+   "speaker": 874,
+   "f0": 202.3,
+   "clarity": 0.769
+  },
+  {
+   "speaker": 875,
+   "f0": 198.6,
+   "clarity": 0.796
+  },
+  {
+   "speaker": 876,
+   "f0": 137.0,
+   "clarity": 0.682
+  },
+  {
+   "speaker": 877,
+   "f0": 216.2,
+   "clarity": 0.727
+  },
+  {
+   "speaker": 878,
+   "f0": 114.8,
+   "clarity": 0.675
+  },
+  {
+   "speaker": 879,
+   "f0": 134.0,
+   "clarity": 0.712
+  },
+  {
+   "speaker": 880,
+   "f0": 190.1,
+   "clarity": 0.761
+  },
+  {
+   "speaker": 881,
+   "f0": 198.6,
+   "clarity": 0.77
+  },
+  {
+   "speaker": 882,
+   "f0": 136.5,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 883,
+   "f0": 109.4,
+   "clarity": 0.633
+  },
+  {
+   "speaker": 884,
+   "f0": 134.5,
+   "clarity": 0.665
+  },
+  {
+   "speaker": 885,
+   "f0": 148.0,
+   "clarity": 0.71
+  },
+  {
+   "speaker": 886,
+   "f0": 188.5,
+   "clarity": 0.791
+  },
+  {
+   "speaker": 887,
+   "f0": 203.2,
+   "clarity": 0.766
+  },
+  {
+   "speaker": 888,
+   "f0": 121.2,
+   "clarity": 0.692
+  },
+  {
+   "speaker": 889,
+   "f0": 117.0,
+   "clarity": 0.66
+  },
+  {
+   "speaker": 890,
+   "f0": 137.8,
+   "clarity": 0.708
+  },
+  {
+   "speaker": 891,
+   "f0": 140.4,
+   "clarity": 0.724
+  },
+  {
+   "speaker": 892,
+   "f0": 134.5,
+   "clarity": 0.691
+  },
+  {
+   "speaker": 893,
+   "f0": 143.2,
+   "clarity": 0.661
+  },
+  {
+   "speaker": 894,
+   "f0": 191.7,
+   "clarity": 0.739
+  },
+  {
+   "speaker": 895,
+   "f0": 176.4,
+   "clarity": 0.695
+  },
+  {
+   "speaker": 896,
+   "f0": 111.9,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 897,
+   "f0": 182.2,
+   "clarity": 0.755
+  },
+  {
+   "speaker": 898,
+   "f0": 157.5,
+   "clarity": 0.742
+  },
+  {
+   "speaker": 899,
+   "f0": 117.0,
+   "clarity": 0.646
+  },
+  {
+   "speaker": 900,
+   "f0": 148.5,
+   "clarity": 0.75
+  },
+  {
+   "speaker": 901,
+   "f0": 137.8,
+   "clarity": 0.69
+  },
+  {
+   "speaker": 902,
+   "f0": 127.1,
+   "clarity": 0.643
+  },
+  {
+   "speaker": 903,
+   "f0": 176.4,
+   "clarity": 0.756
+  }
+ ]
+}
