@@ -54,7 +54,7 @@ assert.ok((blk.match(/pumpModel\('small'/g) || []).length === 2, 'a blend pump a
 assert.ok(blk.includes("spinners.push({ o: ag, axis: 'y', k: 'prop', i });") && blk.includes("spinners.push({ o: ag, axis: 'y', k: 'ybm' });"), 'agitators');
 assert.ok(html.includes("if (O.cooler) sim.yeastT = O.cooler.T;"), 'the yeast cooler temperature reaches the blend tank');
 assert.ok(html.includes("f.rate = ((fillIdx === i ? sim.liq.out - (sim.propSide || 0) : 0) + (sim.pitchTo === i ? sim.pitchRate : 0)) / N;"), 'the fill line carries the mash and the pitch');
-assert.ok(html.includes("props: { k: ['prop', 'props', 'prop tank', 'prop tanks', 'yeast prop', 'propagation', 'blend tank', 'pitch', 'pitched'], say: () => propSay()"), 'Rick can tell you about them');
+assert.ok(html.includes("props: { k: ['prop', 'props', 'prop tank', 'prop tanks', 'yeast prop', 'propagation', 'blend tank', 'pitch', 'pitched'], say: () => Math.random() < 0.34 ? ") && /props: \{[^\n]*: propSay\(\)/.test(html), 'Rick can tell you about them (v1.97.85: sometimes the blend tank line, otherwise the live status)');
 // the alley's east wall is open where they stand
 assert.ok(html.includes("    wall(FXE, Z1 + FR, FXE, -37.1, PH, wm, [], { trim: true });\n    wall(FXE, -29.8, FXE, -23.7, PH, wm, [], { trim: true });"));
 console.log('PASS: yeast props + blend tank (every fermenter pitched at normal rates with no change in output; warm cooler = weak yeast; no prop = slow ferm + alert; the props overlap when the front end runs harder; placed by Ferm 1 across from the coolers)');
