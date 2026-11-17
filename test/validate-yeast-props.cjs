@@ -23,7 +23,7 @@ assert.equal(JSON.stringify(Sim.UNIT.yp0.temp.good), '[88,93]', 'props grow best
   assert.ok(done.length >= 25, 'fermenters keep cycling (' + done.length + ' fills)');
   assert.ok(done.every(d => d.pitched && d.y > 0.99), 'every one pitched with full-strength yeast');
   assert.deepEqual(alerts, [], 'no alerts');
-  assert.ok(Math.abs(eth / 250 - 4670) < 250, 'ethanol about what the plant made before the props (' + (eth / 250).toFixed(0) + ' gal/h)');
+  assert.ok(Math.abs(eth / 250 - 4670 * Sim.K) < 600, 'ethanol about what the plant made before the props, at the real rate since v1.97.87 (' + (eth / 250).toFixed(0) + ' gal/h)');
   const states = new Set(ev.map(e => e[2])); for (const k of ['filling', 'propping', 'ready', 'pitching', 'cleaning', 'empty']) assert.ok(states.has(k), 'props go through ' + k);
   assert.ok(new Set(ev.map(e => e[1])).size === 2, 'both prop tanks take turns');
   assert.ok(s.prop.every(p => p.bu <= Sim.CAP.prop + 1e-6), 'never over-full'); }
@@ -42,9 +42,9 @@ assert.equal(JSON.stringify(Sim.UNIT.yp0.temp.good), '[88,93]', 'props grow best
   assert.equal(Sim.status(s, 'f' + s.ferm.indexOf(raw))[0], 'bad');
   const kSlow = Sim.F.yeastK(0), kOk = Sim.F.yeastK(1); assert.ok(kSlow < 0.35 && kOk === 1, 'unpitched ferments at ' + kSlow + 'x'); }
 // ---- run the front end harder: the two props overlap so they keep up
-{ const s = Sim.create(); for (let i = 0; i < 4; i++) s.sp['mill' + i].rate = 550; const done = [];
+{ const s = Sim.create(); for (let i = 0; i < 4; i++) s.sp['mill' + i].rate = 92; /* v1.97.87: feeder speed %, ~30% over the normal 71% (was 550 vs 425 bu/h) */ const done = [];
   run(s, 200, s => s.ferm.forEach((f, i) => { if (f.state === 'fermenting' && f.t < 0.06 && !done.some(d => d.i === i && s.t - d.t < 1)) done.push({ i, t: s.t, p: f.pitched }); }));
-  assert.ok(done.slice(-6).every(d => d.p), 'at 550 bu/h a mill, every fermenter is still pitched'); }
+  assert.ok(done.slice(-6).every(d => d.p), 'with the mills ~30% faster, every fermenter is still pitched'); }
 // ---- 3D: where they stand, what they are wired to
 assert.ok(html.includes("yb: [-11.6, -36.4, 1.5, 2, 2.1], yp0: [-11.6, -31.4, 2.5, 5.6], yp1: [-11.6, -26.3, 2.5, 5.6],"), 'blend tank next to Ferm 1, the props south of it, solid to walk into');
 const blk = html.slice(html.indexOf('// ---------- YEAST PROPS + BLEND TANK'), html.indexOf('// Beer leaves a fermenter through the drain'));

@@ -4351,32 +4351,45 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const SPEEDS = [[1 / 3600, 'Real time'], [1 / 60, '1 min/s'], [1 / 6, '10 min/s'], [1, '1 hr/s']];
 const SIM_H_PER_SEC = 1 / 60;   // default: one plant minute per real second
 const NF = 7;
-const CAP = { silo: 175000, day: 9000, st1: 1200, st2: 1200, ct: 30, liq: 1800, ferm: 18000, beer: 70000, etoh: 120000, oil: 60000, prop: 560 }; // bu-eq, gal, lb
-// 7 fermenters: at 1,700 bu/h an 85% batch (15,300 bu) fills in 9 h; then 50 h ferment, 2 h drain, 1 h clean = 62 h < 7 x 9 h
-const FERM_H = 50, DRAIN_RATE = 7650, CIP_H = 1, COL_MAX = 2700, TRUCK_DELAY = 1.0, TRUCK_DRAIN_H = 1.0;
-const RAIL_GAL = 8000, OIL_LOAD = 45000, CAKE_LOAD = 25;
+// v1.97.87 (owner: "the flow of corn to flour to slurry", with photos of the real control screens): the plant runs at its real rate.
+// The fermenters were already the real 807,000 gal with the real 9 h fill; what fills them is ~4,350 lb/min of ground corn (about
+// 4,650 bu/h) mixed 4.8 lb per gallon of water into ~1,250 GPM of slurry, so every bushel-based capacity and flow below is K times
+// what it was at the old 1,700 bu/h (same fill / drain / residence times, 2.7x the corn, ethanol, oil and cake).
+const K = 2.74, LB_BU = 56;
+const CAP = { silo: 175000, day: 3000, st1: 1200 * K, st2: 1200 * K, ct: 30 * K, liq: 1800 * K, ferm: 18000 * K, beer: 70000 * K, etoh: 120000 * K, oil: 60000 * K, prop: 560 * K }; // bu-eq, gal, lb
+const FERM_GAL = 807000, GAL_BU = FERM_GAL / CAP.ferm;   // gallons of slurry / mash per bushel-equivalent (~16.4)
+const LBM = bu => bu * LB_BU / 60, GPM = bu => bu * GAL_BU / 60;   // bu/h -> lb/min of corn, bu-eq/h -> GPM of slurry / mash
+// hammermills: the feeder (rotary valve) speed sets the feed, ~15.3 lb/min per %; amps and bearing temperatures follow the load
+const MILL_LBM_PCT = 15.3, MILL_AMP0 = 140, MILL_AMP_LB = 0.19;
+// slurry blender: flour + backset + heated cook water, by the grind / water ratio (lb/gal) and backset %; alpha-amylase dosed in ml/min
+// (owner: no controls for these yet - fixed at the real plant's numbers)
+const BLEND = { ratio: 4.8, bs: 55, enz: 80 };
+const FLOUR_LBG = 12.5, BACKSET_LBG = 8.7, WATER_LBG = 8.34, CW_T = 202, BS_T = 185, CORN_T = 60, ENZ_PER_LB = 80 / 4350;
+// 7 fermenters: at ~4,650 bu/h an 85% batch fills in 9 h; then 50 h ferment, 2 h drain, 1 h clean = 62 h < 7 x 9 h
+const FERM_H = 50, DRAIN_RATE = 7650 * K, CIP_H = 1, COL_MAX = 2700 * K, TRUCK_DELAY = 1.0, TRUCK_DRAIN_H = 1.0;
+const RAIL_GAL = 8000, OIL_LOAD = 45000, CAKE_LOAD = 25, CAKE_DRAIN_H = 0.4;   // v1.97.87: a cake truck loads in ~25 min (110 t/h of cake at the real rate)
 const FAILURES = false;   // no breakdowns for now (strainer plugging, fermenter infections) — add failure rates later
 // v1.97.76 yeast: the blend tank mixes water, yeast (from the yeast cooler totes), enzyme and nutrients; an empty prop tank takes that
 // batch plus a side stream of cooled mash off the mash coolers and grows yeast for ~8 h; the ready prop is pitched into the fermenter
 // that is filling. Two props take turns, so one can be cleaned while the other grows. A fermenter with no yeast pitched ferments slowly.
-const YB_MIX = 0.5, YB_DUMP = 0.25, PROP_H = 8, PROP_LEAD = 1.1, PROP_FILL = 0.9, SIDE_MAX = 700, PITCH_RATE = 1200, PROP_CIP = 0.5, PROP_STALE = 6;
-const MILL_MAX = 650, DAY_FILL = 900, STR_MAX = 3600, STR_PLUG_H = 14, STR_CLEAN_H = 0.75;
+const YB_MIX = 0.5, YB_DUMP = 0.25, PROP_H = 8, PROP_LEAD = 1.1, PROP_FILL = 0.9, SIDE_MAX = 700 * K, PITCH_RATE = 1200 * K, PROP_CIP = 0.5, PROP_STALE = 6;
+const DAY_FILL = 1800, STR_MAX = 3600 * K, STR_PLUG_H = 14, STR_CLEAN_H = 0.75;
 
 // Every selectable unit. lvl/temp = setpoint ranges when the unit has that control.
 const UNITS = [
   { id: 'rail', st: 'receiving', name: 'Rail Pit (Pit 1)', holds: 'Corn from hopper railcars', color: '#f4c430', rate: { def: 1, min: 0, max: 4, step: 0.5, unit: 'railcars/h', label: 'Railcars unloaded per hour (max)' } },
   { id: 'recv', st: 'receiving', name: 'Truck Pits (Pits 2 & 3)', holds: 'Corn trucks unloading', color: '#f4c430', rate: { def: 3, min: 0, max: 6, step: 0.5, unit: 'trucks/h', label: 'Trucks unloaded per hour (max)' } },
   ...[0, 1].map(i => ({ id: 'silo' + i, st: 'receiving', name: 'Tin Bin ' + (i + 1), holds: 'Corn', color: '#ffc61a', lvl: { def: 60, min: 0, max: 100, label: 'Trucks refill to' } })),
-  ...[0, 1, 2, 3].map(i => ({ id: 'day' + i, st: 'milling', name: 'Day Bin ' + (i + 1), holds: 'Corn', color: '#ffc61a', lvl: { def: 70, min: 0, max: 100, label: 'Keep filled to' } })),
-  ...[0, 1, 2, 3].map(i => ({ id: 'mill' + i, st: 'milling', name: 'Hammermill ' + (i + 1), holds: 'Corn → flour', color: '#e9c98a', rate: { def: 425, min: 0, max: MILL_MAX, step: 25 } })),
-  { id: 'blend',  st: 'slurry',    name: 'Slurry Blender',    holds: 'Flour + water',  color: '#e9c98a' },
-  { id: 'st1',    st: 'slurry',    name: 'Slurry Tank 1',     holds: 'Corn slurry',    color: '#e8c88a', lvl: { def: 60, min: 0, max: 100 }, temp: { def: 160, min: 120, max: 200, good: [150, 175] } },
+  ...[0, 1, 2, 3].map(i => ({ id: 'day' + i, st: 'milling', name: 'Grinding Bin ' + (i + 1), holds: 'Scalped corn for Hammermill ' + (i + 1), color: '#ffc61a', lvl: { def: 70, min: 0, max: 100, label: 'Keep filled to' } })),
+  ...[0, 1, 2, 3].map(i => ({ id: 'mill' + i, st: 'milling', name: 'Hammermill ' + (i + 1), holds: 'Corn → flour', color: '#e9c98a', rate: { def: 71, min: 0, max: 100, step: 1, unit: '%', label: 'Feeder speed' } })),
+  { id: 'blend',  st: 'slurry',    name: 'Slurry Blender',    holds: 'Flour + backset + cook water + enzyme', color: '#e9c98a' },
+  { id: 'st1',    st: 'slurry',    name: 'Slurry Tank 1',     holds: 'Corn slurry',    color: '#e8c88a', lvl: { def: 60, min: 0, max: 100 }, temp: { def: 186, min: 140, max: 200, good: [182, 190] } },
   { id: 'strA',   st: 'slurry',    name: 'Strainer 1',        holds: 'Slurry',         color: '#c9b48a', duty: 0 },
   { id: 'strB',   st: 'slurry',    name: 'Strainer 2',        holds: 'Slurry',         color: '#c9b48a', duty: 1 },
   { id: 'tb3',    st: 'receiving', name: 'Tin Bin 3', holds: 'Corn (550,000 bu storage)', color: '#ffc61a' },
   { id: 'tb4',    st: 'receiving', name: 'Tin Bin 4', holds: 'Corn (550,000 bu storage)', color: '#ffc61a' },
   { id: 'cip',    st: 'slurry',    name: 'CIP Tank',          holds: 'Cleaning solution', color: '#7fd3ff' },
-  { id: 'st2',    st: 'slurry',    name: 'Slurry Tank 2',     holds: 'Strained slurry', color: '#e8c88a', lvl: { def: 60, min: 0, max: 100 }, temp: { def: 180, min: 140, max: 205, good: [175, 188] } },
+  { id: 'st2',    st: 'slurry',    name: 'Slurry Tank 2',     holds: 'Strained slurry', color: '#e8c88a', lvl: { def: 60, min: 0, max: 100 }, temp: { def: 187, min: 140, max: 205, good: [182, 190] } },
   { id: 'hydro',  st: 'cook',      name: 'Hydroheater',       holds: 'Slurry + steam',  color: '#ff5a5f', temp: { def: 225, min: 195, max: 250, good: [220, 230], label: 'Discharge temperature' } },
   { id: 'ct1',    st: 'cook',      name: 'Cook Tube 1',       holds: 'Cooking mash',   color: '#f0a84a', tempRO: true },
   { id: 'ct2',    st: 'cook',      name: 'Cook Tube 2',       holds: 'Cooking mash',   color: '#f0a84a', tempRO: true },
@@ -4400,6 +4413,9 @@ const UNITS = [
 const UNIT = {}; UNITS.forEach(u => { UNIT[u.id] = u; });
 
 const F = {
+  ratio: r => r < 4.5 ? clamp(1 - 0.06 * (4.5 - r), 0.85, 1) : r > 5.1 ? clamp(1 - 0.12 * (r - 5.1), 0.8, 1) : 1,   // thin slurry: weak beer; thick: viscous, poor liquefaction
+  enz: x => x >= 0.85 ? 1 : clamp(0.7 + 0.3 * x / 0.85, 0.7, 1),   // alpha-amylase dose vs what the grind needs
+  backset: b => b > 65 ? clamp(1 - 0.012 * (b - 65), 0.8, 1) : 1,   // too much backset: salts and solids build up
   slurryT(T) { if (T < 175) return clamp(1 - 0.0004 * (175 - T) ** 2, 0.85, 1); if (T <= 188) return 1; return clamp(1 - 0.0006 * (T - 188) ** 2, 0.85, 1); },
   cookT(T) { if (T < 220) return clamp(1 - 0.0015 * (220 - T) ** 2, 0.6, 1); if (T <= 230) return 1; return clamp(1 - 0.0008 * (T - 230) ** 2, 0.8, 1); },
   hold: h => 1 - Math.exp(-h / 0.008),
@@ -4417,16 +4433,21 @@ function newFerm() { return { state: 'empty', t: 0, bu: 0, pot: 0, p: 0, stress:
 function newProp() { return { state: 'empty', t: 0, bu: 0, pot: 0, grow: 0, hold: 0, stress: 0, q0: 1, q: 0, to: -1, T: 80 }; }
 function propQ(p) { return p.q0 * (0.35 + 0.65 * p.grow) * (1 - p.stress) * (p.hold > PROP_STALE ? Math.exp(-(p.hold - PROP_STALE) / 12) : 1); }
 
+function spDefaults(u) {   // a unit's setpoints at their defaults (level, temperature, rate and any extra controls)
+  const o = { lvl: u.lvl && u.lvl.def, temp: u.temp && u.temp.def, rate: u.rate && u.rate.def };
+  for (const c of u.ctls || []) o[c] = u[c].def;
+  return o;
+}
 function create() {
   const s = { t: 0, sp: {}, events: [], alerts: [], speed: SIM_H_PER_SEC };
-  UNITS.forEach(u => { s.sp[u.id] = { lvl: u.lvl && u.lvl.def, temp: u.temp && u.temp.def, rate: u.rate && u.rate.def }; });
+  UNITS.forEach(u => { s.sp[u.id] = spDefaults(u); });
   s.silo = [0, 1].map(() => ({ L: 60, inflow: 0 }));
   s.day = [0, 1, 2, 3].map(() => ({ L: 70, inflow: 0 }));
-  s.mills = [0, 1, 2, 3].map(() => ({ rate: 0, limit: '' }));
-  s.blend = { flow: 0 };
-  s.st1 = { L: 60, T: 160, out: 0 };
+  s.mills = [0, 1, 2, 3].map((_, i) => ({ rate: 0, limit: '', lbm: 0, amps: 0, bearT: 95, dir: i % 2 ? 'REV' : 'FWD', on: true, low: false }));
+  s.blend = { flow: 0, lbm: 0, water: 0, bsGpm: 0, cwGpm: 0, gpm: 0, dens: 0, mixT: 0, q: 1 };
+  s.st1 = { L: 60, T: 186, out: 0, steam: 0 };
   s.str = [{ f: 0, clean: 0 }, { f: 0, clean: 0 }]; s.duty = 0;
-  s.st2 = { L: 60, T: 180, out: 0 };
+  s.st2 = { L: 60, T: 187, out: 0, steam: 0 };
   s.hydro = { T: 225 }; s.ct = [{ T: 224 }, { T: 223 }]; s.cook = { out: 0, q: 1, hold: 0 };
   s.liq1 = { L: 90, T: 188, out: 0 };
   s.liq = { L: 70, T: 187, out: 0, q: 1 };
@@ -4466,9 +4487,9 @@ function step(s, realDt) {
 function dead(s) {
   s.silo.forEach(sl => { sl.inflow = 0; });
   s.day.forEach(d => { d.inflow = 0; });
-  s.mills.forEach(m => { m.rate = 0; m.limit = 'power'; });
+  s.mills.forEach(m => { m.rate = 0; m.limit = 'power'; m.lbm = 0; m.amps = 0; });
   s.conveyor = 0; s.recv = 0; s.recvRail = 0; s.recvTruck = 0;
-  s.blend.flow = 0; s.beer.feed = 0;
+  s.blend.flow = 0; s.blend.lbm = 0; s.blend.water = 0; s.blend.bsGpm = 0; s.blend.cwGpm = 0; s.blend.gpm = 0; s.st1.steam = 0; s.st2.steam = 0; s.beer.feed = 0;
   s.st1.out = 0; s.st2.out = 0; s.cook.out = 0; s.liq1.out = 0; s.liq.out = 0; s.propSide = 0;
   s.out.corn = 0; s.out.eth = 0; s.out.oil = 0; s.out.cake = 0;
 }
@@ -4496,26 +4517,44 @@ function stepH(s, dt) {
   // ---- day bins -> hammermills -> slurry blender
   let flour = 0; s.millLimited = '';
   s.mills.forEach((m, i) => {
-    let r = sp['mill' + i].rate; m.limit = '';
+    let r = sp['mill' + i].rate * MILL_LBM_PCT * 60 / LB_BU; m.limit = '';   // feeder speed % -> bu/h
     const d = s.day[i], dBu = d.L / 100 * CAP.day;
     if (dBu < 5 && r > d.inflow) { r = d.inflow; m.limit = 'nocorn'; }
     if (s.st1.L >= 96) { r = 0; m.limit = 'full'; } else if (s.st1.L > 90) { r *= (96 - s.st1.L) / 6; m.limit = 'full'; }
     m.rate = r; flour += r;
     d.L = clamp((dBu + (d.inflow - r) * dt) / CAP.day * 100, 0, 100);
     if (m.limit && sp['mill' + i].rate > 0) s.millLimited = m.limit;
+    // the motor: running while its feeder is set; a fresh start alternates the rotation (FWD / REV) to wear both sides of the hammers
+    const on = sp['mill' + i].rate > 0;
+    if (on && !m.on) m.dir = m.dir === 'FWD' ? 'REV' : 'FWD';
+    m.on = on; m.lbm = LBM(r);
+    m.amps = on ? MILL_AMP0 + MILL_AMP_LB * m.lbm : 0;
+    m.bearT += ((on ? 78 + 0.024 * m.lbm : 75) - m.bearT) * (1 - Math.exp(-dt / 0.4));
+    // low level switch on the grinding bin
+    if (d.L < 10 && on && !m.low) { m.low = true; s.alerts.push({ unit: 'day' + i, msg: 'Grinding Bin ' + (i + 1) + ' low level — Hammermill ' + (i + 1) + ' is running out of corn.' }); }
+    if (d.L > 20) m.low = false;
   });
   s.blend.flow = flour;
+  // ---- slurry blender: flour + backset + heated cook water, mixed to the grind / water ratio; alpha-amylase dosed in
+  { const B = s.blend, bp = BLEND, lbm = LBM(flour), water = lbm / bp.ratio, bs = water * bp.bs / 100, cw = water - bs;
+    B.lbm = lbm; B.water = water; B.bsGpm = bs; B.cwGpm = cw; B.gpm = water + lbm / FLOUR_LBG;
+    const mass = lbm + cw * WATER_LBG + bs * BACKSET_LBG;
+    B.dens = B.gpm > 0 ? mass / B.gpm : 0;
+    B.mixT = mass > 0 ? (lbm * 0.4 * CORN_T + cw * WATER_LBG * CW_T + bs * BACKSET_LBG * BS_T) / (lbm * 0.4 + cw * WATER_LBG + bs * BACKSET_LBG) : CORN_T;
+    B.enzNeed = lbm * ENZ_PER_LB;
+    B.q = lbm > 1 ? F.ratio(bp.ratio) * F.enz(B.enzNeed > 0 ? bp.enz / B.enzNeed : 1) * F.backset(bp.bs) : 1; }
 
   // ---- slurry tank 1 -> duty strainer -> slurry tank 2
   const b1 = s.st1.L / 100 * CAP.st1, sd = s.str[s.duty], so = s.str[1 - s.duty];
   const strCap = STR_MAX * (1 - Math.pow(sd.f, 3));
-  let o1 = clamp(flour + 2.5 * (s.st1.L - sp.st1.lvl) / 100 * CAP.st1, 0, 3400);
+  let o1 = clamp(flour + 2.5 * (s.st1.L - sp.st1.lvl) / 100 * CAP.st1, 0, 3400 * K);
   if (s.st2.L >= 97) o1 = 0;
   s.strainLimited = o1 > strCap + 1;
   o1 = Math.min(o1, strCap, b1 / dt + flour);
   s.st1.out = o1;
   s.st1.L = clamp((b1 + (flour - o1) * dt) / CAP.st1 * 100, 0, 100);
   s.st1.T += (sp.st1.temp - s.st1.T) * (1 - Math.exp(-dt / 0.5));
+  s.st1.steam = flour > 1 ? clamp((sp.st1.temp - s.blend.mixT) / 32 * 100, 0, 100) : 0;   // steam valve: how far it heats the blended slurry
   if (FAILURES) sd.f = Math.min(1, sd.f + dt * o1 / 1700 / STR_PLUG_H); sd.clean = 0;   // plugging is off until manual strainer switching is added
   if (so.f > 0) { so.clean += dt; so.f = Math.max(0, so.f - dt / STR_CLEAN_H); }
   if (sd.f > 0.8 && !sd.warned) { sd.warned = true; s.alerts.push({ unit: s.duty ? 'strB' : 'strA', msg: 'Strainer ' + (s.duty + 1) + ' is plugging — switch to the other strainer.' }); }
@@ -4523,12 +4562,13 @@ function stepH(s, dt) {
 
   // ---- slurry tank 2 -> hydroheater -> cook tube 1 -> cook tube 2
   const b2 = s.st2.L / 100 * CAP.st2;
-  let o2 = clamp(o1 + 2.5 * (s.st2.L - sp.st2.lvl) / 100 * CAP.st2, 0, 3400);
+  let o2 = clamp(o1 + 2.5 * (s.st2.L - sp.st2.lvl) / 100 * CAP.st2, 0, 3400 * K);
   if (s.liq1.L >= 97) o2 = 0;
   o2 = Math.min(o2, b2 / dt + o1);
   s.st2.out = o2;
   s.st2.L = clamp((b2 + (o1 - o2) * dt) / CAP.st2 * 100, 0, 100);
   s.st2.T += (sp.st2.temp - s.st2.T) * (1 - Math.exp(-dt / 0.5));
+  s.st2.steam = o2 > 1 ? clamp(35 + (sp.st2.temp - s.st1.T) * 12, 0, 100) : 0;
   const hT = o2 > 1 ? sp.hydro.temp : s.st2.T;
   s.hydro.T += (hT - s.hydro.T) * (1 - Math.exp(-dt / (o2 > 1 ? 0.04 : 0.6)));
   s.ct[0].T += (s.hydro.T - 1.2 - s.ct[0].T) * (1 - Math.exp(-dt / 0.06));
@@ -4550,13 +4590,13 @@ function stepH(s, dt) {
   // Liq Tank 2: the online Liq pump sends mash to the filling fermenter
   const lIn = l1Out, lBu = s.liq.L / 100 * CAP.liq;
   let lOut = 0;
-  if (filling) { lOut = clamp(lIn + 2.5 * (s.liq.L - sp.liq.lvl) / 100 * CAP.liq, 0, 3600); lOut = Math.min(lOut, lBu / dt + lIn); }
+  if (filling) { lOut = clamp(lIn + 2.5 * (s.liq.L - sp.liq.lvl) / 100 * CAP.liq, 0, 3600 * K); lOut = Math.min(lOut, lBu / dt + lIn); }
   s.liq.out = lOut;
   s.liq.L = clamp((lBu + (lIn - lOut) * dt) / CAP.liq * 100, 0, 100);
   s.liq.T += (sp.liq.temp - s.liq.T) * (1 - Math.exp(-dt / 0.4));
   const resH = sOut > 1 ? (lBu + l1Bu) / sOut : 2;
   s.liq.res = resH;
-  s.liq.q = F.liqT(s.liq.T) * F.residence(resH) * F.slurryT(s.st2.T) * s.cook.q;
+  s.liq.q = F.liqT(s.liq.T) * F.residence(resH) * F.slurryT(s.st2.T) * s.cook.q * s.blend.q;
 
   // ---- yeast: blend tank -> prop tanks -> pitched into the fermenter that is filling (v1.97.76)
   const yb = s.yb;
@@ -4677,7 +4717,7 @@ function stepH(s, dt) {
   s.cake.ships = s.cake.ships || [];
   const cakePending = s.cake.ships.reduce((a, x) => a + x.left, 0);
   if (s.cake.t - cakePending >= CAKE_LOAD + 8 && s.cake.ships.length < 3) { const x = { left: CAKE_LOAD }; s.cake.ships.push(x); s.events.push({ kind: 'cake', ship: x }); }
-  for (const x of s.cake.ships) { const d = Math.min(x.left, CAKE_LOAD / TRUCK_DRAIN_H * dt); x.left -= d; s.cake.t -= d; }
+  for (const x of s.cake.ships) { const d = Math.min(x.left, CAKE_LOAD / CAKE_DRAIN_H * dt); x.left -= d; s.cake.t -= d; }
   s.cake.ships = s.cake.ships.filter(x => x.left > 0.05);
 
   // ---- shipping: a truck is called when a storage tank passes its ship point
@@ -4766,29 +4806,32 @@ function status(s, id) {
       return ['good', s.silo[+id[4]].filling ? 'Receiving corn — trucks fill it back up to the setpoint.' : 'At setpoint. Trucks start again when it drops 3% below.'];
     case 'day0': case 'day1': case 'day2': case 'day3': {
       const m = s.mills[+id[3]];
-      if (L < 3 && s.sp['mill' + id[3]].rate > 0) return ['bad', 'Day bin empty — its mill is starving. Raise the setpoint or check the silos.'];
+      if (L < 3 && s.sp['mill' + id[3]].rate > 0) return ['bad', 'Grinding bin empty — its mill is starving. Raise the setpoint or check the tin bins.'];
+      if (L < 10 && s.sp['mill' + id[3]].rate > 0) return ['warn', 'Low level alarm — the mill will run out of corn soon.'];
       if (sp.lvl < 20) return ['warn', 'Low level leaves the mill little buffer.'];
-      return ['good', 'The overhead conveyor keeps this bin topped up from the silos.'];
+      return ['good', 'Corn from the tin bins goes over the scalper and the gravity splitter, which keeps this bin topped up.'];
     }
     case 'mill0': case 'mill1': case 'mill2': case 'mill3': {
       const m = s.mills[+id[4]];
       if (sp.rate === 0) return ['idle', 'Mill stopped.'];
-      if (m.limit === 'nocorn') return ['bad', 'Day bin is empty — the mill is starving for corn.'];
+      if (m.limit === 'nocorn') return ['bad', 'Grinding bin is empty — the mill is starving for corn.'];
       if (m.limit === 'full') return ['bad', 'Slowed down: Slurry Tank 1 is full because the plant downstream is backed up.'];
-      return ['good', 'Grinding corn into flour for the slurry blender.'];
+      if (sp.rate > 90) return ['warn', 'Feeder near wide open — the mill is pulling ' + Math.round(m.amps) + ' A.'];
+      return ['good', 'Grinding corn into flour for the slurry blender (' + m.dir + ').'];
     }
     case 'tb3': case 'tb4':
       return ['idle', 'Big storage bin (550,000 bu). Not connected yet.'];
     case 'cip':
       return ['idle', 'Clean-in-place tank. Not piped to anything yet.'];
-    case 'blend':
+    case 'blend': {
       if (s.blend.flow < 1) return ['idle', 'No flour coming in.'];
-      return ['good', 'Mixes flour from the mills with hot water into slurry.'];
+      return ['good', 'Mixing flour with backset and hot cook water into slurry.'];
+    }
     case 'st1': {
       if (L > 94) return ['bad', 'High level — the mills have to slow down.'];
       if (L < 8) return ['bad', 'Low level — the transfer pump is starving.'];
       if (s.strainLimited) return ['warn', 'The strainer is plugging, so slurry is backing up here.'];
-      const t = tempMsg(UNIT.st1, T); if (t) return [t[0], t[1] + ' — best range is 150–175°F.'];
+      const t = tempMsg(UNIT.st1, T); if (t) return [t[0], t[1] + ' — best range is 182–190°F.'];
       return ['good', 'Slurry mixing and soaking before straining.'];
     }
     case 'strA': case 'strB': {
@@ -4801,7 +4844,7 @@ function status(s, id) {
     case 'st2': {
       if (L > 94) return ['bad', 'High level — the cook can\'t take more, so slurry backs up.'];
       if (L < 8) return ['bad', 'Low level — the hydroheater feed pump is starving.'];
-      const t = tempMsg(UNIT.st2, T); if (t) return [t[0], t[1] + ' — best range is 175–188°F.'];
+      const t = tempMsg(UNIT.st2, T); if (t) return [t[0], t[1] + ' — best range is 182–190°F.'];
       return ['good', 'Strained slurry waiting to be cooked.'];
     }
     case 'hydro': {
@@ -4907,7 +4950,7 @@ function stationStatus(s, st) {
   return w;
 }
 
-const Sim = { PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
+const Sim = { K, LB_BU, GAL_BU, LBM, GPM, CW_T, spDefaults, PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
 if (typeof module !== 'undefined') module.exports = Sim; else root.Sim = Sim;
 })(this);
 </script>
@@ -11997,7 +12040,7 @@ function update(sim, dt, events) {
   dayT += dt;
   if (dayT > (GT.rate > 1 ? 0.2 : 20)) { dayT = 0; const d = gameDate(); daylight(d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600); }   // fast cycle: re-light 5x a second
   clock += dt;
-  const Sim = root.Sim, p = sim.sp, o = sim.out, N = 1800;
+  const Sim = root.Sim, p = sim.sp, o = sim.out, N = 1800 * Sim.K;   // v1.97.87: flows are K times bigger at the real rate; the visuals keep their look
   const lv = id => Sim.level(sim, id) / 100;
   const feed = sim.beer.feed;
 
@@ -12010,11 +12053,11 @@ function update(sim, dt, events) {
   O.fSpout[0].rate = sim.silo[0].inflow / 1500; O.fSpout[1].rate = sim.silo[1].inflow / 1500;
   O.pitGrain.forEach((f, i) => { f.rate = !POWER_OUTAGE.on && pitBusy[i] ? 1 : 0; });
   O.fCollect.rate = O.fCollect2.rate = O.fIncline.rate = O.fTransfer.rate = sim.conveyor / N;
-  O.fBinSpout.forEach((f, i) => { f.rate = sim.day[i].inflow / 900; });
+  O.fBinSpout.forEach((f, i) => { f.rate = sim.day[i].inflow / 1800; });
   O.cleaner.position.x = COLX + GDX + (sim.conveyor > 1 ? Math.sin(clock * 55) * 0.12 : 0);
   sim.mills.forEach((m, i) => { O.fDay[i].rate = m.rate / 425; O.fMillOut[i].rate = m.rate / 425; });
   O.fFlour.rate = O.fFlour2.rate = O.fFlour3.rate = sim.blend.flow / N;
-  O.fMillA.rate = (sim.mills[0].rate + sim.mills[1].rate) / 850; O.fMillB.rate = (sim.mills[2].rate + sim.mills[3].rate) / 850;
+  O.fMillA.rate = (sim.mills[0].rate + sim.mills[1].rate) / (850 * Sim.K); O.fMillB.rate = (sim.mills[2].rate + sim.mills[3].rate) / (850 * Sim.K);
   O.fBlend.rate = sim.blend.flow / N;
   O.str.forEach((st, i) => { st.f.rate = sim.duty === i ? sim.st1.out / N : 0; });
   O.fToHydro.rate = sim.st2.out / N; O.fCook.rate = sim.cook.out / N; O.fFlash.rate = sim.cook.out / N; O.fLiqOvf.rate = sim.liq1.out / N; O.hx.forEach((f, i) => { f.rate = sim.hxTrain === i ? sim.liq.out / N : 0; }); O.lp.forEach((p, i) => { const on = sim.liqDuty === i; p.f.rate = on ? sim.liq.out / N : 0; p.light.color.setHex(on ? 0x3ddc84 : 0x9aa4ae); }); O.fSteamIn.rate = sim.cook.out > 1 ? Math.max(0.3, (sim.hydro.T - 190) / 40) : 0;
@@ -12030,7 +12073,7 @@ function update(sim, dt, events) {
   sim.ferm.forEach((fm, i) => { O.ferms[i].rec.rate = !POWER_OUTAGE.on && fm.bu > 100 && fm.state !== 'cleaning' ? 0.6 : 0; });
   O.fFeed.rate = feed / N;
   updateFlows(dt);
-  for (const s of spinners) s.o.rotation[s.axis] += dt * (POWER_OUTAGE.on ? 0 : 1) * (s.k === 'prop' ? (sim.prop && sim.prop[s.i].bu > 20 ? 2.5 : 0) : s.k === 'ybm' ? (sim.yb && (sim.yb.state === 'mixing' || sim.yb.state === 'dumping') ? 5 : 0) : s.k === 'mill' ? 16 * sim.mills[s.i].rate / 425 : s.k === 'blend' ? 6 * Math.min(1.5, sim.blend.flow / N) : s.k === 'agit' ? (sim.ferm[s.i].bu > 100 ? 2.5 : 0) : 9 * Math.min(1.5, feed / N));
+  for (const s of spinners) s.o.rotation[s.axis] += dt * (POWER_OUTAGE.on ? 0 : 1) * (s.k === 'prop' ? (sim.prop && sim.prop[s.i].bu > 20 ? 2.5 : 0) : s.k === 'ybm' ? (sim.yb && (sim.yb.state === 'mixing' || sim.yb.state === 'dumping') ? 5 : 0) : s.k === 'mill' ? 16 * sim.mills[s.i].rate / (425 * Sim.K) : s.k === 'blend' ? 6 * Math.min(1.5, sim.blend.flow / N) : s.k === 'agit' ? (sim.ferm[s.i].bu > 100 ? 2.5 : 0) : 9 * Math.min(1.5, feed / N));
 
   // real tank levels
   O.silos[0].set(lv('silo0')); O.silos[1].set(lv('silo1'));
@@ -17739,7 +17782,7 @@ const n0 = v => Math.round(v).toLocaleString('en-US');
 
 // ---------- outputs ----------
 const OUTS = [
-  { k: 'corn',  label: 'Corn ground', color: '#f4c430', f: o => n0(o.corn) + ' bu/h' },
+  { k: 'corn',  label: 'Corn ground', color: '#f4c430', f: o => n0(Sim.LBM(o.corn)) + ' lb/min' },
   { k: 'eth',   label: 'Ethanol',     color: '#2fb6ff', f: o => n0(o.eth) + ' gal/h' },
   { k: 'oil',   label: 'Corn oil',    color: '#ffb300', f: o => n0(o.oil) + ' lb/h' },
   { k: 'cake',  label: 'Wet cake',    color: '#7a4b22', f: o => o.cake.toFixed(1) + ' t/h' },
@@ -17811,7 +17854,7 @@ function buildPanel() {
       <div class="ctl" data-c="temp"><div class="lab"><span>Temperature setpoint</span><span class="v"></span></div>${track(true)}</div></div>`;
   if (u.lvlRO) h += `<div class="blk"><div class="bh"><span>Level</span><b id="pvL"></b></div><div class="gauge"><div class="gfill" id="gL" style="background:${u.color}"></div></div></div>`;
   if (u.tempRO) h += `<div class="blk"><div class="bh"><span>Temperature</span><b id="pvT"></b></div><div class="hint">${u.tempHint || 'Set by the hydroheater discharge temperature.'}</div></div>`;
-  if (u.rate) h += `<div class="blk"><div class="bh"><span>${cur === 'recv' || cur === 'rail' ? 'Receiving' : 'Grinding'}</span><b id="pvR"></b></div>
+  if (u.rate) h += `<div class="blk"><div class="bh"><span>${cur === 'recv' || cur === 'rail' ? 'Receiving' : 'Feed'}</span><b id="pvR"></b></div>
       <div class="ctl" data-c="rate"><div class="lab"><span>${u.rate.label || 'Grind rate setpoint'}</span><span class="v"></span></div>${track()}</div></div>`;
   if (u.duty !== undefined) h += `<div class="blk"><div class="bh"><span>Plugged</span><b id="pvP"></b></div>
       <div class="gauge"><div class="gfill" id="gP" style="background:#8a6a3c"></div></div>
@@ -17832,7 +17875,7 @@ function bindCtl(el, u) {
   const c = el.dataset.c, m = u[c], step = m.step || (c === 'temp' ? 1 : 5), tr = el.querySelector('.track');
   const C = { el, c, m, step };
   C.get = () => sim.sp[cur][c];
-  C.set = v => { v = Math.round(v / step) * step; sim.sp[cur][c] = Math.max(m.min, Math.min(m.max, v)); render(C); };
+  C.set = v => { v = Math.round(v / step) * step; if (step < 1) v = +v.toFixed(2); sim.sp[cur][c] = Math.max(m.min, Math.min(m.max, v)); render(C); };
   C.frac = v => (v - m.min) / (m.max - m.min);
   let drag = false;
   const at = e => { const r = tr.getBoundingClientRect(); C.set(m.min + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (m.max - m.min)); };
@@ -17849,7 +17892,7 @@ function render(C) {
   const v = C.get(), f = C.frac(v);
   C.el.querySelector('.fill').style.width = f * 100 + '%';
   C.el.querySelector('.knob').style.left = f * 100 + '%';
-  C.el.querySelector('.v').textContent = C.c === 'temp' ? v + '°F' : C.c === 'rate' ? (C.m.unit ? v + ' ' + C.m.unit : n0(v) + ' bu/h') : v + '%';
+  C.el.querySelector('.v').textContent = C.c === 'temp' ? v + '°F' : C.c === 'lvl' ? v + '%' : C.m.unit ? (C.m.step < 1 ? v.toFixed(1) : v) + ' ' + C.m.unit : n0(v) + ' bu/h';
 }
 function refreshPanel() {
   if (!cur) return;
@@ -17863,7 +17906,7 @@ function refreshPanel() {
     $('gSP').style.left = sim.sp[cur].lvl + '%';
   }
   if (u.temp || u.tempRO) { const T = Sim.temp(sim, cur); $('pvT').textContent = T.toFixed(1) + '°F'; }
-  if (u.rate) $('pvR').textContent = n0(cur === 'recv' ? sim.recvTruck : cur === 'rail' ? sim.recvRail : sim.mills[+cur[4]].rate) + ' bu/h';
+  if (u.rate) $('pvR').textContent = cur === 'recv' ? n0(sim.recvTruck) + ' bu/h' : cur === 'rail' ? n0(sim.recvRail) + ' bu/h' : n0(sim.mills[+cur[4]].lbm) + ' lb/min';
   if (u.duty !== undefined) {
     const st = sim.str[u.duty], on = sim.duty === u.duty;
     $('pvP').textContent = (st.f * 100).toFixed(0) + '%';
@@ -17874,39 +17917,39 @@ function refreshPanel() {
   $('uinfo').innerHTML = info(cur).map(r => `<div><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
 }
 function info(id) {
-  const s = sim, C = Sim.CAP;
+  const s = sim, C = Sim.CAP, gpm = v => n0(Sim.GPM(v)) + ' GPM', lbm = v => n0(Sim.LBM(v)) + ' lb/min';
   switch (id) {
     case 'rail': return [['Corn from rail', n0(s.recvRail) + ' bu/h'], ['Each hopper car', '≈3,500 bu'], ['Total receiving', n0(s.recv) + ' bu/h'], ['Tin Bins 1 / 2', s.silo[0].L.toFixed(0) + '% / ' + s.silo[1].L.toFixed(0) + '%']];
     case 'recv': return [['Corn from trucks', n0(s.recvTruck) + ' bu/h'], ['Elevators sending to', s.silo[0].inflow && s.silo[1].inflow ? 'Both bins' : s.silo[0].inflow ? 'Tin Bin 1' : s.silo[1].inflow ? 'Tin Bin 2' : '—'], ['Trucks unloaded', n0(s.trucksIn || 0)], ['Mills using', n0(s.blend.flow) + ' bu/h'], ['Tin Bins 1 / 2', s.silo[0].L.toFixed(0) + '% / ' + s.silo[1].L.toFixed(0) + '%']];
     case 'silo0': case 'silo1': { const sl = s.silo[+id[4]]; return [['Corn in bin', n0(sl.L / 100 * C.silo) + ' bu'], ['Trucks unloading', sl.inflow > 0 ? 'Yes' : 'No'], ['Both bins to day bins', n0(s.conveyor) + ' bu/h']]; }
-    case 'day0': case 'day1': case 'day2': case 'day3': { const i = +id[3], d = s.day[i]; return [['Corn in bin', n0(d.L / 100 * C.day) + ' bu'], ['Filling from silos', n0(d.inflow) + ' bu/h'], ['To Hammermill ' + (i + 1), n0(s.mills[i].rate) + ' bu/h']]; }
-    case 'mill0': case 'mill1': case 'mill2': case 'mill3': { const i = +id[4]; return [['Day Bin ' + (i + 1), s.day[i].L.toFixed(0) + '%'], ['All 4 mills', n0(s.blend.flow) + ' bu/h'], ['Slurry Tank 1', s.st1.L.toFixed(0) + '%']]; }
-    case 'blend': return [['Flour in', n0(s.blend.flow) + ' bu/h'], ['Hot water in', n0(s.blend.flow * 0.42) + ' gal/min'], ['To Slurry Tank 1', n0(s.blend.flow) + ' bu/h']];
-    case 'st1': return [['In from blender', n0(s.blend.flow) + ' bu/h'], ['Pumped to strainer', n0(s.st1.out) + ' bu/h'], ['Time in tank', s.st1.out > 1 ? (s.st1.L / 100 * C.st1 / s.st1.out * 60).toFixed(0) + ' min' : '—'], ['Strainer in service', 'Strainer ' + (s.duty + 1)]];
-    case 'strA': case 'strB': { const i = id === 'strA' ? 0 : 1; return [['Status', s.duty === i ? 'In service' : (s.str[i].f > 0.01 ? 'Standby — cleaning' : 'Standby — clean')], ['Flow through', n0(s.duty === i ? s.st1.out : 0) + ' bu/h']]; }
+    case 'day0': case 'day1': case 'day2': case 'day3': { const i = +id[3], d = s.day[i]; return [['Corn in bin', n0(d.L / 100 * C.day) + ' bu'], ['Filling from tin bins', lbm(d.inflow)], ['To Hammermill ' + (i + 1), lbm(s.mills[i].rate)], ['Low level alarm', d.L < 10 ? 'ON' : 'Off']]; }
+    case 'mill0': case 'mill1': case 'mill2': case 'mill3': { const i = +id[4], m = s.mills[i]; return [['Feed', lbm(m.rate)], ['Motor', m.on ? Math.round(m.amps) + ' A · ' + m.dir : 'Stopped'], ['Bearings', m.bearT.toFixed(0) + '°F'], ['Grinding Bin ' + (i + 1), s.day[i].L.toFixed(0) + '%'], ['All 4 mills', lbm(s.blend.flow)]]; }
+    case 'blend': { const B = s.blend; return [['Ground corn in', n0(B.lbm) + ' lb/min'], ['Backset in', n0(B.bsGpm) + ' GPM'], ['Cook water in (' + Sim.CW_T + '°F)', n0(B.cwGpm) + ' GPM'], ['Slurry out', n0(B.gpm) + ' GPM'], ['Slurry density', B.dens ? B.dens.toFixed(2) + ' lb/gal' : '—'], ['Mixed temperature', B.lbm > 1 ? B.mixT.toFixed(0) + '°F' : '—'], ['Enzyme needed', n0(B.enzNeed || 0) + ' ml/min']]; }
+    case 'st1': return [['In from blender', n0(s.blend.gpm) + ' GPM'], ['Pumped to strainer', gpm(s.st1.out)], ['Steam valve', s.st1.steam.toFixed(0) + '%'], ['Density', s.blend.dens ? s.blend.dens.toFixed(2) + ' lb/gal' : '—'], ['Time in tank', s.st1.out > 1 ? (s.st1.L / 100 * C.st1 / s.st1.out * 60).toFixed(0) + ' min' : '—'], ['Strainer in service', 'Strainer ' + (s.duty + 1)]];
+    case 'strA': case 'strB': { const i = id === 'strA' ? 0 : 1; return [['Status', s.duty === i ? 'In service' : (s.str[i].f > 0.01 ? 'Standby — cleaning' : 'Standby — clean')], ['Flow through', gpm(s.duty === i ? s.st1.out : 0)]]; }
     case 'tb3': case 'tb4': return [['Capacity', '550,000 bu'], ['Connected to', 'Nothing yet']];
     case 'cip': return [['Holds', 'Cleaning solution'], ['Connected to', 'Nothing yet']];
-    case 'st2': return [['In from strainer', n0(s.st1.out) + ' bu/h'], ['Pumped to hydroheater', n0(s.st2.out) + ' bu/h'], ['Time in tank', s.st2.out > 1 ? (s.st2.L / 100 * C.st2 / s.st2.out * 60).toFixed(0) + ' min' : '—']];
-    case 'hydro': return [['Slurry flow', n0(s.cook.out) + ' bu/h'], ['Inlet temperature', s.st2.T.toFixed(0) + '°F'], ['Starch cooked', (s.cook.q * 100).toFixed(0) + '%']];
-    case 'ct1': case 'ct2': return [['Flow', n0(s.cook.out) + ' bu/h'], ['Time in both tubes', s.cook.hold > 0 ? (s.cook.hold * 60).toFixed(1) + ' min' : '—'], ['Flow path', id === 'ct1' ? 'In bottom, out top → Tube 2' : 'From Tube 1, in bottom, out top → Flash vessel']];
-    case 'flash': return [['In from Cook Tube 2', n0(s.cook.out) + ' bu/h'], ['Pumped to Liq Tank 1', n0(s.cook.out) + ' bu/h']];
-    case 'liq1': return [['In from flash vessel', n0(s.cook.out) + ' bu/h'], ['Overflow to Liq Tank 2', n0(s.liq1.out) + ' bu/h']];
+    case 'st2': return [['In from strainer', gpm(s.st1.out)], ['Pumped to hydroheater', gpm(s.st2.out)], ['Steam valve', s.st2.steam.toFixed(0) + '%'], ['Time in tank', s.st2.out > 1 ? (s.st2.L / 100 * C.st2 / s.st2.out * 60).toFixed(0) + ' min' : '—']];
+    case 'hydro': return [['Slurry flow', gpm(s.cook.out)], ['Inlet temperature', s.st2.T.toFixed(0) + '°F'], ['Starch cooked', (s.cook.q * 100).toFixed(0) + '%']];
+    case 'ct1': case 'ct2': return [['Flow', gpm(s.cook.out)], ['Time in both tubes', s.cook.hold > 0 ? (s.cook.hold * 60).toFixed(1) + ' min' : '—'], ['Flow path', id === 'ct1' ? 'In bottom, out top → Tube 2' : 'From Tube 1, in bottom, out top → Flash vessel']];
+    case 'flash': return [['In from Cook Tube 2', gpm(s.cook.out)], ['Pumped to Liq Tank 1', gpm(s.cook.out)]];
+    case 'liq1': return [['In from flash vessel', gpm(s.cook.out)], ['Overflow to Liq Tank 2', gpm(s.liq1.out)]];
     case 'hxA1': case 'hxA2': case 'hxB1': case 'hxB2': {
       const on = s.hxTrain === (id[2] === 'A' ? 0 : 1), f = on ? s.liq.out : 0, Tin = s.liq.T, Tmid = Tin - 48, Tout = 92;
-      return [['Train ' + id[2], on ? 'In service' : 'Standby'], ['Mash flow', n0(f) + ' bu/h'],
+      return [['Train ' + id[2], on ? 'In service' : 'Standby'], ['Mash flow', gpm(f)],
         id[3] === '1' ? ['Mash in → out', f > 1 ? Tin.toFixed(0) + '°F → ' + Tmid.toFixed(0) + '°F' : '—'] : ['Mash in → out', f > 1 ? Tmid.toFixed(0) + '°F → ' + Tout + '°F' : '—']];
     }
-    case 'lp1': case 'lp2': { const i = id === 'lp1' ? 0 : 1; return [['Status', s.liqDuty === i ? 'Online' : 'Standby'], ['Flow', n0(s.liqDuty === i ? s.liq.out : 0) + ' bu/h']]; }
-    case 'liq': return [['In from Liq Tank 1', n0(s.liq1.out) + ' bu/h'], ['Pumped to fermenters', n0(s.liq.out) + ' bu/h'], ['Time in Liq 1 + 2', (s.liq.res * 60).toFixed(0) + ' min'], ['Starch broken down', (s.liq.q * 100).toFixed(0) + '%']];
-    case 'beer': return [['Beer in well', n0(s.beer.bu * 17) + ' gal'], ['Feed to column', n0(s.beer.feed * 17) + ' gal/h'], ['Ethanol in beer', s.beer.bu > 0 ? (s.beer.eth / (s.beer.bu * 17) * 100).toFixed(1) + '%' : '—']];
-    case 'col': return [['Beer feed', n0(s.beer.feed * 17) + ' gal/h'], ['Ethanol recovered', (s.col.rec * 100).toFixed(0) + '%'], ['Product proof', s.out.proof.toFixed(0)], ['Lost out the bottom', n0(s.out.lost) + ' gal/h']];
+    case 'lp1': case 'lp2': { const i = id === 'lp1' ? 0 : 1; return [['Status', s.liqDuty === i ? 'Online' : 'Standby'], ['Flow', gpm(s.liqDuty === i ? s.liq.out : 0)]]; }
+    case 'liq': return [['In from Liq Tank 1', gpm(s.liq1.out)], ['Pumped to fermenters', gpm(s.liq.out)], ['Time in Liq 1 + 2', (s.liq.res * 60).toFixed(0) + ' min'], ['Starch broken down', (s.liq.q * 100).toFixed(0) + '%']];
+    case 'beer': return [['Beer in well', n0(s.beer.bu * Sim.GAL_BU) + ' gal'], ['Feed to column', n0(s.beer.feed * Sim.GAL_BU) + ' gal/h'], ['Ethanol in beer', s.beer.bu > 0 ? (s.beer.eth / (s.beer.bu * Sim.GAL_BU) * 100).toFixed(1) + '%' : '—']];
+    case 'col': return [['Beer feed', n0(s.beer.feed * Sim.GAL_BU) + ' gal/h'], ['Ethanol recovered', (s.col.rec * 100).toFixed(0) + '%'], ['Product proof', s.out.proof.toFixed(0)], ['Lost out the bottom', n0(s.out.lost) + ' gal/h']];
     case 'etoh': return [['In storage', n0(s.etoh.gal) + ' gal'], ['Tanker trucks coming', String((s.etoh.ships || []).length)], ['Making', n0(s.out.eth) + ' gal/h']];
     case 'oil': return [['In storage', n0(s.oil.lb) + ' lb'], ['Trucks coming', String((s.oil.ships || []).length)], ['Making', n0(s.out.oil) + ' lb/h']];
   }
   if (id === 'yb') { const y = s.yb; return [['Batch', { mixing: 'Mixing', ready: 'Mixed, waiting', dumping: 'To Prop ' + (y.to + 1), empty: 'Empty' }[y.state]], ['Yeast strength', Math.round((y.q || 0) * 100) + '%'], ['Yeast cooler', (s.yeastT || 38).toFixed(0) + '°F']]; }
   if (id === 'yp0' || id === 'yp1') { const p = s.prop[+id[2]];
     return [['Status', { empty: 'Empty', filling: 'Filling', propping: 'Growing', ready: 'Ready to pitch', pitching: 'Pitching to Ferm ' + (p.to + 1), cleaning: 'Cleaning (CIP)' }[p.state]],
-      ['Grown', Math.round(p.grow * 100) + '%'], ['Mash in', p.state === 'filling' ? n0(s.propSide) + ' bu/h' : '—'], ['Yeast strength', p.state === 'ready' || p.state === 'pitching' ? Math.round(Sim.propQ(p) * 100) + '%' : '—']]; }
+      ['Grown', Math.round(p.grow * 100) + '%'], ['Mash in', p.state === 'filling' ? gpm(s.propSide) : '—'], ['Yeast strength', p.state === 'ready' || p.state === 'pitching' ? Math.round(Sim.propQ(p) * 100) + '%' : '—']]; }
   if (/^f\d$/.test(id)) {
     const f = s.ferm[+id[1]];
     const r = [['Status', Sim.FSTATE[f.state]]];
@@ -17915,7 +17958,7 @@ function info(id) {
     if (f.bu > 100 && f.state !== 'cleaning') {
       r.push(['Sugar converted', (f.p * 100).toFixed(0) + '%']);
       const eth = f.pot * f.p * (1 - f.stress) * (1 - f.infLoss);
-      r.push(['Ethanol in beer', (eth / (f.bu * 17) * 100).toFixed(1) + '%']);
+      r.push(['Ethanol in beer', (eth / (f.bu * Sim.GAL_BU) * 100).toFixed(1) + '%']);
     }
     if (f.inf) r.push(['Infection', 'Yes ⚠']);
     return r;
@@ -17980,7 +18023,7 @@ function modal(html, buttons, vert) {
   modalBtns.forEach((el, i) => el.onclick = () => { $('modal').classList.remove('open'); buttons[i][1] && buttons[i][1](); });
 }
 function markModal() { modalBtns.forEach((b, i) => b.classList.toggle('focus', nav === 'pad' && i === modalFocus)); }
-function resetAll() { UNITS.forEach(u => { sim.sp[u.id] = { lvl: u.lvl && u.lvl.def, temp: u.temp && u.temp.def, rate: u.rate && u.rate.def }; }); if (cur) buildPanel(); }
+function resetAll() { UNITS.forEach(u => { sim.sp[u.id] = Sim.spDefaults(u); }); if (cur) buildPanel(); }
 function help() {
   modal(`<h1>Your ethanol plant is running</h1>
   <p><b>Tap any tank</b> to select it, then change its <b>level</b> and <b>temperature setpoints</b>. Watch the tanks and pipes react.</p>

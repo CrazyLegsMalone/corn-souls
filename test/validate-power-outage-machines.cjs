@@ -39,7 +39,7 @@ const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
   assert.ok(/No power/.test(st[1]), 'the readout says there is no power: ' + st[1]);
 
   s.power = false;                      // power comes back
-  s.sp.mill0.rate = s.sp.mill1.rate = 425;   // pin the setpoints and give the mills corn and room, so the
+  s.sp.mill0.rate = s.sp.mill1.rate = 71;   // feeder speed % (v1.97.87)   // pin the setpoints and give the mills corn and room, so the
   s.st1.L = 50; s.day[0].L = s.day[1].L = 100;   // check does not depend on where the settle left the plant
   Sim.step(s, 30);
   assert.ok(s.t > snap.t, 'the plant clock runs again');
