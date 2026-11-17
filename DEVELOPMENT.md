@@ -1,3 +1,12 @@
+## TEST v1.97.90 — distillation built and connected as on the plant's screens (2026-11-17)
+- Owner: *"We can finish cooling later let's do distillation"*, with the plant's Beer Stripper, Rectifier, Mole Sieve A and Mole Sieve B screens. Generic names only, no new controls.
+- **Beer column** (now a real column on the pad): beer feed from the beer/mash exchanger in near the top, heated by **2nd effect evaporator vapor** at the bottom, under vacuum (~7.7 psia), ~180 °F bottom / ~153 °F top. Its bottom temperature setpoint moved from the old atmospheric 217 °F to 180 °F (good 176–185 °F); an old saved 217 °F setpoint resets to 180. Overhead vapor to the rectifier; bottoms through the **Beer Bottoms Pump** to the whole stillage tank (stub until that tank is built).
+- **Rectifier** (~5.5 psia, 129 °F top / 140 °F bottom) → **190 Proof Condenser** + **Vent Condensers 1 & 2** → **Reflux Tank** (1,240 gal, **Vacuum Pumps** on its vent to the regen tank) → **Reflux Pump**: reflux back to the top (~1.55× the draw) and 190 proof through the **190 Filter** onto the rack to 190 storage and the sieves. **Fusel Draw Pump** off the side. **Rectifier Bottoms Pump** → **Side Stripper** (the cook's flash vapor now goes into its bottom; the stub is gone), overhead back to the rectifier, bottoms through the **Side Stripper Pump** to the cook water tank (whole stillage tank while the cook water tank is over 65%).
+- **Mole sieves:** **190 Proof Feed Pump** → **Sieve Vaporizer** (~305 °F, 47 psig) → 8 **Sieve Bottles** (Unit A #1 #2 #3 #7, Unit B #4 #5 #6 #8) cycling ON / DEPRESS / REGEN / REPRESS on a 10 min step, two of each unit on line; a colour band on each bottle shows its step. 200 proof vapor → economizer + 200P cooler → **200 Proof Flash Vessel** → **200 Proof Product Pump** → 200 proof storage. Regen vapor → **Regen Condensers 1 & 2** → **Regen Tank** → **Regen Pumps** → rectifier.
+- Flows follow the screens' ratios to the 200 proof rate (190 draw 233/221, regen 41/221, sieve feed 288/221, rectifier bottoms 200/221). Column sizes and the pad layout are estimates.
+- Tests: new `validate-distillation.cjs`.
+- Bumped TEST to `1.97.90`.
+
 ## TEST v1.97.89 — the cook and liquefaction connected as on the plant's screens (2026-11-17)
 - Owner: *"Continue"* (after v1.97.88: next the cook, from the plant's cook / liquefaction / beer well screens).
 - **Hydroheater:** shows the steam it takes (lb/h, ~23,700 at the normal rate, worked out from the heat the slurry takes) and its pressure (~22.6 psig).

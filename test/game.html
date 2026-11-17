@@ -4420,11 +4420,87 @@ const UNITS = [
   ...[0, 1].map(i => ({ id: 'yp' + i, st: 'ferm', name: 'Yeast Prop Tank ' + (i + 1), holds: 'Yeast growing in cooled mash', color: '#e8d29a', lvlRO: true, temp: { def: 91, min: 80, max: 100, good: [88, 93] } })),
   ...Array.from({ length: NF }, (_, i) => ({ id: 'f' + i, st: 'ferm', name: 'Fermenter ' + (i + 1), holds: 'Fermenting mash', color: '#d9a441', lvl: { def: 85, min: 20, max: 100, label: 'Fill to' }, temp: { def: 90, min: 78, max: 100, good: [88, 92] } })),
   { id: 'beer',   st: 'ferm',      name: 'Beer Well',         holds: 'Beer',          color: '#d9a441', lvl: { def: 40, min: 0, max: 100 } },
-  { id: 'col',    st: 'dist',      name: 'Beer Column',       holds: 'Beer → ethanol vapor', color: '#4aa3ff', temp: { def: 217, min: 195, max: 240, good: [212, 222], label: 'Bottom temperature' } },
+  { id: 'col',    st: 'dist',      name: 'Beer Column',       holds: 'Beer → ethanol vapor (under vacuum)', color: '#4aa3ff', temp: { def: 180, min: 165, max: 195, good: [176, 185], label: 'Bottom temperature' } },
+  // v1.97.90 distillation as on the plant's Beer Stripper, Rectifier and Mole Sieve screens (generic names, no controls yet)
+  { id: 'bbp',    st: 'dist', name: 'Beer Bottoms Pump',        holds: 'Whole stillage to the Whole Stillage Tank', color: '#2f6fa8' },
+  { id: 'ss',     st: 'dist', name: 'Side Stripper',            holds: 'Rectifier bottoms + flash vapor', color: '#4aa3ff', lvlRO: true, tempRO: true, tempHint: 'Bottom temperature; the flash vapor from cook does the heating.' },
+  { id: 'ssp',    st: 'dist', name: 'Side Stripper Pump',       holds: 'Hot water to the cook water tank', color: '#2f6fa8' },
+  { id: 'rect',   st: 'dist', name: 'Rectifier',                holds: 'Ethanol vapor → 190 proof', color: '#4aa3ff', tempRO: true, tempHint: 'Bottom temperature; the rectifier runs under vacuum.' },
+  { id: 'rbp',    st: 'dist', name: 'Rectifier Bottoms Pump',   holds: 'Weak ethanol to the side stripper', color: '#2f6fa8' },
+  { id: 'fusel',  st: 'dist', name: 'Fusel Draw Pump',          holds: 'Fusel oils off the rectifier', color: '#2f6fa8' },
+  { id: 'cond190', st: 'dist', name: '190 Proof Condenser',     holds: 'Rectifier overhead vapor + vent condensers', color: '#5fb8ff' },
+  { id: 'reflux', st: 'dist', name: 'Reflux Tank',              holds: '190 proof ethanol', color: '#9fe0ff', lvlRO: true },
+  { id: 'vac',    st: 'dist', name: 'Vacuum Pumps',             holds: 'Pull the vacuum on the columns', color: '#2f6fa8' },
+  { id: 'rfp',    st: 'dist', name: 'Reflux Pump',              holds: 'Reflux back to the rectifier + 190 proof forward', color: '#2f6fa8' },
+  { id: 'sfp',    st: 'dist', name: '190 Proof Feed Pump',      holds: '190 proof to the sieves', color: '#2f6fa8' },
+  { id: 'vapz',   st: 'dist', name: 'Sieve Vaporizer',          holds: '190 proof boiled to vapor', color: '#ff8c42', tempRO: true, tempHint: 'Steam boils the 190 proof and superheats the vapor for the sieve bottles.' },
+  ...[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ id: 'ms' + n, st: 'dist', name: 'Sieve Bottle #' + n, holds: 'Molecular sieve beads (Unit ' + ([1, 2, 3, 7].includes(n) ? 'A' : 'B') + ')', color: '#c9d4de', tempRO: true })),
+  { id: 'regen',  st: 'dist', name: 'Regen Tank',               holds: 'Weak ethanol from the regen condensers', color: '#9fc4d8', lvlRO: true },
+  { id: 'rgp',    st: 'dist', name: 'Regen Pumps',              holds: 'Regen back to the rectifier', color: '#2f6fa8' },
+  { id: 'fv200',  st: 'dist', name: '200 Proof Flash Vessel',   holds: '200 proof ethanol', color: '#5ec8ff', lvlRO: true },
+  { id: 'pp200',  st: 'dist', name: '200 Proof Product Pump',   holds: '200 proof to storage', color: '#2f6fa8' },
   { id: 'etoh',   st: 'storage',   name: 'Ethanol Tanks',     holds: 'Fuel ethanol',  color: '#2fb6ff', lvl: { def: 80, min: 30, max: 100, label: 'Ship when above' } },
   { id: 'oil',    st: 'oil',       hidden: true, name: 'Corn Oil Tank',     holds: 'Corn oil',      color: '#ffb300', lvl: { def: 80, min: 30, max: 100, label: 'Ship when above' } }
 ];
 const UNIT = {}; UNITS.forEach(u => { UNIT[u.id] = u; });
+
+// ---------- DISTILLATION (v1.97.90), as on the plant's Beer Stripper, Rectifier, Mole Sieve A and Mole Sieve B screens ----------
+// Beer column (vacuum, heated by evaporator vapor) -> overhead vapor to the rectifier; bottoms (whole stillage) -> beer bottoms pump.
+// Rectifier (vacuum) -> overhead -> 190 proof condenser + 2 vent condensers -> reflux tank (vacuum pumps on its vent) -> reflux pump:
+// reflux back to the rectifier top, 190 proof through the 190 filter to 190 storage and the 190 proof feed pump -> sieve vaporizer ->
+// 8 sieve bottles (Unit A #1 #2 #3 #7, Unit B #4 #5 #6 #8) -> 200 proof vapor -> economizer + 200P cooler -> 200 proof flash vessel ->
+// 200 proof product pump -> 200 proof storage. Bottles in regen give a weak vapor -> regen condensers -> regen tank -> regen pumps -> rectifier.
+// Rectifier bottoms -> rectifier bottoms pump -> side stripper (heated by the cook flash vapor) -> overhead back to the rectifier;
+// side stripper bottoms -> side stripper pump -> cook water tank (whole stillage tank when the cook water tank is full).
+const SIEVE_STEP_H = 10 / 60, SIEVE_UNIT = { A: [1, 2, 3, 7], B: [4, 5, 6, 8] };
+const newDist = () => ({ on: false, t: 0, beerGpm: 0, stillGpm: 0, bcTop: 153, bcP: 7.7, bcL: 55, ssT: 176, ssTop: 153, ssL: 52, ssGpm: 0, ssTo: 'cwt',
+  rectBot: 140, rectTop: 129, rectP: 5.5, rbGpm: 0, fusel: 0, refL: 54, refluxGpm: 0, drawGpm: 0, proof190: 190, feedGpm: 0, vapT: 305, vapP: 47,
+  regenL: 51, regenGpm: 0, f200L: 49, p200Gpm: 0, eff: 78.5, bottles: [1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ n, unit: SIEVE_UNIT.A.includes(n) ? 'A' : 'B', st: 'IDLE', P: 14.7, T: 280 })) });
+function sieveStep(D, dt) {
+  D.t += dt;
+  for (const u of ['A', 'B']) {
+    const tt = D.t + (u === 'B' ? SIEVE_STEP_H / 2 : 0), step = Math.floor(tt / SIEVE_STEP_H), f = tt / SIEVE_STEP_H - step;
+    SIEVE_UNIT[u].forEach((n, k) => {
+      const b = D.bottles[n - 1], ph = (step + k) % 4;
+      if (!D.on) { b.st = 'IDLE'; b.P += (14.7 - b.P) * Math.min(1, dt * 4); b.T += (240 - b.T) * Math.min(1, dt * 0.5); return; }
+      if (ph < 2) { b.st = 'ON'; b.P = 57; b.T = 300; }
+      else if (ph === 2 && f < 0.12) { b.st = 'DEPRESS'; b.P = 57 - (57 - 1.5) * f / 0.12; b.T = 298; }
+      else if (ph === 3 && f > 0.75) { b.st = 'REPRESS'; b.P = 1.5 + (57 - 1.5) * (f - 0.75) / 0.25; b.T = 296; }
+      else { b.st = 'REGEN'; b.P = 1.5; b.T = 290; }
+    });
+  }
+}
+function distStep(s, dt, feed, eth) {
+  const D = s.dist || (s.dist = newDist()), g = eth / 60, on = feed > 1 && g > 0.5, w = Math.sin(D.t * 9) * 0.6;   // g: 200 proof GPM
+  D.on = on; sieveStep(D, dt);
+  D.beerGpm = on ? GPM(feed) : 0; D.stillGpm = D.beerGpm * 0.86;
+  D.bcTop = s.col.T - 27.6; D.bcP = on ? 7.7 : 14.7; D.bcL = on ? 55 + w : D.bcL;
+  D.rbGpm = on ? g * 0.905 : 0; D.fusel = on ? 72 : 0;
+  D.ssT = on ? clamp(176 + (s.flash.vapor > 1 ? 0 : -12), 150, 190) : D.ssT; D.ssTop = on ? 152.7 : D.ssTop; D.ssL = on ? 51.6 - w : D.ssL;
+  D.ssGpm = on ? D.rbGpm * 0.82 : 0; if (s.cwt.L > 65) D.ssTo = 'wst'; else if (s.cwt.L < 50) D.ssTo = 'cwt';   // valves as on the screen: cook water tank, else the whole stillage tank
+  D.rectBot = on ? 140 : D.rectBot; D.rectTop = on ? 129 + 3 * s.col.off : D.rectTop; D.rectP = on ? 5.5 : 14.7;
+  D.drawGpm = on ? g * 1.054 : 0; D.refluxGpm = D.drawGpm * 1.55; D.proof190 = 190 - 40 * s.col.off; D.refL = on ? 54 + w * 0.5 : D.refL;
+  D.feedGpm = on ? g * 1.30 : 0; D.vapT = on ? 305 : 200; D.vapP = on ? 47 : 0;
+  D.regenGpm = on ? g * 0.186 : 0; D.regenL = on ? 51 - w * 0.5 : D.regenL;
+  D.p200Gpm = on ? g : 0; D.f200L = on ? 49 + w * 0.4 : D.f200L; D.eff = on ? 78.5 : 0;
+}
+function distStatus(s, id) {
+  const D = s.dist; if (!D || !D.on) return ['idle', 'Distillation is not running — no beer feed.'];
+  if (id[0] === 'm' && id[1] === 's') { const b = D.bottles[+id.slice(2) - 1];
+    return { ON: ['good', 'ON line: the beads soak up the water, 200 proof vapor goes out the bottom.'], DEPRESS: ['good', 'Depressurizing, getting ready to regenerate.'],
+      REGEN: ['good', 'Regenerating under vacuum: the water comes back off the beads and goes to the regen condensers.'], REPRESS: ['good', 'Repressurizing with product vapor to go back on line.'], IDLE: ['idle', 'Idle.'] }[b.st]; }
+  switch (id) {
+    case 'rect': return D.proof190 < 188 ? ['warn', 'Proof is low — the beer column is carrying water over.'] : ['good', 'Ethanol vapor climbs to the top at 190 proof; weak ethanol drains out the bottom.'];
+    case 'ss': return s.flash.vapor > 1 ? ['good', 'Flash vapor from cook strips the last ethanol out of the rectifier bottoms.'] : ['warn', 'No flash vapor from cook — the side stripper is cooling off.'];
+    case 'ssp': return D.ssTo === 'cwt' ? ['good', 'Hot water forward to the Cook Water Tank.'] : ['good', 'Cook Water Tank is high — sending to the Whole Stillage Tank for now.'];
+    case 'reflux': return ['good', '190 proof from the condensers. The vacuum pumps pull on its vent.'];
+    case 'vapz': return ['good', 'Steam boils the 190 proof to vapor at about 305°F for the sieves.'];
+    case 'fv200': return ['good', 'Cooled 200 proof collects here before the product pump.'];
+    case 'regen': return ['good', 'Collects the weak ethanol from the bottles in regen.'];
+  }
+  return ['good', 'Running.'];
+}
+
 
 const F = {
   ratio: r => r < 4.5 ? clamp(1 - 0.06 * (4.5 - r), 0.85, 1) : r > 5.1 ? clamp(1 - 0.12 * (r - 5.1), 0.8, 1) : 1,   // thin slurry: weak beer; thick: viscous, poor liquefaction
@@ -4439,8 +4515,8 @@ const F = {
   yeastK: y => 0.3 + 0.7 * y,   // a fermenter's speed by how good the yeast pitched into it was (0: none pitched)
   propT(T) { if (T < 88) return clamp(1 - 0.06 * (88 - T), 0.2, 1); if (T <= 93) return 1; return clamp(1 - 0.08 * (T - 93), 0.2, 1); },
   viab: T => T <= 45 ? 1 : clamp(1 - 0.015 * (T - 45), 0.5, 1),   // yeast from a warm cooler is weaker
-  colRec: T => clamp(1 - 0.04 * (212 - T), 0.3, 1),
-  offspec: T => clamp(0.03 * (T - 222), 0, 0.6)
+  colRec: T => clamp(1 - 0.04 * (176 - T), 0.3, 1),   // v1.97.90: the beer column runs under vacuum (~7.7 psia), ~180 F at the bottom
+  offspec: T => clamp(0.03 * (T - 185), 0, 0.6)
 };
 
 function newFerm() { return { state: 'empty', t: 0, bu: 0, pot: 0, p: 0, stress: 0, inf: false, infLoss: 0, T: 80, rate: 0, pitched: false, yeast: 0 }; }
@@ -4473,7 +4549,8 @@ function create() {
   s.yb = { state: 'ready', t: 0, L: 85, q: 1 }; s.yeastT = 38; s.propSide = 0;
   s.prop = [Object.assign(newProp(), { state: 'propping', bu: PROP_FILL * CAP.prop, pot: PROP_FILL * CAP.prop * 2.95 * 0.96, grow: 0.7, T: 91 }), Object.assign(newProp(), { T: 80 })];
   s.beer = { bu: 0.4 * CAP.beer, eth: 0.4 * CAP.beer * 2.75, feed: 0 };
-  s.col = { T: 217, rec: 1, off: 0 };
+  s.col = { T: 180, rec: 1, off: 0 };
+  s.dist = newDist();
   s.etoh = { gal: 0.45 * CAP.etoh, ships: [] };
   s.oil = { lb: 0.5 * CAP.oil, ships: [] };
   s.cake = { t: 8, ship: 0 };
@@ -4506,6 +4583,7 @@ function dead(s) {
   s.mills.forEach(m => { m.rate = 0; m.limit = 'power'; m.lbm = 0; m.amps = 0; });
   s.conveyor = 0; s.recv = 0; s.recvRail = 0; s.recvTruck = 0;
   s.tb.forEach(b => { b.in = 0; b.out = 0; }); s.reclaim = 0; s.tst.in = s.tst.out = s.tst.evap = 0; s.mft.in = s.mft.out = 0; s.cwt.in = s.cwt.out = s.cwt.makeup = 0;
+  if (s.dist) { const D = s.dist; D.on = false; D.beerGpm = D.stillGpm = D.rbGpm = D.ssGpm = D.drawGpm = D.refluxGpm = D.feedGpm = D.regenGpm = D.p200Gpm = D.fusel = 0; }
   s.hydro.steam = 0; s.hydro.P = 0; s.flash.vapor = 0; s.flash.enz = 0; s.cook.recirc = 0; s.liqOvf = 0;
   s.blend.flow = 0; s.blend.lbm = 0; s.blend.water = 0; s.blend.bsGpm = 0; s.blend.cwGpm = 0; s.blend.gpm = 0; s.st1.steam = 0; s.st2.steam = 0; s.beer.feed = 0;
   s.st1.out = 0; s.st2.out = 0; s.cook.out = 0; s.liq1.out = 0; s.liq.out = 0; s.propSide = 0;
@@ -4758,11 +4836,13 @@ function stepH(s, dt) {
   // v1.97.89 the beer from the beer well goes through the in-service beer/mash exchanger (heated by the hot mash) on its way to the column
   s.beerHx.Tin = 93; s.beerHx.Tout = feed > 1 && lOut > 1 ? clamp(93 + 0.62 * (s.liq.T - 93) * Math.min(1, lOut / Math.max(1, feed)), 93, s.liq.T - 20) : 93;
   // ---- beer column: bottom temperature decides recovery and product quality
+  if (!(sp.col.temp >= UNIT.col.temp.min && sp.col.temp <= UNIT.col.temp.max)) sp.col.temp = UNIT.col.temp.def;   // v1.97.90: old saves had the 217 F (atmospheric) setpoint
   s.col.T += (sp.col.temp - s.col.T) * (1 - Math.exp(-dt / 0.3));
   s.col.rec = F.colRec(s.col.T); s.col.off = F.offspec(s.col.T);
   const eth = ethIn * s.col.rec * (1 - s.col.off) * 0.995;
   const lost = ethIn * (1 - s.col.rec);
   s.etoh.gal = Math.min(CAP.etoh, s.etoh.gal + eth * dt);
+  distStep(s, dt, feed, eth);
 
   // ---- the water side of the slurry (GPM): centrifuges -> Thin Stillage Tank -> Backset Pump (blender) / evaporators;
   //      evaporator condensate -> Meth Feed Tank -> Meth Feed Pump -> Cook Water Tank (+ well water) -> Cook Water Pump -> heater -> blender
@@ -4773,7 +4853,7 @@ function stepH(s, dt) {
     M.in = T.evap * COND_FRAC; M.out = M.L > 0.5 ? clamp(M.in + (M.L - 40) * 10, 0, MFP_MAX) : 0;
     M.L = clamp(M.L + (M.in - M.out) * h, 0, 100);
     if (W.L < 30) W.filling = true; else if (W.L > 45) W.filling = false;
-    W.makeup = W.filling ? MAKEUP_GPM : 0; W.in = M.out + W.makeup; W.out = s.blend.cwGpm;
+    W.makeup = W.filling ? MAKEUP_GPM : 0; W.ss = s.dist.ssTo === 'cwt' ? s.dist.ssGpm : 0; W.in = M.out + W.makeup + W.ss; W.out = s.blend.cwGpm;   // v1.97.90 + side stripper bottoms
     W.L = clamp(W.L + (W.in - W.out) * h, 0, 100);
     if (W.L < 5 && !W.warned) { W.warned = true; s.alerts.push({ unit: 'cwt', msg: 'Cook Water Tank is nearly empty — the blender is short of water.' }); } if (W.L > 15) W.warned = false;
     if (T.L < 5 && !T.warned) { T.warned = true; s.alerts.push({ unit: 'tst', msg: 'Thin Stillage Tank is nearly empty — no backset for the blender.' }); } if (T.L > 15) T.warned = false; }
@@ -4826,6 +4906,7 @@ function level(s, id) {
   switch (id) {
     case 'silo0': return s.silo[0].L; case 'silo1': return s.silo[1].L; case 'tb3': return s.tb[0].L; case 'tb4': return s.tb[1].L;
     case 'tst': return s.tst.L; case 'mft': return s.mft.L; case 'cwt': return s.cwt.L;
+    case 'ss': return s.dist.ssL; case 'reflux': return s.dist.refL; case 'regen': return s.dist.regenL; case 'fv200': return s.dist.f200L;
     case 'day0': case 'day1': case 'day2': case 'day3': return s.day[+id[3]].L;
     case 'st1': return s.st1.L; case 'st2': return s.st2.L;
     case 'liq': return s.liq.L; case 'liq1': return s.liq1.L;
@@ -4839,7 +4920,8 @@ function level(s, id) {
   return null;
 }
 function temp(s, id) {
-  switch (id) { case 'cwh': return s.cwh.T; case 'st1': return s.st1.T; case 'st2': return s.st2.T; case 'hydro': return s.hydro.T; case 'ct1': return s.ct[0].T; case 'ct2': return s.ct[1].T; case 'liq': return s.liq.T; case 'liq1': return s.liq1.T; case 'col': return s.col.T; }
+  if (id[0] === 'm' && id[1] === 's' && s.dist) return s.dist.bottles[+id.slice(2) - 1].T;
+  switch (id) { case 'ss': return s.dist.ssT; case 'rect': return s.dist.rectBot; case 'vapz': return s.dist.vapT; case 'cwh': return s.cwh.T; case 'st1': return s.st1.T; case 'st2': return s.st2.T; case 'hydro': return s.hydro.T; case 'ct1': return s.ct[0].T; case 'ct2': return s.ct[1].T; case 'liq': return s.liq.T; case 'liq1': return s.liq1.T; case 'col': return s.col.T; }
   if (/^f\d$/.test(id)) return s.ferm[+id[1]].T;
   if (id === 'yp0' || id === 'yp1') return s.prop[+id[2]].T;
   return null;
@@ -5000,11 +5082,14 @@ function status(s, id) {
       return ['good', 'Holds beer between batches and feeds the column steadily.'];
     case 'col':
       if (s.beer.feed < 1) return ['idle', 'No beer feed right now.'];
-      if (T < 206) return ['bad', 'Too cool — ethanol is going out the bottom with the stillage!'];
-      if (T < 212) return ['warn', 'A bit cool — some ethanol is lost out the bottom.'];
-      if (T > 228) return ['bad', 'Too hot — water carries over and the product is off-spec.'];
-      if (T > 222) return ['warn', 'Hot — some water carries over, lowering the proof.'];
-      return ['good', 'Ethanol boils off the top, water and solids leave the bottom.'];
+      if (T < 172.5) return ['bad', 'Too cool — ethanol is going out the bottom with the stillage!'];
+      if (T < 176) return ['warn', 'A bit cool — some ethanol is lost out the bottom.'];
+      if (T > 191) return ['bad', 'Too hot — water carries over and the product is off-spec.'];
+      if (T > 185) return ['warn', 'Hot — some water carries over, lowering the proof.'];
+      return ['good', 'Evaporator vapor boils the ethanol off the top under vacuum; stillage leaves the bottom.'];
+    case 'bbp': case 'ss': case 'ssp': case 'rect': case 'rbp': case 'fusel': case 'cond190': case 'reflux': case 'vac': case 'rfp': case 'sfp': case 'vapz':
+    case 'ms1': case 'ms2': case 'ms3': case 'ms4': case 'ms5': case 'ms6': case 'ms7': case 'ms8': case 'regen': case 'rgp': case 'fv200': case 'pp200':
+      return distStatus(s, id);
     case 'etoh':
       if (L >= 99) return ['bad', 'Tanks full — distillation has to stop!'];
       if (sp.lvl > 94) return ['warn', 'Shipping this late leaves little room while waiting for a truck.'];
@@ -5057,7 +5142,7 @@ function stationStatus(s, st) {
   return w;
 }
 
-const Sim = { K, LB_BU, GAL_BU, LBM, GPM, CW_T, CMT_GAL, TB_CAP, spDefaults, PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
+const Sim = { SIEVE_STEP_H, newDist, K, LB_BU, GAL_BU, LBM, GPM, CW_T, CMT_GAL, TB_CAP, spDefaults, PROP_H, newProp, propQ, switchStrainer, switchLiqPump: (s, to) => { s.liqDuty = to; }, UNITS, UNIT, CAP, FSTATE, SIM_H_PER_SEC, SPEEDS, NF, FERM_H, F, create, step, level, temp, status, stationStatus, STATION_UNITS };
 if (typeof module !== 'undefined') module.exports = Sim; else root.Sim = Sim;
 })(this);
 </script>
@@ -7540,9 +7625,14 @@ const UPOS = { rail: [-196, 0, 5.5, 6], recv: [-182, 0, 10.5, 10], silo0: [SILOX
   f0: [-7.6, -47.1, 8.1, 18], f1: [-7.6, -63.5, 8.1, 18], f2: [-7.6, -79.9, 8.1, 18], f3: [-7.6, -96.3, 8.1, 18],
   f4: [-31, -96.3, 8.1, 18], f5: [-31, -79.9, 8.1, 18], f6: [-31, -63.5, 8.1, 18], beer: [-31, -45, 10.2, 15],
   yb: [-11.6, -36.4, 1.5, 2, 2.1], yp0: [-11.6, -31.4, 2.5, 5.6], yp1: [-11.6, -26.3, 2.5, 5.6],   // v1.97.76: blend tank (on legs) and the two yeast props
-  col: [-52.5, WEST_WING.south + 7.5, 12, 2], etoh: [-158, 236, 28, 13],
+  col: [-36.5, 52.6, 2.0, 24], etoh: [-158, 236, 28, 13],
   // v1.97.88: the scalper over the grinding bins, and the CMT tanks, their pumps and the cook water heater south of the building
   scalper: [COLX, -2, 3.2, 3, DAYY + 16.5], tst: [37.4, 56.654, 5.6, 17], mft: [26.182, 56.654, 5.6, 17], cwt: [14.964, 56.654, 5.6, 17],
+  // v1.97.90 distillation pad
+  rect: [-43, 52.6, 1.7, 28], ss: [-48, 50.2, 1.0, 16], bbp: [-34.6, 56.4, 0.7, 1.5], ssp: [-49.4, 48.3, 0.6, 1.4], rbp: [-43.0, 56.3, 0.6, 1.4], fusel: [-44.9, 48.6, 0.5, 1.2],
+  cond190: [-52, 50.4, 2.2, 3, 8], reflux: [-50, 55.6, 1.4, 2.6], vac: [-52.0, 55.6, 0.9, 1.2], rfp: [-46.8, 56.3, 0.6, 1.4], sfp: [-72.2, 53.0, 0.6, 1.3], vapz: [-71.6, 50.2, 0.85, 3.9],
+  ms1: [-58.3, 50, 1.25, 8.5], ms2: [-61.8, 50, 1.25, 8.5], ms3: [-65.3, 50, 1.25, 8.5], ms7: [-68.8, 50, 1.25, 8.5], ms4: [-58.3, 54.6, 1.25, 8.5], ms5: [-61.8, 54.6, 1.25, 8.5], ms6: [-65.3, 54.6, 1.25, 8.5], ms8: [-68.8, 54.6, 1.25, 8.5],
+  regen: [-54.5, 55.6, 1.4, 6], rgp: [-52.4, 57.9, 0.5, 1.2], fv200: [-72.4, 57.4, 0.75, 2.8], pp200: [-70.1, 58.15, 0.5, 1.2],
   tsp: [36.89, 48.84, 0.8, 1.6], mfp: [25.67, 48.84, 0.8, 1.6], cwp: [14.45, 48.84, 0.8, 1.6], cwh: [18.3, 48.6, 1.2, 2.6] };
 for (const id of ['rail', 'recv', 'silo0', 'silo1', 'tb3', 'tb4', 'scalper', 'day0', 'day1', 'day2', 'day3', 'mill0', 'mill1', 'mill2', 'mill3']) { UPOS[id][0] += GDX; UPOS[id][1] += GDZ; }
 for (const st of ['receiving', 'milling']) { STATIONS[st].pos[0] += GDX; STATIONS[st].pos[2] += GDZ; }
@@ -8019,8 +8109,8 @@ function init(container) {
   O.fFlash = flow(flashOut.map(q => V3(...q)), blob, 0xf0a84a, 20, { speed: 6 });
   // v1.97.89 as on the plant's cook screen: the flash vapor goes overhead to the side stripper (distillation pad); the flash vessel pump can send
   // the mash back to Slurry Tank 1 instead of forward (while the cook is too cool); Liq Tank 1 overflows back to Slurry Tank 1 when it's full
-  { const VY = FVY + FVH + 3.2, DZ0 = WEST_WING.south + 3.3, vap = [[FVX, VY, FVZ], [FVX, 11.4, FVZ], [FVX, 11.4, DZ0 + 1.5], [-36, 11.4, DZ0 + 1.5], [-36, 3.0, DZ0 + 1.5]];
-    pipe(vap.slice(1), 'flash', 0.38); box(1.2, 3.0, 1.2, mat(0x9aa6b2), -36, 1.5, DZ0 + 1.5, 'flash');   // stub on the pad where the side stripper will stand
+  { const VY = FVY + FVH + 3.2, DZ0 = WEST_WING.south + 3.3, vap = [[FVX, VY, FVZ], [FVX, 11.4, FVZ], [FVX, 11.4, DZ0 + 1.5], [-48, 11.4, DZ0 + 1.5], [-48, 2.0, DZ0 + 1.5], [-48, 2.0, 49.2]];   // v1.97.90: into the bottom of the side stripper
+    pipe(vap.slice(1), 'flash', 0.38);
     O.fVapor = flow(vap.map(q => V3(...q)), new T.SphereGeometry(0.3, 6, 5), 0xf4f6f8, 40, { speed: 9 });
     const rec = [[FVX + 0.4, 1.4, -2.9], [FVX + 0.4, 7.4, -2.2], [-70.0, 7.4, -2.2], [-70.0, 7.4, -7.0], [-70.0, ST1H + 0.5, -7.0]];
     pipe(rec, 'flash', 0.3); O.fRecirc = flow(rec.map(q => V3(...q)), blob, 0xe8c88a, 30, { speed: 6 });
@@ -9000,7 +9090,7 @@ function init(container) {
   // beer well pump inside the building (east side of the beer well); beer goes overhead to distillation
   pumpModel('large', BPX, BPZ, 'x', 1, 'beer', 0.9);   // the owner's big teal motor pump, motor toward the alley
   const BRX = FXW + BWR + 1.1;   // the beer line runs south just clear of the beer well (it used to clip its side)
-  const bwOut = [[FXW + BWO - 0.15, 0.9, BPZ], [BPX, 0.9, BPZ], [BPX, 7.6, BPZ], [BRX, 7.6, BPZ], [BRX, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 1.6, DISTZ0 + 2]];   // beer runs overhead down the ferm alley, out the south wall
+  const bwOut = [[FXW + BWO - 0.15, 0.9, BPZ], [BPX, 0.9, BPZ], [BPX, 7.6, BPZ], [BRX, 7.6, BPZ], [BRX, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 7.6, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 18, DISTZ0 + 2], [DISTX + DISTW / 2 - 2, 18, 52.6], [-34.5, 18, 52.6]];   // v1.97.90: up into the top of the beer column   // beer runs overhead down the ferm alley, out the south wall
   // v1.97.89 as on the plant's screens: on its way to distillation the beer goes through the in-service beer/mash exchanger (train A at z -24,
   // train B at z -30), where the hot mash heats it: off the overhead run at the exchangers, down and in the exchanger's east side, out its top, back up
   const BHX = -25.6, hxPath = z => [...bwOut.slice(0, 4), [BRX, 7.6, z - 1.2], [BHX, 7.6, z - 1.2], [BHX, 1.4, z - 1.2], [-26.3, 1.4, z - 0.5], [-26.3, 3.4, z + 0.5], [BHX + 0.6, 3.4, z + 0.5], [BHX + 0.6, 7.9, z + 0.5], [BRX, 7.9, z + 0.5], [BRX, 7.9, bwOut[4][2]], ...bwOut.slice(5)];
@@ -9008,6 +9098,141 @@ function init(container) {
   for (const z of [-24, -30]) { pipe([[BRX, 7.6, z - 1.2], [BHX, 7.6, z - 1.2], [BHX, 1.4, z - 1.2], [-26.3, 1.4, z - 0.5]], 'dist', 0.3); pipe([[-26.3, 3.4, z + 0.5], [BHX + 0.6, 3.4, z + 0.5], [BHX + 0.6, 7.9, z + 0.5], [BRX, 7.9, z + 0.5]], 'dist', 0.3); }
   O.fFeedHx = [-24, -30].map(z => flow(hxPath(z).map(q => V3(...q)), blob, 0xd9a441, 70, { speed: 7 }));
   O.fFeed = { rate: 0 };   // (the single straight run is now the two exchanger paths above)
+
+  // ---------- DISTILLATION (v1.97.90), connected as on the plant's Beer Stripper, Rectifier, Mole Sieve A and Mole Sieve B screens ----------
+  // East -> west on the pad: Beer Column, Rectifier, Side Stripper, the 190 proof condenser structure with the reflux and regen tanks
+  // under it, then the 8 sieve bottles (Unit A north row #1 #2 #3 #7, Unit B south row #4 #5 #6 #8) and the vaporizer, coolers and
+  // 200 proof flash vessel at the west end. A pipe rack along the south edge carries the 190 proof (y 7) and 200 proof (y 6) lines.
+  // Column sizes are estimates (no drawings yet).
+  {
+    const jacket = mat(0xd3d6d9), band = mat(0x9aa1a8), steel = mat(0x6f7378), grate = mat(0x7d838a), conc = mat(0xb5b0a6), yel = mat(0xf2c200);
+    const column = (x, z, r, h, id, plate, face) => {
+      add(new T.CylinderGeometry(r + 0.25, r + 0.35, 0.4, 28), conc, x, 0.2, z, null);                       // foundation
+      add(new T.CylinderGeometry(r, r, 2.2, 28), steel, x, 0.4 + 1.1, z, id);                                  // skirt
+      add(new T.CylinderGeometry(r, r, h - 2.2, 28), jacket, x, 2.6 + (h - 2.2) / 2, z, id);                   // insulated shell
+      add(new T.SphereGeometry(r, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), jacket, x, 0.4 + h, z, id).scale.y = 0.45;   // top head
+      for (let y = 4; y < h; y += 2.4) add(new T.CylinderGeometry(r + 0.03, r + 0.03, 0.07, 28), band, x, y, z, null, true);   // jacket bands
+      for (let y = 8; y < h - 1; y += 7) {                                                                     // ring platforms with rails
+        const p = add(new T.RingGeometry(r, r + 0.9, 28), grate, x, y, z, null, true); p.rotation.x = -Math.PI / 2; p.material.side = T.DoubleSide;
+        const t = new T.Mesh(new T.TorusGeometry(r + 0.85, 0.04, 4, 32), yel); t.rotation.x = Math.PI / 2; t.position.set(x, y + 1.05, z); scene.add(t);
+      }
+      box(0.5, h - 1, 0.06, yel, x + (face || 1) * 0, 0.4 + (h - 1) / 2, z - r - 0.35, null);                // caged ladder (north side)
+      extraCols.push([x, z, r + 0.1]);
+      nameplate(plate, x, 2.0, z, r, 0, 1, 0.8);
+    };
+    const hvessel = (x, y, z, r, L, axis, id, legs) => {   // horizontal vessel / shell-and-tube exchanger along x or z
+      const g = new T.CylinderGeometry(r, r, L, 20); if (axis === 'x') g.rotateZ(Math.PI / 2); else g.rotateX(Math.PI / 2);
+      add(g, jacket, x, y, z, id);
+      for (const s of [-1, 1]) { const e = add(new T.SphereGeometry(r, 16, 8), jacket, axis === 'x' ? x + s * L / 2 : x, y, axis === 'x' ? z : z + s * L / 2, id); if (axis === 'x') e.scale.x = 0.4; else e.scale.z = 0.4; }
+      if (legs) for (const s of [-0.3, 0.3]) box(axis === 'x' ? 0.25 : r * 1.4, y - r * 0.5, axis === 'x' ? r * 1.4 : 0.25, steel, axis === 'x' ? x + s * L : x, (y - r * 0.5) / 2, axis === 'x' ? z : z + s * L, null);   // saddles
+    };
+    const P = (pts, id, r) => pipe(pts, id, r || 0.3);
+    const F = (pts, col, n, opt) => flow(pts.map(q => V3(...q)), blob, col, n || 40, opt || { speed: 6 });
+    const BCX = -36.5, BCZ = 52.6, RCX = -43.0, RCZ = 52.6, SSX = -48.0, SSZ = 50.2;
+    O.dist = {};
+    // --- columns
+    column(BCX, BCZ, 2.0, 24, 'col', 'BEER COLUMN');
+    column(RCX, RCZ, 1.7, 28, 'rect', 'RECTIFIER');
+    column(SSX, SSZ, 1.0, 16, 'ss', 'SIDE STRIPPER');
+    // beer column overhead vapor -> down between the columns into the bottom of the rectifier
+    const bcVap = [[BCX, 25.2, BCZ], [BCX, 26.6, BCZ], [-40.0, 26.6, BCZ], [-40.0, 6.0, BCZ], [RCX + 1.7, 6.0, RCZ]];
+    P(bcVap, 'col', 0.55); O.dist.bcVap = F(bcVap, 0xf4f6f8, 50, { speed: 9 });
+    // heat: 2nd effect evaporator vapor from the evaporators (just north, inside the building) into the bottom of the beer column
+    const ev2 = [[-33.6, 9.0, 42.4], [-33.6, 9.0, 47.6], [BCX, 9.0, 47.6], [BCX, 3.0, 47.6], [BCX, 3.0, BCZ - 2.0]];
+    P(ev2, 'col', 0.5); O.dist.ev2 = F(ev2, 0xf4f6f8, 30, { speed: 9 }); nameplate('2ND EFFECT VAPOR', BCX, 9.9, 47.6, 0.35, 0, 1, 0.45);
+    // side stripper overhead vapor -> rectifier
+    const ssVap = [[SSX, 16.8, SSZ], [SSX, 17.6, SSZ], [SSX, 17.6, RCZ], [RCX - 1.7, 17.6, RCZ]];
+    P(ssVap, 'ss', 0.4); O.dist.ssVap = F(ssVap, 0xf4f6f8, 30, { speed: 9 });
+    // rectifier bottoms -> rectifier bottoms pump -> top of the side stripper
+    pumpSet(-43.6, 56.3, 'x', 1, 'rbp', 0.55); nameplate('RECTIFIER BOTTOMS PUMP', -43.0, 1.9, 56.3, 0.5, 0, 1, 0.5);
+    const rb = [[RCX, 0.9, RCZ + 1.7], [RCX - 0.6, 0.6, 56.3], [-44.0, 0.6, 56.3], [-43.6, 0.6, 56.3], [-43.6, 1.6, 56.3], [-43.6, 15.6, 56.3], [-45.9, 15.6, 56.3], [-45.9, 15.6, SSZ], [SSX + 1.0, 15.6, SSZ]];
+    P(rb.slice(0, 4), 'rbp', 0.25); P(rb.slice(4), 'rbp', 0.25); O.dist.rb = F(rb, 0x9fe0ff, 50);
+    // side stripper bottoms -> side stripper pump -> cook water tank (or the whole stillage tank)
+    pumpSet(-49.0, 48.3, 'x', -1, 'ssp', 0.5); nameplate('SIDE STRIPPER PUMP', -49.3, 1.8, 48.3, 0.5, 0, -1, 0.5);
+    const ssb = [[SSX, 0.7, SSZ - 1.0], [SSX, 0.6, 48.3], [-48.6, 0.6, 48.3], [-49.0, 1.5, 48.3], [-49.0, 8.0, 48.3], [-49.0, 8.0, 44.3]];
+    P(ssb, 'ssp', 0.25); O.dist.ssb = F(ssb, 0xbfe4f2, 40); nameplate('TO COOK WATER TANK', -49.0, 8.9, 44.6, 0.1, 0, 1, 0.5);
+    // beer column bottoms -> beer bottoms pump -> whole stillage tank
+    pumpSet(-35.0, 56.4, 'x', 1, 'bbp', 0.7); nameplate('BEER BOTTOMS PUMP', -34.4, 2.2, 56.4, 0.6, 0, 1, 0.5);
+    const still = [[BCX, 0.9, BCZ + 2.0], [BCX, 0.6, 56.4], [-35.5, 0.6, 56.4], [-35.0, 1.8, 56.4], [-35.0, 4.0, 56.4], [-31.2, 4.0, 56.4]];
+    P(still, 'bbp', 0.4); O.dist.still = F(still, 0x8a6a3c, 40); nameplate('TO WHOLE STILLAGE TANK', -31.6, 4.9, 56.4, 0.1, 1, 0, 0.5);
+    // --- 190 proof condenser structure (vent condensers 1 + 2 above it to the south)
+    for (const x of [-54.3, -49.7]) for (const z of [48.9, 52.4]) box(0.3, 13, 0.3, steel, x, 6.5, z, null);
+    for (const y of [7.5, 13]) { const d = add(new T.BoxGeometry(4.9, 0.15, 3.8), grate, -52.0, y, 50.65, null, true); }
+    hvessel(-52.0, 8.6, 49.9, 0.85, 4.0, 'x', 'cond190');
+    hvessel(-52.0, 9.4, 51.75, 0.42, 2.8, 'x', 'cond190'); hvessel(-52.0, 10.4, 51.75, 0.42, 2.8, 'x', 'cond190');
+    nameplate('190 PROOF CONDENSER', -52.0, 8.6, 49.9, 0.9, 0, -1, 0.6); nameplate('VENT CONDENSERS', -52.0, 11.2, 51.75, 0.45, 0, 1, 0.45);
+    const ovhd = [[RCX, 29.2, RCZ], [RCX, 30.2, RCZ], [-51.0, 30.2, RCZ], [-51.0, 30.2, 49.9], [-51.0, 9.4, 49.9]];
+    P(ovhd, 'cond190', 0.55); O.dist.ovhd = F(ovhd, 0xf4f6f8, 50, { speed: 9 });
+    P([[-54.0, 8.6, 49.9], [-54.6, 8.6, 49.9], [-54.6, 9.4, 51.75], [-53.4, 9.4, 51.75]], 'cond190', 0.15);   // vent gas on to the vent condensers
+    // condensate -> reflux tank (vacuum pumps on its vent, discharging to the regen tank)
+    hvessel(-50.0, 1.7, 55.6, 0.85, 2.6, 'x', 'reflux', true); nameplate('REFLUX TANK', -50.0, 1.7, 55.6, 0.86, 0, 1, 0.55);
+    const cnd = [[-50.4, 7.75, 49.9], [-50.4, 7.0, 49.9], [-49.6, 7.0, 50.6], [-49.6, 7.0, 55.6], [-49.6, 2.55, 55.6]];
+    P(cnd, 'reflux', 0.25); O.dist.cnd = F(cnd, 0x9fe0ff, 40);
+    pumpSet(-52.3, 54.3, 'x', 1, 'vac', 0.45); pumpSet(-52.3, 56.9, 'x', 1, 'vac', 0.45); nameplate('VACUUM PUMPS', -52.3, 1.4, 55.6, 0.2, -1, 0, 0.45);
+    P([[-51.0, 2.5, 55.6], [-51.0, 3.2, 55.6], [-52.3, 3.2, 55.6], [-52.3, 3.2, 54.3], [-52.3, 1.3, 54.3]], 'vac', 0.12);
+    P([[-52.3, 1.3, 56.9], [-52.3, 3.0, 56.9], [-53.6, 3.0, 56.9], [-53.6, 3.0, 55.6], [-53.6, 2.45, 55.6]], 'vac', 0.12);
+    // reflux pump: reflux up to the top of the rectifier; 190 proof through the 190 filter onto the rack (190 storage + the sieves)
+    pumpSet(-47.2, 56.3, 'x', 1, 'rfp', 0.55); nameplate('REFLUX PUMP', -46.6, 1.9, 56.3, 0.5, 0, 1, 0.5);
+    P([[-48.7, 1.1, 55.6], [-48.4, 0.6, 55.6], [-48.4, 0.6, 56.3], [-47.6, 0.6, 56.3]], 'rfp', 0.22);
+    const rfx = [[-47.2, 1.5, 56.3], [-47.2, 27.0, 56.3], [-47.2, 27.0, RCZ], [RCX - 1.7, 27.0, RCZ]];
+    P(rfx, 'rfp', 0.25); O.dist.reflux = F(rfx, 0x9fe0ff, 60);
+    cyl(0.3, 1.5, jacket, -46.4, 2.6, 56.3, 'rfp', 14); nameplate('190 FILTER', -46.4, 3.4, 56.3, 0.3, 0, 1, 0.35);
+    const drw = [[-47.2, 3.0, 56.3], [-46.4, 3.0, 56.3], [-46.4, 4.1, 56.3], [-46.4, 7.0, 56.3], [-46.4, 7.0, 57.3]];
+    P(drw, 'rfp', 0.2); O.dist.draw = F(drw, 0x9fe0ff, 20);
+    // fusel draw pump: side draw off the rectifier into the 190 proof line
+    pumpSet(-44.6, 48.6, 'x', -1, 'fusel', 0.45); nameplate('FUSEL DRAW PUMP', -44.9, 1.5, 48.6, 0.4, 0, -1, 0.42);
+    const fus = [[RCX, 12.0, RCZ - 1.7], [RCX, 12.0, 48.6], [RCX, 0.6, 48.6], [-44.2, 0.6, 48.6], [-44.6, 1.3, 48.6], [-44.6, 3.0, 48.6], [-44.6, 3.0, 48.0], [-40.6, 3.0, 48.0], [-40.6, 3.0, 57.3], [-40.6, 7.0, 57.3]];
+    P(fus, 'fusel', 0.12); O.dist.fusel = F(fus, 0xe8d29a, 30, { speed: 4 });
+    // rack along the south edge of the pad
+    for (let x = -67; x < -32; x += 6) { box(0.25, 7.2, 0.25, steel, x, 3.6, 57.75, null); box(0.2, 0.2, 1.4, steel, x, 7.25, 57.75, null); extraCols.push([x, 57.75, 0.25]); }
+    // --- mole sieves
+    const SX = [-58.3, -61.8, -65.3, -68.8], SZN = 50.0, SZS = 54.6, HZ = 52.3, Y0 = 2.4, SH = 5.6, SR = 1.25;
+    const bottle = [1, 2, 3, 7].map((n, i) => [n, SX[i], SZN, -1]).concat([4, 5, 6, 8].map((n, i) => [n, SX[i], SZS, 1]));
+    O.dist.bands = [];
+    for (const [n, x, z, face] of bottle) {
+      const id = 'ms' + n;
+      add(new T.CylinderGeometry(SR, SR, SH, 22), jacket, x, Y0 + SH / 2, z, id);
+      add(new T.SphereGeometry(SR, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), jacket, x, Y0 + SH, z, id).scale.y = 0.45;
+      const c = add(new T.ConeGeometry(SR, 1.4, 22), jacket, x, Y0 - 0.7, z, id); c.rotation.x = Math.PI;
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; box(0.22, Y0, 0.22, steel, x + Math.cos(a) * SR * 0.85, Y0 / 2, z + Math.sin(a) * SR * 0.85, null); }
+      const bm = new T.MeshLambertMaterial({ color: 0x9aa4ae, emissive: 0x9aa4ae, emissiveIntensity: 0.35 }); O.dist.bands[n - 1] = bm;
+      add(new T.CylinderGeometry(SR + 0.04, SR + 0.04, 0.35, 22), bm, x, Y0 + SH - 0.6, z, id, true);   // step band: green ON, blue REGEN, yellow DEPRESS / REPRESS
+      extraCols.push([x, z, SR]);
+      nameplate('SIEVE #' + n, x, 3.4, z, SR, 0, face, 0.5);
+      P([[x, Y0 + SH + 0.5, z], [x, 9.3, z], [x, 9.3, HZ]], id, 0.2);   // vapor in at the top
+      P([[x, 0.6, z], [x, 0.6, HZ]], id, 0.2);                         // product / regen out the bottom
+    }
+    nameplate('MOLE SIEVE A', -63.5, 9.9, SZN - SR, 0.1, 0, -1, 0.7); nameplate('MOLE SIEVE B', -63.5, 9.9, SZS + SR, 0.1, 0, 1, 0.7);
+    // 190 proof feed pump (fed from the 190 line on the rack) -> sieve vaporizer -> vapor header over the bottles
+    pumpSet(-72.6, 53.0, 'x', 1, 'sfp', 0.5); nameplate('190 PROOF FEED PUMP', -72.2, 1.8, 53.0, 0.4, 0, -1, 0.42);
+    cyl(0.8, 3.6, jacket, -71.6, 0.3, 50.2, 'vapz', 20); cyl(0.85, 0.3, conc, -71.6, 0, 50.2, null, 20); extraCols.push([-71.6, 50.2, 0.85]);
+    nameplate('SIEVE VAPORIZER', -71.6, 2.6, 50.2, 0.8, 0, -1, 0.45);
+    P([[-71.0, 3.0, 50.2], [-70.2, 3.0, 50.2], [-70.2, 5.0, 49.0]], 'vapz', 0.12);   // steam in
+    const feed = [[-73.4, 7.0, 57.3], [-73.4, 0.6, 57.3], [-73.4, 0.6, 53.0], [-73.0, 0.6, 53.0], [-72.6, 1.4, 53.0], [-72.6, 2.0, 53.0], [-72.6, 2.0, 51.4], [-71.6, 2.0, 51.0]];
+    P(feed, 'sfp', 0.22); O.dist.sfeed = F(feed, 0x9fe0ff, 30);
+    const hdr = [[-71.6, 3.9, 50.2], [-71.6, 9.3, 50.2], [-71.6, 9.3, HZ], [SX[0], 9.3, HZ]];
+    P(hdr, 'vapz', 0.3); O.dist.hdr = F(hdr, 0xf4f6f8, 40, { speed: 9 });
+    // 200 proof vapor out the bottoms -> economizer + 200P cooler -> 200 proof flash vessel -> 200 proof product pump -> rack
+    const out = [[SX[0], 0.6, HZ], [-70.9, 0.6, HZ], [-70.9, 1.0, 53.6], [-70.9, 1.0, 56.4], [-70.9, 1.9, 56.4], [-70.9, 1.9, 53.6], [-70.9, 2.6, 53.6], [-71.6, 2.6, 57.4]];
+    P([[SX[0], 0.6, HZ], [-70.9, 0.6, HZ], [-70.9, 1.0, 53.6]], 'fv200', 0.3); O.dist.p200v = F(out, 0x5ec8ff, 40);
+    hvessel(-70.9, 1.0, 55.0, 0.35, 2.2, 'z', 'fv200'); hvessel(-70.9, 1.9, 55.0, 0.35, 2.2, 'z', 'fv200');
+    nameplate('ECONOMIZER / 200P COOLER', -70.6, 2.7, 55.0, 0.1, 1, 0, 0.35);
+    P([[-70.9, 1.9, 56.1], [-70.9, 2.6, 56.6], [-71.6, 2.6, 57.4]], 'fv200', 0.18);
+    cyl(0.7, 2.4, jacket, -72.4, 0.2, 57.4, 'fv200', 18); add(new T.SphereGeometry(0.7, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), jacket, -72.4, 2.6, 57.4, 'fv200').scale.y = 0.4; extraCols.push([-72.4, 57.4, 0.75]);
+    nameplate('200 PROOF FLASH VESSEL', -72.4, 1.6, 57.4, 0.7, 0, 1, 0.38);
+    pumpSet(-70.6, 58.15, 'x', 1, 'pp200', 0.45); nameplate('200 PROOF PRODUCT PUMP', -69.9, 1.4, 58.15, 0.35, 0, 1, 0.38);
+    P([[-72.4, 0.5, 57.9], [-71.0, 0.5, 58.15]], 'pp200', 0.15);
+    // regen: a vacuum header off the bottles in regen -> regen condensers 1 + 2 -> regen tank -> regen pumps -> rectifier
+    const rgv = [[SX[3], 9.9, HZ], [-56.0, 9.9, HZ], [-56.0, 9.9, 55.6], [-56.0, 5.4, 55.6], [-55.7, 5.4, 55.6]];
+    P(rgv, 'regen', 0.25); O.dist.rgv = F(rgv, 0xf4f6f8, 30, { speed: 8 });
+    for (const y of [4.3, 5.4]) hvessel(-54.5, y, 55.6, 0.4, 2.4, 'x', 'regen');
+    for (const x of [-55.6, -53.4]) for (const z of [55.1, 56.1]) box(0.15, 5.6, 0.15, steel, x, 2.8, z, null);
+    hvessel(-54.5, 1.6, 55.6, 0.85, 2.4, 'x', 'regen', true); nameplate('REGEN TANK', -54.5, 1.6, 55.6, 0.86, 0, 1, 0.55); nameplate('REGEN CONDENSERS', -54.5, 6.3, 55.6, 0.45, 0, 1, 0.42);
+    P([[-53.5, 3.9, 55.6], [-53.5, 2.45, 55.6]], 'regen', 0.12);
+    pumpSet(-52.9, 57.9, 'x', 1, 'rgp', 0.45); nameplate('REGEN PUMPS', -52.4, 1.4, 57.9, 0.35, 0, 1, 0.4);
+    const rgr = [[-54.0, 0.75, 56.45], [-54.0, 0.6, 57.9], [-53.3, 0.6, 57.9], [-52.9, 1.3, 57.9], [-52.9, 5.0, 57.9], [-52.9, 5.0, 56.9], [-52.9, 20.5, 56.9], [-52.9, 20.5, RCZ], [RCX - 1.7, 20.5, RCZ]];
+    P(rgr, 'rgp', 0.18); O.dist.rgr = F(rgr, 0xbfe4f2, 40);
+  }
 
   // ---------- EVAPORATORS 1-8 (photos): big insulated bottom sump, a cone, then a tall tube body, all in one row along the south
   // side of the evap alley, all on the ground floor. Above the first floor, Evaps 1 and 2 (west end) stand in the open; Evaps 3-8 are
@@ -9131,8 +9356,8 @@ function init(container) {
   // 200 proof from distillation to the 200 proof tank, and 190 proof from its tank back to distillation, overhead side by side on the
   // satellite route: from the east end of distillation straight south down the east side of the energy center to the plant's south edge,
   // west along the south side of the south road to the tank farm, then south between the tank rows to the proof tanks
-  const p200 = [[-33, 1.2, 55], [-33, 6, 55], [-17, 6, 55], [-17, 6, 191.0], [-149, 6, 191.0], [-149, 6, P200Z], [-149, 1.2, P200Z], [PRX - 5.2, 1.2, P200Z]];
-  const p190 = [[PRX - 5.2, 1.2, P190Z], [-147.8, 1.2, P190Z], [-147.8, 7, P190Z], [-147.8, 7, 192.2], [-15.8, 7, 192.2], [-15.8, 7, 53.8], [-33, 7, 53.8], [-33, 1.2, 53.8]];
+  const p200 = [[-70.2, 1.2, 58.15], [-70.2, 6, 58.15], [-32.6, 6, 58.15], [-32.6, 6, 55], [-17, 6, 55],   /* v1.97.90: from the 200 proof product pump along the pad's rack */ [-17, 6, 191.0], [-149, 6, 191.0], [-149, 6, P200Z], [-149, 1.2, P200Z], [PRX - 5.2, 1.2, P200Z]];
+  const p190 = [[PRX - 5.2, 1.2, P190Z], [-147.8, 1.2, P190Z], [-147.8, 7, P190Z], [-147.8, 7, 192.2], [-15.8, 7, 192.2], [-15.8, 7, 53.8], [-32.2, 7, 53.8], [-32.2, 7, 57.3], [-73.4, 7, 57.3]];   // v1.97.90: along the pad's rack to the 190 proof feed pump
   pipe(p200, 'etoh', 0.3); pipe(p190, 'etoh', 0.3);
   for (let x = -147; x < -18; x += 12) { if (Math.abs(x - MXR) < 6) continue;   // pipe rack posts along the south side of the south road (photos)
     add(new T.CylinderGeometry(0.25, 0.25, 5.8, 10), mat(0xc9cdd1), x, 2.9, 191.6); box(0.25, 0.25, 2.4, mat(0x7d838a), x, 5.85, 191.6); extraCols.push([x, 191.6, 0.35]); }
@@ -12245,6 +12470,12 @@ function update(sim, dt, events) {
   }
   sim.ferm.forEach((fm, i) => { O.ferms[i].rec.rate = !POWER_OUTAGE.on && fm.bu > 100 && fm.state !== 'cleaning' ? 0.6 : 0; });
   O.fFeed.rate = feed / N; if (O.fFeedHx) O.fFeedHx.forEach((f, i) => { f.rate = sim.hxTrain === i ? feed / N : 0; });
+  if (O.dist && sim.dist) { const D = sim.dist, g = v => v / 250, on = D.on ? 0.9 : 0, Q = O.dist;   // v1.97.90 distillation flows
+    Q.ev2.rate = Q.bcVap.rate = Q.ovhd.rate = Q.hdr.rate = Q.p200v.rate = on; Q.ssVap.rate = D.on && sim.flash.vapor > 1 ? 0.7 : 0; Q.rgv.rate = on * 0.5;
+    Q.rb.rate = g(D.rbGpm); Q.ssb.rate = g(D.ssGpm); Q.still.rate = D.stillGpm / 1200; Q.cnd.rate = g(D.refluxGpm + D.drawGpm) * 0.5; Q.reflux.rate = g(D.refluxGpm);
+    Q.draw.rate = g(D.drawGpm); Q.fusel.rate = D.fusel ? 0.4 : 0; Q.sfeed.rate = g(D.feedGpm); Q.rgr.rate = g(D.regenGpm) * 3;
+    D.bottles.forEach((b, i) => Q.bands[i].color.setHex(b.st === 'ON' ? 0x3ddc84 : b.st === 'REGEN' ? 0x4aa3ff : b.st === 'IDLE' ? 0x9aa4ae : 0xffc531));
+    Q.bands.forEach(m => m.emissive.copy(m.color)); }
   if (O.fVapor) { O.fVapor.rate = sim.flash.vapor / 24000; O.fRecirc.rate = sim.cook.recirc / N; O.fLiqOvf2.rate = sim.liqOvf / N; }
   updateFlows(dt);
   for (const s of spinners) s.o.rotation[s.axis] += dt * (POWER_OUTAGE.on ? 0 : 1) * (s.k === 'prop' ? (sim.prop && sim.prop[s.i].bu > 20 ? 2.5 : 0) : s.k === 'ybm' ? (sim.yb && (sim.yb.state === 'mixing' || sim.yb.state === 'dumping') ? 5 : 0) : s.k === 'mill' ? 16 * sim.mills[s.i].rate / (425 * Sim.K) : s.k === 'blend' ? 6 * Math.min(1.5, sim.blend.flow / N) : s.k === 'agit' ? (sim.ferm[s.i].bu > 100 ? 2.5 : 0) : 9 * Math.min(1.5, feed / N));
@@ -12931,7 +13162,7 @@ let colliders = null; const extraCols = [];   // round obstacles that aren't uni
 function buildColliders() {
   // round footprints of tanks, bins, vessels and pumps that stand on the ground; raised equipment you can walk under is skipped
   colliders = [];
-  for (const id in UPOS) { const u = UPOS[id]; if ((u[4] || 0) > 3 || id === 'col' || id === 'rail' || id === 'recv' || id === 'etoh') continue;   /* tank farm: each tank has its own collider */   /* receiving: walk inside it (walls are wall lines) */   /* the distillation pad is flat: walk on it */ colliders.push([u[0], u[1], u[2] * 0.93]); }
+  for (const id in UPOS) { const u = UPOS[id]; if ((u[4] || 0) > 3 || id === 'rail' || id === 'recv' || id === 'etoh') continue;   /* tank farm: each tank has its own collider */   /* receiving: walk inside it (walls are wall lines) */   /* the distillation pad is flat: walk on it */ colliders.push([u[0], u[1], u[2] * 0.93]); }
   colliders.push(...extraCols);
 }
 function pushOut() {
@@ -18107,7 +18338,7 @@ function info(id) {
     case 'tsp': return [['Flow', n0(s.blend.bsGpm) + ' GPM'], ['From', 'Thin Stillage Tank'], ['To', 'Slurry Blender']];
     case 'mft': return [['Condensate in', n0(s.mft.in) + ' GPM'], ['Pumped to Cook Water Tank', n0(s.mft.out) + ' GPM'], ['In tank', n0(s.mft.L / 100 * Sim.CMT_GAL) + ' gal']];
     case 'mfp': return [['Flow', n0(s.mft.out) + ' GPM'], ['From', 'Meth Feed Tank'], ['To', 'Cook Water Tank']];
-    case 'cwt': return [['From the Meth Feed Pump', n0(s.mft.out) + ' GPM'], ['Well water make-up', n0(s.cwt.makeup) + ' GPM'], ['To the blender', n0(s.blend.cwGpm) + ' GPM'], ['In tank', n0(s.cwt.L / 100 * Sim.CMT_GAL) + ' gal']];
+    case 'cwt': return [['From the Meth Feed Pump', n0(s.mft.out) + ' GPM'], ['From the Side Stripper Pump', n0(s.cwt.ss || 0) + ' GPM'], ['Well water make-up', n0(s.cwt.makeup) + ' GPM'], ['To the blender', n0(s.blend.cwGpm) + ' GPM'], ['In tank', n0(s.cwt.L / 100 * Sim.CMT_GAL) + ' gal']];
     case 'cwp': return [['Flow', n0(s.blend.cwGpm) + ' GPM'], ['From', 'Cook Water Tank'], ['To', 'Cook Water Heater → Slurry Blender']];
     case 'cwh': return [['Cook water', n0(s.blend.cwGpm) + ' GPM'], ['Out', s.cwh.T.toFixed(0) + '°F']];
     case 'cip': return [['Holds', 'Cleaning solution'], ['Connected to', 'Nothing yet']];
@@ -18125,7 +18356,27 @@ function info(id) {
     case 'lp1': case 'lp2': { const i = id === 'lp1' ? 0 : 1; return [['Status', s.liqDuty === i ? 'Online' : 'Standby'], ['Flow', gpm(s.liqDuty === i ? s.liq.out : 0)]]; }
     case 'liq': return [['In from Liq Tank 1', gpm(s.liq1.out)], ['Pumped to fermenters', gpm(s.liq.out)], ['Time in Liq 1 + 2', (s.liq.res * 60).toFixed(0) + ' min'], ['Starch broken down', (s.liq.q * 100).toFixed(0) + '%']];
     case 'beer': return [['Beer in well', n0(s.beer.bu * Sim.GAL_BU) + ' gal'], ['Feed to column', n0(s.beer.feed * Sim.GAL_BU) + ' gal/h'], ['Ethanol in beer', s.beer.bu > 0 ? (s.beer.eth / (s.beer.bu * Sim.GAL_BU) * 100).toFixed(1) + '%' : '—']];
-    case 'col': return [['Beer feed', n0(s.beer.feed * Sim.GAL_BU) + ' gal/h'], ['Ethanol recovered', (s.col.rec * 100).toFixed(0) + '%'], ['Product proof', s.out.proof.toFixed(0)], ['Lost out the bottom', n0(s.out.lost) + ' gal/h']];
+    case 'col': { const D = s.dist; return [['Beer feed', n0(D.beerGpm) + ' GPM'], ['Bottom / top', D.on ? s.col.T.toFixed(1) + '°F / ' + D.bcTop.toFixed(1) + '°F' : '—'], ['Bottom pressure', D.on ? D.bcP.toFixed(2) + ' psia' : '—'], ['Level', D.bcL.toFixed(0) + '%'],
+      ['Heat', D.on ? '2nd effect evaporator vapor' : '—'], ['Ethanol recovered', (s.col.rec * 100).toFixed(0) + '%'], ['Product proof', s.out.proof.toFixed(0)], ['Lost out the bottom', n0(s.out.lost) + ' gal/h']]; }
+    case 'bbp': return [['Flow', n0(s.dist.stillGpm) + ' GPM'], ['From', 'Beer Column bottoms'], ['To', 'Whole Stillage Tank']];
+    case 'ss': { const D = s.dist; return [['In from the rectifier bottoms', n0(D.rbGpm) + ' GPM'], ['Flash vapor from cook', s.flash.vapor > 1 ? 'Yes' : 'No'], ['Bottom / top', D.on ? D.ssT.toFixed(1) + '°F / ' + D.ssTop.toFixed(1) + '°F' : '—'], ['Pressure', D.on ? '6.8 psia' : '—'], ['Level', D.ssL.toFixed(0) + '%'], ['Overhead', 'To the rectifier']]; }
+    case 'ssp': return [['Flow', n0(s.dist.ssGpm) + ' GPM'], ['To', s.dist.ssTo === 'cwt' ? 'Cook Water Tank' : 'Whole Stillage Tank']];
+    case 'rect': { const D = s.dist; return [['Vapor in', 'Beer column + side stripper overhead'], ['Top / bottom', D.on ? D.rectTop.toFixed(0) + '°F / ' + D.rectBot.toFixed(0) + '°F' : '—'], ['Pressure', D.on ? D.rectP.toFixed(1) + ' psia' : '—'], ['Reflux in', n0(D.refluxGpm) + ' GPM'], ['Regen in', n0(D.regenGpm) + ' GPM'], ['Proof off the top', D.on ? D.proof190.toFixed(0) : '—']]; }
+    case 'rbp': return [['Flow', n0(s.dist.rbGpm) + ' GPM'], ['From', 'Rectifier bottoms'], ['To', 'Side Stripper (top)']];
+    case 'fusel': return [['Output', n0(s.dist.fusel) + '%'], ['From', 'Rectifier side draw'], ['To', '190 proof line']];
+    case 'cond190': return [['Vapor in', s.dist.on ? 'Rectifier overhead' : '—'], ['Pressure', s.dist.on ? '4.67 psia' : '—'], ['Then', 'Vent Condensers 1 + 2'], ['Condensate to', 'Reflux Tank']];
+    case 'reflux': { const D = s.dist; return [['Level', D.refL.toFixed(0) + '%'], ['In tank', n0(D.refL / 100 * 1240) + ' gal'], ['Proof', D.on ? D.proof190.toFixed(0) : '—'], ['Pressure', D.on ? '4.0 psia' : '—']]; }
+    case 'vac': return [['Running', s.dist.on ? 'Vacuum Pumps 1 + 2' : '—'], ['Pulls on', 'Reflux Tank vent'], ['Discharge to', 'Regen Tank']];
+    case 'rfp': { const D = s.dist; return [['Reflux to the rectifier', n0(D.refluxGpm) + ' GPM'], ['190 proof forward', n0(D.drawGpm) + ' GPM'], ['Through', '190 Filter'], ['To', '190 storage + sieves']]; }
+    case 'sfp': return [['Flow', n0(s.dist.feedGpm) + ' GPM'], ['To', 'Sieve Vaporizer']];
+    case 'vapz': { const D = s.dist; return [['190 proof in', n0(D.feedGpm) + ' GPM'], ['Vapor out', D.on ? D.vapT.toFixed(0) + '°F, ' + D.vapP.toFixed(0) + ' psig' : '—'], ['Heat', 'Steam']]; }
+    case 'regen': { const D = s.dist; return [['Level', D.regenL.toFixed(0) + '%'], ['In tank', n0(D.regenL / 100 * 1240) + ' gal'], ['From', 'Regen Condensers 1 + 2 + vacuum pumps']]; }
+    case 'rgp': return [['Flow', n0(s.dist.regenGpm) + ' GPM'], ['To', 'Rectifier']];
+    case 'fv200': { const D = s.dist; return [['Level', D.f200L.toFixed(0) + '%'], ['In vessel', n0(D.f200L / 100 * 1240) + ' gal'], ['From', 'Sieve economizer + 200P cooler'], ['Sieve efficiency', D.on ? D.eff.toFixed(1) + '%' : '—']]; }
+    case 'pp200': return [['Flow', n0(s.dist.p200Gpm) + ' GPM'], ['To', '200 proof storage']];
+    case 'ms1': case 'ms2': case 'ms3': case 'ms4': case 'ms5': case 'ms6': case 'ms7': case 'ms8': { const b = s.dist.bottles[+id.slice(2) - 1], D = s.dist;
+      const left = D.on ? Math.round((Sim.SIEVE_STEP_H - (D.t + (b.unit === 'B' ? Sim.SIEVE_STEP_H / 2 : 0)) % Sim.SIEVE_STEP_H) * 60) : 0;
+      return [['Unit', b.unit], ['Step', b.st], ['Pressure', b.P.toFixed(1) + ' psia'], ['Temperature', b.T.toFixed(0) + '°F'], ['Next step in', D.on ? left + ' min' : '—']]; }
     case 'etoh': return [['In storage', n0(s.etoh.gal) + ' gal'], ['Tanker trucks coming', String((s.etoh.ships || []).length)], ['Making', n0(s.out.eth) + ' gal/h']];
     case 'oil': return [['In storage', n0(s.oil.lb) + ' lb'], ['Trucks coming', String((s.oil.ships || []).length)], ['Making', n0(s.out.oil) + ' lb/h']];
   }
